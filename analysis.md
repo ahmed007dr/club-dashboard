@@ -5,16 +5,16 @@ To build a comprehensive Sports Club Management System using Django, capable of 
 
 ---
 
-## System Modules (Apps)
-1. **core** - Clubs, Custom Users (roles: admin, receptionist, accountant, coach)
-2. **members** - Member profiles, referrals
-3. **subscriptions** - Subscription types and instances
-4. **receipts** - Payment receipts and invoice generation
-5. **finance** - Income, Expenses, Categories, Sources
-6. **attendance** - Entry logs with subscription validation
-7. **tickets** - Day/session ticket sales and usage
-8. **staff** - Shift management for employees
-9. **invites** - Guest invites and usage tracking
+## System Modules (Apps) ( all is done )
+1. **core** - Clubs, Custom Users (roles: admin, receptionist, accountant, coach) ( done )
+2. **members** - Member profiles, referrals ( done )
+3. **subscriptions** - Subscription types and instances ( done )
+4. **receipts** - Payment receipts and invoice generation ( done )
+5. **finance** - Income, Expenses, Categories, Sources ( done )
+6. **attendance** - Entry logs with subscription validation ( done )
+7. **tickets** - Day/session ticket sales and usage ( done )
+8. **staff** - Shift management for employees ( done )
+9. **invites** - Guest invites and usage tracking ( done )
 
 ---
 

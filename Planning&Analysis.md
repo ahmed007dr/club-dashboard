@@ -6,15 +6,15 @@
 ---
 
 #### ✅ **Board: Planning & Analysis**
-- 📌 **Card: Define System Modules**
+- 📌 **Card: Define System Modules** all is ( done )
   - Core ( done )
   - Members ( done )
   - Subscriptions ( done )
   - Receipts ( done )
   - Finance (Income & Expenses)
   - Attendance ( done )
-  - Staff (Shifts)
-  - Invites
+  - Staff (Shifts)  ( done )
+  - Invites ( done )
   - Tickets ( done )
 
 - 📌 **Card: Define Stakeholders**

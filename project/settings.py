@@ -37,6 +37,19 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+
+    #apps
+    "core",
+    "members",
+    "subscriptions",
+    "receipts",
+    "finance",
+    "attendance",
+    "tickets",
+    "staff",
+    "invites",
+
 ]
 
 MIDDLEWARE = [
@@ -80,6 +93,17 @@ DATABASES = {
 }
 
 
+# # DATABASES = {
+# #     "default": {
+# #         "ENGINE": "django.db.backends.postgresql",
+# #         "NAME": "club",
+# #         "USER": "postgres",
+# #         "PASSWORD": "123",
+# #         "HOST": "db",
+# #         "PORT": "5432",
+# #     }
+# # }
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -104,7 +128,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Africa/Cairo'
 
 USE_I18N = True
 
@@ -114,7 +138,20 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
+
+
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/4.2/howto/static-files/
+
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+#add   path for url static & media
+
+MEDIA_URL='media/'
+MEDIA_ROOT=BASE_DIR / "media"
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
