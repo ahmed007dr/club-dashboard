@@ -22,3 +22,10 @@ def edit_club(request):
     else:
         form = ClubForm(instance=club)
     return render(request, 'core/edit_club.html', {'form': form})
+
+
+def handler404(request, exception):
+    return render(request, '404.html', status=404)
+
+def handler500(request):
+    return render(request, '500.html', status=500)
