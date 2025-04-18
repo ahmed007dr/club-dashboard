@@ -48,6 +48,8 @@ urlpatterns = [
     path('', include('core.urls')), 
     path('', include('members.urls')), 
     path('', include('subscriptions.urls')), 
+    path('', include('tickets.urls')), 
+    path('', include('receipts.urls')), 
 
     #swagger
 

@@ -12,6 +12,12 @@ class UserClubSerializer(serializers.ModelSerializer): # list only one club not 
         model = Club
         fields = ['id', 'name', 'logo']
 
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'first_name', 'last_name', 'email']
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
     club = UserClubSerializer(read_only=True)
     
