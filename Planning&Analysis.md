@@ -8,7 +8,7 @@
 #### ✅ **Board: Planning & Analysis**
 - 📌 **Card: Define System Modules**
   - Core ( done )
-  - Members
+  - Members ( done )
   - Subscriptions
   - Receipts
   - Finance (Income & Expenses)
