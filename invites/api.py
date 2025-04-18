@@ -1,0 +1,61 @@
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from .models import FreeInvite
+from .serializers import FreeInviteSerializer
+from rest_framework.permissions import IsAuthenticated
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def free_invite_list_api(request):
+    invites = FreeInvite.objects.select_related('club', 'invited_by', 'handled_by').all()
+    serializer = FreeInviteSerializer(invites, many=True)
+    return Response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_free_invite_api(request):
+    data = request.data.copy()
+    if 'handled_by' not in data and request.user.is_staff:
+        data['handled_by'] = request.user.id
+    
+    serializer = FreeInviteSerializer(data=data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def free_invite_detail_api(request, invite_id):
+    invite = get_object_or_404(FreeInvite, id=invite_id)
+    serializer = FreeInviteSerializer(invite)
+    return Response(serializer.data)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def edit_free_invite_api(request, invite_id):
+    invite = get_object_or_404(FreeInvite, id=invite_id)
+    serializer = FreeInviteSerializer(invite, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_free_invite_api(request, invite_id):
+    invite = get_object_or_404(FreeInvite, id=invite_id)
+    invite.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def mark_invite_used_api(request, invite_id):
+    invite = get_object_or_404(FreeInvite, id=invite_id)
+    invite.status = 'used'
+    invite.handled_by = request.user
+    invite.save()
+    serializer = FreeInviteSerializer(invite)
+    return Response(serializer.data)
