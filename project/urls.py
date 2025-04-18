@@ -47,6 +47,7 @@ urlpatterns = [
     #app
     path('', include('core.urls')), 
     path('', include('members.urls')), 
+    path('', include('subscriptions.urls')), 
 
     #swagger
 

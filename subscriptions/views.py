@@ -12,7 +12,7 @@ def add_subscription(request):
         form = SubscriptionForm(request.POST)
         if form.is_valid():
             subscription = form.save(commit=False)
-            subscription.amount_remaining = subscription.subscription_value - subscription.amount_paid
+            subscription.remaining_amount = subscription.type.price - subscription.paid_amount
             subscription.save()
             messages.success(request, "تم إضافة الاشتراك بنجاح.")
             return redirect('subscription_list')
@@ -26,7 +26,8 @@ def edit_subscription(request, subscription_id):
         form = SubscriptionForm(request.POST, instance=subscription)
         if form.is_valid():
             subscription = form.save(commit=False)
-            subscription.amount_remaining = subscription.subscription_value - subscription.amount_paid
+            #subscription.amount_remaining = subscription.subscription_value - subscription.amount_paid
+            subscription.remaining_amount = subscription.type.price - subscription.paid_amount
             subscription.save()
             messages.success(request, "تم تعديل الاشتراك بنجاح.")
             return redirect('subscription_list')
