@@ -74,10 +74,10 @@
 #### 🎨 **Board: Frontend Collaboration**
 
 **List: Pages to Design**
-- [ ] Login/Register Page
-- [ ] Dashboard (stats & quick links)
-- [ ] Members Management
-- [ ] Subscriptions Overview
+- [ ] Login/Register Page ( done )
+- [ ] Dashboard (stats & quick links) ( done )
+- [ ] Members Management ( done )
+- [ ] Subscriptions Overview ( done )
 - [ ] Receipt Generation
 - [ ] Finance Summary (Income/Expense)
 - [ ] Attendance Logs
@@ -86,7 +86,7 @@
 - [ ] Guest Invitations
 
 **List: UI Components**
-- [ ] Navbar & Sidebar
+- [ ] Navbar & Sidebar ( done )
 - [ ] Cards for KPIs
 - [ ] Tables with filters/search
 - [ ] Modal for Receipts/Tickets
