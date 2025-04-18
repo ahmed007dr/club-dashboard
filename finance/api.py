@@ -1,0 +1,121 @@
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from .models import Expense, Income, ExpenseCategory, IncomeSource
+from .serializers import (
+    ExpenseSerializer, IncomeSerializer,
+    ExpenseCategorySerializer, IncomeSourceSerializer
+)
+from rest_framework.permissions import IsAuthenticated
+
+# Expense Category Views
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def expense_category_api(request):
+    if request.method == 'GET':
+        categories = ExpenseCategory.objects.all()
+        serializer = ExpenseCategorySerializer(categories, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = ExpenseCategorySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Expense Views
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def expense_api(request):
+    if request.method == 'GET':
+        expenses = Expense.objects.select_related('category', 'paid_by').all()
+        serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        data = request.data.copy()
+        data['paid_by'] = request.user.id
+        
+        serializer = ExpenseSerializer(data=data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Income Source Views
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def income_source_api(request):
+    if request.method == 'GET':
+        sources = IncomeSource.objects.all()
+        serializer = IncomeSourceSerializer(sources, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = IncomeSourceSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Income Views
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def income_api(request):
+    if request.method == 'GET':
+        incomes = Income.objects.select_related('source', 'received_by').all()
+        serializer = IncomeSerializer(incomes, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        data = request.data.copy()
+        data['received_by'] = request.user.id
+        
+        serializer = IncomeSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# Detail Views
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def expense_detail_api(request, pk):
+    expense = get_object_or_404(Expense, pk=pk)
+    
+    if request.method == 'GET':
+        serializer = ExpenseSerializer(expense, context={'request': request})
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        serializer = ExpenseSerializer(expense, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        expense.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def income_detail_api(request, pk):
+    income = get_object_or_404(Income, pk=pk)
+    
+    if request.method == 'GET':
+        serializer = IncomeSerializer(income)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        serializer = IncomeSerializer(income, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        income.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

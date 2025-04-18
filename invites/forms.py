@@ -1,14 +1,16 @@
-from django.db import models
+from django import forms
+from .models import FreeInvite  # Import the model from models.py
 
-# Create your models here.
-class FreeInvite(models.Model):
-    club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
-    guest_name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=20)
-    date = models.DateField()
-    status = models.CharField(max_length=50, choices=[('pending', 'Pending'), ('used', 'Used')])
-    invited_by = models.ForeignKey('members.Member', on_delete=models.SET_NULL, null=True, blank=True)
-    handled_by = models.ForeignKey('core.User', on_delete=models.SET_NULL, null=True, blank=True)
-
-    def __str__(self):
-        return self.guest_name
+class FreeInviteForm(forms.ModelForm):
+    class Meta:
+        model = FreeInvite  # Reference the model from models.py
+        fields = ['club', 'guest_name', 'phone', 'date', 'status', 'invited_by', 'handled_by']
+        widgets = {
+            'club': forms.Select(attrs={'class': 'form-control'}),
+            'guest_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'status': forms.Select(attrs={'class': 'form-control'}),
+            'invited_by': forms.Select(attrs={'class': 'form-control'}),
+            'handled_by': forms.Select(attrs={'class': 'form-control'}),
+        }

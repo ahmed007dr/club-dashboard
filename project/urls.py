@@ -52,6 +52,7 @@ urlpatterns = [
     path('', include('receipts.urls')), 
     path('', include('staff.urls')), 
     path('', include('invites.urls')), 
+    path('', include('finance.urls')), 
 
     #swagger
 
