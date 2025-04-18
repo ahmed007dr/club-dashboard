@@ -38,6 +38,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    #lib
+    'rest_framework',
+    # 'drf-yasg', # swagger
 
     #apps
     "core",
@@ -67,11 +70,12 @@ ROOT_URLCONF = 'project.urls'
 
 AUTH_USER_MODEL = 'core.User'
 
+import os
 
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],  
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
