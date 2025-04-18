@@ -9,8 +9,8 @@
 - 📌 **Card: Define System Modules**
   - Core ( done )
   - Members ( done )
-  - Subscriptions
-  - Receipts
+  - Subscriptions ( done )
+  - Receipts ( done )
   - Finance (Income & Expenses)
   - Attendance
   - Staff (Shifts)
