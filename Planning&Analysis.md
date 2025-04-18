@@ -12,10 +12,10 @@
   - Subscriptions ( done )
   - Receipts ( done )
   - Finance (Income & Expenses)
-  - Attendance
+  - Attendance ( done )
   - Staff (Shifts)
   - Invites
-  - Tickets
+  - Tickets ( done )
 
 - 📌 **Card: Define Stakeholders**
   - Admins
