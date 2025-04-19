@@ -42,7 +42,7 @@ INSTALLED_APPS = [
     #lib
     'rest_framework',
     # 'django_filters',
-
+    "corsheaders",
 
     #apps
     "core",
@@ -60,6 +60,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    "corsheaders.middleware.CorsMiddleware", # cros
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -71,6 +72,17 @@ ROOT_URLCONF = 'project.urls'
 
 
 AUTH_USER_MODEL = 'core.User'
+
+CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOWED_ALL_ORIGINS = True
+
+CSRF_ALLOWED_ORIGINS = [
+    "http://localhost:5173/",
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173/",
+]
 
 import os
 
