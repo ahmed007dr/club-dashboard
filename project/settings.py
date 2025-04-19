@@ -37,12 +37,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'drf_yasg', # swagger
 
     #lib
     'rest_framework',
-    'django_filters',
+    # 'django_filters',
 
-    # 'drf-yasg', # swagger
 
     #apps
     "core",

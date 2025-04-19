@@ -40,16 +40,15 @@ urlpatterns = [
     path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     
     # API Endpoints
-    path('api/v1/', include([
-        path('members/', include('members.urls')),
-        path('subscriptions/', include('subscriptions.urls')),
-        path('tickets/', include('tickets.urls')),
-        path('receipts/', include('receipts.urls')),
-        path('staff/', include('staff.urls')),
-        path('invites/', include('invites.urls')),
-        path('finance/', include('finance.urls')),
-        path('', include('core.urls')),
-    ])),
+    path('api/members/', include('members.urls')),
+    path('api/subscriptions/', include('subscriptions.urls')),
+    path('api/tickets/', include('tickets.urls')),
+    path('api/receipts/', include('receipts.urls')),
+    path('api/staff/', include('staff.urls')),
+    path('api/invites/', include('invites.urls')),
+    path('api/finance/', include('finance.urls')),
+    path('api/', include('core.urls')),
+    
 ]
 
 # Static and media URL handling (development only)
