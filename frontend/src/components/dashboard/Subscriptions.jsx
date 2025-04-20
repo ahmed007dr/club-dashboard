@@ -1,6 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from '@tanstack/react-table';
+import { CiTrash } from 'react-icons/ci';
+import { CiEdit } from 'react-icons/ci';
+import { FaEye } from "react-icons/fa";
 import AddSubscription from '../modals/AddSubscription';
+import SubscriptionsTypes from './Subscriptionstypes';
 
 const fakeSubscriptions = [
   {
@@ -64,6 +68,9 @@ const columnHelper = createColumnHelper();
 
 const Subscriptions = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
   const [formData, setFormData] = useState({
     member: '',
     subscription_type: '',
@@ -100,7 +107,39 @@ const Subscriptions = () => {
 
   const closeModal = () => setIsModalOpen(false);
 
-  // Define columns for the table
+  const openEditModal = (subscription) => {
+    setFormData({
+      member: subscription.member_name,
+      subscription_type: subscription.subscription_type,
+      sport_type: '', // Update if you have this data
+      start_date: subscription.start_date,
+      end_date: subscription.end_date,
+      attendance_days: subscription.attendance_days,
+      subscription_value: subscription.paid_amount, // Assuming
+      amount_paid: subscription.paid_amount,
+      amount_remaining: subscription.remaining_amount,
+    });
+    setSelectedSubscription(subscription);
+    setIsModalOpen(true);
+  };
+
+  const openDeleteModal = (subscription) => {
+    setSelectedSubscription(subscription);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    console.log("Deleting:", selectedSubscription);
+    setIsDeleteModalOpen(false); // Close the delete modal
+  };
+
+  const openInfoModal = (subscription) => {
+    setSelectedSubscription(subscription);
+    setIsInfoModalOpen(true);
+  };
+
+  const closeInfoModal = () => setIsInfoModalOpen(false);
+
   const columns = useMemo(() => [
     columnHelper.accessor("id", {
       header: "#",
@@ -118,29 +157,39 @@ const Subscriptions = () => {
       header: "Subscription Type",
       cell: info => info.getValue(),
     }),
-    columnHelper.accessor("start_date", {
-      header: "Start Date",
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor("end_date", {
-      header: "End Date",
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor("paid_amount", {
-      header: "Paid Amount",
-      cell: info => `$${info.getValue()}`,
-    }),
-    columnHelper.accessor("remaining_amount", {
-      header: "Remaining Amount",
-      cell: info => `$${info.getValue()}`,
-    }),
+   
     columnHelper.accessor("attendance_days", {
       header: "Attendance Days",
       cell: info => info.getValue(),
     }),
+    columnHelper.display({
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => (
+        <div className="flex justify-end gap-3">
+          <button
+            className="text-blue-600 hover:text-blue-800"
+            onClick={() => openEditModal(row.original)}
+          >
+            <CiEdit size={20} />
+          </button>
+          <button
+            className="text-red-600 hover:text-red-800"
+            onClick={() => openDeleteModal(row.original)}
+          >
+            <CiTrash size={20} />
+          </button>
+          <button
+            className="text-green-600 hover:text-green-800"
+            onClick={() => openInfoModal(row.original)}
+          >
+            <FaEye size={20} />
+          </button>
+        </div>
+      ),
+    }),
   ], []);
 
-  // Create the table
   const table = useReactTable({
     data: fakeSubscriptions,
     columns,
@@ -191,15 +240,13 @@ const Subscriptions = () => {
         </table>
       </div>
 
+      {/* Edit Modal */}
       {isModalOpen && (
         <>
-          {/* Overlay */}
           <div
-            className="fixed inset-0 z-40" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
+            className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
             onClick={closeModal}
           ></div>
-
-          {/* Modal */}
           <AddSubscription
             formData={formData}
             handleChange={handleChange}
@@ -208,6 +255,67 @@ const Subscriptions = () => {
           />
         </>
       )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <>
+          <div
+            className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+            onClick={() => setIsDeleteModalOpen(false)}
+          ></div>
+          <div className="fixed z-50 bg-white p-6 rounded-lg shadow-md top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md">
+            <h2 className="text-xl font-semibold mb-4 text-red-600">Confirm Deletion</h2>
+            <p className="mb-6">Are you sure you want to delete this subscription?</p>
+            <div className="flex justify-end gap-3">
+              <button
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                onClick={() => setIsDeleteModalOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                onClick={confirmDelete}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Subscription Info Modal */}
+      {isInfoModalOpen && (
+        <div
+          className="fixed inset-0 flex justify-center items-center z-40"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+          onClick={closeInfoModal}
+        >
+          <div className="fixed z-50 bg-white p-6 rounded-lg shadow-md top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Subscription Details</h2>
+            <div>
+              <p><strong>Member Name:</strong> {selectedSubscription.member_name}</p>
+              <p><strong>Club Name:</strong> {selectedSubscription.club_name}</p>
+              <p><strong>Subscription Type:</strong> {selectedSubscription.subscription_type}</p>
+              <p><strong>Start Date:</strong> {selectedSubscription.start_date}</p>
+              <p><strong>End Date:</strong> {selectedSubscription.end_date}</p>
+              <p><strong>Paid Amount:</strong> ${selectedSubscription.paid_amount}</p>
+              <p><strong>Remaining Amount:</strong> ${selectedSubscription.remaining_amount}</p>
+              <p><strong>Attendance Days:</strong> {selectedSubscription.attendance_days}</p>
+            </div>
+            <div className="flex justify-end gap-3 mt-4">
+              <button
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                onClick={closeInfoModal}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+     <SubscriptionsTypes/>
     </div>
   );
 };
