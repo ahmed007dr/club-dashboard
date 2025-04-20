@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+body {
+    /* Light mode: Default background (white) and text color (black) */
+    @apply bg-white text-black;
+  
+    /* Dark mode: When dark mode is enabled, apply dark background (black) and white text */
+    @apply dark:bg-gray-900 dark:text-white;
+  }
