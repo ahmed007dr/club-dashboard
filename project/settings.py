@@ -85,6 +85,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173/",
 ]
 
+from datetime import timedelta
 
 # Add to REST_FRAMEWORK settings
 REST_FRAMEWORK = {
