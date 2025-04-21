@@ -5,6 +5,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from finance.models import Income, IncomeSource
 from django.utils.timezone import now
+from accounts.models import User
 
 class Receipt(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
@@ -14,7 +15,7 @@ class Receipt(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(max_length=50, choices=[('cash', 'Cash'), ('visa', 'Visa'), ('bank', 'Bank Transfer')])
     note = models.TextField(blank=True, null=True)
-    issued_by = models.ForeignKey('core.User', on_delete=models.SET_NULL, null=True)
+    issued_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     invoice_number = models.CharField(max_length=100, blank=True, null=True, unique=True)
 
     def __str__(self):

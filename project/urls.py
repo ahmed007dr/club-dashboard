@@ -27,13 +27,7 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('', home_view, name='home'),
     path('admin/', admin.site.urls),
-    
-    # # API Authentication
-    # path('api/auth/', include([
-    #     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    #     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    #     path('', include('rest_framework.urls')),
-    # ])),
+    path('accounts/', include('accounts.urls')),
     
     # API Documentation
     path('api/docs/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
@@ -48,7 +42,7 @@ urlpatterns = [
     path('api/invites/', include('invites.urls')),
     path('api/finance/', include('finance.urls')),
     path('api/', include('core.urls')),
-    
+
 ]
 
 # Static and media URL handling (development only)

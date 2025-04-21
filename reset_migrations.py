@@ -1,33 +1,37 @@
-import os ,django
-import shutil
-import subprocess
-
+import os,django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
 django.setup()
 
-# المسار الحالي للمشروع
+import shutil
+import subprocess
+
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# أسماء التطبيقات اللي فيها models
 APPS = [
-    "attendance", "core", "members", "staff",
-    "subscriptions", "tickets", "invites",
-    "receipts", "finance"
+    "core", "accounts", "attendance", "members", "staff",
+    "subscriptions", "tickets", "invites", "receipts", "finance"
 ]
 
-# حذف ملفات migrations داخل كل app
+def create_static_dir():
+    static_path = os.path.join(BASE_DIR, "static")
+    if not os.path.exists(static_path):
+        os.makedirs(static_path)
+        print("📁 Created static directory.")
+
 def delete_migrations(app_name):
     migrations_path = os.path.join(BASE_DIR, app_name, "migrations")
     if os.path.exists(migrations_path):
         for filename in os.listdir(migrations_path):
             file_path = os.path.join(migrations_path, filename)
-            if filename != "__init__.py" and filename.endswith(".py"):
+            if filename != "__init__.py" and (filename.endswith(".py") or filename.endswith(".pyc")):
                 os.remove(file_path)
-            elif filename.endswith(".pyc"):
-                os.remove(file_path)
+        # Clear __pycache__
+        pycache_path = os.path.join(migrations_path, "__pycache__")
+        if os.path.exists(pycache_path):
+            shutil.rmtree(pycache_path)
 
-# حذف قاعدة البيانات SQLite لو موجودة
 def delete_sqlite_db():
     db_path = os.path.join(BASE_DIR, "db.sqlite3")
     if os.path.exists(db_path):
@@ -35,10 +39,15 @@ def delete_sqlite_db():
 
 def run_cmd(cmd):
     print(f"\n> Running: {cmd}")
-    subprocess.run(cmd, shell=True)
+    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    print(result.stdout)
+    print(result.stderr)
+    if result.returncode != 0:
+        print(f"❌ Command failed with exit code {result.returncode}")
 
 if __name__ == "__main__":
     print("🔁 Resetting Django Migrations...")
+    create_static_dir()
 
     for app in APPS:
         delete_migrations(app)
@@ -48,7 +57,9 @@ if __name__ == "__main__":
     print("🗑️ Deleted old SQLite database.")
 
     print("⚙️ Making new migrations...")
-    run_cmd("python manage.py makemigrations")
+    for app in APPS:
+        print(f"Generating migrations for {app}...")
+        run_cmd(f"python manage.py makemigrations {app}")
 
     print("⚙️ Applying new migrations...")
     run_cmd("python manage.py migrate")

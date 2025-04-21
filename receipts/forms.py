@@ -1,5 +1,7 @@
 from django import forms
 from .models import Receipt
+from accounts.models import User
+
 
 class ReceiptForm(forms.ModelForm):
     class Meta:

@@ -1,4 +1,5 @@
 from django.db import models
+from accounts.models import User
 
 # Create your models here.
 class ExpenseCategory(models.Model):
@@ -15,7 +16,7 @@ class Expense(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True)
     date = models.DateField()
-    paid_by = models.ForeignKey('core.User', on_delete=models.SET_NULL, null=True)
+    paid_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     invoice_number = models.CharField(max_length=100, blank=True, null=True)
     attachment = models.FileField(upload_to='expenses/', null=True, blank=True)
 
@@ -36,7 +37,7 @@ class Income(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True)
     date = models.DateField()
-    received_by = models.ForeignKey('core.User', on_delete=models.SET_NULL, null=True)
+    received_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     related_receipt = models.ForeignKey('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):

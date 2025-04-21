@@ -2,7 +2,8 @@ from rest_framework import serializers
 from .models import Receipt
 from members.serializers import MemberSerializer
 from subscriptions.serializers import SubscriptionSerializer
-from core.serializers import ClubSerializer, UserSerializer
+from core.serializers import ClubSerializer
+from accounts.serializers import UserSerializer
 
 class ReceiptSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)

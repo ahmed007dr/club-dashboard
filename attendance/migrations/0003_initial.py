@@ -9,14 +9,14 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('attendance', '0001_initial'),
-        ('members', '0001_initial'),
+        ('attendance', '0002_initial'),
+        ('subscriptions', '0001_initial'),
     ]
 
     operations = [
         migrations.AddField(
             model_name='entrylog',
-            name='member',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='members.member'),
+            name='related_subscription',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='subscriptions.subscription'),
         ),
     ]

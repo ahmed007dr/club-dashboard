@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Expense, Income, ExpenseCategory, IncomeSource
-from core.serializers import ClubSerializer, UserSerializer
+from core.serializers import ClubSerializer
+from accounts.serializers import UserSerializer
 from receipts.serializers import ReceiptSerializer
 
 class ExpenseCategorySerializer(serializers.ModelSerializer):

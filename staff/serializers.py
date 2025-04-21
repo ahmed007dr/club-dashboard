@@ -1,6 +1,8 @@
 from rest_framework import serializers
 from .models import Shift
-from core.serializers import ClubSerializer, UserSerializer
+from core.serializers import ClubSerializer
+from accounts.serializers import UserSerializer
+
 
 class ShiftSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)

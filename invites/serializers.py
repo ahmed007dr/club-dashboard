@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import FreeInvite
-from core.serializers import ClubSerializer, UserSerializer
+from core.serializers import ClubSerializer
+from accounts.serializers import UserSerializer
 from members.serializers import MemberSerializer
 
 class FreeInviteSerializer(serializers.ModelSerializer):

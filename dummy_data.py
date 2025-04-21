@@ -1,13 +1,15 @@
-import os , django
+import os
+import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
 django.setup()
 
 import random
-from datetime import timedelta , timedelta, time ,datetime
+from datetime import timedelta, datetime
 from django.utils import timezone
 from faker import Faker
-from core.models import Club, User
+from core.models import Club
+from accounts.models import User
 from members.models import Member
 from subscriptions.models import SubscriptionType, Subscription
 from tickets.models import Ticket
@@ -16,6 +18,7 @@ from attendance.models import EntryLog
 from staff.models import Shift
 from invites.models import FreeInvite
 from finance.models import ExpenseCategory, Expense, IncomeSource, Income
+
 
 fake = Faker()
 
@@ -30,8 +33,8 @@ def create_dummy_data():
         )
         clubs.append(club)
 
-    # Create Users (with different roles)
-    roles = ['admin', 'reception', 'accountant', 'coach']
+    # Create Users (with different roles including owner)
+    roles = ['owner', 'admin', 'reception', 'accountant', 'coach']
     users = []
     for _ in range(5):
         username = fake.user_name()
@@ -57,14 +60,16 @@ def create_dummy_data():
             birth_date=fake.date_of_birth(minimum_age=18, maximum_age=70),
             phone=fake.phone_number()[:20],
             created_at=timezone.now(),
-            referred_by=None  # Will update later
+            referred_by=None
         )
         members.append(member)
 
     # Update some members with referrals
-    for member in random.sample(members, 3):
-        member.referred_by = random.choice(members)
-        member.save()
+    for member in random.sample(members, min(3, len(members))):
+        possible_referrers = [m for m in members if m != member]
+        if possible_referrers:
+            member.referred_by = random.choice(possible_referrers)
+            member.save()
 
     # Create Subscription Types
     subscription_types = []
@@ -96,8 +101,8 @@ def create_dummy_data():
             type=sub_type,
             start_date=start_date,
             end_date=end_date,
-            paid_amount=sub_type.price * random.uniform(0.8, 1.0),
-            remaining_amount=sub_type.price * random.uniform(0.0, 0.2),
+            paid_amount=round(sub_type.price * random.uniform(0.8, 1.0), 2),
+            remaining_amount=round(sub_type.price * random.uniform(0.0, 0.2), 2),
             attendance_days=random.randint(0, 30)
         )
         subscriptions.append(subscription)
@@ -108,12 +113,11 @@ def create_dummy_data():
             club=random.choice(clubs),
             buyer_name=fake.name(),
             ticket_type=random.choice(['day_pass', 'session']),
-            price=round(random.uniform(20.00, 100.00), 2),  # rounded to 2 decimal places
+            price=round(random.uniform(20.00, 100.00), 2),
             used=fake.boolean(),
             used_by=random.choice(members) if fake.boolean() else None,
-            issue_date=fake.date_this_year()  # added missing required field
+            issue_date=fake.date_this_year()
         )
-
 
     # Create Receipts
     for _ in range(5):
@@ -122,7 +126,7 @@ def create_dummy_data():
             club=subscription.club if subscription else random.choice(clubs),
             member=subscription.member if subscription else random.choice(members),
             subscription=subscription,
-            amount=random.uniform(50.00, 500.00),
+            amount=round(random.uniform(50.00, 500.00), 2),
             payment_method=random.choice(['cash', 'visa', 'bank']),
             note=fake.sentence(),
             issued_by=random.choice(users)
@@ -141,9 +145,8 @@ def create_dummy_data():
     for _ in range(5):
         date = fake.date_this_month()
         start_time = fake.time_object()
-        # Convert to datetime, add hours, then get time component
         end_time = (datetime.combine(date, start_time) + 
-                timedelta(hours=random.randint(4, 8))).time()
+                   timedelta(hours=random.randint(4, 8))).time()
         
         Shift.objects.create(
             club=random.choice(clubs),
@@ -153,6 +156,7 @@ def create_dummy_data():
             shift_end=end_time,
             approved_by=random.choice(users) if fake.boolean() else None
         )
+
     # Create Free Invites
     for _ in range(5):
         FreeInvite.objects.create(
@@ -164,6 +168,7 @@ def create_dummy_data():
             invited_by=random.choice(members) if fake.boolean() else None,
             handled_by=random.choice(users) if fake.boolean() else None
         )
+
     # Create Expense Categories
     expense_categories = []
     for _ in range(3):
@@ -174,13 +179,12 @@ def create_dummy_data():
         )
         expense_categories.append(category)
 
-
     # Create Expenses
     for _ in range(5):
         Expense.objects.create(
-            club=random.choice(clubs),  # Changed from club to clubs
+            club=random.choice(clubs),
             category=random.choice(expense_categories),
-            amount=round(random.uniform(50.00, 1000.00), 2),  # Added rounding to 2 decimal places
+            amount=round(random.uniform(50.00, 1000.00), 2),
             description=fake.sentence(),
             date=fake.date_this_year(),
             paid_by=random.choice(users),
@@ -203,7 +207,7 @@ def create_dummy_data():
         Income.objects.create(
             club=receipt.club if receipt else random.choice(clubs),
             source=random.choice(income_sources),
-            amount=random.uniform(50.00, 1000.00),
+            amount=round(random.uniform(50.00, 1000.00), 2),
             description=fake.sentence(),
             date=fake.date_this_year(),
             received_by=random.choice(users),

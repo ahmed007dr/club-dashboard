@@ -46,6 +46,7 @@ INSTALLED_APPS = [
 
     #apps
     "core",
+    "accounts",
     "members",
     "subscriptions",
     "receipts",
@@ -71,7 +72,7 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'project.urls'
 
 
-AUTH_USER_MODEL = 'core.User'
+AUTH_USER_MODEL = 'accounts.User'
 
 CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOWED_ALL_ORIGINS = True

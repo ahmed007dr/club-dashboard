@@ -1,13 +1,14 @@
 from django.db import models
+from accounts.models import User
 
 # Create your models here.
 class Shift(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
-    staff = models.ForeignKey('core.User', on_delete=models.CASCADE)
+    staff = models.ForeignKey('accounts.User', on_delete=models.CASCADE)
     date = models.DateField()
     shift_start = models.TimeField()
     shift_end = models.TimeField()
-    approved_by = models.ForeignKey('core.User', related_name='approved_shifts', on_delete=models.SET_NULL, null=True, blank=True)
+    approved_by = models.ForeignKey('accounts.User', related_name='approved_shifts', on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return f"{self.staff.username} - {self.date}"
