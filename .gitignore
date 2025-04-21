@@ -1,19 +1,13 @@
-# Ignore Python bytecode
+# Django
 *.pyc
 __pycache__/
-
-# Ignore virtual environment
+db.sqlite3
+*.sqlite3
+*.log
+# Static and media files
+static/
+media/
+# IDE and environment
+.idea/
 venv/
-env/
-ENV/
-.venv/
-
-# Ignore VSCode settings
-.vscode/
-
-# Ignore database files
-# *.sqlite3
-
-# Ignore system files
-.DS_Store
-Thumbs.db
+*.env
