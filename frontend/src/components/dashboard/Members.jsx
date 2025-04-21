@@ -1,22 +1,21 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState } from "react";
 import AddMember from "../modals/AddMember";
-import {
-  useReactTable,
-  getCoreRowModel,
-  flexRender,
-  createColumnHelper,
-} from "@tanstack/react-table";
-
-// Column helper setup for TanStack Table
-const columnHelper = createColumnHelper();
+import { Link } from "react-router-dom";
+import { CiTrash } from "react-icons/ci";
+import { CiEdit } from "react-icons/ci";
 
 const Members = () => {
   const [data, setData] = useState([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filteredData, setFilteredData] = useState([]);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [searchQuery, setSearchQuery] = useState(""); // Added search query state
 
-  const openModal = () => setIsModalOpen(true);
-  const closeModal = () => setIsModalOpen(false);
-  // Fake members data (no fetch, all belong to "club")
+  const openAddModal = () => setIsAddModalOpen(true);
+  const closeAddModal = () => setIsAddModalOpen(false);
+
   const fakeMembers = [
     {
       id: 1,
@@ -36,134 +35,237 @@ const Members = () => {
       phone: "0109876543",
       club_name: "Sports Club",
     },
-    {
-      id: 3,
-      photo: "https://i.pravatar.cc/100?img=13",
-      name: "Mohamed Al-Qhatani",
-      membership_number: "1003",
-      national_id: "223344556677",
-      phone: "0101239876",
-      club_name: "Sports Club",
-    },
-    {
-      id: 4,
-      photo: "https://i.pravatar.cc/100?img=14",
-      name: "Reem Al-Shahri",
-      membership_number: "1004",
-      national_id: "334455667788",
-      phone: "01071123334",
-      club_name: "Sports Club",
-    },
-    {
-      id: 5,
-      photo: "https://i.pravatar.cc/100?img=15",
-      name: "Abdullah Al-Harbi",
-      membership_number: "1005",
-      national_id: "445566778899",
-      phone: "0108998776",
-      club_name: "Sports Club",
-    },
   ];
 
   useEffect(() => {
-    // Directly set the fake data
     setData(fakeMembers);
+    setFilteredData(fakeMembers); // Initially show all members
   }, []);
 
-  const columns = useMemo(() => [
-    columnHelper.accessor((row, index) => index + 1, {
-      id: 'index',
-      header: '#',
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor("photo", {
-      header: "Photo",
-      cell: info => (
-        <img
-          src={info.getValue()}
-          alt="photo"
-          className="w-10 h-10 rounded-full object-cover"
-        />
-      ),
-    }),
-    columnHelper.accessor("name", {
-      header: "Name",
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor("membership_number", {
-      header: "Membership Number",
-    }),
-    columnHelper.accessor("national_id", {
-      header: "National ID",
-    }),
-    columnHelper.accessor("phone", {
-      header: "Phone",
-    }),
-    columnHelper.accessor("club_name", {
-      header: "Club Name",
-    }),
-  ], []);
+  // Function to filter members based on search query
+  const handleSearch = (e) => {
+    const query = e.target.value.toLowerCase();
+    setSearchQuery(query);
+    const filtered = data.filter(
+      (member) =>
+        member.name.toLowerCase().includes(query) ||
+        member.membership_number.includes(query) ||
+        member.national_id.includes(query)
+    );
+    setFilteredData(filtered);
+  };
 
-  const table = useReactTable({
-    data,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  });
+  const handleDeleteClick = (member) => {
+    setSelectedMember(member);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    setData(data.filter((m) => m.id !== selectedMember.id));
+    setFilteredData(filteredData.filter((m) => m.id !== selectedMember.id)); // Update filtered data after deletion
+    setIsDeleteModalOpen(false);
+  };
+
+  const handleEditClick = (member) => {
+    setSelectedMember(member);
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditChange = (e) => {
+    setSelectedMember({ ...selectedMember, [e.target.name]: e.target.value });
+  };
+
+  const handleEditSubmit = () => {
+    const updatedData = data.map((m) =>
+      m.id === selectedMember.id ? selectedMember : m
+    );
+    setData(updatedData);
+    setFilteredData(updatedData); // Update filtered data after edit
+    setIsEditModalOpen(false);
+  };
 
   return (
     <div className="p-4 overflow-x-auto">
       <h2 className="text-2xl font-bold text-center mb-4">Members List</h2>
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={handleSearch}
+        placeholder="Search by name, membership number, or national ID"
+        className="border p-2 rounded-md mb-4 w-full"
+      />
       <button
-        onClick={openModal}
+        onClick={openAddModal}
         className="bg-green-600 text-white py-2 px-4 rounded-md mb-4"
       >
         Add Member
       </button>
+
       <table className="min-w-full border border-gray-200">
         <thead className="bg-green-100 text-left">
-          {table.getHeaderGroups().map(headerGroup => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map(header => (
-                <th key={header.id} className="p-3 border-b border-gray-200 font-medium">
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </th>
-              ))}
-            </tr>
-          ))}
+          <tr>
+            <th className="p-3 border-b">#</th>
+            <th className="p-3 border-b">Photo</th>
+            <th className="p-3 border-b">Name</th>
+            <th className="p-3 border-b">Membership Number</th>
+            <th className="p-3 border-b">National ID</th>
+            <th className="p-3 border-b">Phone</th>
+            <th className="p-3 border-b">Club Name</th>
+            <th className="p-3 border-b">Actions</th>
+          </tr>
         </thead>
-        <tbody className="text-left">
-          {table.getRowModel().rows.map(row => (
-            <tr key={row.id} className="hover:bg-gray-50">
-              {row.getVisibleCells().map(cell => (
-                <td key={cell.id} className="p-3 border-b border-gray-100">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
+        <tbody>
+          {filteredData.map((member, index) => (
+            <tr key={member.id} className="hover:bg-gray-50">
+              <td className="p-3 border-b">{index + 1}</td>
+              <td className="p-3 border-b">
+                <Link to={`/member/${member.id}`}>
+                  <img
+                    src={member.photo}
+                    alt="member"
+                    className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
+                  />
+                </Link>
+              </td>
+              <td className="p-3 border-b">{member.name}</td>
+              <td className="p-3 border-b">{member.membership_number}</td>
+              <td className="p-3 border-b">{member.national_id}</td>
+              <td className="p-3 border-b">{member.phone}</td>
+              <td className="p-3 border-b">{member.club_name}</td>
+              <td className="p-3 border-b">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleEditClick(member)}
+                    className="text-blue-600 hover:text-blue-800"
+                    title="Edit"
+                  >
+                    <CiEdit />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteClick(member)}
+                    className="text-red-600 hover:text-red-800"
+                    title="Delete"
+                  >
+                    <CiTrash />
+                  </button>
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
-      {/* Conditionally render the AddMember modal */}
-      {isModalOpen && (
-  <div
-    className="fixed inset-0 flex justify-center items-center z-40"
-    style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
-  >
-    <div className="bg-white p-6 rounded-lg shadow-lg w-1/3 relative">
-      <button
-        onClick={closeModal}
-        className="absolute top-0 right-0 p-2 text-black text-xl"
-        style={{ zIndex: 10 }}
-      >
-        &times;
-      </button>
-      <AddMember />
-    </div>
-  </div>
-)}
 
+      {/* Add Modal */}
+      {isAddModalOpen && (
+        <div
+          className="fixed inset-0 flex justify-center items-center z-40"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+        >
+          <div className="bg-white p-6 rounded-lg w-1/3 relative">
+            <button onClick={closeAddModal} className="absolute top-2 right-3 text-xl">
+              &times;
+            </button>
+            <AddMember />
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div
+          className="fixed inset-0 flex justify-center items-center z-40"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+        >
+          <div className="bg-white p-6 rounded-lg shadow-lg w-1/3 relative">
+            <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
+            <p>
+              Are you sure you want to delete <strong>{selectedMember?.name}</strong>?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="bg-gray-300 px-4 py-2 rounded"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="bg-red-600 text-white px-4 py-2 rounded"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {isEditModalOpen && selectedMember && (
+        <div
+          className="fixed inset-0 flex justify-center items-center z-40"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+        >
+          <div className="bg-white p-6 rounded-lg shadow-lg w-1/3 relative">
+            <h3 className="text-lg font-semibold mb-4">Edit Member</h3>
+            <div className="flex flex-col gap-3">
+              <input
+                type="text"
+                name="name"
+                value={selectedMember.name}
+                onChange={handleEditChange}
+                placeholder="Name"
+                className="border px-3 py-2 rounded"
+              />
+              <input
+                type="text"
+                name="membership_number"
+                value={selectedMember.membership_number}
+                onChange={handleEditChange}
+                placeholder="Membership Number"
+                className="border px-3 py-2 rounded"
+              />
+              <input
+                type="text"
+                name="national_id"
+                value={selectedMember.national_id}
+                onChange={handleEditChange}
+                placeholder="National ID"
+                className="border px-3 py-2 rounded"
+              />
+              <input
+                type="text"
+                name="phone"
+                value={selectedMember.phone}
+                onChange={handleEditChange}
+                placeholder="Phone"
+                className="border px-3 py-2 rounded"
+              />
+              <input
+                type="text"
+                name="club_name"
+                value={selectedMember.club_name}
+                onChange={handleEditChange}
+                placeholder="Club Name"
+                className="border px-3 py-2 rounded"
+              />
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="bg-gray-300 px-4 py-2 rounded"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditSubmit}
+                  className="bg-green-600 text-white px-4 py-2 rounded"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
