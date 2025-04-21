@@ -30,3 +30,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'club',
             'is_active'
         ]
+
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+    def validate(self, data):
+        username = data.get('username')
+        password = data.get('password')
+
+        if username and password:
+            return data
+        raise serializers.ValidationError("Username and password are required")
