@@ -6,12 +6,21 @@ const ExpenseCategories = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    // Get token from localStorage or any other storage you're using
+    const token = localStorage.getItem('token'); // Adjust this as needed
+
+    // If there's no token, handle the error accordingly
+    if (!token) {
+      setError('Authentication token is missing');
+      return;
+    }
+
     // Fetch data when the component mounts
     axios
       .get('http://127.0.0.1:8000/api/finance/api/expense-categories/', {
         headers: {
           'accept': 'application/json',
-          'X-CSRFTOKEN': 'TaRpMCbb524KNQjJcfKnc9En7YuZaeAgc8yJMANJKpDLCG6KWgiRLoyp5zSnid4Q', // Replace with your actual token
+          'Authorization': token,  // Directly add token here (without 'Bearer' prefix)
         },
       })
       .then((response) => {
@@ -22,8 +31,7 @@ const ExpenseCategories = () => {
         setError('Error fetching data'); // Handle error
         console.error(err);
       });
-  }, []);
-   // Empty dependency array to run the effect only once
+  }, []); // Empty dependency array to run the effect only once
 
   if (error) {
     return <div>{error}</div>;
