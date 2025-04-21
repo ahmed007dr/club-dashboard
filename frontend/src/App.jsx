@@ -15,6 +15,7 @@ import Leads from './components/dashboard/Leads';
 import Club from './components/dashboard/Club';
 import Profile from './components/dashboard/Profile';
 import Staff from './components/dashboard/Staff';
+import Finance from './components/dashboard/Finance';
 import Member from "./pages/member/Member"; 
 
 function App() {
@@ -35,6 +36,7 @@ function App() {
         <Route path="club" element={<Club />} />
         <Route path="profile" element={<Profile />} />
         <Route path="staff" element={<Staff />} />
+        <Route path="finance" element={<Finance />} />
       </Route>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} /> 

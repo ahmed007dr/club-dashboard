@@ -12,6 +12,7 @@ import { MdOutlineDashboard } from 'react-icons/md';
 import { MdOutlineSportsHandball } from "react-icons/md";
 import { FaRegUser } from "react-icons/fa";
 import { FaRegBuilding } from "react-icons/fa";
+import { TbMoneybag } from "react-icons/tb";
 const Dashboard = () => {
   const dispatch = useDispatch();
   const sidebarOpen = useSelector((state) => state.ui.sidebarOpen);
@@ -28,6 +29,7 @@ const Dashboard = () => {
     { path: 'club', name: 'Club', icon: <MdOutlineSportsHandball /> },
     { path: 'profile', name: 'Profile', icon: <FaRegUser /> },
     { path: 'staff', name: 'Staff', icon: <FaRegBuilding /> },
+    { path: 'finance', name: 'Finance', icon: <TbMoneybag />},
   ];
 
   return (
