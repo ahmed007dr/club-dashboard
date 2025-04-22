@@ -34,14 +34,14 @@ urlpatterns = [
     path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     
     # API Endpoints
-    path('members/api/', include('members.urls')),
-    path('subscriptions/api/', include('subscriptions.urls')),
-    path('tickets/api/', include('tickets.urls')),
-    path('receipts/api/', include('receipts.urls')),
-    path('staff/api/', include('staff.urls')),
-    path('invites/api/', include('invites.urls')),
-    path('finance/api/', include('finance.urls')),
-    path('api/', include('core.urls')),
+    path('members/', include('members.urls')),
+    path('subscriptions/', include('subscriptions.urls')),
+    path('tickets/', include('tickets.urls')),
+    path('receipts/', include('receipts.urls')),
+    path('staff/', include('staff.urls')),
+    path('invites/', include('invites.urls')),
+    path('finance/', include('finance.urls')),
+    path('core/', include('core.urls')),
 
 ]
 
