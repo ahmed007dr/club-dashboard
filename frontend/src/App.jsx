@@ -17,6 +17,7 @@ import Profile from './components/dashboard/Profile';
 import Staff from './components/dashboard/Staff';
 import Finance from './components/dashboard/Finance';
 import Member from "./pages/member/Member"; 
+import AddMember from "./components/modals/AddMember"; 
 
 function App() {
   return (
@@ -37,6 +38,7 @@ function App() {
         <Route path="profile" element={<Profile />} />
         <Route path="staff" element={<Staff />} />
         <Route path="finance" element={<Finance />} />
+        <Route path="add-member" element={<AddMember />} />
       </Route>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} /> 
