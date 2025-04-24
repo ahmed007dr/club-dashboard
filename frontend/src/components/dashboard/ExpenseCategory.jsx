@@ -102,7 +102,7 @@ const ExpenseCategory = () => {
 
       {showModal && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+          <div className="modal">
             <h2 className="text-xl font-semibold mb-4">Add Expense Category</h2>
 
             <div className="mb-3">

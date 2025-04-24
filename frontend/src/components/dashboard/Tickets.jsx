@@ -185,7 +185,7 @@ const Tickets = () => {
       {/* Mark as Used Confirmation Modal */}
       {isMarkUsedModalOpen && ticketToMarkUsed && (
         <div className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="bg-white p-6 rounded shadow max-w-md w-full">
+          <div className="modal">
             <h3 className="text-lg font-bold mb-4">Do you want to mark this ticket as used?</h3>
             <div className="flex gap-4 justify-center">
               <button
@@ -196,7 +196,7 @@ const Tickets = () => {
               </button>
               <button
                 onClick={() => handleMarkAsUsed(ticketToMarkUsed)}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
+                className="btn"
               >
                 Mark as Used
               </button>
@@ -208,7 +208,7 @@ const Tickets = () => {
       {/* EDIT MODAL */}
       {modalType === "edit" && selectedTicket && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white p-6 rounded shadow max-w-md w-full">
+          <div className="modal">
             <h3 className="text-lg font-bold mb-4">Edit Ticket</h3>
             <form onSubmit={handleEditSubmit} className="space-y-4">
               {/* Club Input */}
@@ -293,7 +293,7 @@ const Tickets = () => {
               <div className="flex justify-between gap-2">
                 <button
                   type="submit"
-                  className="bg-blue-500 text-white px-4 py-2 rounded"
+                  className="btn"
                 >
                   Save
                 </button>
@@ -313,7 +313,7 @@ const Tickets = () => {
       {/* DELETE CONFIRMATION MODAL */}
       {isDeleteModalOpen && ticketToDelete && (
         <div className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="bg-white p-6 rounded shadow max-w-md w-full">
+          <div className="modal">
             <h3 className="text-lg font-bold mb-4">Are you sure you want to delete this ticket?</h3>
             <div className="flex gap-4 justify-center">
               <button
@@ -324,7 +324,7 @@ const Tickets = () => {
               </button>
               <button
                 onClick={() => handleDeleteTicket(ticketToDelete.id)}
-                className="px-4 py-2 bg-red-600 text-white rounded"
+                className="btn"
               >
                 Delete
               </button>

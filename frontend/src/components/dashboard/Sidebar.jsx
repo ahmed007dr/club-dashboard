@@ -63,19 +63,21 @@ const Sidebar = ({ navItems, sidebarOpen, closeSidebar }) => {
                     {hasChildren && openMenus[item.name] && (
   <div className="ml-8 mt-1 space-y-1">
     {item.children.map((child) => (
-      <Link
-        to={child.path}
-        key={child.name}
-        onClick={closeSidebar}
-        className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-          location.pathname.endsWith(child.path)
-            ? ''
-            : ''
-        }`}
-      >
-        <span className="text-base">{child.icon}</span>
-        <span>{child.name}</span>
-      </Link>
+   <Link
+   to={child.path}
+   key={child.name}
+   onClick={closeSidebar}
+   className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+     location.pathname === '/' && child.path === ''
+       ? 'bg-blue-500 text-white font-medium' // Active link styles for "Main"
+       : location.pathname.endsWith(child.path) && child.path !== ''
+       ? 'bg-blue-500 text-white font-medium' // Active link styles for other links
+       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white' // Inactive link styles
+   }`}
+ >
+   <span className="text-base">{child.icon}</span>
+   <span>{child.name}</span>
+ </Link>
     ))}
   </div>
 )}

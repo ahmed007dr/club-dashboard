@@ -123,7 +123,7 @@ const Expense = () => {
       {/* Edit Modal */}
       {showModal && currentExpense && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+          <div className="modal">
             <h3 className="text-xl font-semibold mb-4">Edit Expense</h3>
             <div className="grid grid-cols-1 gap-4">
               {[

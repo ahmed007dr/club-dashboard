@@ -118,7 +118,7 @@ const Receipts = () => {
       {/* Modals */}
       {modalType && selectedReceipt && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+          <div className="modal">
             {modalType === 'view' && (
               <>
                 <h3 className="text-xl font-semibold mb-4">Receipt Info</h3>
@@ -200,16 +200,10 @@ const Receipts = () => {
       />
 
       <div className="flex justify-end gap-3 mt-4">
-        <button
-          type="button"
-          onClick={closeModal}
-          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-        >
-          Cancel
-        </button>
+        
         <button
           type="submit"
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          className="btn"
         >
           Submit
         </button>
@@ -239,7 +233,7 @@ const Receipts = () => {
                     setReceipts(receipts.filter(r => r.id !== selectedReceipt.id));
                     closeModal();
                   }}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  className="btn"
                 >
                   Confirm Delete
                 </button>

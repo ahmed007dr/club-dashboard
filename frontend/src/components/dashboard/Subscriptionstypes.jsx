@@ -156,7 +156,7 @@ const SubscriptionsTypes = () => {
       {/* Add Subscription Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="bg-white p-6 rounded-lg w-96">
+          <div className="modal">
             <h3 className="text-lg font-bold mb-4">Add Subscription</h3>
             <div className="mb-2">
               <label className="block">Name</label>
@@ -180,7 +180,7 @@ const SubscriptionsTypes = () => {
               <label><input type="checkbox" checked={newSubscription.includesClasses} onChange={(e) => setNewSubscription({ ...newSubscription, includesClasses: e.target.checked })} /> Classes</label>
             </div>
             <div>
-              <button className="bg-green-600 text-white px-4 py-2 rounded mr-2" onClick={handleAdd}>Add</button>
+              <button className="btn" onClick={handleAdd}>Add</button>
               <button className="bg-gray-500 text-white px-4 py-2 rounded" onClick={closeModal}>Cancel</button>
             </div>
           </div>
@@ -191,7 +191,7 @@ const SubscriptionsTypes = () => {
       {isModalOpen && (
         <div className="fixed inset-0 flex justify-center items-center z-40"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="bg-white p-6 rounded-lg w-96">
+          <div className="modal">
             <h3>Edit Subscription</h3>
             <div>
               <label className="block">Name</label>
@@ -246,7 +246,7 @@ const SubscriptionsTypes = () => {
             </div>
             <div className="mt-4">
               <button
-                className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
+                className="btn"
                 onClick={handleEdit}
               >
                 Save
@@ -266,11 +266,11 @@ const SubscriptionsTypes = () => {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 flex justify-center items-center z-40"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="bg-white p-6 rounded-lg w-96">
+          <div className="modal">
             <h3>Are you sure you want to delete this subscription?</h3>
             <div className="mt-4">
               <button
-                className="bg-red-500 text-white px-4 py-2 rounded mr-2"
+                className="btn mr-2"
                 onClick={handleDelete}
               >
                 Yes, Delete
@@ -290,7 +290,7 @@ const SubscriptionsTypes = () => {
       {isDetailsModalOpen && (
         <div className="fixed inset-0 flex justify-center items-center z-40"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="bg-white p-6 rounded-lg w-96">
+          <div className="modal">
             <h3>Subscription Details</h3>
             <div>
               <strong>Name:</strong> {modalData.name}

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { CiEdit } from 'react-icons/ci';
-
+import { HiOutlineDocumentReport } from 'react-icons/hi';
 const fakeClubs = [
   {
     id: 1,
@@ -87,7 +87,10 @@ const Club = () => {
 
   return (
     <div className="p-4 overflow-x-auto">
-      <h2 className="text-2xl font-bold text-center mb-4">Clubs List</h2>
+      <div className="flex items-start space-x-3">
+        <HiOutlineDocumentReport className="btn-forest text-2xl" />
+        <h2 className="text-2xl font-semibold mb-4">Clubs</h2>
+      </div>
       <table className="min-w-full border border-gray-200">
         <thead className=" text-left">
           <tr>
@@ -101,7 +104,7 @@ const Club = () => {
         </thead>
         <tbody>
           {fakeClubs.map((club, index) => (
-            <tr key={club.id} className="hover:bg-gray-50">
+            <tr key={club.id} className="">
               <td className="p-3 border-b">{index + 1}</td>
               <td className="p-3 border-b">
                 <img
@@ -131,7 +134,7 @@ const Club = () => {
       {/* Modal for editing club */}
       {modalOpen && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white p-6 rounded shadow-lg w-1/2">
+          <div className="modal">
             <h3 className="text-xl font-bold mb-4">Edit Club</h3>
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
@@ -196,7 +199,7 @@ const Club = () => {
                 </button>
                 <button
                   type="submit"
-                  className="bg-blue-500 text-white p-2 rounded"
+                  className="btn"
                 >
                   Save Changes
                 </button>

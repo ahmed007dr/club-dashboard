@@ -184,13 +184,13 @@ const FreeInvites = () => {
       {/* Modal for confirming deletion */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full">
+          <div className="modal">
             <h2 className="text-2xl font-semibold text-center mb-4">Are you sure you want to delete this invite?</h2>
             <p className="mb-4">This action cannot be undone.</p>
             <div className="flex justify-center space-x-4">
               <button
                 onClick={handleDelete}
-                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                className="btn"
               >
                 Yes, Delete
               </button>
@@ -208,7 +208,7 @@ const FreeInvites = () => {
       {/* Modal for editing a ticket */}
       {isEditModalOpen && selectedTicket && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full">
+          <div className="modal">
             <h2 className="text-2xl font-semibold text-center mb-4">Edit Invite</h2>
             <form>
               <div className="mb-4">
@@ -272,13 +272,13 @@ const FreeInvites = () => {
               <div className="flex justify-center space-x-4">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  className="btn"
                 >
                   Save
                 </button>
                 <button
                   onClick={closeEditModal}
-                  className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                  className="btn-red"
                 >
                   Cancel
                 </button>
@@ -291,7 +291,7 @@ const FreeInvites = () => {
       {/* Modal for viewing ticket info */}
       {isModalOpen && selectedTicket && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full">
+          <div className="modal">
             <h2 className="text-2xl font-semibold text-center mb-4">Invite Details</h2>
             <p><strong>Guest Name:</strong> {selectedTicket.guestName}</p>
             <p><strong>Phone:</strong> {selectedTicket.phone}</p>
@@ -303,7 +303,7 @@ const FreeInvites = () => {
             <div className="flex justify-center space-x-4 mt-4">
               <button
                 onClick={closeModal}
-                className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                className="btn"
               >
                 Close
               </button>
@@ -315,10 +315,10 @@ const FreeInvites = () => {
       {/* Confirmation Modal */}
       {isMarkUsedModalOpen && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white p-6 rounded-lg shadow-lg">
+          <div className="modal">
             <h3 className="text-xl mb-4">Do you want to mark this invite as used?</h3>
             <div className="flex space-x-4">
-              <button onClick={handleMarkUsed} className="bg-green-500 text-white py-2 px-4 rounded-md">
+              <button onClick={handleMarkUsed} className="btn">
                 Yes
               </button>
               <button onClick={closeMarkUsedModal} className="bg-gray-300 py-2 px-4 rounded-md">

@@ -175,63 +175,65 @@ const Subscriptions = () => {
         </>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
-        <>
-          <div
-            className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
-            onClick={() => setIsDeleteModalOpen(false)}
-          ></div>
-          <div className="fixed z-50  p-6 rounded-lg shadow-md top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md">
-            <h2 className="text-xl font-semibold mb-4 text-red-600">Confirm Deletion</h2>
-            <p className="mb-6">Are you sure you want to delete this subscription?</p>
-            <div className="flex justify-end gap-3">
-              <button
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                onClick={() => setIsDeleteModalOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 bg-red-600  rounded hover:bg-red-700"
-                onClick={confirmDelete}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+{isDeleteModalOpen && (
+  <div
+    className="fixed inset-0 z-40 flex justify-center items-center"
+    style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
+    onClick={() => setIsDeleteModalOpen(false)} // clicking anywhere closes modal
+  >
+    <div className="modal">
+      <h2 className="text-xl font-semibold mb-4 text-red-600">Confirm Deletion</h2>
+      <p className="mb-6">Are you sure you want to delete this subscription?</p>
+      <div className="flex justify-end gap-3">
+        <button
+          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+          onClick={() => setIsDeleteModalOpen(false)}
+        >
+          Cancel
+        </button>
+        <button
+          className="btn"
+          onClick={confirmDelete}
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
 
       {/* Subscription Info Modal */}
       {isInfoModalOpen && (
-        <div
-          className="fixed inset-0 flex justify-center items-center z-40"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+  <div
+    className="fixed inset-0 z-40 flex justify-center items-center"
+    style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+    onClick={closeInfoModal}
+  >
+    <div onClick={(e) => e.stopPropagation()} className="z-50 modal">
+      <div>
+        <p><strong>Member Name:</strong> {selectedSubscription.member_name}</p>
+        <p><strong>Club Name:</strong> {selectedSubscription.club_name}</p>
+        <p><strong>Subscription Type:</strong> {selectedSubscription.subscription_type}</p>
+        <p><strong>Start Date:</strong> {selectedSubscription.start_date}</p>
+        <p><strong>End Date:</strong> {selectedSubscription.end_date}</p>
+        <p><strong>Paid Amount:</strong> ${selectedSubscription.paid_amount}</p>
+        <p><strong>Remaining Amount:</strong> ${selectedSubscription.remaining_amount}</p>
+        <p><strong>Attendance Days:</strong> {selectedSubscription.attendance_days}</p>
+      </div>
+      <div className="flex justify-end gap-3 mt-4">
+        <button
+          className="btn"
           onClick={closeInfoModal}
         >
-          <div className="fixed z-50  p-6 rounded-lg shadow-md top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md">
-            <div>
-              <p><strong>Member Name:</strong> {selectedSubscription.member_name}</p>
-              <p><strong>Club Name:</strong> {selectedSubscription.club_name}</p>
-              <p><strong>Subscription Type:</strong> {selectedSubscription.subscription_type}</p>
-              <p><strong>Start Date:</strong> {selectedSubscription.start_date}</p>
-              <p><strong>End Date:</strong> {selectedSubscription.end_date}</p>
-              <p><strong>Paid Amount:</strong> ${selectedSubscription.paid_amount}</p>
-              <p><strong>Remaining Amount:</strong> ${selectedSubscription.remaining_amount}</p>
-              <p><strong>Attendance Days:</strong> {selectedSubscription.attendance_days}</p>
-            </div>
-            <div className="flex justify-end gap-3 mt-4">
-              <button
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                onClick={closeInfoModal}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

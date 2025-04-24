@@ -78,7 +78,7 @@ const SubscriptionsTable = ({ subscriptions, openEditModal, openDeleteModal, ope
         </thead>
         <tbody className="text-right">
           {table.getRowModel().rows.map(row => (
-            <tr key={row.id} className="hover:bg-gray-50">
+            <tr key={row.id} className="">
               {row.getVisibleCells().map(cell => (
                 <td key={cell.id} className="p-3 border-b border-gray-100">
                   {flexRender(cell.column.columnDef.cell, cell.getContext())}

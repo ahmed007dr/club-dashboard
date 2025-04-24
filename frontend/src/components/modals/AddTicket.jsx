@@ -25,7 +25,7 @@ const AddTicket = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto mt-10 bg-white p-6 rounded-lg shadow-md">
+    <div className="modal">
       <h2 className="text-2xl font-semibold mb-6 text-center">Create Ticket</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
 

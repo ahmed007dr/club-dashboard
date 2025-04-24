@@ -119,7 +119,7 @@ const Members = () => {
         </thead>
         <tbody>
           {filteredData.map((member, index) => (
-            <tr key={member.id} className="hover:bg-gray-50">
+            <tr key={member.id} className=" ">
               <td className="p-3 border-b">{index + 1}</td>
               <td className="p-3 border-b">
                 <Link to={`/member/${member.id}`}>
@@ -161,8 +161,7 @@ const Members = () => {
       {/* Add Modal */}
       {isAddModalOpen && (
         <div
-          className="fixed inset-0 flex justify-center items-center z-40"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+          className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(255, 255, 255, 0.2)]"
         >
           <div className="bg-white p-6 rounded-lg w-1/3 relative">
             <button onClick={closeAddModal} className="absolute top-2 right-3 text-xl">
@@ -176,10 +175,10 @@ const Members = () => {
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div
-          className="fixed inset-0 flex justify-center items-center z-40"
+          className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(249, 236, 236, 0.2)]"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
         >
-          <div className="bg-white p-6 rounded-lg shadow-lg w-1/3 relative">
+          <div className="modal relative">
             <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
             <p>
               Are you sure you want to delete <strong>{selectedMember?.name}</strong>?
@@ -193,7 +192,7 @@ const Members = () => {
               </button>
               <button
                 onClick={confirmDelete}
-                className="bg-red-600 text-white px-4 py-2 rounded"
+                className="btn"
               >
                 Delete
               </button>
@@ -208,7 +207,7 @@ const Members = () => {
           className="fixed inset-0 flex justify-center items-center z-40"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
         >
-          <div className="bg-white p-6 rounded-lg shadow-lg w-1/3 relative">
+          <div className="modal relative">
             <h3 className="text-lg font-semibold mb-4">Edit Member</h3>
             <div className="flex flex-col gap-3">
               <input
@@ -260,7 +259,7 @@ const Members = () => {
                 </button>
                 <button
                   onClick={handleEditSubmit}
-                  className="bg-green-600 text-white px-4 py-2 rounded"
+                  className="btn"
                 >
                   Save
                 </button>
