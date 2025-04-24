@@ -14,15 +14,15 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/login', {
-        email,
-        password
-      });
-
+      const response = await axios.post('http://127.0.0.1:8000/accounts/api/login/', {
+        username: email,
+        password: password
+    });
+    
       // حفظ التوكن وبيانات المستخدم في localStorage
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-
+      localStorage.setItem('access_token', response.data.access);
+      localStorage.setItem('refresh_token', response.data.refresh);
+      
       // توجيه المستخدم إلى الصفحة الرئيسية أو داشبورد
       navigate('/dashboard');
     } catch (err) {

@@ -6,7 +6,7 @@ from django.shortcuts import redirect
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
-# from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 def home_view(request):
     return redirect('schema-swagger-ui')
@@ -27,13 +27,17 @@ schema_view = get_schema_view(
 urlpatterns = [
     path('', home_view, name='home'),
     path('admin/', admin.site.urls),
-    path('accounts/', include('accounts.urls')),
     
     # API Documentation
     path('api/docs/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('api/redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
     
+    #access token 
+    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+
     # API Endpoints
+    path('accounts/', include('accounts.urls')),
     path('members/', include('members.urls')),
     path('subscriptions/', include('subscriptions.urls')),
     path('tickets/', include('tickets.urls')),
@@ -41,6 +45,7 @@ urlpatterns = [
     path('staff/', include('staff.urls')),
     path('invites/', include('invites.urls')),
     path('finance/', include('finance.urls')),
+    path('attendance/', include('attendance.urls')),
     path('core/', include('core.urls')),
 
 ]
