@@ -1,0 +1,175 @@
+{
+	"info": {
+		"_postman_id": "b23841dc-9e26-411a-bd0a-b1ba40d6f603",
+		"name": "New Collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "44398681",
+		"_collection_link": "https://dashboard-team-6036.postman.co/workspace/dac332d2-5904-4d7e-8be0-58c580048dba/collection/44398681-b23841dc-9e26-411a-bd0a-b1ba40d6f603?action=share&source=collection_link&creator=44398681"
+	},
+	"item": [
+		{
+			"name": "login api",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "",
+						"value": "",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "username",
+							"value": "admin",
+							"type": "text"
+						},
+						{
+							"key": "password",
+							"value": "123",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://127.0.0.1:8000/accounts/api/login/",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"accounts",
+						"api",
+						"login",
+						""
+					],
+					"query": [
+						{
+							"key": "\"username\"",
+							"value": "admin",
+							"disabled": true
+						},
+						{
+							"key": "\"password\"",
+							"value": "123",
+							"disabled": true
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "logout",
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ1NTE2NDAyLCJpYXQiOjE3NDU1MTI4MDIsImp0aSI6IjJkMGZjODk4NjEzYjQ1N2E5Mzg3ZmNjYjY4N2JlZjJiIiwidXNlcl9pZCI6Nn0.kfzJrtVzCBoS-3VwAPy0almN2U3s0UMK3tafyqak3_k",
+						"description": "Authorization: Bearer <your_access_token>",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"refresh\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc0NTU5OTIwMiwiaWF0IjoxNzQ1NTEyODAyLCJqdGkiOiJkYmQ2YjMzMmE3NmE0ZmFhYTM2MjA0MzAyY2NkZjkyYiIsInVzZXJfaWQiOjZ9.eXgZrVFK6hWVh0dlVYtuCYNNQWeHFOKDMPwrSPGVBew\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:8000/accounts/api/logout/",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"accounts",
+						"api",
+						"logout",
+						""
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "profile account",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"auth": {
+					"type": "noauth"
+				},
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ1NTE2NzUyLCJpYXQiOjE3NDU1MTMxNTIsImp0aSI6ImQ4MGIwZTVkMGU2NDQ1YzlhMDdlNjViMmEzYmEwYjBlIiwidXNlcl9pZCI6Nn0.xhL8y4ZRuniA8GOC_XnrUldYzQ0Hn4dbbwG_gc38DU4",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"refresh\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoicmVmcmVzaCIsImV4cCI6MTc0NTU5OTU1MiwiaWF0IjoxNzQ1NTEzMTUyLCJqdGkiOiJkOTI4MTNkMDllMjU0NDBmODg0YjRhYTZlNzFhZWIzNyIsInVzZXJfaWQiOjZ9.P-5sSJvWFsLO-KxwcGZOZBGol3XuQVO3Q5bTSonyR0M\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://127.0.0.1:8000/accounts/api/profile/?username=admin&password=123",
+					"protocol": "http",
+					"host": [
+						"127",
+						"0",
+						"0",
+						"1"
+					],
+					"port": "8000",
+					"path": [
+						"accounts",
+						"api",
+						"profile",
+						""
+					],
+					"query": [
+						{
+							"key": "username",
+							"value": "admin"
+						},
+						{
+							"key": "password",
+							"value": "123"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

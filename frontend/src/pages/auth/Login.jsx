@@ -37,6 +37,18 @@ const Login = () => {
 
       // Redirect user to the homepage or dashboard
       navigate('/');
+
+      const response = await axios.post('http://127.0.0.1:8000/accounts/api/login/', {
+        username: email,
+        password: password
+    });
+    
+      // حفظ التوكن وبيانات المستخدم في localStorage
+      localStorage.setItem('access_token', response.data.access);
+      localStorage.setItem('refresh_token', response.data.refresh);
+      
+      // توجيه المستخدم إلى الصفحة الرئيسية أو داشبورد
+      navigate('/dashboard');
     } catch (err) {
       setError(err.message);
     }
