@@ -10,53 +10,49 @@ const Main = () => {
 
      
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Card 1: Members */}
-        <div className=" p-6 rounded-lg shadow-md flex items-center justify-between">
-          <div className="text-center">
-            <div className="text-green-600 text-4xl mb-4">
-              <FaUsers /> 
-            </div>
-            <h3 className="text-xl font-semibold">Members</h3>
-            
-          </div>
-        </div>
-
-        {/* Card 2: Subscription */}
-        <div className=" p-6 rounded-lg shadow-md flex items-center justify-between">
-          <div className="text-center">
-            <div className="text-blue-600 text-4xl mb-4">
-              <FaCalendarCheck /> 
-            </div>
-            <h3 className="text-xl font-semibold">Subscription</h3>
-            
-          </div>
-        </div>
-
-        {/* Card 3: Ticket */}
-        <div className=" p-6 rounded-lg shadow-md flex items-center justify-between">
-          <div className="text-center">
-            <div className="text-red-600 text-4xl mb-4">
-              <FaTicketAlt /> 
-            </div>
-            <h3 className="text-xl font-semibold">Tickets</h3>
-            
-          </div>
-        </div>
-
-        {/* Card 4: Attendance */}
-        <div className=" p-6 rounded-lg shadow-md flex items-center justify-between">
-          <div className="text-center">
-            <div className="text-yellow-600 text-4xl mb-4">
-              <FaCheckCircle /> 
-            </div>
-            <h3 className="text-xl font-semibold">Attendance</h3>
-           
-          </div>
-        </div>
-
-        <MembersList /> 
-
+  {/* Card 1: Members */}
+  <div className="rounded-xl bg-white/0 ring-1 ring-black/5 backdrop-blur-3xl p-6 shadow-md flex items-center justify-between">
+    <div className="text-center">
+      <div className="text-green-600 text-4xl mb-4">
+        <FaUsers className="btn-indigo text-2xl" />
       </div>
+      <h3 className="text-xl font-semibold">Members</h3>
+    </div>
+  </div>
+
+  {/* Card 2: Subscription */}
+  <div className="rounded-xl bg-white/0 ring-1 ring-black/5 backdrop-blur-3xl p-6 shadow-md flex items-center justify-between">
+    <div className="text-center">
+      <div className="text-blue-600 text-4xl mb-4">
+        <FaCalendarCheck className="btn-yellow text-2xl" />
+      </div>
+      <h3 className="text-xl font-semibold">Subscription</h3>
+    </div>
+  </div>
+
+  {/* Card 3: Ticket */}
+  <div className="rounded-xl bg-white/0 ring-1 ring-black/5 backdrop-blur-3xl p-6 shadow-md flex items-center justify-between">
+    <div className="text-center">
+      <div className="text-red-600 text-4xl mb-4">
+        <FaTicketAlt className="btn-pinkish text-2xl" />
+      </div>
+      <h3 className="text-xl font-semibold">Tickets</h3>
+    </div>
+  </div>
+
+  {/* Card 4: Attendance */}
+  <div className="rounded-xl bg-white/0 ring-1 ring-black/5 backdrop-blur-3xl p-6 shadow-md flex items-center justify-between">
+    <div className="text-center">
+      <div className="text-yellow-600 text-4xl mb-4">
+        <FaCheckCircle className="btn-orange text-2xl" />
+      </div>
+      <h3 className="text-xl font-semibold">Attendance</h3>
+    </div>
+  </div>
+
+  <MembersList />
+</div>
+
     </div>
   );
 };

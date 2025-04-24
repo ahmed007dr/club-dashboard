@@ -3,6 +3,7 @@ import AddTicket from '../modals/AddTicket';
 import { CiTrash } from 'react-icons/ci';
 import { CiEdit } from 'react-icons/ci';
 import { FaEye } from "react-icons/fa";
+import {  GiTicket } from 'react-icons/gi';
 
 const Tickets = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -86,19 +87,24 @@ const Tickets = () => {
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-4">Tickets</h2>
+
+<div className="flex items-start space-x-3">
+  <GiTicket className="btn-orange text-2xl" />
+  <h2 className="text-2xl font-semibold mb-4">Tickets</h2>
+</div>
+
 
       {/* Create Ticket Button */}
       <button
         onClick={handleCreateTicket}
-        className="mb-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+        className="btn"
       >
         Create Ticket
       </button>
 
-      <table className="min-w-full bg-white shadow rounded-lg overflow-hidden">
+      <table className="min-w-full  shadow rounded-lg overflow-hidden">
         <thead>
-          <tr className="bg-gray-100 text-left text-sm font-semibold text-gray-700">
+          <tr className=" text-left text-sm font-semibold ">
             <th className="px-4 py-3">Club</th>
             <th className="px-4 py-3">Buyer</th>
             <th className="px-4 py-3">Type</th>
@@ -118,9 +124,9 @@ const Tickets = () => {
               <td className="px-4 py-2">${ticket.price}</td>
               <td className="px-4 py-2">
                 {ticket.used ? (
-                  <span className="text-green-600 font-semibold">Yes</span>
+                  <span className="bg-light-green">Yes</span>
                 ) : (
-                  <span className="text-red-600 font-semibold">No</span>
+                  <span className="bg-light-red">No</span>
                 )}
               </td>
               <td className="px-4 py-2">{ticket.issue_date}</td>
@@ -128,39 +134,49 @@ const Tickets = () => {
                 {ticket.used_by ? ticket.used_by.name : "—"}
               </td>
               <td className="px-4 py-2 flex gap-2">
-                <FaEye
-                  onClick={() => {
-                    setSelectedTicket(ticket);
-                    setModalType("view");
-                  }}
-                  className="text-blue-600 cursor-pointer"
-                />
-                <CiEdit
-                  onClick={() => {
-                    setSelectedTicket({ ...ticket });
-                    setModalType("edit");
-                  }}
-                  className="text-yellow-500 text-xl cursor-pointer"
-                />
-                <CiTrash
-                  onClick={() => {
-                    setTicketToDelete(ticket);
-                    setIsDeleteModalOpen(true); // Open delete confirmation modal
-                  }}
-                  className="text-red-600 text-xl cursor-pointer"
-                />
-                {!ticket.used && (
-                  <button
-                    onClick={() => {
-                      setTicketToMarkUsed(ticket);
-                      setIsMarkUsedModalOpen(true); // Open "Mark as Used" confirmation modal
-                    }}
-                    className="text-blue-600 cursor-pointer"
-                  >
-                    Mark as Used
-                  </button>
-                )}
-              </td>
+  <button
+    onClick={() => {
+      setSelectedTicket(ticket);
+      setModalType("view");
+    }}
+    className="btn-blue"
+  >
+    <FaEye size={20} />
+  </button>
+
+  <button
+    onClick={() => {
+      setSelectedTicket({ ...ticket });
+      setModalType("edit");
+    }}
+    className="btn-green"
+  >
+    <CiEdit size={20} />
+  </button>
+
+  <button
+    onClick={() => {
+      setTicketToDelete(ticket);
+      setIsDeleteModalOpen(true);
+    }}
+    className="btn-red"
+  >
+    <CiTrash size={20} />
+  </button>
+
+  {!ticket.used && (
+    <button
+      onClick={() => {
+        setTicketToMarkUsed(ticket);
+        setIsMarkUsedModalOpen(true);
+      }}
+      className="text-blue-600 cursor-pointer"
+    >
+      Mark as Used
+    </button>
+  )}
+</td>
+
             </tr>
           ))}
         </tbody>

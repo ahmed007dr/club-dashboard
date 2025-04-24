@@ -100,10 +100,9 @@ const SubscriptionsTypes = () => {
 
   return (
     <div>
-      <h2>Subscription Plans</h2>
       
       <button
-          className="bg-green-600 text-white px-4 py-2 rounded"
+          className="btn"
           onClick={() => setIsAddModalOpen(true)}
         >
           + Add Subscription Type
@@ -131,22 +130,22 @@ const SubscriptionsTypes = () => {
               <td className="border px-4 py-2">{subscription.includesClasses ? "Included" : "Not Included"}</td>
               <td className="border px-4 py-2">
                 <button
-                  className="bg-blue-500 text-white px-4 py-2 rounded mr-2"
+                  className="btn-green"
                   onClick={() => openEditModal(subscription)}
                 >
-                  <CiEdit className="inline" />
+                  <CiEdit />
                 </button>
                 <button
-                  className="bg-red-500 text-white px-4 py-2 rounded mr-2"
+                  className="btn-red"
                   onClick={() => openDeleteModal(subscription)}
                 >
-                  <CiTrash className="inline" />
+                  <CiTrash />
                 </button>
                 <button
-                  className="bg-green-500 text-white px-4 py-2 rounded"
+                  className="btn-blue"
                   onClick={() => openDetailsModal(subscription)}
                 >
-                  <FaEye className="inline" /> 
+                  <FaEye /> 
                 </button>
               </td>
             </tr>

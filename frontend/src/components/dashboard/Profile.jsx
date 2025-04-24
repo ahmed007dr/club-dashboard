@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { BsPersonBoundingBox } from 'react-icons/bs';
 
 const Profile = () => {
   const [data, setData] = useState([]);
@@ -55,10 +56,14 @@ const Profile = () => {
 
   return (
     <div className="p-4 overflow-x-auto">
-      <h2 className="text-2xl font-bold text-center mb-4">Profile List</h2>
+           <div className="flex items-start space-x-3">
+        <BsPersonBoundingBox className='btn-pinkish text-2xl' />
+        <h1 className="text-2xl font-bold mb-4">Profile</h1>
+      </div>
+      
 
       <table className="min-w-full border border-gray-200">
-        <thead className="bg-green-100 text-left">
+        <thead className=" text-left">
           <tr>
             <th className="p-3 border-b">ID</th>
             <th className="p-3 border-b">Username</th>
@@ -75,18 +80,18 @@ const Profile = () => {
         </thead>
         <tbody>
           {data.map((profile) => (
-            <tr key={profile.id} className="hover:bg-gray-50">
+            <tr key={profile.id} className="">
               <td className="p-3 border-b">{profile.id}</td>
               <td className="p-3 border-b">{profile.username}</td>
               <td className="p-3 border-b">{profile.firstName}</td>
               <td className="p-3 border-b">{profile.lastName}</td>
               <td className="p-3 border-b">{profile.email}</td>
               <td className="p-3 border-b">{profile.role}</td>
-              <td className="p-3 border-b">{profile.isActive ? 'Yes' : 'No'}</td>
+              <td className="p-3 border-b">{profile.isActive ? <span className="bg-light-green">Yes</span> : <span className="bg-light-red">No</span>}</td>
               <td className="p-3 border-b">{new Date(profile.dateJoined).toLocaleDateString()}</td>
               <td className="p-3 border-b">{new Date(profile.lastLogin).toLocaleString()}</td>
-              <td className="p-3 border-b">{profile.isSuperuser ? 'Yes' : 'No'}</td>
-              <td className="p-3 border-b">{profile.isStaff ? 'Yes' : 'No'}</td>
+              <td className="p-3 border-b">{profile.isSuperuser ? <span className="bg-light-green">Yes</span>  : <span className="bg-light-red">No</span>}</td>
+              <td className="p-3 border-b">{profile.isStaff ? <span className="bg-light-green">Yes</span>  : <span className="bg-light-red">No</span>}</td>
             </tr>
           ))}
         </tbody>

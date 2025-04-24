@@ -2,10 +2,97 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@layer components {
+  .btn {
+    @apply bg-gradient-to-r from-purple-900 to-violet-800 text-white font-semibold py-2 px-4 rounded-lg shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+  }
+  .btn-red {
+    @apply bg-gradient-to-r from-red-600 to-red-800 text-white rounded-full p-3 shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+  }
+
+  .btn-green {
+    @apply bg-gradient-to-r from-green-600 to-green-800 text-white rounded-full p-3 shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+  }
+
+  .btn-blue {
+    @apply bg-gradient-to-r from-blue-600 to-blue-800 text-white rounded-full p-3 shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+  }
+
+  .btn-purple {
+    @apply text-white rounded-full p-3 shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+    background: linear-gradient(to right, #9706bf, #7d05a0);
+  }
+/* Add this to your CSS file for btn-pinkish styling */
+.btn-pinkish {
+  @apply text-white rounded-full p-3 shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+  background: linear-gradient(to right, #bf0691, #9a0574);
+  display: inline-flex; /* Flex to align items properly */
+  align-items: center;  /* Vertically align the content */
+  justify-content: center; /* Center the content horizontally */
+  width: 40px; /* Set a specific size for the icon container */
+  height: 40px; /* Set a specific size for the icon container */
+}
+.btn-darkblue {
+  @apply text-white rounded-full p-3 shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+  background: linear-gradient(to right,#0772b5, #005b8c); 
+  display: inline-flex; /* Flex to align items properly */
+  align-items: center;  /* Vertically align the content */
+  justify-content: center; /* Center the content horizontally */
+  width: 40px; /* Set a specific size for the icon container */
+  height: 40px; /* Set a specific size for the icon container */
+}
+
+.btn-yellow {
+  @apply text-white rounded-full p-3 shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+  background: linear-gradient(to right, #b5b507, #7a7a01); 
+  display: inline-flex; /* Flex to align items properly */
+  align-items: center;  /* Vertically align the content */
+  justify-content: center; /* Center the content horizontally */
+  width: 40px; /* Set a specific size for the icon container */
+  height: 40px; /* Apply gradient with #b5b507 and darker yellow */
+}
+.btn-orange {
+  @apply text-white rounded-full p-3 shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+  background: linear-gradient(to right, #b53e07, #802d05); 
+  display: inline-flex; /* Flex to align items properly */
+  align-items: center;  /* Vertically align the content */
+  justify-content: center; /* Center the content horizontally */
+  width: 40px; /* Set a specific size for the icon container */
+  height: 40px; /* Lighter to deeper reddish-orange */
+}
+
+.btn-gold {
+  @apply text-white rounded-full p-3 shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+  background: linear-gradient(to right, #f5c542, #c49b09);
+  display: inline-flex; /* Flex to align items properly */
+  align-items: center;  /* Vertically align the content */
+  justify-content: center; /* Center the content horizontally */
+  width: 40px; /* Set a specific size for the icon container */
+  height: 40px;
+} 
+
+.btn-indigo {
+  @apply text-white rounded-full p-3 shadow-lg hover:opacity-90 transition duration-300 ease-in-out;
+  background: linear-gradient(to right, #5a67d8, #434190);
+  display: inline-flex; /* Flex to align items properly */
+  align-items: center;  /* Vertically align the content */
+  justify-content: center; /* Center the content horizontally */
+  width: 40px; /* Set a specific size for the icon container */
+  height: 40px;
+}
+  
+  .bg-light-red {
+    @apply bg-red-100 text-red-800 p-2 rounded-sm;
+  }
+  .bg-light-green {
+    @apply bg-green-100 text-green-800 p-2 rounded-sm;
+  }
+}
+
 body {
     /* Light mode: Default background (white) and text color (black) */
-    @apply bg-white text-black;
+    @apply bg-white text-[#0a0314];
   
     /* Dark mode: When dark mode is enabled, apply dark background (black) and white text */
-    @apply dark:bg-gray-900 dark:text-white;
+    @apply dark:bg-[#0a0314] dark:text-white;
   }

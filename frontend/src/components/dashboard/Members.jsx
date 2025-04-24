@@ -3,7 +3,7 @@ import AddMember from "../modals/AddMember";
 import { Link } from "react-router-dom";
 import { CiTrash } from "react-icons/ci";
 import { CiEdit } from "react-icons/ci";
-
+import { RiGroupLine } from 'react-icons/ri';
 const Members = () => {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -86,7 +86,10 @@ const Members = () => {
 
   return (
     <div className="p-4 overflow-x-auto">
-      <h2 className="text-2xl font-bold text-center mb-4">Members List</h2>
+      <div className="flex items-start space-x-3">
+  <RiGroupLine className="btn-yellow text-2xl" />
+  <h2 className="text-2xl font-semibold mb-4">Members</h2>
+</div>
       <input
         type="text"
         value={searchQuery}
@@ -96,13 +99,13 @@ const Members = () => {
       />
       <button
         onClick={openAddModal}
-        className="bg-green-600 text-white py-2 px-4 rounded-md mb-4"
+        className="btn"
       >
         Add Member
       </button>
 
       <table className="min-w-full border border-gray-200">
-        <thead className="bg-green-100 text-left">
+        <thead className=" text-left">
           <tr>
             <th className="p-3 border-b">#</th>
             <th className="p-3 border-b">Photo</th>
@@ -135,15 +138,15 @@ const Members = () => {
               <td className="p-3 border-b">
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleEditClick(member)}
-                    className="text-blue-600 hover:text-blue-800"
+                    onClick={() => handleEditClick(member)} 
+                    className="btn-green"
                     title="Edit"
                   >
                     <CiEdit />
                   </button>
                   <button
                     onClick={() => handleDeleteClick(member)}
-                    className="text-red-600 hover:text-red-800"
+                    className="btn-red"
                     title="Delete"
                   >
                     <CiTrash />

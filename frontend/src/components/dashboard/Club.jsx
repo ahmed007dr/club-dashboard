@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { CiEdit } from 'react-icons/ci';
 
 const fakeClubs = [
   {
@@ -88,7 +89,7 @@ const Club = () => {
     <div className="p-4 overflow-x-auto">
       <h2 className="text-2xl font-bold text-center mb-4">Clubs List</h2>
       <table className="min-w-full border border-gray-200">
-        <thead className="bg-green-100 text-left">
+        <thead className=" text-left">
           <tr>
             <th className="p-3 border-b">#</th>
             <th className="p-3 border-b">Logo</th>
@@ -117,9 +118,9 @@ const Club = () => {
               <td className="p-3 border-b">
                 <button
                   onClick={() => openModal(club)}
-                  className="bg-blue-500 text-white p-2 rounded"
+                  className="btn-green"
                 >
-                  Edit
+                  <CiEdit />
                 </button>
               </td>
             </tr>

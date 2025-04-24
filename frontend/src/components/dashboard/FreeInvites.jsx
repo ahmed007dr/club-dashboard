@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CiTrash, CiEdit } from 'react-icons/ci';
 import { FaEye } from 'react-icons/fa';
-
+import { RiVipCrown2Line } from 'react-icons/ri';
 const fakeInvites = [
   {
     guestName: "Mike Johnson",
@@ -97,13 +97,16 @@ const FreeInvites = () => {
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-4">Free Invites</h2>
-      <p>This is the Free Invites section.</p>
+      <div className="flex items-start space-x-3">
+  <RiVipCrown2Line className="btn-gold text-2xl" />
+  <h2 className="text-2xl font-semibold mb-4">Free Invites</h2>
+</div>
+
 
       {/* Table displaying free invites */}
       <div className="mt-6 overflow-x-auto">
-        <table className="min-w-full bg-white border border-gray-300 rounded-lg shadow-lg">
-          <thead className="bg-green-600 text-white">
+        <table className="min-w-full  border border-gray-300 rounded-lg shadow-lg">
+          <thead className=" ">
             <tr>
               <th className="px-4 py-2 text-left">Guest Name</th>
               <th className="px-4 py-2 text-left">Phone</th>
@@ -116,46 +119,65 @@ const FreeInvites = () => {
             </tr>
           </thead>
           <tbody>
-            {fakeInvites.map((invite, index) => (
-              <tr key={index} className="border-b hover:bg-gray-100">
-                <td className="px-4 py-2">{invite.guestName}</td>
-                <td className="px-4 py-2">{invite.phone}</td>
-                <td className="px-4 py-2">{invite.date}</td>
-                <td className="px-4 py-2 capitalize">{invite.status}</td>
-                <td className="px-4 py-2">{invite.clubId}</td>
-                <td className="px-4 py-2">{invite.handledById}</td>
-                <td className="px-4 py-2">{invite.invitedById}</td>
-                <td className="px-4 py-2">
-                  <div className="flex space-x-2">
-                    {/* Edit Button */}
-                    <button
-                      onClick={() => openEditModal(invite)}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <CiEdit size={20} />
-                    </button>
-                    {/* View Button */}
-                    <button
-                      onClick={() => openViewModal(invite)}
-                      className="text-green-600 hover:text-green-800"
-                    >
-                      <FaEye size={20} />
-                    </button>
-                    {/* Delete Button */}
-                    <button
-                      onClick={() => openDeleteModal(invite)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <CiTrash size={20} />
-                    </button>
-                    <button onClick={() => openMarkUsedModal(invite)} className="text-blue-500">
-                    Mark as Used
-                  </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+          {fakeInvites.map((invite, index) => (
+  <tr
+    key={index}
+    
+  >
+    <td className="px-4 py-2">{invite.guestName}</td>
+    <td className="px-4 py-2">{invite.phone}</td>
+    <td className="px-4 py-2">{invite.date}</td>
+    <td className="px-4 py-2 capitalize">
+  <span
+    className={`${
+      invite.status === 'used'
+        ? 'bg-light-green px-2 py-1 rounded'
+        : invite.status === 'pending'
+        ? 'bg-light-red  px-2 py-1 rounded'
+        : ''
+    }`}
+  >
+    {invite.status === 'pending' ? 'Pending' : 'Used'}
+  </span>
+</td>
+
+
+    <td className="px-4 py-2">{invite.clubId}</td>
+    <td className="px-4 py-2">{invite.handledById}</td>
+    <td className="px-4 py-2">{invite.invitedById}</td>
+    <td className="px-4 py-2">
+      <div className="flex space-x-2">
+        {/* Edit Button */}
+        <button
+          onClick={() => openEditModal(invite)}
+          className="btn-green"
+        >
+          <CiEdit size={20} />
+        </button>
+        {/* View Button */}
+        <button
+          onClick={() => openViewModal(invite)}
+          className="btn-blue"
+        >
+          <FaEye size={20} />
+        </button>
+        {/* Delete Button */}
+        <button
+          onClick={() => openDeleteModal(invite)}
+          className="btn-red"
+        >
+          <CiTrash size={20} />
+        </button>
+        <button onClick={() => openMarkUsedModal(invite)} className="text-blue-500">
+          Mark as Used
+        </button>
+      </div>
+    </td>
+  </tr>
+))}
+
           </tbody>
+
         </table>
       </div>
 

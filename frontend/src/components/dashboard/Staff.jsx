@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { CiTrash } from 'react-icons/ci';
+import { CiEdit } from 'react-icons/ci';
+import { FaEye } from "react-icons/fa";
 
 const fakeShifts = [
   {
@@ -113,7 +116,7 @@ const Staff = () => {
       <div className="p-6">
         <h1 className="text-2xl font-bold mb-4">Staff Shifts</h1>
         <table className="w-full border text-sm">
-          <thead className="bg-gray-100">
+          <thead className="">
             <tr>
               <th className="p-2 border">Staff ID</th>
               <th className="p-2 border">Date</th>
@@ -134,9 +137,9 @@ const Staff = () => {
                 <td className="border p-2">{shift.approvedBy}</td>
                 <td className="border p-2">{shift.clubId}</td>
                 <td className="border p-2 flex gap-2 justify-center">
-                  <button onClick={() => handleOpenModal('view', shift)} className="text-blue-500">View</button>
-                  <button onClick={() => handleOpenModal('edit', shift)} className="text-green-500">Edit</button>
-                  <button onClick={() => handleOpenModal('delete', shift)} className="text-red-500">Delete</button>
+                  <button onClick={() => handleOpenModal('view', shift)} className="btn-blue"><FaEye/></button>
+                  <button onClick={() => handleOpenModal('edit', shift)} className="btn-green"><CiEdit/></button>
+                  <button onClick={() => handleOpenModal('delete', shift)} className="btn-red"><CiTrash/></button>
                 </td>
               </tr>
             ))}

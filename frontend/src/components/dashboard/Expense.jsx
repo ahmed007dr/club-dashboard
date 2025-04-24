@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CiEdit } from 'react-icons/ci';
 
 const Expense = () => {
   const [expenses, setExpenses] = useState([
@@ -79,8 +80,8 @@ const Expense = () => {
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-4">Expense List</h2>
       <div className="overflow-x-auto rounded-lg shadow border border-gray-200">
-        <table className="min-w-full bg-white divide-y divide-gray-200">
-          <thead className="bg-gray-100 text-gray-700 text-left text-sm">
+        <table className="min-w-full  divide-y divide-gray-200">
+          <thead className=" text-gray-700 text-left text-sm">
             <tr>
               <th className="px-4 py-2">Club</th>
               <th className="px-4 py-2">Category</th>
@@ -95,7 +96,7 @@ const Expense = () => {
           </thead>
           <tbody className="text-sm divide-y divide-gray-100">
             {expenses.map((expense, index) => (
-              <tr key={index} className="hover:bg-gray-50">
+              <tr key={index} className="">
                 <td className="px-4 py-2">{expense.club}</td>
                 <td className="px-4 py-2">{expense.category}</td>
                 <td className="px-4 py-2">{expense.amount} EGP</td>
@@ -107,9 +108,10 @@ const Expense = () => {
                 <td className="px-4 py-2">
                   <button
                     onClick={() => handleEditClick(index)}
-                    className="text-white bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded"
+                    className="btn-green"
                   >
-                    Edit
+                    
+                    <CiEdit />
                   </button>
                 </td>
               </tr>
