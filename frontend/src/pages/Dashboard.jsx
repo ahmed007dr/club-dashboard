@@ -27,7 +27,6 @@ const Dashboard = () => {
     { path: 'free-invites', name: 'Free Invites', icon: <FiGift /> },
     { path: 'leads', name: 'Leads', icon: <FiUsers /> },
     { path: 'club', name: 'Club', icon: <MdOutlineSportsHandball /> },
-    { path: 'profile', name: 'Profile', icon: <FaRegUser /> },
     { path: 'staff', name: 'Staff', icon: <FaRegBuilding /> },
     { path: 'finance', name: 'Finance', icon: <TbMoneybag />},
   ];
@@ -45,6 +44,7 @@ const Dashboard = () => {
           <Outlet /> 
         </main>
       </div>
+
     </div>
   );
 };
