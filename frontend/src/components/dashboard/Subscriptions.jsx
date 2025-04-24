@@ -1,11 +1,10 @@
-import React, { useState, useMemo } from 'react';
-import { useReactTable, getCoreRowModel, flexRender, createColumnHelper } from '@tanstack/react-table';
-import { CiTrash } from 'react-icons/ci';
-import { CiEdit } from 'react-icons/ci';
-import { FaEye } from "react-icons/fa";
-import AddSubscription from '../modals/AddSubscription';
-import SubscriptionsTypes from './Subscriptionstypes';
+import React, { useState } from 'react';
+import { IoIosArrowDown, IoIosArrowUp } from 'react-icons/io';
 
+import AddSubscription from '../modals/AddSubscription';
+import SubscriptionsTable from './SubscriptionsTable'; // Import the table component
+import SubscriptionsTypes from './SubscriptionsTypes'; // Import SubscriptionsTypes
+import { MdOutlineSubscriptions } from 'react-icons/md';
 const fakeSubscriptions = [
   {
     id: 1,
@@ -18,53 +17,8 @@ const fakeSubscriptions = [
     remaining_amount: "0.00",
     attendance_days: 20,
   },
-  {
-    id: 2,
-    member_name: "Mona Fawzy",
-    club_name: "Elite Gym",
-    subscription_type: "Premium Gym & Pool Membership",
-    start_date: "2023-02-01",
-    end_date: "2023-04-01",
-    paid_amount: "70.00",
-    remaining_amount: "30.00",
-    attendance_days: 40,
-  },
-  {
-    id: 3,
-    member_name: "Omar Tamer",
-    club_name: "Sport Club",
-    subscription_type: "All-Inclusive Membership",
-    start_date: "2023-03-01",
-    end_date: "2023-06-01",
-    paid_amount: "100.00",
-    remaining_amount: "60.00",
-    attendance_days: 50,
-  },
-  {
-    id: 4,
-    member_name: "Nadine Hassan",
-    club_name: "Health Club",
-    subscription_type: "Basic Gym Membership",
-    start_date: "2023-04-10",
-    end_date: "2023-05-10",
-    paid_amount: "30.00",
-    remaining_amount: "0.00",
-    attendance_days: 15,
-  },
-  {
-    id: 5,
-    member_name: "Youssef Adel",
-    club_name: "Wellness Club",
-    subscription_type: "Premium Gym & Pool Membership",
-    start_date: "2023-05-01",
-    end_date: "2023-07-01",
-    paid_amount: "70.00",
-    remaining_amount: "10.00",
-    attendance_days: 30,
-  },
+  // Add more subscriptions here
 ];
-
-const columnHelper = createColumnHelper();
 
 const Subscriptions = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -82,6 +36,12 @@ const Subscriptions = () => {
     amount_paid: '',
     amount_remaining: '',
   });
+
+  const [openSection, setOpenSection] = useState(null);
+
+  const toggleSection = (section) => {
+    setOpenSection(openSection === section ? null : section);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -104,8 +64,6 @@ const Subscriptions = () => {
     console.log('Submitted:', formData);
     setIsModalOpen(false); // Close modal
   };
-
-  const closeModal = () => setIsModalOpen(false);
 
   const openEditModal = (subscription) => {
     setFormData({
@@ -140,104 +98,65 @@ const Subscriptions = () => {
 
   const closeInfoModal = () => setIsInfoModalOpen(false);
 
-  const columns = useMemo(() => [
-    columnHelper.accessor("id", {
-      header: "#",
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor("member_name", {
-      header: "Member Name",
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor("club_name", {
-      header: "Club Name",
-      cell: info => info.getValue(),
-    }),
-    columnHelper.accessor("subscription_type", {
-      header: "Subscription Type",
-      cell: info => info.getValue(),
-    }),
-   
-    columnHelper.accessor("attendance_days", {
-      header: "Attendance Days",
-      cell: info => info.getValue(),
-    }),
-    columnHelper.display({
-      id: "actions",
-      header: "Actions",
-      cell: ({ row }) => (
-        <div className="flex justify-end gap-3">
-          <button
-            className="text-blue-600 hover:text-blue-800"
-            onClick={() => openEditModal(row.original)}
-          >
-            <CiEdit size={20} />
-          </button>
-          <button
-            className="text-red-600 hover:text-red-800"
-            onClick={() => openDeleteModal(row.original)}
-          >
-            <CiTrash size={20} />
-          </button>
-          <button
-            className="text-green-600 hover:text-green-800"
-            onClick={() => openInfoModal(row.original)}
-          >
-            <FaEye size={20} />
-          </button>
-        </div>
-      ),
-    }),
-  ], []);
-
-  const table = useReactTable({
-    data: fakeSubscriptions,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-  });
-
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-semibold">Subscriptions</h2>
+      <div className="flex items-start space-x-3">
+  <MdOutlineSubscriptions className="btn-indigo text-2xl" />
+  <h2 className="text-2xl font-semibold mb-4">Subscription</h2>
+</div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+          className="btn"
         >
           Add Subscription
         </button>
       </div>
 
-      <p>This is the Subscriptions section.</p>
 
-      {/* Subscriptions Table */}
-      <div className="overflow-x-auto mt-6">
-        <table className="min-w-full border border-gray-200">
-          <thead className="bg-green-100 text-right">
-            {table.getHeaderGroups().map(headerGroup => (
-              <tr key={headerGroup.id}>
-                {headerGroup.headers.map(header => (
-                  <th key={header.id} className="p-3 border-b border-gray-200 font-medium">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </th>
-                ))}
-              </tr>
-            ))}
-          </thead>
-          <tbody className="text-right">
-            {table.getRowModel().rows.map(row => (
-              <tr key={row.id} className="hover:bg-gray-50">
-                {row.getVisibleCells().map(cell => (
-                  <td key={cell.id} className="p-3 border-b border-gray-100">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Subscription Types Accordion */}
+      <div className="border-b border-gray-200 mb-4">
+        <button
+          onClick={() => toggleSection('subscriptionsTypes')}
+          className="w-full flex items-center justify-between text-left text-lg font-medium py-3 px-4  rounded-t"
+        >
+          <span>Subscription Types</span>
+          {openSection === 'subscriptionsTypes' ? (
+            <IoIosArrowUp className="text-xl" />
+          ) : (
+            <IoIosArrowDown className="text-xl" />
+          )}
+        </button>
+        {openSection === 'subscriptionsTypes' && (
+          <div className="shadow rounded-b">
+            <SubscriptionsTypes />
+          </div>
+        )}
+      </div>
+
+      {/* Subscriptions Table Accordion */}
+      <div className="border-b border-gray-200 mb-4">
+        <button
+          onClick={() => toggleSection('subscriptionsTable')}
+          className="w-full flex items-center justify-between text-left text-lg font-medium py-3 px-4  rounded-t"
+        >
+          <span>Subscriptions Table</span>
+          {openSection === 'subscriptionsTable' ? (
+            <IoIosArrowUp className="text-xl" />
+          ) : (
+            <IoIosArrowDown className="text-xl" />
+          )}
+        </button>
+        {openSection === 'subscriptionsTable' && (
+          <div className="shadow rounded-b">
+            <SubscriptionsTable 
+              subscriptions={fakeSubscriptions} 
+              openEditModal={openEditModal} 
+              openDeleteModal={openDeleteModal} 
+              openInfoModal={openInfoModal} 
+            />
+          </div>
+        )}
       </div>
 
       {/* Edit Modal */}
@@ -245,79 +164,80 @@ const Subscriptions = () => {
         <>
           <div
             className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
-            onClick={closeModal}
+            onClick={() => setIsModalOpen(false)}
           ></div>
           <AddSubscription
             formData={formData}
             handleChange={handleChange}
             handleSubmit={handleSubmit}
-            closeModal={closeModal}
+            closeModal={() => setIsModalOpen(false)}
           />
         </>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
-        <>
-          <div
-            className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
-            onClick={() => setIsDeleteModalOpen(false)}
-          ></div>
-          <div className="fixed z-50 bg-white p-6 rounded-lg shadow-md top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md">
-            <h2 className="text-xl font-semibold mb-4 text-red-600">Confirm Deletion</h2>
-            <p className="mb-6">Are you sure you want to delete this subscription?</p>
-            <div className="flex justify-end gap-3">
-              <button
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                onClick={() => setIsDeleteModalOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-                onClick={confirmDelete}
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </>
-      )}
+{isDeleteModalOpen && (
+  <div
+    className="fixed inset-0 z-40 flex justify-center items-center"
+    style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
+    onClick={() => setIsDeleteModalOpen(false)} // clicking anywhere closes modal
+  >
+    <div className="modal">
+      <h2 className="text-xl font-semibold mb-4 text-red-600">Confirm Deletion</h2>
+      <p className="mb-6">Are you sure you want to delete this subscription?</p>
+      <div className="flex justify-end gap-3">
+        <button
+          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+          onClick={() => setIsDeleteModalOpen(false)}
+        >
+          Cancel
+        </button>
+        <button
+          className="btn"
+          onClick={confirmDelete}
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
 
       {/* Subscription Info Modal */}
       {isInfoModalOpen && (
-        <div
-          className="fixed inset-0 flex justify-center items-center z-40"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+  <div
+    className="fixed inset-0 z-40 flex justify-center items-center"
+    style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+    onClick={closeInfoModal}
+  >
+    <div onClick={(e) => e.stopPropagation()} className="z-50 modal">
+      <div>
+        <p><strong>Member Name:</strong> {selectedSubscription.member_name}</p>
+        <p><strong>Club Name:</strong> {selectedSubscription.club_name}</p>
+        <p><strong>Subscription Type:</strong> {selectedSubscription.subscription_type}</p>
+        <p><strong>Start Date:</strong> {selectedSubscription.start_date}</p>
+        <p><strong>End Date:</strong> {selectedSubscription.end_date}</p>
+        <p><strong>Paid Amount:</strong> ${selectedSubscription.paid_amount}</p>
+        <p><strong>Remaining Amount:</strong> ${selectedSubscription.remaining_amount}</p>
+        <p><strong>Attendance Days:</strong> {selectedSubscription.attendance_days}</p>
+      </div>
+      <div className="flex justify-end gap-3 mt-4">
+        <button
+          className="btn"
           onClick={closeInfoModal}
         >
-          <div className="fixed z-50 bg-white p-6 rounded-lg shadow-md top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md">
-            <h2 className="text-xl font-semibold mb-4">Subscription Details</h2>
-            <div>
-              <p><strong>Member Name:</strong> {selectedSubscription.member_name}</p>
-              <p><strong>Club Name:</strong> {selectedSubscription.club_name}</p>
-              <p><strong>Subscription Type:</strong> {selectedSubscription.subscription_type}</p>
-              <p><strong>Start Date:</strong> {selectedSubscription.start_date}</p>
-              <p><strong>End Date:</strong> {selectedSubscription.end_date}</p>
-              <p><strong>Paid Amount:</strong> ${selectedSubscription.paid_amount}</p>
-              <p><strong>Remaining Amount:</strong> ${selectedSubscription.remaining_amount}</p>
-              <p><strong>Attendance Days:</strong> {selectedSubscription.attendance_days}</p>
-            </div>
-            <div className="flex justify-end gap-3 mt-4">
-              <button
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                onClick={closeInfoModal}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
-     <SubscriptionsTypes/>
     </div>
   );
 };
 
 export default Subscriptions;
+
+

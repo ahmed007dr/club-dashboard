@@ -3,7 +3,7 @@ import AddMember from "../modals/AddMember";
 import { Link } from "react-router-dom";
 import { CiTrash } from "react-icons/ci";
 import { CiEdit } from "react-icons/ci";
-
+import { RiGroupLine } from 'react-icons/ri';
 const Members = () => {
   const [data, setData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -86,7 +86,10 @@ const Members = () => {
 
   return (
     <div className="p-4 overflow-x-auto">
-      <h2 className="text-2xl font-bold text-center mb-4">Members List</h2>
+      <div className="flex items-start space-x-3">
+  <RiGroupLine className="btn-yellow text-2xl" />
+  <h2 className="text-2xl font-semibold mb-4">Members</h2>
+</div>
       <input
         type="text"
         value={searchQuery}
@@ -96,13 +99,13 @@ const Members = () => {
       />
       <button
         onClick={openAddModal}
-        className="bg-green-600 text-white py-2 px-4 rounded-md mb-4"
+        className="btn"
       >
         Add Member
       </button>
 
       <table className="min-w-full border border-gray-200">
-        <thead className="bg-green-100 text-left">
+        <thead className=" text-left">
           <tr>
             <th className="p-3 border-b">#</th>
             <th className="p-3 border-b">Photo</th>
@@ -116,7 +119,7 @@ const Members = () => {
         </thead>
         <tbody>
           {filteredData.map((member, index) => (
-            <tr key={member.id} className="hover:bg-gray-50">
+            <tr key={member.id} className=" ">
               <td className="p-3 border-b">{index + 1}</td>
               <td className="p-3 border-b">
                 <Link to={`/member/${member.id}`}>
@@ -135,15 +138,15 @@ const Members = () => {
               <td className="p-3 border-b">
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleEditClick(member)}
-                    className="text-blue-600 hover:text-blue-800"
+                    onClick={() => handleEditClick(member)} 
+                    className="btn-green"
                     title="Edit"
                   >
                     <CiEdit />
                   </button>
                   <button
                     onClick={() => handleDeleteClick(member)}
-                    className="text-red-600 hover:text-red-800"
+                    className="btn-red"
                     title="Delete"
                   >
                     <CiTrash />
@@ -158,8 +161,7 @@ const Members = () => {
       {/* Add Modal */}
       {isAddModalOpen && (
         <div
-          className="fixed inset-0 flex justify-center items-center z-40"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+          className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(255, 255, 255, 0.2)]"
         >
           <div className="bg-white p-6 rounded-lg w-1/3 relative">
             <button onClick={closeAddModal} className="absolute top-2 right-3 text-xl">
@@ -173,10 +175,10 @@ const Members = () => {
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div
-          className="fixed inset-0 flex justify-center items-center z-40"
+          className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(249, 236, 236, 0.2)]"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
         >
-          <div className="bg-white p-6 rounded-lg shadow-lg w-1/3 relative">
+          <div className="modal relative">
             <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
             <p>
               Are you sure you want to delete <strong>{selectedMember?.name}</strong>?
@@ -190,7 +192,7 @@ const Members = () => {
               </button>
               <button
                 onClick={confirmDelete}
-                className="bg-red-600 text-white px-4 py-2 rounded"
+                className="btn"
               >
                 Delete
               </button>
@@ -205,7 +207,7 @@ const Members = () => {
           className="fixed inset-0 flex justify-center items-center z-40"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
         >
-          <div className="bg-white p-6 rounded-lg shadow-lg w-1/3 relative">
+          <div className="modal relative">
             <h3 className="text-lg font-semibold mb-4">Edit Member</h3>
             <div className="flex flex-col gap-3">
               <input
@@ -257,7 +259,7 @@ const Members = () => {
                 </button>
                 <button
                   onClick={handleEditSubmit}
-                  className="bg-green-600 text-white px-4 py-2 rounded"
+                  className="btn"
                 >
                   Save
                 </button>

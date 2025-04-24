@@ -4,33 +4,60 @@ import { useDispatch, useSelector } from 'react-redux';
 import Sidebar from '../components/dashboard/Sidebar';
 import { closeSidebar } from '../redux/slices/uiSlice';
 
-import {
-  FiDollarSign, FiFileText, FiCalendar, FiGift, FiUsers,
-} from 'react-icons/fi';
-import { IoTicketOutline } from 'react-icons/io5';
 import { MdOutlineDashboard } from 'react-icons/md';
-import { MdOutlineSportsHandball } from "react-icons/md";
-import { FaRegUser } from "react-icons/fa";
-import { FaRegBuilding } from "react-icons/fa";
-import { TbMoneybag } from "react-icons/tb";
+import { FiUsers } from 'react-icons/fi';
+import { FaRegBuilding } from 'react-icons/fa';
+import { TbMoneybag } from 'react-icons/tb';
+import { BsPersonBoundingBox } from 'react-icons/bs';
+import { RiUserLine, RiGroupLine, RiVipCrown2Line } from 'react-icons/ri';
+import { AiOutlineSchedule } from 'react-icons/ai';
+import { MdOutlineSubscriptions } from 'react-icons/md';
+import { IoMdAnalytics } from 'react-icons/io';
+import { HiOutlineDocumentReport } from 'react-icons/hi';
+import { GiTeamIdea, GiMoneyStack, GiTicket } from 'react-icons/gi';
 const Dashboard = () => {
   const dispatch = useDispatch();
   const sidebarOpen = useSelector((state) => state.ui.sidebarOpen);
 
   const navItems = [
-    { path: '', name: 'Main', icon: <MdOutlineDashboard /> },
-    { path: 'subscriptions', name: 'Subscriptions', icon: <FiDollarSign /> },
-    { path: 'receipts', name: 'Receipts', icon: <FiFileText /> },
-    { path: 'members', name: 'Members', icon: <FiUsers /> },
-    { path: 'tickets', name: 'Tickets', icon: <IoTicketOutline /> },
-    { path: 'attendance', name: 'Attendance', icon: <FiCalendar /> },
-    { path: 'free-invites', name: 'Free Invites', icon: <FiGift /> },
-    { path: 'leads', name: 'Leads', icon: <FiUsers /> },
-    { path: 'club', name: 'Club', icon: <MdOutlineSportsHandball /> },
-    { path: 'profile', name: 'Profile', icon: <FaRegUser /> },
-    { path: 'staff', name: 'Staff', icon: <FaRegBuilding /> },
-    { path: 'finance', name: 'Finance', icon: <TbMoneybag />},
+    {
+      name: 'Dashboard',
+      icon: <MdOutlineDashboard />,
+      children: [
+        { path: '', name: 'Main', icon: <IoMdAnalytics /> },
+        { path: 'profile', name: 'Profile', icon: <BsPersonBoundingBox /> },
+      ],
+    },
+    {
+      name: 'Membership',
+      icon: <FiUsers />,
+      children: [
+        { path: 'members', name: 'Members', icon: <RiGroupLine /> },
+        { path: 'attendance', name: 'Attendance', icon: <AiOutlineSchedule /> },
+        { path: 'free-invites', name: 'Free Invites', icon: <RiVipCrown2Line /> },
+        { path: 'leads', name: 'Leads', icon: <GiTeamIdea /> },
+        { path: 'subscriptions', name: 'Subscription', icon: <MdOutlineSubscriptions /> },
+      ],
+    },
+    {
+      name: 'Management',
+      icon: <FaRegBuilding />,
+      children: [
+        { path: 'staff', name: 'Staff', icon: <RiUserLine /> },
+        { path: 'club', name: 'Club', icon: <HiOutlineDocumentReport /> },
+        { path: 'tickets', name: 'Tickets', icon: <GiTicket /> },
+      ],
+    },
+    {
+      name: 'Accounting',
+      icon: <TbMoneybag />,
+      children: [
+        { path: 'finance', name: 'Finance', icon: <GiMoneyStack /> },
+        { path: 'receipts', name: 'Receipts', icon: <HiOutlineDocumentReport />  },
+      ],
+    },
   ];
+  
 
   return (
     <div className="flex h-screen overflow-hidden">

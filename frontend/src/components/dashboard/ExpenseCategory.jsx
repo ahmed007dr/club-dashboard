@@ -73,16 +73,16 @@ const ExpenseCategory = () => {
         <h1 className="text-2xl font-bold">Expense Categories</h1>
         <button
           onClick={() => setShowModal(true)}
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          className="btn"
         >
           + Add Expense Category
         </button>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full bg-white shadow-md rounded-lg overflow-hidden">
+        <table className="min-w-full  shadow-md rounded-lg overflow-hidden">
           <thead>
-            <tr className="bg-gray-100 text-left text-sm uppercase text-gray-600 tracking-wider">
+            <tr className=" text-left text-sm uppercase text-gray-600 tracking-wider">
               <th className="px-6 py-3">Club</th>
               <th className="px-6 py-3">Name</th>
               <th className="px-6 py-3">Description</th>
@@ -90,7 +90,7 @@ const ExpenseCategory = () => {
           </thead>
           <tbody>
             {expenseCategories.map((category, index) => (
-              <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
+              <tr key={index} className="border-b border-gray-200 ">
                 <td className="px-6 py-4">{category.club}</td>
                 <td className="px-6 py-4">{category.name}</td>
                 <td className="px-6 py-4">{category.description}</td>
@@ -102,7 +102,7 @@ const ExpenseCategory = () => {
 
       {showModal && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+          <div className="modal">
             <h2 className="text-xl font-semibold mb-4">Add Expense Category</h2>
 
             <div className="mb-3">

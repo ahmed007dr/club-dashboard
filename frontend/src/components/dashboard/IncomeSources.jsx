@@ -35,13 +35,13 @@ const IncomeSources = () => {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-5xl bg-white p-6 rounded-lg shadow-md">
+    <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="min-w-full max-w-5xl  p-6 rounded-lg shadow-md">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Income Sources</h2>
         <div className="overflow-x-auto">
           <table className="min-w-full table-auto border border-gray-200">
             <thead>
-              <tr className="bg-green-100 text-left text-sm font-semibold text-gray-700 uppercase">
+              <tr className=" text-left text-sm font-semibold  uppercase">
                 <th className="px-4 py-3 border-b">ID</th>
                 <th className="px-4 py-3 border-b">Name</th>
                 <th className="px-4 py-3 border-b">Description</th>
@@ -50,7 +50,7 @@ const IncomeSources = () => {
             </thead>
             <tbody>
               {incomeSources.map((source) => (
-                <tr key={source.id} className="hover:bg-green-50 text-sm text-gray-700">
+                <tr key={source.id} className=" text-sm ">
                   <td className="px-4 py-2 border-b">{source.id}</td>
                   <td className="px-4 py-2 border-b">{source.name}</td>
                   <td className="px-4 py-2 border-b">{source.description}</td>

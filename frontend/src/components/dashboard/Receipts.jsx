@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { CiTrash, CiEdit } from 'react-icons/ci';
 import { FaEye } from "react-icons/fa";
+import { HiOutlineDocumentReport } from 'react-icons/hi';
+
 
 const fakeReceipts = [
   {
@@ -49,7 +51,10 @@ const Receipts = () => {
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-4">Receipts</h2>
+          <div className="flex items-start space-x-3">
+        <HiOutlineDocumentReport className='btn-darkblue text-2xl' />
+        <h1 className="text-2xl font-bold mb-4">Receipts</h1>
+      </div>
        <div className="mb-4">
         <input
           type="text"
@@ -60,14 +65,14 @@ const Receipts = () => {
         />
         <button
          // onClick={handleSearch}
-          className="ml-2 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          className="ml-2 btn"
         >
           بحث
         </button>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full bg-white border border-gray-300 rounded-lg shadow">
-          <thead className="bg-green-600 text-white">
+        <table className="min-w-full  border border-gray-300 rounded-lg shadow">
+          <thead className="">
             <tr>
               <th className="px-4 py-2 text-left">Buyer</th>
               <th className="px-4 py-2 text-left">Ticket Type</th>
@@ -80,21 +85,27 @@ const Receipts = () => {
           </thead>
           <tbody>
             {receipts.map((receipt) => (
-              <tr key={receipt.id} className="border-b hover:bg-gray-50">
+              <tr key={receipt.id} className="border-b ">
                 <td className="px-4 py-2">{receipt.buyer_name}</td>
                 <td className="px-4 py-2 capitalize">{receipt.ticket_type}</td>
                 <td className="px-4 py-2">EGP {receipt.price}</td>
-                <td className="px-4 py-2">{receipt.used ? "Yes" : "No"}</td>
+                <td className="px-4 py-2">
+                {receipt.used ? (
+                  <span className="bg-light-green">Yes</span>
+                ) : (
+                  <span className="bg-light-red">No</span>
+                )}
+              </td>
                 <td className="px-4 py-2">{receipt.issue_date}</td>
                 <td className="px-4 py-2">{receipt.used_by || "N/A"}</td>
                 <td className="px-4 py-2 space-x-2">
-                  <button onClick={() => openModal('view', receipt)} className="text-blue-500 hover:text-blue-700">
+                  <button onClick={() => openModal('view', receipt)} className="btn-blue">
                     <FaEye />
                   </button>
-                  <button onClick={() => openModal('edit', receipt)} className="text-green-500 hover:text-green-700">
+                  <button onClick={() => openModal('edit', receipt)} className="btn-green">
                     <CiEdit />
                   </button>
-                  <button onClick={() => openModal('delete', receipt)} className="text-red-500 hover:text-red-700">
+                  <button onClick={() => openModal('delete', receipt)} className="btn-red  ">
                     <CiTrash />
                   </button>
                 </td>
@@ -107,7 +118,7 @@ const Receipts = () => {
       {/* Modals */}
       {modalType && selectedReceipt && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+          <div className="modal">
             {modalType === 'view' && (
               <>
                 <h3 className="text-xl font-semibold mb-4">Receipt Info</h3>
@@ -189,16 +200,10 @@ const Receipts = () => {
       />
 
       <div className="flex justify-end gap-3 mt-4">
-        <button
-          type="button"
-          onClick={closeModal}
-          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-        >
-          Cancel
-        </button>
+        
         <button
           type="submit"
-          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          className="btn"
         >
           Submit
         </button>
@@ -228,7 +233,7 @@ const Receipts = () => {
                     setReceipts(receipts.filter(r => r.id !== selectedReceipt.id));
                     closeModal();
                   }}
-                  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  className="btn"
                 >
                   Confirm Delete
                 </button>

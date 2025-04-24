@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CiTrash, CiEdit } from 'react-icons/ci';
 import { FaEye } from 'react-icons/fa';
-
+import { RiVipCrown2Line } from 'react-icons/ri';
 const fakeInvites = [
   {
     guestName: "Mike Johnson",
@@ -97,13 +97,16 @@ const FreeInvites = () => {
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-4">Free Invites</h2>
-      <p>This is the Free Invites section.</p>
+      <div className="flex items-start space-x-3">
+  <RiVipCrown2Line className="btn-gold text-2xl" />
+  <h2 className="text-2xl font-semibold mb-4">Free Invites</h2>
+</div>
+
 
       {/* Table displaying free invites */}
       <div className="mt-6 overflow-x-auto">
-        <table className="min-w-full bg-white border border-gray-300 rounded-lg shadow-lg">
-          <thead className="bg-green-600 text-white">
+        <table className="min-w-full  border border-gray-300 rounded-lg shadow-lg">
+          <thead className=" ">
             <tr>
               <th className="px-4 py-2 text-left">Guest Name</th>
               <th className="px-4 py-2 text-left">Phone</th>
@@ -116,59 +119,78 @@ const FreeInvites = () => {
             </tr>
           </thead>
           <tbody>
-            {fakeInvites.map((invite, index) => (
-              <tr key={index} className="border-b hover:bg-gray-100">
-                <td className="px-4 py-2">{invite.guestName}</td>
-                <td className="px-4 py-2">{invite.phone}</td>
-                <td className="px-4 py-2">{invite.date}</td>
-                <td className="px-4 py-2 capitalize">{invite.status}</td>
-                <td className="px-4 py-2">{invite.clubId}</td>
-                <td className="px-4 py-2">{invite.handledById}</td>
-                <td className="px-4 py-2">{invite.invitedById}</td>
-                <td className="px-4 py-2">
-                  <div className="flex space-x-2">
-                    {/* Edit Button */}
-                    <button
-                      onClick={() => openEditModal(invite)}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <CiEdit size={20} />
-                    </button>
-                    {/* View Button */}
-                    <button
-                      onClick={() => openViewModal(invite)}
-                      className="text-green-600 hover:text-green-800"
-                    >
-                      <FaEye size={20} />
-                    </button>
-                    {/* Delete Button */}
-                    <button
-                      onClick={() => openDeleteModal(invite)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <CiTrash size={20} />
-                    </button>
-                    <button onClick={() => openMarkUsedModal(invite)} className="text-blue-500">
-                    Mark as Used
-                  </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+          {fakeInvites.map((invite, index) => (
+  <tr
+    key={index}
+    
+  >
+    <td className="px-4 py-2">{invite.guestName}</td>
+    <td className="px-4 py-2">{invite.phone}</td>
+    <td className="px-4 py-2">{invite.date}</td>
+    <td className="px-4 py-2 capitalize">
+  <span
+    className={`${
+      invite.status === 'used'
+        ? 'bg-light-green px-2 py-1 rounded'
+        : invite.status === 'pending'
+        ? 'bg-light-red  px-2 py-1 rounded'
+        : ''
+    }`}
+  >
+    {invite.status === 'pending' ? 'Pending' : 'Used'}
+  </span>
+</td>
+
+
+    <td className="px-4 py-2">{invite.clubId}</td>
+    <td className="px-4 py-2">{invite.handledById}</td>
+    <td className="px-4 py-2">{invite.invitedById}</td>
+    <td className="px-4 py-2">
+      <div className="flex space-x-2">
+        {/* Edit Button */}
+        <button
+          onClick={() => openEditModal(invite)}
+          className="btn-green"
+        >
+          <CiEdit size={20} />
+        </button>
+        {/* View Button */}
+        <button
+          onClick={() => openViewModal(invite)}
+          className="btn-blue"
+        >
+          <FaEye size={20} />
+        </button>
+        {/* Delete Button */}
+        <button
+          onClick={() => openDeleteModal(invite)}
+          className="btn-red"
+        >
+          <CiTrash size={20} />
+        </button>
+        <button onClick={() => openMarkUsedModal(invite)} className="text-blue-500">
+          Mark as Used
+        </button>
+      </div>
+    </td>
+  </tr>
+))}
+
           </tbody>
+
         </table>
       </div>
 
       {/* Modal for confirming deletion */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full">
+          <div className="modal">
             <h2 className="text-2xl font-semibold text-center mb-4">Are you sure you want to delete this invite?</h2>
             <p className="mb-4">This action cannot be undone.</p>
             <div className="flex justify-center space-x-4">
               <button
                 onClick={handleDelete}
-                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                className="btn"
               >
                 Yes, Delete
               </button>
@@ -186,7 +208,7 @@ const FreeInvites = () => {
       {/* Modal for editing a ticket */}
       {isEditModalOpen && selectedTicket && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full">
+          <div className="modal">
             <h2 className="text-2xl font-semibold text-center mb-4">Edit Invite</h2>
             <form>
               <div className="mb-4">
@@ -250,13 +272,13 @@ const FreeInvites = () => {
               <div className="flex justify-center space-x-4">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                  className="btn"
                 >
                   Save
                 </button>
                 <button
                   onClick={closeEditModal}
-                  className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                  className="btn-red"
                 >
                   Cancel
                 </button>
@@ -269,7 +291,7 @@ const FreeInvites = () => {
       {/* Modal for viewing ticket info */}
       {isModalOpen && selectedTicket && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-lg w-full">
+          <div className="modal">
             <h2 className="text-2xl font-semibold text-center mb-4">Invite Details</h2>
             <p><strong>Guest Name:</strong> {selectedTicket.guestName}</p>
             <p><strong>Phone:</strong> {selectedTicket.phone}</p>
@@ -281,7 +303,7 @@ const FreeInvites = () => {
             <div className="flex justify-center space-x-4 mt-4">
               <button
                 onClick={closeModal}
-                className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                className="btn"
               >
                 Close
               </button>
@@ -293,10 +315,10 @@ const FreeInvites = () => {
       {/* Confirmation Modal */}
       {isMarkUsedModalOpen && (
         <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="bg-white p-6 rounded-lg shadow-lg">
+          <div className="modal">
             <h3 className="text-xl mb-4">Do you want to mark this invite as used?</h3>
             <div className="flex space-x-4">
-              <button onClick={handleMarkUsed} className="bg-green-500 text-white py-2 px-4 rounded-md">
+              <button onClick={handleMarkUsed} className="btn">
                 Yes
               </button>
               <button onClick={closeMarkUsedModal} className="bg-gray-300 py-2 px-4 rounded-md">

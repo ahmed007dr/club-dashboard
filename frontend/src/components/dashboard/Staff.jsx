@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-
+import { CiTrash } from 'react-icons/ci';
+import { CiEdit } from 'react-icons/ci';
+import { FaEye } from "react-icons/fa";
+import { RiUserLine } from 'react-icons/ri'; 
 const fakeShifts = [
   {
     staffId: 'S001',
@@ -111,32 +114,35 @@ const Staff = () => {
   
     return (
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-4">Staff Shifts</h1>
+        <div className="flex items-start space-x-3">
+  <RiUserLine className="btn-brown text-2xl" />
+  <h2 className="text-2xl font-semibold mb-4">Staff</h2>
+</div>
         <table className="w-full border text-sm">
-          <thead className="bg-gray-100">
+          <thead className="">
             <tr>
-              <th className="p-2 border">Staff ID</th>
-              <th className="p-2 border">Date</th>
-              <th className="p-2 border">Shift Start</th>
-              <th className="p-2 border">Shift End</th>
-              <th className="p-2 border">Approved By</th>
-              <th className="p-2 border">Club ID</th>
-              <th className="p-2 border">Actions</th>
+              <th className="p-2">Staff ID</th>
+              <th className="p-2 ">Date</th>
+              <th className="p-2">Shift Start</th>
+              <th className="p-2">Shift End</th>
+              <th className="p-2">Approved By</th>
+              <th className="p-2">Club ID</th>
+              <th className="p-2">Actions</th>
             </tr>
           </thead>
           <tbody>
             {shifts.map((shift) => (
               <tr key={shift.id} className="text-center">
-                <td className="border p-2">{shift.staffId}</td>
-                <td className="border p-2">{shift.date}</td>
-                <td className="border p-2">{shift.shiftStart}</td>
-                <td className="border p-2">{shift.shiftEnd}</td>
-                <td className="border p-2">{shift.approvedBy}</td>
-                <td className="border p-2">{shift.clubId}</td>
-                <td className="border p-2 flex gap-2 justify-center">
-                  <button onClick={() => handleOpenModal('view', shift)} className="text-blue-500">View</button>
-                  <button onClick={() => handleOpenModal('edit', shift)} className="text-green-500">Edit</button>
-                  <button onClick={() => handleOpenModal('delete', shift)} className="text-red-500">Delete</button>
+                <td className=" p-2">{shift.staffId}</td>
+                <td className=" p-2">{shift.date}</td>
+                <td className=" p-2">{shift.shiftStart}</td>
+                <td className=" p-2">{shift.shiftEnd}</td>
+                <td className=" p-2">{shift.approvedBy}</td>
+                <td className=" p-2">{shift.clubId}</td>
+                <td className=" p-2 flex gap-2 justify-center">
+                  <button onClick={() => handleOpenModal('view', shift)} className="btn-blue"><FaEye/></button>
+                  <button onClick={() => handleOpenModal('edit', shift)} className="btn-green"><CiEdit/></button>
+                  <button onClick={() => handleOpenModal('delete', shift)} className="btn-red"><CiTrash/></button>
                 </td>
               </tr>
             ))}
@@ -145,12 +151,12 @@ const Staff = () => {
   
         {/* Delete Modal */}
         {modalType === 'delete' && selectedShift && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-xl shadow-lg w-80">
+          <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+            <div className="modal">
               <h2 className="text-lg font-semibold mb-4">Are you sure you want to delete this shift?</h2>
               <div className="flex justify-end gap-4">
                 <button onClick={handleCloseModal} className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                <button onClick={handleDelete} className="px-4 py-2 bg-red-500 text-white rounded">Delete</button>
+                <button onClick={handleDelete} className="btn">Delete</button>
               </div>
             </div>
           </div>
@@ -158,8 +164,8 @@ const Staff = () => {
   
         {/* View Modal */}
         {modalType === 'view' && selectedShift && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-xl shadow-lg w-96">
+          <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+            <div className="modal">
               <h2 className="text-xl font-bold mb-4">Shift Details</h2>
               <ul className="text-sm space-y-2">
                 <li><strong>Staff ID:</strong> {selectedShift.staffId}</li>
@@ -170,7 +176,7 @@ const Staff = () => {
                 <li><strong>Club ID:</strong> {selectedShift.clubId}</li>
               </ul>
               <div className="mt-6 text-right">
-                <button onClick={handleCloseModal} className="px-4 py-2 bg-blue-500 text-white rounded">Close</button>
+                <button onClick={handleCloseModal} className="btn">Close</button>
               </div>
             </div>
           </div>
@@ -178,8 +184,8 @@ const Staff = () => {
   
         {/* Edit Modal */}
         {modalType === 'edit' && selectedShift && (
-          <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-            <div className="bg-white p-6 rounded-xl shadow-lg w-96">
+          <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
+            <div className="modal">
               <h2 className="text-xl font-bold mb-4">Edit Shift</h2>
               <form onSubmit={handleEditSubmit} className="space-y-3">
                 {['staffId', 'date', 'shiftStart', 'shiftEnd', 'approvedBy', 'clubId'].map(field => (
@@ -197,7 +203,7 @@ const Staff = () => {
                 ))}
                 <div className="mt-4 flex justify-end gap-2">
                   <button onClick={handleCloseModal} type="button" className="px-4 py-2 bg-gray-300 rounded">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-green-500 text-white rounded">Save</button>
+                  <button type="submit" className="btn">Save</button>
                 </div>
               </form>
             </div>

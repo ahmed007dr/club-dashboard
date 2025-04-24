@@ -1,10 +1,18 @@
-// components/Sidebar.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { FiX } from 'react-icons/fi';
 import { Link, useLocation } from 'react-router-dom';
+import { IoIosArrowDown, IoIosArrowUp } from 'react-icons/io';
 
 const Sidebar = ({ navItems, sidebarOpen, closeSidebar }) => {
   const location = useLocation();
+  const [openMenus, setOpenMenus] = useState({});
+ 
+  const toggleMenu = (name) => {
+    setOpenMenus((prev) => ({
+      ...prev,
+      [name]: !prev[name],
+    }));
+  };
 
   return (
     <>
@@ -15,13 +23,13 @@ const Sidebar = ({ navItems, sidebarOpen, closeSidebar }) => {
         />
       )}
 
-      <aside className={`fixed z-20 top-0 left-0 bg-white dark:bg-gray-900 md:relative transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 w-64 h-full border-r border-gray-200 transition-transform duration-300 ease-in-out`}>
+      <aside className={`fixed z-20 top-0 left-0  md:relative transform ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 w-64 h-full border-r border-gray-200 transition-transform duration-300 ease-in-out`}>
         <div className="h-full flex flex-col">
           <div className="p-4 border-b border-gray-200 flex items-center justify-between">
             <h1 className="text-xl font-semibold">Logo</h1>
             <button
               onClick={closeSidebar}
-              className="md:hidden text-gray-500 hover:text-gray-700"
+              className="md:hidden  hover:text-gray-700"
             >
               <FiX size={24} />
             </button>
@@ -31,20 +39,50 @@ const Sidebar = ({ navItems, sidebarOpen, closeSidebar }) => {
             <nav className="flex-1 space-y-2">
               {navItems.map((item) => {
                 const isActive = location.pathname.endsWith(item.path);
+                const hasChildren = !!item.children;
+
                 return (
-                  <Link
-                    to={item.path}
-                    key={item.name}
-                    onClick={closeSidebar}
-                    className={`w-full flex items-center space-x-3 p-3 rounded-lg transition-colors duration-200 ${
-                      isActive
-                        ? 'bg-blue-50 text-blue-600 font-medium'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <span className="text-lg">{item.icon}</span>
-                    <span>{item.name}</span>
-                  </Link>
+                  <div key={item.name}>
+                    <div
+                      onClick={() => hasChildren ? toggleMenu(item.name) : closeSidebar()}
+                      className={`w-full flex items-center justify-between cursor-pointer space-x-3 p-3 rounded-lg transition-colors duration-200 ${
+                        isActive ? 'bg-blue-50 text-blue-600 font-medium' : ''
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="text-lg">{item.icon}</span>
+                        <span>{item.name}</span>
+                      </div>
+                      {hasChildren && (
+                        <span className="text-xl">
+                          {openMenus[item.name] ? <IoIosArrowUp /> : <IoIosArrowDown />}
+                        </span>
+                      )}
+                    </div>
+
+                    {hasChildren && openMenus[item.name] && (
+  <div className="ml-8 mt-1 space-y-1">
+    {item.children.map((child) => (
+   <Link
+   to={child.path}
+   key={child.name}
+   onClick={closeSidebar}
+   className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+     location.pathname === '/' && child.path === ''
+       ? 'bg-blue-500 text-white font-medium' // Active link styles for "Main"
+       : location.pathname.endsWith(child.path) && child.path !== ''
+       ? 'bg-blue-500 text-white font-medium' // Active link styles for other links
+       : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white' // Inactive link styles
+   }`}
+ >
+   <span className="text-base">{child.icon}</span>
+   <span>{child.name}</span>
+ </Link>
+    ))}
+  </div>
+)}
+
+                  </div>
                 );
               })}
             </nav>
@@ -60,3 +98,4 @@ const Sidebar = ({ navItems, sidebarOpen, closeSidebar }) => {
 };
 
 export default Sidebar;
+

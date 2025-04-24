@@ -26,7 +26,7 @@ const AddFreeInvite = () => {
   };
 
   return (
-    <div className="max-w-3xl mx-auto bg-white p-6 rounded-lg shadow-md">
+    <div className="modal">
       <h2 className="text-2xl font-semibold mb-6 text-center">Create Free Invite</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
 

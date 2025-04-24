@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import img from '../../images/img.png';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -14,6 +13,31 @@ const Login = () => {
     setError('');
 
     try {
+      const formData = new URLSearchParams();
+      formData.append('username', username);
+      formData.append('password', password);
+
+      const response = await fetch('http://127.0.0.1:8000/accounts/api/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: formData,
+      });
+
+      const data = await response.json();
+      console.log('Login response data:', data);
+      if (!response.ok) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      // Save token and user data in localStorage
+      localStorage.setItem('token', data.access);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // Redirect user to the homepage or dashboard
+      navigate('/');
+
       const response = await axios.post('http://127.0.0.1:8000/accounts/api/login/', {
         username: email,
         password: password
@@ -26,7 +50,7 @@ const Login = () => {
       // توجيه المستخدم إلى الصفحة الرئيسية أو داشبورد
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.message);
     }
   };
 
@@ -43,11 +67,11 @@ const Login = () => {
           <h2 className="text-3xl font-bold mb-6 text-center">Login to Your Account</h2>
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
-              <label className="block text-sm font-medium mb-1">Email</label>
+              <label className="block text-sm font-medium mb-1">Username</label>
               <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                 required
               />
@@ -65,19 +89,19 @@ const Login = () => {
             {error && <p className="text-red-500 text-sm">{error}</p>}
             <button
               type="submit"
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition"
+              className="btn w-full"
             >
               Login
             </button>
           </form>
-          <p className="text-sm mt-4 text-center text-gray-600">
-            Don’t have an account? <a href="/register" className="text-blue-600 hover:underline">Sign up</a>
-          </p>
+         
         </div>
       </div>
     </div>
   );
-};
+}; 
 
 export default Login;
+
+
 
