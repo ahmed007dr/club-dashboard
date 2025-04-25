@@ -1,45 +1,209 @@
-import React, { useState } from 'react';
-import { CiTrash, CiEdit } from 'react-icons/ci';
+import React, { useState, useEffect } from "react";
+import { CiTrash, CiEdit } from "react-icons/ci";
 import { FaEye } from "react-icons/fa";
-import { HiOutlineDocumentReport } from 'react-icons/hi';
-
-
-const fakeReceipts = [
-  {
-    id: 1,
-    buyer_name: "Mike Johnson",
-    ticket_type: "day_pass",
-    price: "30.00",
-    used: false,
-    issue_date: "2025-04-10",
-    used_by: null,
-  },
-  {
-    id: 2,
-    buyer_name: "Sarah Parker",
-    ticket_type: "week_pass",
-    price: "50.00",
-    used: true,
-    issue_date: "2025-04-08",
-    used_by: "Sarah Parker",
-  },
-  {
-    id: 3,
-    buyer_name: "David Brown",
-    ticket_type: "month_pass",
-    price: "100.00",
-    used: false,
-    issue_date: "2025-04-01",
-    used_by: null,
-  },
-];
+import { HiOutlineDocumentReport } from "react-icons/hi";
+import axios from "axios";
+import { toast } from "react-hot-toast";
 
 const Receipts = () => {
-  const [receipts, setReceipts] = useState(fakeReceipts);
+  const [receipts, setReceipts] = useState([]); // Ensure initial state is an array
   const [selectedReceipt, setSelectedReceipt] = useState(null);
-  const [modalType, setModalType] = useState(null); // 'view' | 'edit' | 'delete'
+  const [modalType, setModalType] = useState(null);
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const openModal = (type, receipt) => {
+  useEffect(() => {
+    fetchReceipts();
+  }, []); // No dependencies, runs once on mount
+
+  const fetchReceipts = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const response = await axios.get(
+        `http://127.0.0.1:8000/receipts/api/receipts/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Log the full response for debugging
+      console.log("Fetch Receipts Response:", response.data);
+
+      // Handle different response structures
+      let results = [];
+      if (Array.isArray(response.data)) {
+        results = response.data; // Direct array of receipts
+      } else if (Array.isArray(response.data.results)) {
+        results = response.data.results; // Handle paginated response
+      } else {
+        console.warn("Unexpected response structure:", response.data);
+        results = [];
+      }
+
+      setReceipts(results);
+
+      if (results.length === 0) {
+        toast.error("No receipts found");
+      }
+    } catch (error) {
+      console.error("Error fetching receipts:", error);
+      toast.error(error.message || "Failed to fetch receipts");
+      setReceipts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSearch = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const response = await axios.get(
+        `http://127.0.0.1:8000/receipts/api/receipts/invoice/${invoiceNumber}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      console.log("Search Receipt Response:", response.data);
+
+      const result = response.data ? [response.data] : [];
+      setReceipts(result);
+
+      if (result.length === 0) {
+        toast.error("No receipt found for this invoice number");
+      }
+    } catch (error) {
+      console.error("Error fetching receipt by invoice:", error);
+      toast.error(error.message || "Receipt not found");
+      setReceipts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditReceipt = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const updatedReceipt = {
+      ...selectedReceipt,
+      amount: e.target.amount.value,
+      member: e.target.member.value,
+      club: e.target.club.value,
+      note: e.target.note.value,
+      payment_method: e.target.payment_method.value,
+    };
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      await axios.put(
+        `http://127.0.0.1:8000/receipts/api/receipts/${selectedReceipt.id}/edit/`,
+        updatedReceipt,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setReceipts((prev) =>
+        prev.map((r) => (r.id === selectedReceipt.id ? updatedReceipt : r))
+      );
+      toast.success("Receipt updated successfully");
+      closeModal();
+    } catch (error) {
+      console.error("Error updating receipt:", error);
+      toast.error(error.message || "Failed to update receipt");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteReceipt = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      await axios.delete(
+        `http://127.0.0.1:8000/receipts/api/receipts/${selectedReceipt.id}/delete/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setReceipts(receipts.filter((r) => r.id !== selectedReceipt.id));
+      toast.success("Receipt deleted successfully");
+      closeModal();
+      // Refresh receipts after deletion
+      fetchReceipts();
+    } catch (error) {
+      console.error("Error deleting receipt:", error);
+      toast.error(error.message || "Failed to delete receipt");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCreateReceipt = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const newReceipt = {
+      amount: e.target.amount.value,
+      member: e.target.member.value,
+      club: e.target.club.value,
+      note: e.target.note.value,
+      payment_method: e.target.payment_method.value,
+    };
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("No authentication token found");
+      }
+
+      const response = await axios.post(
+        "http://127.0.0.1:8000/receipts/api/receipts/add/",
+        newReceipt,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setReceipts([...receipts, response.data]);
+      toast.success("Receipt created successfully");
+      closeModal();
+      // Refresh receipts after creation
+      fetchReceipts();
+    } catch (error) {
+      console.error("Error creating new receipt:", error);
+      toast.error(error.message || "Failed to create receipt");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openModal = (type, receipt = null) => {
     setSelectedReceipt(receipt);
     setModalType(type);
   };
@@ -50,195 +214,241 @@ const Receipts = () => {
   };
 
   return (
-    <div>
-          <div className="flex items-start space-x-3">
-        <HiOutlineDocumentReport className='btn-darkblue text-2xl' />
+    <div className="relative">
+      <div className="flex items-start space-x-3">
+        <HiOutlineDocumentReport className="text-blue-600 w-9 h-9 text-2xl" />
         <h1 className="text-2xl font-bold mb-4">Receipts</h1>
       </div>
-       <div className="mb-4">
-        <input
-          type="text"
-         // value={invoiceNumber}
-          //onChange={(e) => setInvoiceNumber(e.target.value)}
-          className="border px-4 py-2 rounded"
-          placeholder="أدخل رقم الفاتورة"
-        />
-        <button
-         // onClick={handleSearch}
-          className="ml-2 btn"
-        >
-          بحث
+      <div className="flex justify-between mb-4">
+        <div>
+          <input
+            type="text"
+            value={invoiceNumber}
+            onChange={(e) => setInvoiceNumber(e.target.value)}
+            className="border px-4 py-2 rounded"
+            placeholder="Enter Invoice Number"
+          />
+          <button onClick={handleSearch} className="ml-2 btn" disabled={loading}>
+            {loading ? "Searching..." : "Search"}
+          </button>
+        </div>
+        <button className="btn" onClick={() => openModal("create")} disabled={loading}>
+          Add Receipt
         </button>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full  border border-gray-300 rounded-lg shadow">
-          <thead className="">
-            <tr>
-              <th className="px-4 py-2 text-left">Buyer</th>
-              <th className="px-4 py-2 text-left">Ticket Type</th>
-              <th className="px-4 py-2 text-left">Price</th>
-              <th className="px-4 py-2 text-left">Used</th>
-              <th className="px-4 py-2 text-left">Issue Date</th>
-              <th className="px-4 py-2 text-left">Used By</th>
-              <th className="px-4 py-2 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {receipts.map((receipt) => (
-              <tr key={receipt.id} className="border-b ">
-                <td className="px-4 py-2">{receipt.buyer_name}</td>
-                <td className="px-4 py-2 capitalize">{receipt.ticket_type}</td>
-                <td className="px-4 py-2">EGP {receipt.price}</td>
-                <td className="px-4 py-2">
-                {receipt.used ? (
-                  <span className="bg-light-green">Yes</span>
-                ) : (
-                  <span className="bg-light-red">No</span>
-                )}
-              </td>
-                <td className="px-4 py-2">{receipt.issue_date}</td>
-                <td className="px-4 py-2">{receipt.used_by || "N/A"}</td>
-                <td className="px-4 py-2 space-x-2">
-                  <button onClick={() => openModal('view', receipt)} className="btn-blue">
-                    <FaEye />
-                  </button>
-                  <button onClick={() => openModal('edit', receipt)} className="btn-green">
-                    <CiEdit />
-                  </button>
-                  <button onClick={() => openModal('delete', receipt)} className="btn-red  ">
-                    <CiTrash />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
-      {/* Modals */}
-      {modalType && selectedReceipt && (
-        <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="modal">
-            {modalType === 'view' && (
+      {loading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full border border-gray-300 rounded-lg shadow">
+            <thead>
+              <tr>
+                <th className="px-4 py-2 text-left">Invoice Number</th>
+                <th className="px-4 py-2 text-left">Member</th>
+                <th className="px-4 py-2 text-left">Amount</th>
+                <th className="px-4 py-2 text-left">Club</th>
+                <th className="px-4 py-2 text-left">Payment Method</th>
+                <th className="px-4 py-2 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(!receipts || receipts.length === 0) ? (
+                <tr>
+                  <td colSpan="6" className="text-center py-4">
+                    No receipts found
+                  </td>
+                </tr>
+              ) : (
+                receipts.map((receipt) => (
+                  <tr key={receipt.id} className="border-b">
+                    <td className="px-4 py-2">{receipt.invoice_number}</td>
+                    <td className="px-4 py-2 capitalize">{receipt.member}</td>
+                    <td className="px-4 py-2">EGP {receipt.amount}</td>
+                    <td className="px-4 py-2">{receipt.club}</td>
+                    <td>{receipt.payment_method}</td>
+                    <td className="px-4 py-2 space-x-2">
+                      <button
+                        onClick={() => openModal("view", receipt)}
+                        className="btn-blue"
+                        disabled={loading}
+                      >
+                        <FaEye />
+                      </button>
+                      <button
+                        onClick={() => openModal("edit", receipt)}
+                        className="btn-green"
+                        disabled={loading}
+                      >
+                        <CiEdit />
+                      </button>
+                      <button
+                        onClick={() => openModal("delete", receipt)}
+                        className="btn-red"
+                        disabled={loading}
+                      >
+                        <CiTrash />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {modalType && (
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-black/50 bg-opacity-50">
+          <div className="modal bg-white p-6 rounded shadow-md w-full max-w-md">
+            {/* View Mode */}
+            {modalType === "view" && selectedReceipt && (
               <>
                 <h3 className="text-xl font-semibold mb-4">Receipt Info</h3>
                 <ul className="space-y-2">
-                  <li><strong>Buyer:</strong> {selectedReceipt.buyer_name}</li>
-                  <li><strong>Ticket Type:</strong> {selectedReceipt.ticket_type}</li>
-                  <li><strong>Price:</strong> EGP {selectedReceipt.price}</li>
-                  <li><strong>Used:</strong> {selectedReceipt.used ? "Yes" : "No"}</li>
-                  <li><strong>Issue Date:</strong> {selectedReceipt.issue_date}</li>
-                  <li><strong>Used By:</strong> {selectedReceipt.used_by || "N/A"}</li>
+                  <li><strong>Invoice Number:</strong> {selectedReceipt.invoice_number}</li>
+                  <li><strong>Date:</strong> {selectedReceipt.date || "N/A"}</li>
+                  <li><strong>Club Name:</strong> {selectedReceipt.club_details?.name || "N/A"}</li>
+                  <li><strong>Issued By:</strong> {(selectedReceipt.issued_by_details?.first_name && selectedReceipt.issued_by_details?.last_name) ? `${selectedReceipt.issued_by_details.first_name} ${selectedReceipt.issued_by_details.last_name}` : "N/A"}</li>
+                  <li><strong>Price:</strong> EGP {selectedReceipt.amount}</li>
+                  <li><strong>Member:</strong> {selectedReceipt.member_details?.name || "N/A"}</li>
+                  <li><strong>Phone:</strong> {selectedReceipt.member_details?.phone || "N/A"}</li>
+                  <li><strong>Note:</strong> {selectedReceipt.note || "N/A"}</li>
+                  <li><strong>Payment Method:</strong> {selectedReceipt.payment_method || "N/A"}</li>
                 </ul>
-              </>
-            )}
-
-{modalType === 'edit' && (
-  <>
-    <h3 className="text-xl font-semibold mb-4">Edit Receipt</h3>
-    <form
-      className="space-y-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-
-        const updatedReceipt = {
-          ...selectedReceipt,
-          buyer_name: e.target.buyer_name.value,
-          ticket_type: e.target.ticket_type.value,
-          price: e.target.price.value,
-          issue_date: e.target.issue_date.value,
-          used_by: e.target.used_by.value || null,
-        };
-
-        setReceipts((prevReceipts) =>
-          prevReceipts.map((r) =>
-            r.id === selectedReceipt.id ? updatedReceipt : r
-          )
-        );
-
-        closeModal();
-      }}
-    >
-      <input
-        name="buyer_name"
-        className="w-full border rounded px-3 py-2"
-        defaultValue={selectedReceipt.buyer_name}
-        placeholder="Buyer Name"
-      />
-
-      <select
-        name="ticket_type"
-        className="w-full border rounded px-3 py-2"
-        defaultValue={selectedReceipt.ticket_type}
-      >
-        <option value="day_pass">Day Pass</option>
-        <option value="week_pass">Week Pass</option>
-        <option value="month_pass">Month Pass</option>
-      </select>
-
-      <input
-        name="price"
-        className="w-full border rounded px-3 py-2"
-        type="number"
-        step="0.01"
-        defaultValue={selectedReceipt.price}
-        placeholder="Price"
-      />
-
-      <input
-        name="issue_date"
-        className="w-full border rounded px-3 py-2"
-        type="date"
-        defaultValue={selectedReceipt.issue_date}
-      />
-
-      <input
-        name="used_by"
-        className="w-full border rounded px-3 py-2"
-        placeholder="Used By"
-        defaultValue={selectedReceipt.used_by || ""}
-      />
-
-      <div className="flex justify-end gap-3 mt-4">
-        
-        <button
-          type="submit"
-          className="btn"
-        >
-          Submit
-        </button>
-      </div>
-    </form>
-  </>
-)}
-
-
-            {modalType === 'delete' && (
-              <>
-                <h3 className="text-xl font-semibold mb-4 text-red-600">Delete Receipt</h3>
-                <p>Are you sure you want to delete this receipt?</p>
-              </>
-            )}
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={closeModal}
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-              {modalType === 'delete' && (
-                <button
-                  onClick={() => {
-                    setReceipts(receipts.filter(r => r.id !== selectedReceipt.id));
-                    closeModal();
-                  }}
-                  className="btn"
-                >
-                  Confirm Delete
+                <button type="button" className="btn-red mt-4" onClick={closeModal} disabled={loading}>
+                  Close
                 </button>
-              )}
-            </div>
+              </>
+            )}
+
+            {/* Edit Mode */}
+            {modalType === "edit" && selectedReceipt && (
+              <form onSubmit={handleEditReceipt} className="space-y-4">
+                <h3 className="text-xl font-semibold mb-4">Edit Receipt</h3>
+                <input
+                  name="amount"
+                  type="number"
+                  className="w-full border rounded px-3 py-2"
+                  defaultValue={selectedReceipt.amount}
+                  placeholder="Amount"
+                  required
+                />
+                <input
+                  name="member"
+                  className="w-full border rounded px-3 py-2"
+                  defaultValue={selectedReceipt.member_details?.id || ""}
+                  placeholder="Member ID"
+                  required
+                />
+                <input
+                  name="club"
+                  type="number"
+                  className="w-full border rounded px-3 py-2"
+                  defaultValue={selectedReceipt.club_details?.id || ""}
+                  placeholder="Club ID"
+                  required
+                />
+                <select
+                  name="payment_method"
+                  className="w-full border rounded px-3 py-2"
+                  defaultValue={selectedReceipt.payment_method || ""}
+                  required
+                >
+                  <option value="">Select Payment Method</option>
+                  <option value="bank">Bank</option>
+                  <option value="cash">Cash</option>
+                  <option value="visa">Visa</option>
+                </select>
+                <textarea
+                  name="note"
+                  className="w-full border rounded px-3 py-2"
+                  defaultValue={selectedReceipt.note || ""}
+                  placeholder="Note"
+                />
+                <div className="flex justify-end space-x-4">
+                  <button type="submit" className="btn-green" disabled={loading}>
+                    {loading ? "Saving..." : "Save"}
+                  </button>
+                  <button type="button" className="btn-red" onClick={closeModal} disabled={loading}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Add Mode */}
+            {modalType === "create" && (
+              <form onSubmit={handleCreateReceipt} className="space-y-4">
+                <h3 className="text-xl font-semibold mb-4">New Receipt</h3>
+                <input
+                  name="amount"
+                  type="number"
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Amount"
+                  required
+                />
+                <input
+                  name="member"
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Member ID"
+                  required
+                />
+                <input
+                  name="club"
+                  type="number"
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Club ID"
+                  required
+                />
+                <select name="payment_method" className="w-full border rounded px-3 py-2" required>
+                  <option value="">Select Payment Method</option>
+                  <option value="bank">Bank</option>
+                  <option value="cash">Cash</option>
+                  <option value="visa">Visa</option>
+                </select>
+                <textarea
+                  name="note"
+                  className="w-full border rounded px-3 py-2"
+                  placeholder="Note"
+                />
+                <div className="flex justify-end space-x-4">
+                  <button type="submit" className="btn-green" disabled={loading}>
+                    {loading ? "Creating..." : "Create"}
+                  </button>
+                  <button type="button" className="btn-red" onClick={closeModal} disabled={loading}>
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Delete Confirmation */}
+            {modalType === "delete" && selectedReceipt && (
+              <>
+                <h3 className="text-xl font-semibold mb-4">
+                  Are you sure you want to delete this receipt?
+                </h3>
+                <div className="flex justify-end space-x-4">
+                  <button
+                    onClick={handleDeleteReceipt}
+                    className="btn-red"
+                    disabled={loading}
+                  >
+                    {loading ? "Deleting..." : "Yes, Delete"}
+                  </button>
+                  <button
+                    onClick={closeModal}
+                    className="btn-green"
+                    disabled={loading}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
