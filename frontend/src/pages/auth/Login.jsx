@@ -1,58 +1,52 @@
 import React, { useState } from 'react';
 import img from '../../images/img.png';
-import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom'; // Assuming you're using React Router
 
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const navigator = useNavigate(); // Use history for redirection
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
+    setLoading(true);
+  
     try {
-      const formData = new URLSearchParams();
-      formData.append('username', username);
-      formData.append('password', password);
-
-      const response = await fetch('http://127.0.0.1:8000/accounts/api/login/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: formData,
-      });
-
-      const data = await response.json();
-      console.log('Login response data:', data);
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      // Save token and user data in localStorage
-      localStorage.setItem('token', data.access);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      // Redirect user to the homepage or dashboard
-      navigate('/');
-
       const response = await axios.post('http://127.0.0.1:8000/accounts/api/login/', {
-        username: email,
-        password: password
-    });
-    
-      // حفظ التوكن وبيانات المستخدم في localStorage
-      localStorage.setItem('access_token', response.data.access);
-      localStorage.setItem('refresh_token', response.data.refresh);
+        username,
+        password,
+      });
+  
+      // Get the response data containing tokens and user info
+      const { access, refresh } = response.data;
+  
+      if (!access) {
+        toast.error('Access token is missing! Please check backend.');
+        return;
+      }
+  
+      // Store access token, refresh token, and user data in localStorage
+      localStorage.setItem('token', access);
+      localStorage.setItem('refreshToken', refresh);
+      // localStorage.setItem('user', JSON.stringify(user));
+  
+      toast.success('Login successful!');
       
-      // توجيه المستخدم إلى الصفحة الرئيسية أو داشبورد
-      navigate('/dashboard');
-    } catch (err) {
-      setError(err.message);
+      navigator('/');  
+    } catch (error) {
+      if (error.response && error.response.data && error.response.data.error) {
+        toast.error(error.response.data.error);  // Display specific error message from the backend
+      } else {
+        toast.error('Login failed! Please try again.');
+      }
+    } finally {
+      setLoading(false);
     }
   };
+  
 
   return (
     <div className="min-h-screen flex">
@@ -86,22 +80,18 @@ const Login = () => {
                 required
               />
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
             <button
               type="submit"
-              className="btn w-full"
+              className="btn w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
+              disabled={loading}
             >
-              Login
+              {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
-         
         </div>
       </div>
     </div>
   );
-}; 
+};
 
 export default Login;
-
-
-

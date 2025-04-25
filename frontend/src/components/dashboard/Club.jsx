@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { CiEdit } from 'react-icons/ci';
 import { HiOutlineDocumentReport } from 'react-icons/hi';
+import { Button } from "../ui/button";
 const fakeClubs = [
   {
     id: 1,
@@ -119,12 +120,12 @@ const Club = () => {
                 {new Date(club.createdAt).toLocaleDateString()}
               </td>
               <td className="p-3 border-b">
-                <button
+                <Button
                   onClick={() => openModal(club)}
                   className="btn-green"
                 >
                   <CiEdit />
-                </button>
+                </Button>
               </td>
             </tr>
           ))}
