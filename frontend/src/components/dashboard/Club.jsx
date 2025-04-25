@@ -1,44 +1,46 @@
-import React, { useState } from "react";
+import React, { useEffect,useState } from "react";
 import { CiEdit } from 'react-icons/ci';
 import { HiOutlineDocumentReport } from 'react-icons/hi';
-const fakeClubs = [
-  {
-    id: 1,
-    name: "Sports Club A",
-    location: "New York, USA",
-    logo: "https://via.placeholder.com/150?text=Sports+Club+A",
-    createdAt: "2023-05-10T14:32:00Z",
-  },
-  {
-    id: 2,
-    name: "Fitness Club B",
-    location: "Los Angeles, USA",
-    logo: "https://via.placeholder.com/150?text=Fitness+Club+B",
-    createdAt: "2022-11-15T08:20:00Z",
-  },
-  {
-    id: 3,
-    name: "Elite Sports Club",
-    location: "London, UK",
-    logo: "https://via.placeholder.com/150?text=Elite+Sports+Club",
-    createdAt: "2021-09-01T16:45:00Z",
-  },
-  {
-    id: 4,
-    name: "Champions Club",
-    location: "Paris, France",
-    logo: "https://via.placeholder.com/150?text=Champions+Club",
-    createdAt: "2023-02-25T10:10:00Z",
-  },
-  {
-    id: 5,
-    name: "ProFit Club",
-    location: "Berlin, Germany",
-    logo: "https://via.placeholder.com/150?text=ProFit+Club",
-    createdAt: "2022-06-05T12:00:00Z",
-  },
-];
+import { useSelector, useDispatch } from "react-redux";
+import { editClub, fetchClubs } from "../../redux/slices/clubSlice";
 
+// const fakeClubs = [
+//   {
+//     id: 1,
+//     name: "Sports Club A",
+//     location: "New York, USA",
+//     logo: "https://via.placeholder.com/150?text=Sports+Club+A",
+//     createdAt: "2023-05-10T14:32:00Z",
+//   },
+//   {
+//     id: 2,
+//     name: "Fitness Club B",
+//     location: "Los Angeles, USA",
+//     logo: "https://via.placeholder.com/150?text=Fitness+Club+B",
+//     createdAt: "2022-11-15T08:20:00Z",
+//   },
+//   {
+//     id: 3,
+//     name: "Elite Sports Club",
+//     location: "London, UK",
+//     logo: "https://via.placeholder.com/150?text=Elite+Sports+Club",
+//     createdAt: "2021-09-01T16:45:00Z",
+//   },
+//   {
+//     id: 4,
+//     name: "Champions Club",
+//     location: "Paris, France",
+//     logo: "https://via.placeholder.com/150?text=Champions+Club",
+//     createdAt: "2023-02-25T10:10:00Z",
+//   },
+//   {
+//     id: 5,
+//     name: "ProFit Club",
+//     location: "Berlin, Germany",
+//     logo: "https://via.placeholder.com/150?text=ProFit+Club",
+//     createdAt: "2022-06-05T12:00:00Z",
+//   },
+// ];
 const Club = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState(null);
@@ -49,6 +51,30 @@ const Club = () => {
     createdAt: "",
   });
 
+  const clubs = useSelector((state) => state.club.items);
+  const dispatch = useDispatch();
+  // console.log(clubs)
+// console.log(members)
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        await dispatch(fetchClubs()).unwrap(); 
+      } catch (error) {
+        throw "Failed to fetch clubs. Please try again later."+error.message;
+      }
+    };
+
+    fetchData();
+  }, [dispatch, clubs]);
+  const formatDateForInput = (dateString) => {
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
   // Handle opening the modal and setting selected club
   const openModal = (club) => {
     setSelectedClub(club);
@@ -56,7 +82,7 @@ const Club = () => {
       name: club.name,
       location: club.location,
       logo: club.logo,
-      createdAt: club.createdAt,
+      createdAt: formatDateForInput(club.createdAt), // Format the date
     });
     setModalOpen(true);
   };
@@ -69,18 +95,20 @@ const Club = () => {
 
   // Handle form input changes
   const handleInputChange = (e) => {
+    
     const { name, value } = e.target;
     setFormData({
       ...formData,
       [name]: value,
     });
   };
-
+  
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Update club details here, you can send data to the server
-    console.log("Updated Club:", formData);
+    dispatch(editClub({ id: selectedClub.id, updatedClub: formData }));
+
+    // console.log("Updated Club:", formData);
     // Close modal after submission
     closeModal();
   };
@@ -103,13 +131,13 @@ const Club = () => {
           </tr>
         </thead>
         <tbody>
-          {fakeClubs.map((club, index) => (
+          {clubs.map((club, index) => (
             <tr key={club.id} className="">
               <td className="p-3 border-b">{index + 1}</td>
               <td className="p-3 border-b">
                 <img
                   src={club.logo}
-                  alt={club.name}
+                  // alt={club.name}
                   className="w-16 h-16 rounded-full object-cover"
                 />
               </td>
