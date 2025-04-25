@@ -13,44 +13,28 @@ const Login = () => {
     setError('');
 
     try {
-      const formData = new URLSearchParams();
-      formData.append('username', username);
-      formData.append('password', password);
-
       const response = await fetch('http://127.0.0.1:8000/accounts/api/login/', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: formData,
+        body: JSON.stringify({ username, password }),
       });
 
       const data = await response.json();
-      console.log('Login response data:', data);
+
       if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
+        throw new Error(data.detail || data.message || 'Login failed');
       }
 
-      // Save token and user data in localStorage
-      localStorage.setItem('token', data.access);
+      // Save tokens and user data
+      localStorage.setItem('access_token', data.access);
+      localStorage.setItem('refresh_token', data.refresh);
       localStorage.setItem('user', JSON.stringify(data.user));
 
-      // Redirect user to the homepage or dashboard
       navigate('/');
-
-      const response = await axios.post('http://127.0.0.1:8000/accounts/api/login/', {
-        username: email,
-        password: password
-    });
-    
-      // حفظ التوكن وبيانات المستخدم في localStorage
-      localStorage.setItem('access_token', response.data.access);
-      localStorage.setItem('refresh_token', response.data.refresh);
-      
-      // توجيه المستخدم إلى الصفحة الرئيسية أو داشبورد
-      navigate('/dashboard');
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'An error occurred during login');
     }
   };
 
@@ -89,19 +73,19 @@ const Login = () => {
             {error && <p className="text-red-500 text-sm">{error}</p>}
             <button
               type="submit"
-              className="btn w-full"
+              className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md transition duration-300"
             >
               Login
             </button>
           </form>
-         
         </div>
       </div>
     </div>
   );
-}; 
+};
 
 export default Login;
+
 
 
 

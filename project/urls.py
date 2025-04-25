@@ -37,6 +37,7 @@ urlpatterns = [
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 
     # API Endpoints
+    path('accounts/', include('accounts.urls')),
     path('members/', include('members.urls')),
     path('subscriptions/', include('subscriptions.urls')),
     path('tickets/', include('tickets.urls')),
@@ -44,6 +45,7 @@ urlpatterns = [
     path('staff/', include('staff.urls')),
     path('invites/', include('invites.urls')),
     path('finance/', include('finance.urls')),
+    path('attendance/', include('attendance.urls')),
     path('core/', include('core.urls')),
 
 ]
