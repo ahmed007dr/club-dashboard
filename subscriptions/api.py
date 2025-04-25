@@ -150,11 +150,13 @@ def renew_subscription(request, pk):
     serializer = SubscriptionSerializer(subscription)
     return Response(serializer.data)
 
+from decimal import Decimal
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def make_payment(request, pk):
     subscription = get_object_or_404(Subscription, pk=pk)
-    amount = float(request.data.get('amount', 0))
+    amount = Decimal(request.data.get('amount', 0))
     
     if amount <= 0:
         return Response(
@@ -164,7 +166,7 @@ def make_payment(request, pk):
     
     subscription.paid_amount += amount
     subscription.remaining_amount = max(
-        0, 
+        Decimal('0'), 
         subscription.type.price - subscription.paid_amount
     )
     subscription.save()

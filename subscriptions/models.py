@@ -8,6 +8,7 @@ class SubscriptionType(models.Model):
     includes_gym = models.BooleanField(default=False)
     includes_pool = models.BooleanField(default=False)
     includes_classes = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.name
@@ -21,7 +22,7 @@ class Subscription(models.Model):
     paid_amount = models.DecimalField(max_digits=10, decimal_places=2)
     remaining_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     attendance_days = models.PositiveIntegerField(default=0)
-    # receipt = models.OneToOneField('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True)
+    # receipt = models.OneToOneField('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True , related_name='subscription_link')
 
     def __str__(self):
         return f"{self.member.name} - {self.type.name}"
