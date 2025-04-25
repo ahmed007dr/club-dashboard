@@ -3,44 +3,46 @@ import AddMember from "../modals/AddMember";
 import { Link } from "react-router-dom";
 import { CiTrash } from "react-icons/ci";
 import { CiEdit } from "react-icons/ci";
-import { RiGroupLine } from 'react-icons/ri';
+import { RiGroupLine } from "react-icons/ri";
+import { useSelector, useDispatch } from "react-redux";
+import { deleteMember, editMember, fetchUsers } from "../../redux/slices/memberSlice";
+
 const Members = () => {
-  const [data, setData] = useState([]);
+  const [data, setData] = useState([{
+    id: "4",
+    photo: "https://i.pravatar.cc/100?img=11",
+    name: "ahmed El-Zahrani",
+    membership_number: "1008",
+    national_id: "102030405066",
+    phone: "0101234566",
+    club_name: "Sports Club"
+  }]);
   const [filteredData, setFilteredData] = useState([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
-  const [searchQuery, setSearchQuery] = useState(""); // Added search query state
-
+  const [searchQuery, setSearchQuery] = useState("");
+  const [error, setError] = useState(null); // State to handle errors
   const openAddModal = () => setIsAddModalOpen(true);
   const closeAddModal = () => setIsAddModalOpen(false);
-
-  const fakeMembers = [
-    {
-      id: 1,
-      photo: "https://i.pravatar.cc/100?img=11",
-      name: "Ahmed El-Zahrani",
-      membership_number: "1001",
-      national_id: "102030405060",
-      phone: "0101234567",
-      club_name: "Sports Club",
-    },
-    {
-      id: 2,
-      photo: "https://i.pravatar.cc/100?img=12",
-      name: "Sara Al-Otaibi",
-      membership_number: "1002",
-      national_id: "112233445566",
-      phone: "0109876543",
-      club_name: "Sports Club",
-    },
-  ];
-
+  
+  const members = useSelector((state) => state.member.items).results; ;
+  const dispatch = useDispatch();
+// console.log(members)
   useEffect(() => {
-    setData(fakeMembers);
-    setFilteredData(fakeMembers); // Initially show all members
-  }, []);
+    const fetchData = async () => {
+      try {
+        await dispatch(fetchUsers()).unwrap(); 
+        setData(members);
+        setFilteredData(members);
+      } catch (error) {
+        setError("Failed to fetch members. Please try again later."+error.message);
+      }
+    };
+
+    fetchData();
+  }, [dispatch, members]);
 
   // Function to filter members based on search query
   const handleSearch = (e) => {
@@ -58,11 +60,14 @@ const Members = () => {
   const handleDeleteClick = (member) => {
     setSelectedMember(member);
     setIsDeleteModalOpen(true);
+    
   };
-
+  
   const confirmDelete = () => {
     setData(data.filter((m) => m.id !== selectedMember.id));
-    setFilteredData(filteredData.filter((m) => m.id !== selectedMember.id)); // Update filtered data after deletion
+    dispatch(deleteMember(selectedMember.id));
+
+    setFilteredData(filteredData.filter((m) => m.id !== selectedMember.id));
     setIsDeleteModalOpen(false);
   };
 
@@ -79,17 +84,20 @@ const Members = () => {
     const updatedData = data.map((m) =>
       m.id === selectedMember.id ? selectedMember : m
     );
+    dispatch(editMember({ id: selectedMember.id, updatedUser: selectedMember }));
+
     setData(updatedData);
-    setFilteredData(updatedData); // Update filtered data after edit
+    setFilteredData(updatedData);
     setIsEditModalOpen(false);
   };
 
   return (
     <div className="p-4 overflow-x-auto">
       <div className="flex items-start space-x-3">
-  <RiGroupLine className="btn-yellow text-2xl" />
-  <h2 className="text-2xl font-semibold mb-4">Members</h2>
-</div>
+        <RiGroupLine className="btn-yellow text-2xl" />
+        <h2 className="text-2xl font-semibold mb-4">Members</h2>
+      </div>
+      {error && <p className="text-red-500 mb-4">{error}</p>}
       <input
         type="text"
         value={searchQuery}
@@ -97,15 +105,12 @@ const Members = () => {
         placeholder="Search by name, membership number, or national ID"
         className="border p-2 rounded-md mb-4 w-full"
       />
-      <button
-        onClick={openAddModal}
-        className="btn"
-      >
+      <button onClick={openAddModal} className="btn">
         Add Member
       </button>
 
       <table className="min-w-full border border-gray-200">
-        <thead className=" text-left">
+        <thead className="text-left">
           <tr>
             <th className="p-3 border-b">#</th>
             <th className="p-3 border-b">Photo</th>
@@ -118,8 +123,8 @@ const Members = () => {
           </tr>
         </thead>
         <tbody>
-          {filteredData.map((member, index) => (
-            <tr key={member.id} className=" ">
+          {Array.isArray(filteredData) && filteredData.map((member, index) => (
+            <tr key={member.id}>
               <td className="p-3 border-b">{index + 1}</td>
               <td className="p-3 border-b">
                 <Link to={`/member/${member.id}`}>
@@ -138,7 +143,7 @@ const Members = () => {
               <td className="p-3 border-b">
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleEditClick(member)} 
+                    onClick={() => handleEditClick(member)}
                     className="btn-green"
                     title="Edit"
                   >
@@ -160,9 +165,7 @@ const Members = () => {
 
       {/* Add Modal */}
       {isAddModalOpen && (
-        <div
-          className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(255, 255, 255, 0.2)]"
-        >
+        <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(255, 255, 255, 0.2)]">
           <div className="bg-white p-6 rounded-lg w-1/3 relative">
             <button onClick={closeAddModal} className="absolute top-2 right-3 text-xl">
               &times;
@@ -190,10 +193,7 @@ const Members = () => {
               >
                 Cancel
               </button>
-              <button
-                onClick={confirmDelete}
-                className="btn"
-              >
+              <button onClick={confirmDelete} className="btn">
                 Delete
               </button>
             </div>
@@ -257,10 +257,7 @@ const Members = () => {
                 >
                   Cancel
                 </button>
-                <button
-                  onClick={handleEditSubmit}
-                  className="btn"
-                >
+                <button onClick={handleEditSubmit} className="btn">
                   Save
                 </button>
               </div>
