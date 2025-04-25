@@ -1,46 +1,44 @@
 import React, { useEffect,useState } from "react";
 import { CiEdit } from 'react-icons/ci';
 import { HiOutlineDocumentReport } from 'react-icons/hi';
-import { useSelector, useDispatch } from "react-redux";
-import { editClub, fetchClubs } from "../../redux/slices/clubSlice";
+const fakeClubs = [
+  {
+    id: 1,
+    name: "Sports Club A",
+    location: "New York, USA",
+    logo: "https://via.placeholder.com/150?text=Sports+Club+A",
+    createdAt: "2023-05-10T14:32:00Z",
+  },
+  {
+    id: 2,
+    name: "Fitness Club B",
+    location: "Los Angeles, USA",
+    logo: "https://via.placeholder.com/150?text=Fitness+Club+B",
+    createdAt: "2022-11-15T08:20:00Z",
+  },
+  {
+    id: 3,
+    name: "Elite Sports Club",
+    location: "London, UK",
+    logo: "https://via.placeholder.com/150?text=Elite+Sports+Club",
+    createdAt: "2021-09-01T16:45:00Z",
+  },
+  {
+    id: 4,
+    name: "Champions Club",
+    location: "Paris, France",
+    logo: "https://via.placeholder.com/150?text=Champions+Club",
+    createdAt: "2023-02-25T10:10:00Z",
+  },
+  {
+    id: 5,
+    name: "ProFit Club",
+    location: "Berlin, Germany",
+    logo: "https://via.placeholder.com/150?text=ProFit+Club",
+    createdAt: "2022-06-05T12:00:00Z",
+  },
+];
 
-// const fakeClubs = [
-//   {
-//     id: 1,
-//     name: "Sports Club A",
-//     location: "New York, USA",
-//     logo: "https://via.placeholder.com/150?text=Sports+Club+A",
-//     createdAt: "2023-05-10T14:32:00Z",
-//   },
-//   {
-//     id: 2,
-//     name: "Fitness Club B",
-//     location: "Los Angeles, USA",
-//     logo: "https://via.placeholder.com/150?text=Fitness+Club+B",
-//     createdAt: "2022-11-15T08:20:00Z",
-//   },
-//   {
-//     id: 3,
-//     name: "Elite Sports Club",
-//     location: "London, UK",
-//     logo: "https://via.placeholder.com/150?text=Elite+Sports+Club",
-//     createdAt: "2021-09-01T16:45:00Z",
-//   },
-//   {
-//     id: 4,
-//     name: "Champions Club",
-//     location: "Paris, France",
-//     logo: "https://via.placeholder.com/150?text=Champions+Club",
-//     createdAt: "2023-02-25T10:10:00Z",
-//   },
-//   {
-//     id: 5,
-//     name: "ProFit Club",
-//     location: "Berlin, Germany",
-//     logo: "https://via.placeholder.com/150?text=ProFit+Club",
-//     createdAt: "2022-06-05T12:00:00Z",
-//   },
-// ];
 const Club = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedClub, setSelectedClub] = useState(null);
@@ -147,12 +145,12 @@ const Club = () => {
                 {new Date(club.createdAt).toLocaleDateString()}
               </td>
               <td className="p-3 border-b">
-                <button
+                <Button
                   onClick={() => openModal(club)}
                   className="btn-green"
                 >
                   <CiEdit />
-                </button>
+                </Button>
               </td>
             </tr>
           ))}
