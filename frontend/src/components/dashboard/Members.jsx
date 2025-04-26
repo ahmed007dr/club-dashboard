@@ -6,7 +6,7 @@ import { CiEdit } from "react-icons/ci";
 import { RiGroupLine } from "react-icons/ri";
 import { useSelector, useDispatch } from "react-redux";
 import { deleteMember, editMember, fetchUsers } from "../../redux/slices/memberSlice";
-
+import { IoAddOutline } from "react-icons/io5";
 const Members = () => {
   const [data, setData] = useState([{
     id: "4",
@@ -74,6 +74,7 @@ const Members = () => {
   const handleEditClick = (member) => {
     setSelectedMember(member);
     setIsEditModalOpen(true);
+    // 
   };
 
   const handleEditChange = (e) => {
@@ -94,7 +95,8 @@ const Members = () => {
   return (
     <div className="p-4 overflow-x-auto">
       <div className="flex items-start space-x-3">
-        <RiGroupLine className="btn-yellow text-2xl" />
+      <RiGroupLine className=" text-2xl" />
+        {/* <RiGroupLine className="btn-yellow text-2xl" /> */}
         <h2 className="text-2xl font-semibold mb-4">Members</h2>
       </div>
       {error && <p className="text-red-500 mb-4">{error}</p>}
@@ -105,9 +107,14 @@ const Members = () => {
         placeholder="Search by name, membership number, or national ID"
         className="border p-2 rounded-md mb-4 w-full"
       />
-      <button onClick={openAddModal} className="btn">
-        Add Member
+      <div className="flex justify-end mb-4">
+      
+      
+      <button onClick={openAddModal} className="flex justify-end text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800">
+      <IoAddOutline className="flex inline-block text-xl" /> 
+      Add Member
       </button>
+      </div>
 
       <table className="min-w-full border border-gray-200">
         <thead className="text-left">
@@ -144,14 +151,14 @@ const Members = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEditClick(member)}
-                    className="btn-green"
+                    className="text-green-700"
                     title="Edit"
                   >
                     <CiEdit />
                   </button>
                   <button
                     onClick={() => handleDeleteClick(member)}
-                    className="btn-red"
+                    className="text-red-500"
                     title="Delete"
                   >
                     <CiTrash />
