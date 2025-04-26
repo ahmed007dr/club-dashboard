@@ -6,6 +6,7 @@ import userSlice from './slices/memberSlice';
 import clubSlice from './slices/clubSlice';
 import attendanceSlice from './slices/AttendanceSlice';
 import entryLogsSlice from './slices/EntryLogsSlice';
+import staffSlice from './slices/staff';
 const store = configureStore({
   reducer: {
     ui: uiReducer, 
@@ -14,6 +15,7 @@ const store = configureStore({
     club:clubSlice.reducer,
     attendance: attendanceSlice.reducer,
     entryLogs: entryLogsSlice.reducer,
+    staff:staffSlice.reducer,
   },
 });
 

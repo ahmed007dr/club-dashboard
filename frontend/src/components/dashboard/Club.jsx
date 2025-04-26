@@ -1,43 +1,9 @@
-import React, { useEffect,useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CiEdit } from 'react-icons/ci';
 import { HiOutlineDocumentReport } from 'react-icons/hi';
-const fakeClubs = [
-  {
-    id: 1,
-    name: "Sports Club A",
-    location: "New York, USA",
-    logo: "https://via.placeholder.com/150?text=Sports+Club+A",
-    createdAt: "2023-05-10T14:32:00Z",
-  },
-  {
-    id: 2,
-    name: "Fitness Club B",
-    location: "Los Angeles, USA",
-    logo: "https://via.placeholder.com/150?text=Fitness+Club+B",
-    createdAt: "2022-11-15T08:20:00Z",
-  },
-  {
-    id: 3,
-    name: "Elite Sports Club",
-    location: "London, UK",
-    logo: "https://via.placeholder.com/150?text=Elite+Sports+Club",
-    createdAt: "2021-09-01T16:45:00Z",
-  },
-  {
-    id: 4,
-    name: "Champions Club",
-    location: "Paris, France",
-    logo: "https://via.placeholder.com/150?text=Champions+Club",
-    createdAt: "2023-02-25T10:10:00Z",
-  },
-  {
-    id: 5,
-    name: "ProFit Club",
-    location: "Berlin, Germany",
-    logo: "https://via.placeholder.com/150?text=ProFit+Club",
-    createdAt: "2022-06-05T12:00:00Z",
-  },
-];
+import { useDispatch, useSelector } from "react-redux";
+import { Button } from "../ui/button";
+import { editClub, fetchClubs } from "@/redux/slices/clubSlice";
 
 const Club = () => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -49,23 +15,38 @@ const Club = () => {
     createdAt: "",
   });
 
-  const clubs = useSelector((state) => state.club.items);
+  const clubs = useSelector((state) => {
+    const items = state.club?.items || [];
+    return Array.isArray(items) ? items : [items]; // Wrap single object in an array
+  });
+  const isLoading = useSelector((state) => state.club.isLoading);
+  const error = useSelector((state) => state.club.error);
   const dispatch = useDispatch();
-  // console.log(clubs)
-// console.log(members)
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        await dispatch(fetchClubs()).unwrap(); 
-      } catch (error) {
-        throw "Failed to fetch clubs. Please try again later."+error.message;
-      }
-    };
 
-    fetchData();
-  }, [dispatch, clubs]);
+  useEffect(() => {
+    // dispatch(fetchClubs());
+
+    const fetchData = async () => {
+          try {
+            await dispatch(fetchClubs()).unwrap();
+            console.log("Club fetched:", clubs); // Log the fetched staff
+          } catch (error) {
+            console.error("Error fetching Club:", error);
+          }
+        };
+    
+        fetchData();
+    // console.log("Clubs fetched:", clubs); // Log the fetched clubs
+    
+  }, [dispatch]);
+
   const formatDateForInput = (dateString) => {
     const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      console.warn("Invalid date string:", dateString);
+      return "";
+    }
+
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -73,43 +54,41 @@ const Club = () => {
     const minutes = String(date.getMinutes()).padStart(2, "0");
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
-  // Handle opening the modal and setting selected club
+
   const openModal = (club) => {
     setSelectedClub(club);
     setFormData({
       name: club.name,
       location: club.location,
       logo: club.logo,
-      createdAt: formatDateForInput(club.createdAt), // Format the date
+      createdAt: formatDateForInput(club.createdAt),
     });
     setModalOpen(true);
   };
 
-  // Handle closing the modal
   const closeModal = () => {
     setModalOpen(false);
     setSelectedClub(null);
   };
 
-  // Handle form input changes
   const handleInputChange = (e) => {
-    
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
+    setFormData({ ...formData, [name]: value });
   };
-  
-  // Handle form submission
+
   const handleSubmit = (e) => {
     e.preventDefault();
     dispatch(editClub({ id: selectedClub.id, updatedClub: formData }));
-
-    // console.log("Updated Club:", formData);
-    // Close modal after submission
     closeModal();
   };
+
+  if (isLoading) {
+    return <p className="text-center">Loading...</p>;
+  }
+
+  if (error) {
+    return <p className="text-red-500 text-center">Error: {error}</p>;
+  }
 
   return (
     <div className="p-4 overflow-x-auto">
@@ -118,7 +97,7 @@ const Club = () => {
         <h2 className="text-2xl font-semibold mb-4">Clubs</h2>
       </div>
       <table className="min-w-full border border-gray-200">
-        <thead className=" text-left">
+        <thead className="text-left">
           <tr>
             <th className="p-3 border-b">#</th>
             <th className="p-3 border-b">Logo</th>
@@ -135,7 +114,7 @@ const Club = () => {
               <td className="p-3 border-b">
                 <img
                   src={club.logo}
-                  // alt={club.name}
+                  alt={club.name}
                   className="w-16 h-16 rounded-full object-cover"
                 />
               </td>
@@ -145,10 +124,7 @@ const Club = () => {
                 {new Date(club.createdAt).toLocaleDateString()}
               </td>
               <td className="p-3 border-b">
-                <Button
-                  onClick={() => openModal(club)}
-                  className="btn-green"
-                >
+                <Button onClick={() => openModal(club)} className="btn-green">
                   <CiEdit />
                 </Button>
               </td>
@@ -159,8 +135,8 @@ const Club = () => {
 
       {/* Modal for editing club */}
       {modalOpen && (
-        <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="modal">
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
             <h3 className="text-xl font-bold mb-4">Edit Club</h3>
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
@@ -174,6 +150,7 @@ const Club = () => {
                   value={formData.name}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded"
+                  required
                 />
               </div>
               <div className="mb-4">
@@ -187,6 +164,7 @@ const Club = () => {
                   value={formData.location}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded"
+                  required
                 />
               </div>
               <div className="mb-4">
@@ -200,6 +178,7 @@ const Club = () => {
                   value={formData.logo}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded"
+                  
                 />
               </div>
               <div className="mb-4">
@@ -213,19 +192,20 @@ const Club = () => {
                   value={formData.createdAt}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded"
+                  required
                 />
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="mr-2 bg-gray-300 text-black p-2 rounded"
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn"
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
                 >
                   Save Changes
                 </button>

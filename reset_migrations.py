@@ -57,11 +57,12 @@ if __name__ == "__main__":
     print("🗑️ Deleted old SQLite database.")
 
     print("⚙️ Making new migrations...")
-    # for app in APPS:
-    #     print(f"Generating migrations for {app}...")
-    #     run_cmd(f"python manage.py makemigrations {app}")
+    for app in APPS:
+        print(f"Generating migrations for {app}...")
+        run_cmd(f"python manage.py makemigrations {app}")
 
     print("⚙️ Applying new migrations...")
     run_cmd("python manage.py migrate")
+    run_cmd("python dummy_data.py")
 
     print("\n🎉 Project is clean and ready!")
