@@ -15,30 +15,6 @@ const Login = () => {
     setLoading(true);
   
     try {
-<<<<<<< HEAD
-      const response = await fetch('http://127.0.0.1:8000/accounts/api/login/', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.detail || data.message || 'Login failed');
-      }
-
-      // Save tokens and user data
-      localStorage.setItem('access_token', data.access);
-      localStorage.setItem('refresh_token', data.refresh);
-      localStorage.setItem('user', JSON.stringify(data.user));
-
-      navigate('/');
-    } catch (err) {
-      setError(err.message || 'An error occurred during login');
-=======
       const response = await axios.post('http://127.0.0.1:8000/accounts/api/login/', {
         username,
         password,
@@ -68,7 +44,6 @@ const Login = () => {
       }
     } finally {
       setLoading(false);
->>>>>>> dev
     }
   };
   
@@ -107,12 +82,8 @@ const Login = () => {
             </div>
             <button
               type="submit"
-<<<<<<< HEAD
-              className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md transition duration-300"
-=======
               className="btn w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
               disabled={loading}
->>>>>>> dev
             >
               {loading ? 'Logging in...' : 'Login'}
             </button>
@@ -124,10 +95,3 @@ const Login = () => {
 };
 
 export default Login;
-<<<<<<< HEAD
-
-
-
-
-=======
->>>>>>> dev

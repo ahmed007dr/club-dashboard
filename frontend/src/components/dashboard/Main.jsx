@@ -1,14 +1,8 @@
 import React from "react";
 import { FaUsers, FaCalendarCheck, FaTicketAlt, FaCheckCircle } from "react-icons/fa"; // Import icons from React Icons
-<<<<<<< HEAD
 import SubscriptionList from './SubscriptionList'
 import ActiveSubscriptionTypes from './ActiveSubscriptionTypes'
 import ExpiredSubscriptions from './ExpiredSubscriptions'
-=======
-// import ExpenseCategories from './ExpenseCategories'
-// import SubscriptionList from './SubscriptionList'
-// import MembersList from './MembersList'
->>>>>>> dev
 const Main = () => {
   return (
     <div className="p-4">
@@ -57,10 +51,7 @@ const Main = () => {
     </div>
   </div>
 
-<<<<<<< HEAD
-=======
   {/* <MembersList /> */}
->>>>>>> dev
 </div>
 <SubscriptionList  />
     </div>
