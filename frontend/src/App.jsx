@@ -16,6 +16,7 @@ import Club from './components/dashboard/Club';
 import Profile from './components/dashboard/Profile';
 import Staff from './components/dashboard/Staff';
 import Finance from './components/dashboard/Finance';
+import MemberSubscriptions from './components/dashboard/MemberSubscriptions';
 import Member from "./pages/member/Member"; 
 import AddMember from "./components/modals/AddMember"; 
 import { Toaster } from 'react-hot-toast';
