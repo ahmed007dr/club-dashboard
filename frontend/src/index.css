@@ -85,8 +85,8 @@ body {
   /* Light circle effect */
   @apply relative overflow-y-auto overflow-x-hidden;
 }
-
-body::before {
+/* Soha Removed violet background color */
+/* body::before {
   content: '';
   @apply absolute top-0 left-0 w-[500px] h-[500px] rounded-full pointer-events-none;
   background: radial-gradient(circle, rgba(101, 14, 227, 0.3) 0%, rgba(101, 14, 227, 0) 70%);
@@ -100,7 +100,7 @@ body::after {
   background: radial-gradient(circle, rgba(101, 14, 227, 0.3) 0%, rgba(101, 14, 227, 0) 70%);
   transform: translate(30%, 30%);
   z-index: -1;
-}
+} */
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);

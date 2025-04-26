@@ -57,6 +57,44 @@ export const deleteMember = createAsyncThunk('users/deleteUser', async (id) => {
     return id;
 });
 
+export const fetchUserById = createAsyncThunk(
+    'users/fetchUserById',
+    async (userId, { rejectWithValue }) => {
+      if (!token) {
+        return rejectWithValue("Authentication token is missing. Please log in again.");
+      }
+  
+      try {
+        const res = await fetch(`http://127.0.0.1:8000/members/api/members/${userId}/`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+  
+        // Check if the response is successful
+        if (!res.ok) {
+          if (res.status === 401) {
+            return rejectWithValue("Unauthorized. Please log in again.");
+          } else if (res.status === 404) {
+            return rejectWithValue("User not found.");
+          } else if (res.status === 500) {
+            return rejectWithValue("Internal Server Error. Please try again later.");
+          }
+        }
+  
+        // Parse and return the user data
+        const data = await res.json();
+        return data;
+  
+      } catch (error) {
+        console.error("Error fetching user by ID:", error);
+        return rejectWithValue("An unexpected error occurred. Please try again later.");
+      }
+    }
+  );
+
 
 
 // User slice
@@ -95,7 +133,18 @@ const userSlice = createSlice({
             .addCase(deleteMember.fulfilled, (state, action) => {
                 const id = action.payload;
                 state.items = state.items.filter(user => user.id !== id);
-            })
+            }).addCase(fetchUserById.fulfilled, (state, action) => {
+                state.user = action.payload; // Store the fetched user data
+                state.isloading = false;
+              })
+              .addCase(fetchUserById.pending, (state) => {
+                state.isloading = true;
+                state.error = null; // Clear any previous errors
+              })
+              .addCase(fetchUserById.rejected, (state, action) => {
+                state.isloading = false;
+                state.error = action.payload; // Store the error message
+              });
           
     },
 });
