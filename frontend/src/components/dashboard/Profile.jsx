@@ -1,101 +1,120 @@
 import React, { useState, useEffect } from 'react';
 import { BsPersonBoundingBox } from 'react-icons/bs';
+import axios from 'axios';
 
 const Profile = () => {
-  const [data, setData] = useState([]);
-
-  // Fake profile data
-  const fakeProfileData = [
-    {
-      id: 1,
-      password: "hashedpassword123",
-      lastLogin: "2023-04-15T10:30:00Z",
-      isSuperuser: true,
-      username: "john_doe",
-      firstName: "John",
-      lastName: "Doe",
-      email: "john.doe@example.com",
-      isStaff: true,
-      isActive: true,
-      dateJoined: "2021-06-25T14:10:00Z",
-      role: "Admin",
-    },
-    {
-      id: 2,
-      password: "hashedpassword456",
-      lastLogin: "2023-04-14T08:15:00Z",
-      isSuperuser: false,
-      username: "jane_smith",
-      firstName: "Jane",
-      lastName: "Smith",
-      email: "jane.smith@example.com",
-      isStaff: true,
-      isActive: true,
-      dateJoined: "2020-08-10T09:20:00Z",
-      role: "Manager",
-    },
-    {
-      id: 3,
-      password: "hashedpassword789",
-      lastLogin: "2023-04-13T12:45:00Z",
-      isSuperuser: false,
-      username: "alex_brown",
-      firstName: "Alex",
-      lastName: "Brown",
-      email: "alex.brown@example.com",
-      isStaff: false,
-      isActive: true,
-      dateJoined: "2022-01-05T11:50:00Z",
-      role: "User",
-    }
-  ];
+  const [data, setData] = useState(null);
 
   useEffect(() => {
-    setData(fakeProfileData);
+    const fetchProfile = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get('http://127.0.0.1:8000/accounts/api/profile/', {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setData(response.data);
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+      }
+    };
+
+    fetchProfile();
   }, []);
 
   return (
     <div className="p-4 overflow-x-auto">
-           <div className="flex items-start space-x-3">
-        <BsPersonBoundingBox className='btn-pinkish text-2xl' />
+      <div className="flex items-start space-x-3">
+        <BsPersonBoundingBox className='text-blue-600 h-9 w-9 text-2xl' />
         <h1 className="text-2xl font-bold mb-4">Profile</h1>
       </div>
-      
 
-      <table className="min-w-full border border-gray-200">
-        <thead className=" text-left">
-          <tr>
-            <th className="p-3 border-b">ID</th>
-            <th className="p-3 border-b">Username</th>
-            <th className="p-3 border-b">First Name</th>
-            <th className="p-3 border-b">Last Name</th>
-            <th className="p-3 border-b">Email</th>
-            <th className="p-3 border-b">Role</th>
-            <th className="p-3 border-b">Is Active</th>
-            <th className="p-3 border-b">Date Joined</th>
-            <th className="p-3 border-b">Last Login</th>
-            <th className="p-3 border-b">Is Superuser</th>
-            <th className="p-3 border-b">Is Staff</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.map((profile) => (
-            <tr key={profile.id} className="">
-              <td className="p-3 border-b">{profile.id}</td>
-              <td className="p-3 border-b">{profile.username}</td>
-              <td className="p-3 border-b">{profile.firstName}</td>
-              <td className="p-3 border-b">{profile.lastName}</td>
-              <td className="p-3 border-b">{profile.email}</td>
-              <td className="p-3 border-b">{profile.role}</td>
-              <td className="p-3 border-b">{profile.isActive ? <span className="bg-light-green">Yes</span> : <span className="bg-light-red">No</span>}</td>
-              <td className="p-3 border-b">{new Date(profile.dateJoined).toLocaleDateString()}</td>
-              <td className="p-3 border-b">{new Date(profile.lastLogin).toLocaleString()}</td>
-              <td className="p-3 border-b">{profile.isSuperuser ? <span className="bg-light-green">Yes</span>  : <span className="bg-light-red">No</span>}</td>
-              <td className="p-3 border-b">{profile.isStaff ? <span className="bg-light-green">Yes</span>  : <span className="bg-light-red">No</span>}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {data ? (
+        <>
+          {/* Card layout for small screens */}
+          <div className="block sm:hidden">
+            <div className=" p-4 border border-gray-200 rounded-lg shadow-md space-y-4">
+              <div className="flex justify-between">
+                <span className="font-semibold">ID:</span>
+                <span>{data.id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">Username:</span>
+                <span>{data.username}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">First Name:</span>
+                <span>{data.first_name || '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">Last Name:</span>
+                <span>{data.last_name || '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">Email:</span>
+                <span>{data.email}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">Role:</span>
+                <span className="capitalize">{data.role}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">Club:</span>
+                <span>{data.club || '-'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">Is Active:</span>
+                <span>
+                  {data.is_active ? (
+                    <span className="bg-light-green px-2 py-1 rounded text-xs">Yes</span>
+                  ) : (
+                    <span className="bg-light-red px-2 py-1 rounded text-xs">No</span>
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Table layout for larger screens */}
+          <div className="hidden sm:block overflow-x-auto">
+            <table className="min-w-full border border-gray-200 table-auto">
+              <thead className="text-left">
+                <tr>
+                  <th className="p-3 border-b">ID</th>
+                  <th className="p-3 border-b">Username</th>
+                  <th className="p-3 border-b">First Name</th>
+                  <th className="p-3 border-b">Last Name</th>
+                  <th className="p-3 border-b">Email</th>
+                  <th className="p-3 border-b">Role</th>
+                  <th className="p-3 border-b">Club</th>
+                  <th className="p-3 border-b">Is Active</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="p-3 border-b">{data.id}</td>
+                  <td className="p-3 border-b">{data.username}</td>
+                  <td className="p-3 border-b">{data.first_name || '-'}</td>
+                  <td className="p-3 border-b">{data.last_name || '-'}</td>
+                  <td className="p-3 border-b">{data.email}</td>
+                  <td className="p-3 border-b capitalize">{data.role}</td>
+                  <td className="p-3 border-b">{data.club || '-'}</td>
+                  <td className="p-3 border-b">
+                    {data.is_active ? (
+                      <span className="bg-light-green px-2 py-1 rounded text-xs">Yes</span>
+                    ) : (
+                      <span className="bg-light-red px-2 py-1 rounded text-xs">No</span>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </>
+      ) : (
+        <p className="text-gray-500">Loading profile...</p>
+      )}
     </div>
   );
 };
