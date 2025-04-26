@@ -9,3 +9,4 @@ class AttendanceForm(forms.ModelForm):
             'subscription': forms.Select(attrs={'class': 'form-control'}),
             'attendance_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
+#

@@ -76,7 +76,11 @@ ROOT_URLCONF = 'project.urls'
 AUTH_USER_MODEL = 'accounts.User'
 
 CORS_ORIGIN_ALLOW_ALL = True
+<<<<<<< HEAD
 CORS_ORIGIN_ALLOW_ALL = True
+=======
+# CORS_ALLOW_ALL_ORIGINS = True
+>>>>>>> dev
 
 #CORS_ALLOWED_ALL_ORIGINS = False  # Disable allow all
 CORS_ALLOWED_ORIGINS = [

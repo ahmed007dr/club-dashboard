@@ -1,18 +1,21 @@
 import React, { useState } from 'react';
 import img from '../../images/img.png';
-import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
+import axios from 'axios';
+import { useNavigate } from 'react-router-dom'; // Assuming you're using React Router
 
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
+  const navigator = useNavigate(); // Use history for redirection
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
+    setLoading(true);
+  
     try {
+<<<<<<< HEAD
       const response = await fetch('http://127.0.0.1:8000/accounts/api/login/', {
         method: 'POST',
         headers: {
@@ -35,8 +38,40 @@ const Login = () => {
       navigate('/');
     } catch (err) {
       setError(err.message || 'An error occurred during login');
+=======
+      const response = await axios.post('http://127.0.0.1:8000/accounts/api/login/', {
+        username,
+        password,
+      });
+  
+      // Get the response data containing tokens and user info
+      const { access, refresh } = response.data;
+  
+      if (!access) {
+        toast.error('Access token is missing! Please check backend.');
+        return;
+      }
+  
+      // Store access token, refresh token, and user data in localStorage
+      localStorage.setItem('token', access);
+      localStorage.setItem('refreshToken', refresh);
+      // localStorage.setItem('user', JSON.stringify(user));
+  
+      toast.success('Login successful!');
+      
+      navigator('/');  
+    } catch (error) {
+      if (error.response && error.response.data && error.response.data.error) {
+        toast.error(error.response.data.error);  // Display specific error message from the backend
+      } else {
+        toast.error('Login failed! Please try again.');
+      }
+    } finally {
+      setLoading(false);
+>>>>>>> dev
     }
   };
+  
 
   return (
     <div className="min-h-screen flex">
@@ -70,12 +105,16 @@ const Login = () => {
                 required
               />
             </div>
-            {error && <p className="text-red-500 text-sm">{error}</p>}
             <button
               type="submit"
+<<<<<<< HEAD
               className="w-full bg-green-500 hover:bg-green-600 text-white py-2 px-4 rounded-md transition duration-300"
+=======
+              className="btn w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded"
+              disabled={loading}
+>>>>>>> dev
             >
-              Login
+              {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
         </div>
@@ -85,7 +124,10 @@ const Login = () => {
 };
 
 export default Login;
+<<<<<<< HEAD
 
 
 
 
+=======
+>>>>>>> dev

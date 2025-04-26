@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
+import { useDispatch } from "react-redux";
+import { addMember } from '../../redux/slices/memberSlice';
 
 const AddMember = () => {
+  const dispatch = useDispatch();
+   
   const [formData, setFormData] = useState({
     name: '',
     membership_number: '',
@@ -14,8 +18,12 @@ const AddMember = () => {
 
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
-    if (type === 'file') {
-      setFormData({ ...formData, [name]: files[0] });
+    if (type === 'file' && files[0]) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setFormData({ ...formData, [name]: reader.result }); // Store Base64 string
+      };
+      reader.readAsDataURL(files[0]); // Convert file to Base64
     } else {
       setFormData({ ...formData, [name]: value });
     }
@@ -24,7 +32,7 @@ const AddMember = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const token = localStorage.getItem('token'); // Adjust key if needed
+    // const token = localStorage.getItem('token'); // Adjust key if needed
     const form = new FormData();
 
     // Append only valid Django fields
@@ -38,26 +46,32 @@ const AddMember = () => {
       form.append('photo', formData.photo);
     }
     form.append('referred_by', formData.referred_by);
+        console.log("Form data:", formData); // Log the form data to check its structure
+        dispatch(addMember(formData));
+    
+    // try { //http://127.0.0.1:8000/members/api/members/create/
+    //   console.log(form);
+    //   const response = await fetch('http://127.0.0.1:8000/members/api/members/create/', {
+    //     method: 'POST',
+    //     headers: {
+    //       Authorization: `Token ${token}`,
+    //       'Content-Type': 'application/json'
+    //     },
+    //     // body: form,
+    //     body: JSON.stringify(form)
+        
+    //   });
 
-    try {
-      const response = await fetch('http://127.0.0.1:8000/members/api/members/create/', {
-        method: 'POST',
-        headers: {
-          Authorization: `Token ${token}`,
-        },
-        body: form,
-      });
+    //   if (!response.ok) {
+    //     const errorData = await response.json();
+    //     console.error('Error:', errorData);
+    //     alert('Failed to add member. Please check the input.');
+    //     return;
+    //   }
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error:', errorData);
-        alert('Failed to add member. Please check the input.');
-        return;
-      }
-
-      const result = await response.json();
-      console.log('Member added successfully:', result);
-      alert('Member added successfully!');
+    //   const result = await response.json();
+    //   console.log('Member added successfully:', result);
+    //   alert('Member added successfully!');
 
       // Optional: Reset form
       setFormData({
@@ -70,10 +84,7 @@ const AddMember = () => {
         club: '',
         referred_by: '',
       });
-    } catch (error) {
-      console.error('Request error:', error);
-      alert('An error occurred while adding the member.');
-    }
+    
   };
 
   return (

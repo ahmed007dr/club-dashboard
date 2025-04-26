@@ -8,6 +8,6 @@ urlpatterns = [
     path('club/edit/', login_required(views.edit_club), name='edit-club'),
 
     # === API ===
-    path('api/club/', login_required(api.api_club_profile), name='api-club-profile'),
-    path('api/club/edit/', login_required(api.api_edit_club), name='api-edit-club'),
+    path('api/club/', api.api_club_profile, name='api-club-profile'),
+    path('api/club/edit/', api.api_edit_club, name='api-edit-club'),
 ]
