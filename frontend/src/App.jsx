@@ -16,6 +16,7 @@ import Club from './components/dashboard/Club';
 import Profile from './components/dashboard/Profile';
 import Staff from './components/dashboard/Staff';
 import Finance from './components/dashboard/Finance';
+import MemberSubscriptions from './components/dashboard/MemberSubscriptions';
 import Member from "./pages/member/Member"; 
 import AddMember from "./components/modals/AddMember"; 
 
@@ -39,6 +40,7 @@ function App() {
         <Route path="staff" element={<Staff />} />
         <Route path="finance" element={<Finance />} />
         <Route path="add-member" element={<AddMember />} />
+        <Route path="/member-subscriptions/:memberId" element={<MemberSubscriptions />} />
       </Route>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} /> 

@@ -33,21 +33,19 @@ export const fetchSubscriptionTypes = createAsyncThunk(
 
 // Async thunk to fetch active subscription types
 export const fetchActiveSubscriptionTypes = createAsyncThunk(
-  'subscriptions/fetchActive',
+  'activeSubscriptionTypes/fetch',
   async (_, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
 
+    try {
+      const token = localStorage.getItem('access_token');
       const response = await axios.get(
         'http://127.0.0.1:8000/subscriptions/api/subscription-types/active/',
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
           },
         }
       );
-
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -79,6 +77,7 @@ export const updateSubscription = createAsyncThunk(
     const token = localStorage.getItem('access_token'); // Get the token from localStorage
 
     if (!token) {
+      console.error("Authorization token is missing.");
       return rejectWithValue("Authorization token is missing.");
     }
 
@@ -93,13 +92,14 @@ export const updateSubscription = createAsyncThunk(
           },
         }
       );
+      console.log("Update successful:", response.data); // Log success
       return response.data; // Return updated subscription
     } catch (error) {
-      return rejectWithValue(error.response.data); // Handle any error
+      console.error("Update failed:", error.response?.data || error.message); // Log error
+      return rejectWithValue(error.response?.data || error.message); // Handle any error
     }
   }
 );
-
 
 export const deleteSubscriptionById = createAsyncThunk(
   'subscriptions/deleteById',
@@ -125,32 +125,45 @@ export const deleteSubscriptionById = createAsyncThunk(
 
 
 // Create an async thunk for fetching subscriptions
+/*
 export const fetchSubscriptions = createAsyncThunk(
   'subscriptions/fetchSubscriptions',
   async (_, { rejectWithValue }) => {
     try {
+      // Retrieve the access token from localStorage
       const token = localStorage.getItem('access_token');
-      console.log('Token from localStorage:', token);  // Retrieve the token from localStorage
+      console.log('Token from localStorage:', token);  
+
+      // If no token is found, throw an error
       if (!token) {
         console.log('No access token found');
         throw new Error('No access token found');
       }
 
+      // Make a GET request to the subscriptions API with the token in Authorization header
       const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/', {
         headers: {
-          Authorization: `Bearer ${token}`, // Add the token to the request header
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`, // Attach Bearer token for authentication
+          'Content-Type': 'application/json', // Specify the content type
         },
       });
-      
-      console.log('Subscriptions fetched successfully:', response.data); // Log successful response
-      return response.data; // Return the subscription data to the slice
+
+      // Log the successful response
+      console.log('Subscriptions fetched successfully:', response.data);
+
+      // Return the fetched subscriptions data
+      return response.data;
     } catch (error) {
-      console.log('Error fetching subscriptions:', error.response ? error.response.data : error.message); // Log error details
-      return rejectWithValue(error.response ? error.response.data : error.message); // Handle errors
+      // Log detailed error information
+      console.log('Error fetching subscriptions:', error.response ? error.response.data : error.message);
+
+      // Return the error to be handled by the slice
+      return rejectWithValue(error.response ? error.response.data : error.message);
     }
   }
 );
+*/
+
 
 
 export const postSubscription = createAsyncThunk(
@@ -284,14 +297,220 @@ export const fetchSubscriptionById = createAsyncThunk(
   }
 );
 
+// Thunk to fetch active subscriptions
+export const fetchActiveSubscriptions = createAsyncThunk(
+  'subscriptions/fetchActiveSubscriptions',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('access_token');
+
+      const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/active/', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// ✅ New thunk: Fetch expired subscriptions
+export const fetchExpiredSubscriptions = createAsyncThunk(
+  'subscriptions/fetchExpiredSubscriptions',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('access_token');
+
+      const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/expired/', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// ✅ New thunk: fetch member subscriptions
+export const fetchMemberSubscriptions = createAsyncThunk(
+  'subscriptions/fetchMemberSubscriptions',
+  async (memberId, thunkAPI) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await axios.get(
+        `http://127.0.0.1:8000/subscriptions/api/subscriptions/member/`,
+        {
+          params: { member_id: memberId },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+
+export const fetchSubscriptionStats = createAsyncThunk(
+  'subscriptions/fetchSubscriptionStats',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('access_token');
+
+      const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/stats/', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// Fetch Upcoming Subscriptions
+export const fetchUpcomingSubscriptions = createAsyncThunk(
+  'subscriptions/fetchUpcomingSubscriptions',
+  async (_, thunkAPI) => {
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/upcoming/', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      return response.data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// POST: Make payment for a subscription
+export const makePayment = createAsyncThunk(
+  'subscriptions/makePayment',
+  async ({ subscriptionId, amount }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('access_token'); 
+
+      const response = await axios.post(
+        `http://127.0.0.1:8000/subscriptions/api/subscriptions/${subscriptionId}/make-payment/`,
+        { amount },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      console.error(error);
+      return rejectWithValue(error.response.data);
+    }
+  }
+);
+
+export const renewSubscription = createAsyncThunk(
+  'subscription/renewSubscription',
+  async ({ subscriptionId}, thunkAPI) => {
+    console.log(`API URL: http://127.0.0.1:8000/subscriptions/api/subscriptions/${subscriptionId}/renew/`);
+    const token = localStorage.getItem('access_token');  // Retrieve token from localStorage
+    
+    if (!token) {
+      return thunkAPI.rejectWithValue("No token found in localStorage");
+    }
+
+    try {
+      const response = await axios.post(
+        `http://127.0.0.1:8000/subscriptions/api/subscriptions/${subscriptionId}/renew/`,
+        {}, // Empty body
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      console.log('Subscription renewed successfully:', response.data);
+      return response.data;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// Thunk to fetch subscriptions and their statuses
+export const fetchSubscriptions = createAsyncThunk(
+  'subscriptions/fetchSubscriptions',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('access_token');
+
+      const config = {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      };
+
+      const [allRes, activeRes, upcomingRes, expiredRes] = await Promise.all([
+        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/', config),
+        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/active/', config),
+        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/upcoming/', config),
+        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/expired/', config),
+      ]);
+
+      const activeIds = new Set(activeRes.data.map(sub => sub.id));
+      const upcomingIds = new Set(upcomingRes.data.map(sub => sub.id));
+      const expiredIds = new Set(expiredRes.data.map(sub => sub.id));
+
+      const subscriptionsWithStatus = allRes.data.map(sub => {
+        if (activeIds.has(sub.id)) {
+          return { ...sub, status: 'Active' };
+        } else if (upcomingIds.has(sub.id)) {
+          return { ...sub, status: 'Upcoming' };
+        } else if (expiredIds.has(sub.id)) {
+          return { ...sub, status: 'Expired' };
+        } else {
+          return { ...sub, status: 'Unknown' };
+        }
+      });
+
+      return subscriptionsWithStatus;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || 'Error fetching subscriptions');
+    }
+  }
+);
 
 const subscriptionsSlice = createSlice({
     name: 'subscriptions',
     initialState: {
       subscriptionTypes: [],
+      ActivesubscriptionTypes: [],
+      Activesubscription: [],
       subscriptions: [],
+      allsubscriptions: [],
+      expiredSubscriptions: [],
+      memberSubscriptions: [],
+      upcomingSubscriptions: [],
+      stats: null,
       subscriptionType: null, 
       subscription: null,
+      payment: null,
       loading: false,
       error: null,
       status: 'idle'
@@ -325,18 +544,18 @@ const subscriptionsSlice = createSlice({
       state.error = action.payload; // Handle error, if any
     })
 
-        .addCase(fetchActiveSubscriptionTypes.pending, (state) => {
-          state.loading = true;
-          state.error = null;
-        })
-        .addCase(fetchActiveSubscriptionTypes.fulfilled, (state, action) => {
-          state.loading = false;
-          state.activeSubscriptions = action.payload;
-        })
-        .addCase(fetchActiveSubscriptionTypes.rejected, (state, action) => {
-          state.loading = false;
-          state.error = action.payload;
-        })
+    .addCase(fetchActiveSubscriptionTypes.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    })
+    .addCase(fetchActiveSubscriptionTypes.fulfilled, (state, action) => {
+      state.loading = false;
+      state.ActivesubscriptionTypes = action.payload;
+    })
+    .addCase(fetchActiveSubscriptionTypes.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload;
+    })
 
         .addCase(fetchSubscriptionTypeById.pending, (state) => {
           state.loading = true;
@@ -386,17 +605,17 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-        .addCase(fetchSubscriptions.pending, (state) => {
-          state.status = 'loading';
+       .addCase(fetchSubscriptions.pending, (state) => {
+         state.status = 'loading';
         })
         .addCase(fetchSubscriptions.fulfilled, (state, action) => {
           state.status = 'succeeded';
-          state.subscriptions = action.payload; // Store the fetched data
-        })
-        .addCase(fetchSubscriptions.rejected, (state, action) => {
-          state.status = 'failed';
+         state.subscriptions = action.payload; // Store the fetched data
+       })
+      .addCase(fetchSubscriptions.rejected, (state, action) => {
+        state.status = 'failed';
           state.error = action.payload; // Handle error
-        })
+       })
       
         .addCase(postSubscription.pending, (state) => {
           state.loading = true;
@@ -448,6 +667,98 @@ const subscriptionsSlice = createSlice({
           state.status = 'failed';
           state.error = action.payload;
         })
+        .addCase(fetchActiveSubscriptions.pending, (state) => {
+          state.loading = true;
+          state.error = null;
+        })
+        .addCase(fetchActiveSubscriptions.fulfilled, (state, action) => {
+          state.loading = false;
+          state.Activesubscription = action.payload;
+        })
+        .addCase(fetchActiveSubscriptions.rejected, (state, action) => {
+          state.loading = false;
+          state.error = action.payload;
+        })
+
+         // Expired subscriptions
+      .addCase(fetchExpiredSubscriptions.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchExpiredSubscriptions.fulfilled, (state, action) => {
+        state.loading = false;
+        state.expiredSubscriptions = action.payload;
+        console.log('Expired subscriptions fetched successfully:', action.payload);
+      })
+      .addCase(fetchExpiredSubscriptions.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+       // ✅ Subscription Stats
+       .addCase(fetchSubscriptionStats.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchSubscriptionStats.fulfilled, (state, action) => {
+        state.loading = false;
+        state.stats = action.payload;
+      })
+      .addCase(fetchSubscriptionStats.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchUpcomingSubscriptions.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchUpcomingSubscriptions.fulfilled, (state, action) => {
+        state.loading = false;
+        state.upcomingSubscriptions = action.payload; 
+      })
+      .addCase(fetchUpcomingSubscriptions.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      
+      .addCase(makePayment.pending, (state) => {
+        state.loading = true;
+        state.paymentStatus = null;
+      })
+      .addCase(makePayment.fulfilled, (state, action) => {
+        state.loading = false;
+        state.subscriptions.remaining_amount= action.payload.remaining_amount; // Update the remaining amount in the subscription
+      })
+      .addCase(makePayment.rejected, (state, action) => {
+        console.error("Payment Error: ", action.payload);
+        state.loading = false;
+        state.paymentStatus = 'failed';
+        state.error = action.payload;
+      })
+      .addCase(renewSubscription.pending, (state) => {
+        state.loading = true;  // Set loading to true while the API call is in progress
+        state.error = null;
+      })
+      .addCase(renewSubscription.fulfilled, (state, action) => {
+        state.loading = false;
+        state.status = 'succeeded';
+        
+        // Update the specific subscription in the array
+        const index = state.subscriptions.findIndex(sub => sub.id === action.payload.id);
+        if (index !== -1) {
+          state.subscriptions[index].end_date = action.payload.end_date;
+        }
+      })
+      .addCase(renewSubscription.rejected, (state, action) => {
+        state.loading = false;  // Set loading to false if the API call fails
+        state.error = action.payload;  // Store the error message
+        state.status = 'failed';  // Mark the operation as failed
+      })
+     
+     // .addCase(fetchAllSubscriptions.fulfilled, (state, action) => {
+      //  state.loading = false;
+      //  state.allsubscriptions = action.payload;
+     // })
+     
     },
   });
   

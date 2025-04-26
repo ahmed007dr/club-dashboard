@@ -8,7 +8,7 @@ import SubscriptionTypeDetails from './SubscriptionTypeDetails'; // ✅ Import t
 const SubscriptionComponent = () => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error } = useSelector((state) => state.subscriptions);
-
+console.log(subscriptionTypes);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
 

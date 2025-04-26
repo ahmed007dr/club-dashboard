@@ -1,7 +1,7 @@
 // UpdateSubscriptionModal.jsx
 import React, { useState, useEffect } from 'react';
 
-const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, updateSubscription }) => {
+const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) => {
   const [formData, setFormData] = useState({
     club: '',
     member: '',
@@ -37,12 +37,12 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, updateSubscrip
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    // You can dispatch an update action here or call an API
-    if (updateSubscription) {
-      updateSubscription(formData);
+    if (onSubmit) {
+      onSubmit({
+        ...formData,
+        id: subscription.id, // Include the subscription ID for the update
+      });
     }
-
     onClose(); // Close modal after submission
   };
 
@@ -148,4 +148,3 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, updateSubscrip
 };
 
 export default UpdateSubscriptionModal;
-
