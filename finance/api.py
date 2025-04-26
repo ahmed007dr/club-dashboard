@@ -8,29 +8,41 @@ from .serializers import (
     ExpenseCategorySerializer, IncomeSourceSerializer
 )
 from rest_framework.permissions import IsAuthenticated
+from utils.permissions import IsOwnerOrRelatedToClub  
 
 # Expense Category Views
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_category_api(request):
     if request.method == 'GET':
-        categories = ExpenseCategory.objects.all()
+        if request.user.role == 'owner':
+            categories = ExpenseCategory.objects.all() 
+        else:
+            categories = ExpenseCategory.objects.filter(club=request.user.club)  
+
         serializer = ExpenseCategorySerializer(categories, many=True)
         return Response(serializer.data)
     
     elif request.method == 'POST':
         serializer = ExpenseCategorySerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            category = serializer.save()
+            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, category):
+                category.delete() 
+                return Response({'error': 'You do not have permission to create an expense category for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Expense Views
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_api(request):
     if request.method == 'GET':
-        expenses = Expense.objects.select_related('category', 'paid_by').all()
+        if request.user.role == 'owner':
+            expenses = Expense.objects.select_related('category', 'paid_by').all()  
+        else:
+            expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)  
+
         serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
         return Response(serializer.data)
     
@@ -40,32 +52,46 @@ def expense_api(request):
         
         serializer = ExpenseSerializer(data=data, context={'request': request})
         if serializer.is_valid():
-            serializer.save()
+            expense = serializer.save()
+            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, expense):
+                expense.delete()  
+                return Response({'error': 'You do not have permission to create an expense for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Income Source Views
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_source_api(request):
     if request.method == 'GET':
-        sources = IncomeSource.objects.all()
+        if request.user.role == 'owner':
+            sources = IncomeSource.objects.all()  
+        else:
+            sources = IncomeSource.objects.filter(club=request.user.club)  
+
         serializer = IncomeSourceSerializer(sources, many=True)
         return Response(serializer.data)
     
     elif request.method == 'POST':
         serializer = IncomeSourceSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save()
+            source = serializer.save()
+            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, source):
+                source.delete() 
+                return Response({'error': 'You do not have permission to create an income source for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Income Views
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_api(request):
     if request.method == 'GET':
-        incomes = Income.objects.select_related('source', 'received_by').all()
+        if request.user.role == 'owner':
+            incomes = Income.objects.select_related('source', 'received_by').all()  
+        else:
+            incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)  
+
         serializer = IncomeSerializer(incomes, many=True)
         return Response(serializer.data)
     
@@ -75,13 +101,16 @@ def income_api(request):
         
         serializer = IncomeSerializer(data=data)
         if serializer.is_valid():
-            serializer.save()
+            income = serializer.save()
+            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, income):
+                income.delete()  
+                return Response({'error': 'You do not have permission to create an income for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Detail Views
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_detail_api(request, pk):
     expense = get_object_or_404(Expense, pk=pk)
     
@@ -92,7 +121,9 @@ def expense_detail_api(request, pk):
     elif request.method == 'PUT':
         serializer = ExpenseSerializer(expense, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
-            serializer.save()
+            updated_expense = serializer.save()
+            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, updated_expense):
+                return Response({'error': 'You do not have permission to update this expense to this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -101,7 +132,7 @@ def expense_detail_api(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_detail_api(request, pk):
     income = get_object_or_404(Income, pk=pk)
     
@@ -112,7 +143,9 @@ def income_detail_api(request, pk):
     elif request.method == 'PUT':
         serializer = IncomeSerializer(income, data=request.data, partial=True)
         if serializer.is_valid():
-            serializer.save()
+            updated_income = serializer.save()
+            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, updated_income):
+                return Response({'error': 'You do not have permission to update this income to this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
