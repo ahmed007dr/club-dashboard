@@ -37,7 +37,7 @@ const Attendance = () => {
     console.log(entryLogs);
 
     
-  }, [dispatch, ]);
+  }, [dispatch]);
 
   // Handle input changes for attendance form
   const handleAttendanceInputChange = (e) => {

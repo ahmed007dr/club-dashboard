@@ -1,8 +1,8 @@
 import React from "react";
 import { FaUsers, FaCalendarCheck, FaTicketAlt, FaCheckCircle } from "react-icons/fa"; // Import icons from React Icons
 import SubscriptionList from './SubscriptionList'
-import ActiveSubscriptionTypes from './ActiveSubscriptionTypes'
-import ExpiredSubscriptions from './ExpiredSubscriptions'
+// import ActiveSubscriptionTypes from './ActiveSubscriptionTypes'
+// import ExpiredSubscriptions from './ExpiredSubscriptions'
 const Main = () => {
   return (
     <div className="p-4">
