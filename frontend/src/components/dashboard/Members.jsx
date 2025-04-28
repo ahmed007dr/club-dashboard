@@ -5,7 +5,7 @@ import { CiTrash } from "react-icons/ci";
 import { CiEdit } from "react-icons/ci";
 import { RiGroupLine } from "react-icons/ri";
 import { useSelector, useDispatch } from "react-redux";
-import { deleteMember, editMember, fetchUsers } from "../../redux/slices/memberSlice";
+import { deleteMember, editMember, fetchUsers, searchMember } from "../../redux/slices/memberSlice";
 import { IoAddOutline } from "react-icons/io5";
 const Members = () => {
   const [data, setData] = useState([{
@@ -17,7 +17,6 @@ const Members = () => {
     phone: "0101234566",
     club_name: "Sports Club"
   }]);
-  const [filteredData, setFilteredData] = useState([]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -26,35 +25,45 @@ const Members = () => {
   const [error, setError] = useState(null); // State to handle errors
   const openAddModal = () => setIsAddModalOpen(true);
   const closeAddModal = () => setIsAddModalOpen(false);
+  const [searchResult,SetSearchResult ]=useState([])
+  
   
   const members = useSelector((state) => state.member.items).results; ;
+  const [filteredData, setFilteredData] = useState(members);
   const dispatch = useDispatch();
-// console.log(members)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        await dispatch(fetchUsers()).unwrap(); 
-        setData(members);
-        setFilteredData(members);
+        const fetchedData= await dispatch(fetchUsers()).unwrap(); 
+        SetSearchResult(fetchedData.results)
+        setData(fetchedData.results);
+        // setFilteredData(data);
       } catch (error) {
         setError("Failed to fetch members. Please try again later."+error.message);
       }
     };
 
     fetchData();
-  }, [dispatch, members]);
+  }, [filteredData]);
 
-  // Function to filter members based on search query
-  const handleSearch = (e) => {
+
+  const handleSearch = async (e) => {
     const query = e.target.value.toLowerCase();
     setSearchQuery(query);
-    const filtered = data.filter(
-      (member) =>
-        member.name.toLowerCase().includes(query) ||
-        member.membership_number.includes(query) ||
-        member.national_id.includes(query)
-    );
-    setFilteredData(filtered);
+  
+    if (query.trim() === "") {
+      console.log(query)
+      // setFilteredData(members);
+      SetSearchResult(data)
+      return;
+    }
+    try {
+      const result = await dispatch(searchMember(query)).unwrap();
+      console.log("Search result:", result);
+      SetSearchResult(result)
+    } catch (error) {
+      setError("Failed to search members. Please try again later. " + error);
+    }
   };
 
   const handleDeleteClick = (member) => {
@@ -63,12 +72,25 @@ const Members = () => {
     
   };
   
-  const confirmDelete = () => {
-    setData(data.filter((m) => m.id !== selectedMember.id));
-    dispatch(deleteMember(selectedMember.id));
-
-    setFilteredData(filteredData.filter((m) => m.id !== selectedMember.id));
-    setIsDeleteModalOpen(false);
+  const confirmDelete = async () => {
+    if (!selectedMember) {
+      setError("No member selected for deletion.");
+      return;
+    }
+  
+    try {
+      // Dispatch the delete action
+      await dispatch(deleteMember(selectedMember.id)).unwrap();
+  
+      // Update the local states after successful deletion
+      const updatedData = data.filter((m) => m.id !== selectedMember.id);
+      setData(updatedData);
+      setFilteredData(updatedData);
+  
+      setIsDeleteModalOpen(false);
+    } catch (error) {
+      setError("Failed to delete member. Please try again later." + error.message);
+    }
   };
 
   const handleEditClick = (member) => {
@@ -130,13 +152,13 @@ const Members = () => {
           </tr>
         </thead>
         <tbody>
-          {Array.isArray(filteredData) && filteredData.map((member, index) => (
+          {Array.isArray(searchResult) && searchResult.map((member, index) => (
             <tr key={member.id}>
               <td className="p-3 border-b">{index + 1}</td>
               <td className="p-3 border-b">
                 <Link to={`/member/${member.id}`}>
                   <img
-                    src={member.photo}
+                    src={member.photo? member.photo : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"}
                     alt="member"
                     className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
                   />
@@ -151,14 +173,14 @@ const Members = () => {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleEditClick(member)}
-                    className="text-green-700"
+                    className="text-green-700 text-xl"
                     title="Edit"
                   >
                     <CiEdit />
                   </button>
                   <button
                     onClick={() => handleDeleteClick(member)}
-                    className="text-red-500"
+                    className="text-red-500 text-xl"
                     title="Delete"
                   >
                     <CiTrash />

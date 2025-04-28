@@ -42,7 +42,7 @@ const Staff = () => {
         staff: `${shift.staff_details.id}`, // Combine first and last name
         approved_by: shift.approved_by_details
           ? `${shift.approved_by_details.id}`
-          : 'Not Approved',
+          : null,
       });
     }
   };
@@ -60,6 +60,7 @@ const Staff = () => {
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
+    console.log("Form Data:", formData); // Log the form data before dispatching
     dispatch(editStaff({ id: selectedShift.id, updatedStaff: formData })); // Dispatch edit action
     handleCloseModal();
   };
