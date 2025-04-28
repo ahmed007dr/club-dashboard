@@ -1,8 +1,8 @@
 import React from "react";
 import { FaUsers, FaCalendarCheck, FaTicketAlt, FaCheckCircle } from "react-icons/fa"; // Import icons from React Icons
 import SubscriptionComponent from './SubscriptionComponent'
-import InviteList from './InviteList'
-import AddTicket from './AddTicket'
+import ReceiptsList from './ReceiptsList'
+import AddReceiptForm from './AddReceiptForm'
 const Main = () => {
   return (
     <div className="p-4">
@@ -53,8 +53,8 @@ const Main = () => {
 
   {/* <MembersList /> */}
 </div>
-<InviteList  />
-<AddTicket  />
+<ReceiptsList  />
+<AddReceiptForm  />
     </div>
   );
 };
