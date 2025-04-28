@@ -4,26 +4,26 @@ import uiReducer from './slices/uiSlice';
 import subscriptionsReducer from './slices/subscriptionsSlice'; 
 import userSlice from './slices/memberSlice';
 import clubSlice from './slices/clubSlice';
-import attendanceSlice from './slices/AttendanceSlice';
-<<<<<<< HEAD
+import ticketsReducer from './slices/ticketsSlice';
+import invitesReducer from './slices/invitesSlice';
 import entryLogSlice from './slices/entryLogSlice';
-=======
+import receiptsReducer from './slices/receiptsSlice';
+
 import entryLogsSlice from './slices/EntryLogsSlice';
 import staffSlice from './slices/staff';
->>>>>>> df365259624ad42779b807e7ba4db94bd9d12439
 const store = configureStore({
   reducer: {
     ui: uiReducer, 
-    subscriptions: subscriptionsReducer, 
+    subscriptions: subscriptionsReducer,
+    tickets: ticketsReducer, 
     member:userSlice.reducer, 
     club:clubSlice.reducer,
-    attendance: attendanceSlice.reducer,
-<<<<<<< HEAD
+    invites: invitesReducer,
     entryLog: entryLogSlice.reducer,
-=======
     entryLogs: entryLogsSlice.reducer,
     staff:staffSlice.reducer,
->>>>>>> df365259624ad42779b807e7ba4db94bd9d12439
+    receipts: receiptsReducer,
+
   },
 });
 

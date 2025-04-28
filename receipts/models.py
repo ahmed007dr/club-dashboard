@@ -6,6 +6,9 @@ from django.dispatch import receiver
 from finance.models import Income, IncomeSource
 from django.utils.timezone import now
 from accounts.models import User
+from members.models import Member
+from subscriptions.models import Subscription
+
 
 class Receipt(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
@@ -20,6 +23,18 @@ class Receipt(models.Model):
 
     def __str__(self):
         return f"Receipt #{self.id} - {self.amount} EGP"
+
+class AutoCorrectionLog(models.Model):
+    member = models.ForeignKey(Member, on_delete=models.CASCADE)
+    old_subscription = models.ForeignKey(Subscription, null=True, blank=True, on_delete=models.SET_NULL, related_name='corrected_from')
+    new_subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='corrected_to')
+    created_at = models.DateTimeField(auto_now_add=True)
+    note = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"Correction for {self.member.name} on {self.created_at.strftime('%Y-%m-%d')}"
+
+
 
 @receiver(post_save, sender=Receipt)
 def create_income_for_receipt(sender, instance, created, **kwargs):
@@ -40,3 +55,4 @@ def create_income_for_receipt(sender, instance, created, **kwargs):
             today_str = now().strftime('%Y%m%d')
             invoice_id = f"INV{today_str}-{instance.id:04d}"
             Receipt.objects.filter(id=instance.id).update(invoice_number=invoice_id)
+

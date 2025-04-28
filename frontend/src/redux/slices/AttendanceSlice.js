@@ -14,7 +14,10 @@ export const fetchAttendances = createAsyncThunk(
           'Content-Type': 'application/json',
         },
       });
+<<<<<<< HEAD
 
+=======
+>>>>>>> 2b57248e23c7e06ae44f8edccf280ec1174605cd
       return response.data;
     } catch (error) {
       console.error('Error fetching attendances:', error);
@@ -35,7 +38,6 @@ export const addAttendance = createAsyncThunk(
           'Content-Type': 'application/json',
         },
       });
-
       return response.data;
     } catch (error) {
       console.error('Error adding attendance:', error);
@@ -50,12 +52,17 @@ export const deleteAttendance = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
+<<<<<<< HEAD
       const response = await axios.delete(`http://127.0.0.1:8000/attendance/api/attendances/${id}/delete/`, {
+=======
+      await axios.delete(`http://127.0.0.1:8000/attendance/api/attendances/${id}/delete/`, {
+>>>>>>> 2b57248e23c7e06ae44f8edccf280ec1174605cd
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
+<<<<<<< HEAD
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -66,20 +73,36 @@ export const deleteAttendance = createAsyncThunk(
     } catch (error) {
       console.error('Error deleting attendance:', error);
       return rejectWithValue(error.message || 'An unexpected error occurred.');
+=======
+      return id;
+    } catch (error) {
+      console.error('Error deleting attendance:', error);
+      return rejectWithValue(error.response?.data?.message || error.message || 'An unexpected error occurred.');
+>>>>>>> 2b57248e23c7e06ae44f8edccf280ec1174605cd
     }
   }
 );
 
+<<<<<<< HEAD
 const attendanceSlice = createSlice({
   name: 'attendance',
   initialState: {
     items: [],
     isLoading: true,
+=======
+// Slice definition
+const attendanceSlice = createSlice({
+  name: 'attendance',
+  initialState: {
+    attendances: [],
+    loading: false,
+>>>>>>> 2b57248e23c7e06ae44f8edccf280ec1174605cd
     error: null,
   },
   reducers: {},
   extraReducers: (builder) => {
     builder
+<<<<<<< HEAD
       // Fetch Attendances
       .addCase(fetchAttendances.pending, (state) => {
         state.isLoading = true;
@@ -122,9 +145,48 @@ const attendanceSlice = createSlice({
       })
       .addCase(deleteAttendance.rejected, (state, action) => {
         state.isLoading = false;
+=======
+      // Fetch attendances
+      .addCase(fetchAttendances.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchAttendances.fulfilled, (state, action) => {
+        state.loading = false;
+        state.attendances = action.payload;
+      })
+      .addCase(fetchAttendances.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Add attendance
+      .addCase(addAttendance.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(addAttendance.fulfilled, (state, action) => {
+        state.loading = false;
+        state.attendances.push(action.payload);
+      })
+      .addCase(addAttendance.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Delete attendance
+      .addCase(deleteAttendance.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(deleteAttendance.fulfilled, (state, action) => {
+        state.loading = false;
+        state.attendances = state.attendances.filter((attendance) => attendance.id !== action.payload);
+      })
+      .addCase(deleteAttendance.rejected, (state, action) => {
+        state.loading = false;
+>>>>>>> 2b57248e23c7e06ae44f8edccf280ec1174605cd
         state.error = action.payload;
       });
   },
 });
 
-export default attendanceSlice;
+export default attendanceSlice.reducer;

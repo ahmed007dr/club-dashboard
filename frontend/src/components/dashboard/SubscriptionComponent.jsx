@@ -59,32 +59,46 @@ console.log(subscriptionTypes);
     <div>
       <h1 className="text-2xl font-bold mb-4">Subscription Types</h1>
       <ul>
-        {subscriptionTypes.map((type) => (
-          <li key={type.id} className="mb-2 flex items-center justify-between">
-            <span className="mr-4">{type.name}</span>
-            <div className="space-x-2">
-              <button
-                onClick={() => openDetailsModal(type)}
-                className="bg-green-500 text-white px-3 py-1 rounded"
-              >
-                View
-              </button>
-              <button
-                onClick={() => openModal(type)}
-                className="bg-blue-500 text-white px-3 py-1 rounded"
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => openDeleteModal(type)}
-                className="bg-red-500 text-white px-3 py-1 rounded"
-              >
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+  {subscriptionTypes.map((type) => (
+    <li key={type.id} className="mb-4 p-4 border-b border-gray-200 flex items-start justify-between">
+      <div className="flex flex-col">
+        <span className="text-lg font-semibold">{type.name}</span>
+        <div className="text-sm text-gray-600">
+          
+          <p>
+            Active:{" "}
+            {type.is_active ? (
+              <span className="text-green-500">Yes</span>
+            ) : (
+              <span className="text-red-500">No</span>
+            )}
+          </p>
+        </div>
+      </div>
+      <div className="space-x-2">
+        <button
+          onClick={() => openDetailsModal(type)}
+          className="bg-green-500 text-white px-3 py-1 rounded"
+        >
+          View
+        </button>
+        <button
+          onClick={() => openModal(type)}
+          className="bg-blue-500 text-white px-3 py-1 rounded"
+        >
+          Edit
+        </button>
+        <button
+          onClick={() => openDeleteModal(type)}
+          className="bg-red-500 text-white px-3 py-1 rounded"
+        >
+          Delete
+        </button>
+      </div>
+    </li>
+  ))}
+</ul>
+
 
       {/* Edit Modal */}
       {isModalOpen && (
