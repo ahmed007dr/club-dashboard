@@ -6,13 +6,15 @@ import {
   deleteReceipt, 
   updateReceipt,
   fetchReceiptById,
-  clearCurrentReceipt
+  clearCurrentReceipt,
+  fetchReceiptByInvoice
 } from '../../redux/slices/receiptsSlice';
+
 
 function ReceiptsList() {
   const dispatch = useDispatch();
   const { receipts, status, error, currentReceipt } = useSelector(state => state.receipts);
-  
+  const [searchTerm, setSearchTerm] = useState('');
   // Form state for adding new receipt
   const [formData, setFormData] = useState({
     club: '',
@@ -31,12 +33,19 @@ function ReceiptsList() {
     message: ''
   });
   
-  const [showForm, setShowForm] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+    // State for delete confirmation modal
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [receiptToDelete, setReceiptToDelete] = useState(null);
 
-  useEffect(() => {
-    dispatch(fetchReceipts());
-  }, [dispatch]);
+ 
+    useEffect(() => {
+      if (searchTerm) {
+        dispatch(fetchReceiptByInvoice(searchTerm));
+      } else {
+        dispatch(fetchReceipts());
+      }
+    }, [dispatch, searchTerm]);
 
   useEffect(() => {
     if (currentReceipt) {
@@ -92,18 +101,42 @@ function ReceiptsList() {
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
-    dispatch(updateReceipt(editData));
+    const { id, amount, invoice_number, message } = editData;
+    
+    const receiptData = {
+      amount,
+      invoice_number,
+      message
+    };
+  
+    dispatch(updateReceipt({ receiptId: id, receiptData }));
     setShowEditModal(false);
   };
+  
+
 
   const handleDelete = (receiptId) => {
-    dispatch(deleteReceipt(receiptId));
+    setReceiptToDelete(receiptId); // Store the receipt ID to delete
+    setShowDeleteConfirm(true); // Show the confirmation modal
+  };
+
+  const confirmDelete = () => {
+    dispatch(deleteReceipt(receiptToDelete));
+    setShowDeleteConfirm(false); // Close the confirmation modal after deleting
+    setReceiptToDelete(null); // Reset the receipt ID
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false); // Close the confirmation modal without deleting
+    setReceiptToDelete(null); // Reset the receipt ID
   };
 
   const handleEdit = (receiptId) => {
     dispatch(fetchReceiptById(receiptId));
     setShowEditModal(true);
   };
+
+  
 
   if (status === 'loading') return <div className="flex justify-center items-center h-screen">Loading...</div>;
   if (error) return <div className="text-red-500 text-center p-4">Error: {error}</div>;
@@ -264,6 +297,30 @@ function ReceiptsList() {
           <p className="p-4 text-gray-500">No receipts found</p>
         )}
       </div>
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="p-6">
+              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Are you sure you want to delete this receipt?</h3>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={cancelDelete}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Modal */}
       {showEditModal && (

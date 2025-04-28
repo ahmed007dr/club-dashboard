@@ -26,45 +26,35 @@ export const fetchReceipts = createAsyncThunk(
 
 
 export const addReceipt = createAsyncThunk(
-    'receipts/addReceipt',
-    async (receiptData, { rejectWithValue }) => {
-      const token = localStorage.getItem('token');
-      
-      try {
-        const response = await axios.post(
-          'http://127.0.0.1:8000/receipts/api/receipts/add/',
-          {
-            club: receiptData.club,
-            member: receiptData.member,
-            subscription: receiptData.subscription,
-            amount: receiptData.amount,
-            payment_method: receiptData.payment_method,
-            note: receiptData.note || '',
-            issued_by: receiptData.issued_by
+  'receipts/addReceipt',
+  async (receiptData, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token'); // get token directly
+
+      console.log('Attempting to add receipt:', receiptData); // Log the receipt data being sent
+
+      const response = await axios.post(
+        'http://127.0.0.1:8000/receipts/api/receipts/add/',
+        receiptData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
-          {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-              'Accept-Language': 'ar' // For Arabic error messages
-            }
-          }
-        );
-        return response.data;
-      } catch (error) {
-        // Handle Django validation errors
-        if (error.response && error.response.data) {
-          // Convert Django error object to more readable format
-          const errors = {};
-          Object.entries(error.response.data).forEach(([key, value]) => {
-            errors[key] = Array.isArray(value) ? value.join(' ') : value;
-          });
-          return rejectWithValue(errors);
         }
-        return rejectWithValue({ message: 'حدث خطأ غير متوقع' });
-      }
+      );
+
+      console.log('Receipt added successfully:', response.data); // Log the successful response
+      return response.data;
+    } catch (error) {
+      console.error('Error adding receipt:', error.response?.data || error.message); // Log the error
+      return rejectWithValue(
+        error.response?.data || error.message
+      );
     }
-  );
+  }
+);
 
 
 export const fetchReceiptByInvoice = createAsyncThunk(
@@ -73,6 +63,7 @@ export const fetchReceiptByInvoice = createAsyncThunk(
     const response = await axios.get(`${API_BASE_URL}/receipts/invoice/${invoiceNumber}/`, {
       headers: getAuthHeaders()
     });
+    console.log('Fetched receipt by invoice:', response.data); // Log the fetched receipt
     return response.data;
   }
 );
@@ -99,11 +90,22 @@ export const deleteReceipt = createAsyncThunk(
 
 export const updateReceipt = createAsyncThunk(
   'receipts/update',
-  async ({ receiptId, receiptData }) => {
-    const response = await axios.put(`${API_BASE_URL}/receipts/${receiptId}/edit/`, receiptData, {
-      headers: getAuthHeaders()
-    });
-    return response.data;
+  async ({ receiptId, receiptData }, { rejectWithValue }) => {
+    try {
+      console.log(`Attempting to update receipt with ID: ${receiptId}`, receiptData); // Log the receipt data being sent
+
+      const response = await axios.put(`${API_BASE_URL}/receipts/${receiptId}/edit/`, receiptData, {
+        headers: getAuthHeaders()
+      });
+
+      console.log('Receipt updated successfully:', response.data); // Log the successful response
+      return response.data;
+    } catch (error) {
+      console.error('Error updating receipt:', error.response?.data || error.message); // Log the error
+      return rejectWithValue(
+        error.response?.data || error.message
+      );
+    }
   }
 );
 
@@ -153,10 +155,13 @@ const receiptsSlice = createSlice({
       .addCase(fetchReceiptByInvoice.pending, (state) => {
         state.status = 'loading';
       })
-      .addCase(fetchReceiptByInvoice.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        state.currentReceipt = action.payload;
-      })
+      // In your receiptsSlice.js
+.addCase(fetchReceiptByInvoice.fulfilled, (state, action) => {
+  state.status = 'succeeded';
+  // Convert single object to array if needed
+  state.receipts = Array.isArray(action.payload) ? action.payload : [action.payload];
+  state.error = null;
+})
       .addCase(fetchReceiptByInvoice.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.error.message;

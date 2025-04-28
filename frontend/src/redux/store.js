@@ -14,7 +14,7 @@ import staffSlice from './slices/staff';
 const store = configureStore({
   reducer: {
     ui: uiReducer, 
-    subscriptions: subscriptionsReducer,
+    subscriptions: subscriptionsReducer, 
     tickets: ticketsReducer, 
     member:userSlice.reducer, 
     club:clubSlice.reducer,
