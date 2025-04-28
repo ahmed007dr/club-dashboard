@@ -10,7 +10,7 @@ export const fetchSubscriptionTypes = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       // Retrieve the access token from localStorage
-      const accessToken = localStorage.getItem('access_token');
+      const accessToken = localStorage.getItem('token');
       if (!accessToken) {
         throw new Error('Access token not found');
       }
@@ -37,7 +37,7 @@ export const fetchActiveSubscriptionTypes = createAsyncThunk(
   async (_, { rejectWithValue }) => {
 
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
       const response = await axios.get(
         'http://127.0.0.1:8000/subscriptions/api/subscription-types/active/',
         {
@@ -58,7 +58,7 @@ export const fetchSubscriptionTypeById = createAsyncThunk(
   'subscriptions/fetchById',
   async (id, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
       const response = await axios.get(`http://127.0.0.1:8000/subscriptions/api/subscription-types/${id}/`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -74,7 +74,7 @@ export const fetchSubscriptionTypeById = createAsyncThunk(
 export const updateSubscription = createAsyncThunk(
   'subscriptions/updateSubscription',
   async ({ id, subscriptionData }, { rejectWithValue }) => {
-    const token = localStorage.getItem('access_token'); // Get the token from localStorage
+    const token = localStorage.getItem('token'); // Get the token from localStorage
 
     if (!token) {
       console.error("Authorization token is missing.");
@@ -105,7 +105,7 @@ export const deleteSubscriptionById = createAsyncThunk(
   'subscriptions/deleteById',
   async (id, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
       const config = {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -131,7 +131,7 @@ export const fetchSubscriptions = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       // Retrieve the access token from localStorage
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
       console.log('Token from localStorage:', token);  
 
       // If no token is found, throw an error
@@ -170,7 +170,7 @@ export const postSubscription = createAsyncThunk(
   'subscription/postSubscription',
   async (subscriptionData, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
 
       if (!token) throw new Error('Access token not found');
 
@@ -198,7 +198,7 @@ export const putSubscriptionType = createAsyncThunk(
   'subscriptionTypes/putSubscriptionType',
   async ({ id, subscriptionData }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
 
       if (!token) {
         console.error('Access token not found');
@@ -231,7 +231,7 @@ export const deleteSubscriptionType = createAsyncThunk(
   'subscriptions/deleteSubscriptionType',
   async (id, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token'); // Get the token from localStorage
+      const token = localStorage.getItem('token'); // Get the token from localStorage
       const response = await axios.delete(
         `http://127.0.0.1:8000/subscriptions/api/subscription-types/${id}/`,
         {
@@ -240,6 +240,7 @@ export const deleteSubscriptionType = createAsyncThunk(
           },
         }
       );
+      console.log('Subscription type deleted successfully:', response.data);
       return id; // Return the id to filter it from the state
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to delete subscription type');
@@ -251,7 +252,7 @@ export const addSubscriptionType = createAsyncThunk(
   'subscriptions/addSubscriptionType',
   async (subscriptionData, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
       const response = await axios.post(
         'http://127.0.0.1:8000/subscriptions/api/subscription-types/',
         subscriptionData, 
@@ -275,7 +276,7 @@ export const fetchSubscriptionById = createAsyncThunk(
   'subscriptions/fetchSubscriptionById',
   async (id, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
 
       if (!token) throw new Error('Access token not found');
 
@@ -302,7 +303,7 @@ export const fetchActiveSubscriptions = createAsyncThunk(
   'subscriptions/fetchActiveSubscriptions',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
 
       const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/active/', {
         headers: {
@@ -322,7 +323,7 @@ export const fetchExpiredSubscriptions = createAsyncThunk(
   'subscriptions/fetchExpiredSubscriptions',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
 
       const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/expired/', {
         headers: {
@@ -342,7 +343,7 @@ export const fetchMemberSubscriptions = createAsyncThunk(
   'subscriptions/fetchMemberSubscriptions',
   async (memberId, thunkAPI) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
       const response = await axios.get(
         `http://127.0.0.1:8000/subscriptions/api/subscriptions/member/`,
         {
@@ -365,7 +366,7 @@ export const fetchSubscriptionStats = createAsyncThunk(
   'subscriptions/fetchSubscriptionStats',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
 
       const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/stats/', {
         headers: {
@@ -385,7 +386,7 @@ export const fetchUpcomingSubscriptions = createAsyncThunk(
   'subscriptions/fetchUpcomingSubscriptions',
   async (_, thunkAPI) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
       const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/upcoming/', {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -403,7 +404,7 @@ export const makePayment = createAsyncThunk(
   'subscriptions/makePayment',
   async ({ subscriptionId, amount }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token'); 
+      const token = localStorage.getItem('token'); 
 
       const response = await axios.post(
         `http://127.0.0.1:8000/subscriptions/api/subscriptions/${subscriptionId}/make-payment/`,
@@ -428,7 +429,7 @@ export const renewSubscription = createAsyncThunk(
   'subscription/renewSubscription',
   async ({ subscriptionId}, thunkAPI) => {
     console.log(`API URL: http://127.0.0.1:8000/subscriptions/api/subscriptions/${subscriptionId}/renew/`);
-    const token = localStorage.getItem('access_token');  // Retrieve token from localStorage
+    const token = localStorage.getItem('token');  // Retrieve token from localStorage
     
     if (!token) {
       return thunkAPI.rejectWithValue("No token found in localStorage");
@@ -458,7 +459,7 @@ export const fetchSubscriptions = createAsyncThunk(
   'subscriptions/fetchSubscriptions',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('token');
 
       const config = {
         headers: {
