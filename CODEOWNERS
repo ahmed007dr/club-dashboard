@@ -1,0 +1,6 @@
+
+# Protect main branch
+main @ahmed007dr
+
+# Protect dev branch
+dev @ahmed007dr
