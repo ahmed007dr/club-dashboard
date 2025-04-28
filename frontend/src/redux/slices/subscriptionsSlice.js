@@ -257,6 +257,7 @@ export const deleteSubscriptionType = createAsyncThunk(
           },
         }
       );
+      console.log('Subscription type deleted successfully:', response.data);
       return id; // Return the id to filter it from the state
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to delete subscription type');

@@ -12,6 +12,7 @@ urlpatterns = [
     
     # ===== API Endpoints =====
     path('api/receipts/', api.receipt_list_api, name='api-receipt-list'),
+    path('api/receipts/validate/', api.validate_or_autocorrect_receipt, name='validate-receipt'),
     path('api/receipts/add/', api.add_receipt_api, name='api-add-receipt'),
     path('api/receipts/<int:receipt_id>/', api.receipt_detail_api, name='api-receipt-detail'),
     path('api/receipts/<int:receipt_id>/edit/', api.edit_receipt_api, name='api-edit-receipt'),
