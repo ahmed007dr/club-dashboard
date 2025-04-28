@@ -11,7 +11,6 @@ const AddMember = () => {
     national_id: '',
     birth_date: '',
     phone: '',
-    photo: null,
     club: '',
     referred_by: '',
   });
@@ -42,9 +41,9 @@ const AddMember = () => {
     form.append('national_id', formData.national_id);
     form.append('birth_date', formData.birth_date);
     form.append('phone', formData.phone);
-    if (formData.photo) {
-      form.append('photo', formData.photo);
-    }
+    // if (formData.photo) {
+    //   form.append('photo', formData.photo);
+    // }
     form.append('referred_by', formData.referred_by);
         console.log("Form data:", formData); // Log the form data to check its structure
         dispatch(addMember(formData));
@@ -187,7 +186,7 @@ const AddMember = () => {
           />
         </div>
 
-        <div>
+        {/* <div>
           <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="photo">Photo</label>
           <input
             id="photo"
@@ -196,7 +195,7 @@ const AddMember = () => {
             onChange={handleChange}
             className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
           />
-        </div>
+        </div> */}
 
         <div>
           <button

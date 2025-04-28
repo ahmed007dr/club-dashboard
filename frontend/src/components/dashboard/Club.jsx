@@ -15,37 +15,27 @@ const Club = () => {
     createdAt: "",
   });
 
-  const clubs = useSelector((state) => {
-    const items = state.club?.items || [];
-    return Array.isArray(items) ? items : [items]; // Wrap single object in an array
-  });
+  const [clubs, setClubs] = useState([]); // Initialize clubs state
   const isLoading = useSelector((state) => state.club.isLoading);
   const error = useSelector((state) => state.club.error);
   const dispatch = useDispatch();
 
   useEffect(() => {
-    // dispatch(fetchClubs());
-
     const fetchData = async () => {
-          try {
-            await dispatch(fetchClubs()).unwrap();
-            console.log("Club fetched:", clubs); // Log the fetched staff
-          } catch (error) {
-            console.error("Error fetching Club:", error);
-          }
-        };
-    
-        fetchData();
-    // console.log("Clubs fetched:", clubs); // Log the fetched clubs
-    
+      try {
+        const res = await dispatch(fetchClubs()).unwrap();
+        setClubs(res); // Set the fetched clubs to state
+      } catch (error) {
+        console.error("Error fetching Club:", error);
+      }
+    };
+
+    fetchData();
   }, [dispatch]);
 
   const formatDateForInput = (dateString) => {
     const date = new Date(dateString);
-    if (isNaN(date.getTime())) {
-      console.warn("Invalid date string:", dateString);
-      return "";
-    }
+   
 
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -55,7 +45,7 @@ const Club = () => {
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   };
 
-  const openModal = (club) => {
+  const handleEditClick = (club) => {
     setSelectedClub(club);
     setFormData({
       name: club.name,
@@ -66,20 +56,25 @@ const Club = () => {
     setModalOpen(true);
   };
 
-  const closeModal = () => {
-    setModalOpen(false);
-    setSelectedClub(null);
-  };
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleEditSubmit = () => {
+    const updatedClubs = clubs.map((c) =>
+      c.id === selectedClub.id ? { ...selectedClub, ...formData } : c
+    );
+
     dispatch(editClub({ id: selectedClub.id, updatedClub: formData }));
-    closeModal();
+
+    setClubs(updatedClubs); // Update the local state with the edited club
+    setModalOpen(false); // Close the modal
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setSelectedClub(null);
   };
 
   if (isLoading) {
@@ -113,7 +108,7 @@ const Club = () => {
               <td className="p-3 border-b">{index + 1}</td>
               <td className="p-3 border-b">
                 <img
-                  src={club.logo}
+                  src={club.logo? club.logo : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"}
                   alt={club.name}
                   className="w-16 h-16 rounded-full object-cover"
                 />
@@ -124,7 +119,7 @@ const Club = () => {
                 {new Date(club.createdAt).toLocaleDateString()}
               </td>
               <td className="p-3 border-b">
-                <Button onClick={() => openModal(club)} className="btn-green">
+                <Button onClick={() => handleEditClick(club)} className="bg-light text-green-700 text-2xl">
                   <CiEdit />
                 </Button>
               </td>
@@ -135,10 +130,15 @@ const Club = () => {
 
       {/* Modal for editing club */}
       {modalOpen && (
-        <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-[rgba(0,0,0,0.2)] bg-opacity-50">
           <div className="bg-white p-6 rounded-lg shadow-lg w-96">
             <h3 className="text-xl font-bold mb-4">Edit Club</h3>
-            <form onSubmit={handleSubmit}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleEditSubmit();
+              }}
+            >
               <div className="mb-4">
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                   Club Name
@@ -175,10 +175,9 @@ const Club = () => {
                   type="text"
                   id="logo"
                   name="logo"
-                  value={formData.logo}
+                  value={formData.logo? formData.logo : ""}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded"
-                  
                 />
               </div>
               <div className="mb-4">

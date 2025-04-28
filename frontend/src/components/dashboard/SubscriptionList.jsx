@@ -9,7 +9,7 @@ import { Link } from 'react-router-dom';
 const SubscriptionsList = () => {
   const dispatch = useDispatch();
   const { subscriptions, status, error, updateStatus } = useSelector((state) => state.subscriptions);
-console.log('Subscriptions:', subscriptions); // Debugging line to check the subscriptions data
+// console.log('Subscriptions:', subscriptions); // Debugging line to check the subscriptions data
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false); // Delete modal state
   const [selectedSubscription, setSelectedSubscription] = useState(null);
