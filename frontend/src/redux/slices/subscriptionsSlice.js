@@ -4,31 +4,48 @@ import axios from 'axios';
 
 
 
-// Define the async thunk for creating a new subscription type
+
+
 export const fetchSubscriptionTypes = createAsyncThunk(
-  'subscriptions/fetchSubscriptionTypes',
+  'subscriptionTypes/fetch',
   async (_, { rejectWithValue }) => {
     try {
-      // Retrieve the access token from localStorage
-      const accessToken = localStorage.getItem('token');
-      if (!accessToken) {
-        throw new Error('Access token not found');
-      }
+      const token = localStorage.getItem('token');
 
-      // Make the GET request with the access token in the headers
-      const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscription-types/', {
+      // Fetch all subscriptions
+      const allResponse = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscription-types/', {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
         },
       });
 
-      return response.data;  // Return data to be used in the reducer
+      // Fetch active subscriptions
+      const activeResponse = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscription-types/active/', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const allSubscriptions = allResponse.data;
+      const activeSubscriptions = activeResponse.data;
+
+      // Get list of active subscription IDs
+      const activeIds = new Set(activeSubscriptions.map(sub => sub.id));
+
+      // Add isActive flag
+      const modifiedSubscriptions = allSubscriptions.map((sub) => ({
+        ...sub,
+        isActive: activeIds.has(sub.id), // if the id is in active list, it's active
+      }));
+
+      return modifiedSubscriptions;
+
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);  // In case of error
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
+
 
 
 // Async thunk to fetch active subscription types
@@ -496,7 +513,7 @@ export const fetchSubscriptions = createAsyncThunk(
     }
   }
 );
-
+//
 const subscriptionsSlice = createSlice({
     name: 'subscriptions',
     initialState: {
@@ -545,18 +562,18 @@ const subscriptionsSlice = createSlice({
       state.error = action.payload; // Handle error, if any
     })
 
-    .addCase(fetchActiveSubscriptionTypes.pending, (state) => {
-      state.loading = true;
-      state.error = null;
-    })
-    .addCase(fetchActiveSubscriptionTypes.fulfilled, (state, action) => {
-      state.loading = false;
-      state.ActivesubscriptionTypes = action.payload;
-    })
-    .addCase(fetchActiveSubscriptionTypes.rejected, (state, action) => {
-      state.loading = false;
-      state.error = action.payload;
-    })
+  //  .addCase(fetchActiveSubscriptionTypes.pending, (state) => {
+   //   state.loading = true;
+  //    state.error = null;
+  //  })
+  //  .addCase(fetchActiveSubscriptionTypes.fulfilled, (state, action) => {
+ //     state.loading = false;
+  //    state.ActivesubscriptionTypes = action.payload;
+ //   })
+  //  .addCase(fetchActiveSubscriptionTypes.rejected, (state, action) => {
+ //     state.loading = false;
+ //     state.error = action.payload;
+  //  })
 
         .addCase(fetchSubscriptionTypeById.pending, (state) => {
           state.loading = true;

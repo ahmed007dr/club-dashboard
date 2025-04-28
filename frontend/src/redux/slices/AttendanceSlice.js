@@ -1,75 +1,63 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+// slices/attendanceSlice.js
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import axios from "axios";
 
-// Async thunk for fetching attendances
+// Fetch attendances
 export const fetchAttendances = createAsyncThunk(
   'attendance/fetchAttendances',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/attendance/api/attendances/', {
-        method: 'GET',
+      const token = localStorage.getItem('token');
+      const response = await axios.get('http://127.0.0.1:8000/attendance/api/attendances/', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to fetch attendances.');
-      }
-      const data = await response.json();
-      return data;
+      return response.data;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Error fetching attendances:', error);
+      return rejectWithValue(error.response?.data?.message || error.message || 'An unexpected error occurred.');
     }
   }
 );
 
-// Async thunk for adding attendance
+// Add new attendance
 export const addAttendance = createAsyncThunk(
   'attendance/addAttendance',
   async (newAttendance, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/attendance/api/attendances/add/', {
-        method: 'POST',
+      const token = localStorage.getItem('token');
+      const response = await axios.post('http://127.0.0.1:8000/attendance/api/attendances/add/', newAttendance, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newAttendance),
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to add attendance.');
-      }
-      return newAttendance; // Return the added attendance for optimistic updates
+      return response.data;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Error adding attendance:', error);
+      return rejectWithValue(error.response?.data?.message || error.message || 'An unexpected error occurred.');
     }
   }
 );
 
-// Async thunk for deleting attendance
+// Delete attendance
 export const deleteAttendance = createAsyncThunk(
   'attendance/deleteAttendance',
   async (id, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`http://127.0.0.1:8000/attendance/api/attendances/${id}/delete/`, {
-        method: 'DELETE',
+      const token = localStorage.getItem('token');
+      await axios.delete(`http://127.0.0.1:8000/attendance/api/attendances/${id}/delete/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to delete attendance.');
-      }
-      return id; // Return the ID of the deleted attendance for optimistic updates
+      return id;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Error deleting attendance:', error);
+      return rejectWithValue(error.response?.data?.message || error.message || 'An unexpected error occurred.');
     }
   }
 );
@@ -105,7 +93,7 @@ const attendanceSlice = createSlice({
       })
       .addCase(addAttendance.fulfilled, (state, action) => {
         state.loading = false;
-        state.attendances.push(action.payload); // Optimistic update
+        state.attendances.push(action.payload);
       })
       .addCase(addAttendance.rejected, (state, action) => {
         state.loading = false;
@@ -118,8 +106,7 @@ const attendanceSlice = createSlice({
       })
       .addCase(deleteAttendance.fulfilled, (state, action) => {
         state.loading = false;
-        const deletedId = action.payload;
-        state.attendances = state.attendances.filter((attendance) => attendance.id !== deletedId); // Remove deleted attendance
+        state.attendances = state.attendances.filter((attendance) => attendance.id !== action.payload);
       })
       .addCase(deleteAttendance.rejected, (state, action) => {
         state.loading = false;
@@ -128,4 +115,4 @@ const attendanceSlice = createSlice({
   },
 });
 
-export default attendanceSlice;
+export default attendanceSlice.reducer;
