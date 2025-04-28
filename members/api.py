@@ -65,6 +65,9 @@ def delete_member_api(request, member_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_search_api(request):
+    paginator = PageNumberPagination()
+    paginator.page_size = 20
+
     search_term = request.GET.get('q', '')
 
     if request.user.role == 'owner':

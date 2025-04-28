@@ -904,7 +904,7 @@
 						"header": [
 							{
 								"key": "Authorization",
-								"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ1NTQ1NjIxLCJpYXQiOjE3NDU1NDIwMjEsImp0aSI6IjdhYTQ4ZjI5Yzg3ZDQ3Yjk5MTY5NjFjMTQ3MjAwMDA2IiwidXNlcl9pZCI6Nn0.f0Bjwp3O7z9K0vc9cyRFWdYLy4VF-AyxlnYJXyyJt6I",
+								"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ1Njc0NDYwLCJpYXQiOjE3NDU2NzA4NjAsImp0aSI6IjRmZDBhY2UxYWI1NDQxNTY4MjgwYmEzYzI3NjM1YmMyIiwidXNlcl9pZCI6MX0.RZDMFOpqLIWExiUhmUXW7g7Du3NT80hXJoXrrOpE4PU",
 								"type": "text"
 							},
 							{
@@ -2896,7 +2896,7 @@
 						"header": [
 							{
 								"key": "Authorization",
-								"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ1NTg5MzYwLCJpYXQiOjE3NDU1ODU3NjAsImp0aSI6ImViYzQ5YWViMzhkODQ3OTFhNzc0Nzg0NTQ1M2IyMGYzIiwidXNlcl9pZCI6Nn0.SuPeUtSFZUCJYmw9VQp8mqkCyGTvSpOqhd6OPsmBJwc",
+								"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ1OTg0OTI4LCJpYXQiOjE3NDU4MDQ5MjgsImp0aSI6IjQzYTE2MWQwNjkyMzQ4MjNiMjc3NTFhNzAxYThjMzg5IiwidXNlcl9pZCI6Nn0.eOLt4ZsvHKnWntli8ZHLTvyr3VjsRdLIj6uJyXO55FU",
 								"type": "text"
 							},
 							{
@@ -2907,7 +2907,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"id\": 6,\r\n    \"amount\": \"200.00\",\r\n    \"invoice_number\": \"INV-001\",\r\n    \"message\": \"Receipt updated successfully\"\r\n}",
+							"raw": "{\r\n    \"amount\": \"200.00\",\r\n    \"note\": \"Updated payment for gym access\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -2915,7 +2915,7 @@
 							}
 						},
 						"url": {
-							"raw": "http://127.0.0.1:8000/receipts/api/receipts/6/edit/",
+							"raw": "http://127.0.0.1:8000/receipts/api/receipts/3/edit/",
 							"protocol": "http",
 							"host": [
 								"127",
@@ -2928,8 +2928,54 @@
 								"receipts",
 								"api",
 								"receipts",
-								"6",
+								"3",
 								"edit",
+								""
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "validate receipt",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ1OTg0OTI4LCJpYXQiOjE3NDU4MDQ5MjgsImp0aSI6IjQzYTE2MWQwNjkyMzQ4MjNiMjc3NTFhNzAxYThjMzg5IiwidXNlcl9pZCI6Nn0.eOLt4ZsvHKnWntli8ZHLTvyr3VjsRdLIj6uJyXO55FU",
+								"type": "text"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"member\": 5,\r\n    \"subscription\": 12,\r\n    \"amount\": 250,\r\n    \"default_subscription_type\": \"Basic\"\r\n}\r\n",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://127.0.0.1:8000/receipts/api/receipts/validate/",
+							"protocol": "http",
+							"host": [
+								"127",
+								"0",
+								"0",
+								"1"
+							],
+							"port": "8000",
+							"path": [
+								"receipts",
+								"api",
+								"receipts",
+								"validate",
 								""
 							]
 						}
@@ -2943,7 +2989,7 @@
 						"header": [
 							{
 								"key": "Authorization",
-								"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ1NTg5MzYwLCJpYXQiOjE3NDU1ODU3NjAsImp0aSI6ImViYzQ5YWViMzhkODQ3OTFhNzc0Nzg0NTQ1M2IyMGYzIiwidXNlcl9pZCI6Nn0.SuPeUtSFZUCJYmw9VQp8mqkCyGTvSpOqhd6OPsmBJwc",
+								"value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ1OTg0OTI4LCJpYXQiOjE3NDU4MDQ5MjgsImp0aSI6IjQzYTE2MWQwNjkyMzQ4MjNiMjc3NTFhNzAxYThjMzg5IiwidXNlcl9pZCI6Nn0.eOLt4ZsvHKnWntli8ZHLTvyr3VjsRdLIj6uJyXO55FU",
 								"type": "text"
 							},
 							{
@@ -2954,7 +3000,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"club\": 1,\r\n    \"member\": 5,\r\n    \"subscription\": 4,\r\n    \"amount\": \"150.00\",\r\n    \"payment_method\": \"cash\",\r\n    \"note\": \"Monthly subscription payment\"\r\n}",
+							"raw": "{\r\n    \"club\": 1,\r\n    \"member\": 5,\r\n    \"subscription\": null,\r\n    \"amount\": \"150.00\",\r\n    \"payment_method\": \"cash\",\r\n    \"note\": \"Payment for gym access\"\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
