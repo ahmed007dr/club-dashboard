@@ -6,6 +6,7 @@ import { FiMenu, FiX, FiSearch, FiBell, FiUser, FiSun, FiMoon } from 'react-icon
 import { Dumbbell } from 'lucide-react';
 import axios from 'axios';
 import { Menu } from '@headlessui/react';
+import BASE_URL from '../../config/api';
 
 const Navbar = ({ hideMenuButton = false }) => {
   const dispatch = useDispatch();
@@ -35,7 +36,7 @@ const Navbar = ({ hideMenuButton = false }) => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await axios.get('http://127.0.0.1:8000/accounts/api/profile/', {
+        const res = await axios.get(`${BASE_URL}/accounts/api/profile/`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
@@ -63,7 +64,7 @@ const Navbar = ({ hideMenuButton = false }) => {
       if (!refreshToken) return;
 
       await axios.post(
-        'http://127.0.0.1:8000/accounts/api/logout/',
+        `${BASE_URL}/accounts/api/logout/`,
         { refresh: refreshToken },
         {
           headers: {

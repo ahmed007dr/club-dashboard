@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import BASE_URL from '../../config/api';
 
 const ExpenseCategories = () => {
   const [categories, setCategories] = useState([]);
@@ -17,7 +18,7 @@ const ExpenseCategories = () => {
 
     // Fetch data when the component mounts
     axios
-      .get('http://127.0.0.1:8000/api/finance/api/expense-categories/', {
+      .get(`${BASE_URL}/api/finance/api/expense-categories/`, {
         headers: {
           'accept': 'application/json',
           'Authorization': token,  // Directly add token here (without 'Bearer' prefix)

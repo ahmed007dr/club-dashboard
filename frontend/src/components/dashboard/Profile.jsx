@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BsPersonBoundingBox } from 'react-icons/bs';
 import axios from 'axios';
+import BASE_URL from '../../config/api';
 
 const Profile = () => {
   const [data, setData] = useState(null);
@@ -9,7 +10,7 @@ const Profile = () => {
     const fetchProfile = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get('http://127.0.0.1:8000/accounts/api/profile/', {
+        const response = await axios.get(`${BASE_URL}/accounts/api/profile/`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
