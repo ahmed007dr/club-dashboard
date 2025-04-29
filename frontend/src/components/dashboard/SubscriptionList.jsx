@@ -273,6 +273,7 @@ const SubscriptionList = () => {
       <tr>
   <th className="py-2 px-4 text-right">العضو</th>
   <th className="py-2 px-4 text-right">النادي</th>
+  <th className="py-2 px-4 text-right" > اسم النادي</th>
   <th className="py-2 px-4 text-right">تاريخ البدء</th>
   <th className="py-2 px-4 text-right">تاريخ الانتهاء</th>
   <th className="py-2 px-4 text-right">المبلغ المدفوع</th>
@@ -294,6 +295,7 @@ const SubscriptionList = () => {
               </Link>
             </td>
             <td className="py-2 px-4">{subscription.club}</td>
+            <td className="py-2 px-4">{subscription.club_name}</td>
             <td className="py-2 px-4">{subscription.start_date}</td>
             <td className="py-2 px-4">{subscription.end_date}</td>
             <td className="py-2 px-4">${subscription.paid_amount}</td>

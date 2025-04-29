@@ -1,9 +1,6 @@
-// slices/attendanceSlice.js
-import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import axios from "axios";
-import BASE_URL from '../../config/api';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
-// Fetch attendances
+// Async thunk for fetching attendances
 export const fetchAttendances = createAsyncThunk(
   'attendance/fetchAttendances',
   async (_, { rejectWithValue }) => {
@@ -15,15 +12,19 @@ export const fetchAttendances = createAsyncThunk(
           'Content-Type': 'application/json',
         },
       });
-      return response.data;
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.message || 'Failed to fetch attendances.');
+      }
+      const data = await response.json();
+      return data;
     } catch (error) {
-      console.error('Error fetching attendances:', error);
-      return rejectWithValue(error.response?.data?.message || error.message || 'An unexpected error occurred.');
+      return rejectWithValue(error.message);
     }
   }
 );
 
-// Add new attendance
+// Async thunk for adding attendance
 export const addAttendance = createAsyncThunk(
   'attendance/addAttendance',
   async (newAttendance, { rejectWithValue }) => {
@@ -34,16 +35,20 @@ export const addAttendance = createAsyncThunk(
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify(newAttendance),
       });
-      return response.data;
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.message || 'Failed to add attendance.');
+      }
+      return newAttendance; // Return the added attendance for optimistic updates
     } catch (error) {
-      console.error('Error adding attendance:', error);
-      return rejectWithValue(error.response?.data?.message || error.message || 'An unexpected error occurred.');
+      return rejectWithValue(error.message);
     }
   }
 );
 
-// Delete attendance
+// Async thunk for deleting attendance
 export const deleteAttendance = createAsyncThunk(
   'attendance/deleteAttendance',
   async (id, { rejectWithValue }) => {
@@ -55,25 +60,23 @@ export const deleteAttendance = createAsyncThunk(
           'Content-Type': 'application/json',
         },
       });
-
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete attendance.');
+        return rejectWithValue(errorData.message || 'Failed to delete attendance.');
       }
-
-      return id;
+      return id; // Return the ID of the deleted attendance for optimistic updates
     } catch (error) {
-      console.error('Error deleting attendance:', error);
-      return rejectWithValue(error.message || 'An unexpected error occurred.');
+      return rejectWithValue(error.message);
     }
   }
 );
 
+// Slice definition
 const attendanceSlice = createSlice({
   name: 'attendance',
   initialState: {
-    items: [],
-    isLoading: true,
+    attendances: [],
+    loading: false,
     error: null,
   },
   reducers: {},
@@ -99,7 +102,7 @@ const attendanceSlice = createSlice({
       })
       .addCase(addAttendance.fulfilled, (state, action) => {
         state.loading = false;
-        state.attendances.push(action.payload);
+        state.attendances.push(action.payload); // Optimistic update
       })
       .addCase(addAttendance.rejected, (state, action) => {
         state.loading = false;
@@ -112,7 +115,8 @@ const attendanceSlice = createSlice({
       })
       .addCase(deleteAttendance.fulfilled, (state, action) => {
         state.loading = false;
-        state.attendances = state.attendances.filter((attendance) => attendance.id !== action.payload);
+        const deletedId = action.payload;
+        state.attendances = state.attendances.filter((attendance) => attendance.id !== deletedId); // Remove deleted attendance
       })
       .addCase(deleteAttendance.rejected, (state, action) => {
         state.loading = false;
@@ -121,4 +125,4 @@ const attendanceSlice = createSlice({
   },
 });
 
-export default attendanceSlice.reducer;
+export default attendanceSlice;

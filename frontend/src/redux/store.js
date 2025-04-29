@@ -4,6 +4,7 @@ import uiReducer from './slices/uiSlice';
 import subscriptionsReducer from './slices/subscriptionsSlice'; 
 import userSlice from './slices/memberSlice';
 import clubSlice from './slices/clubSlice';
+import attendanceSlice from './slices/AttendanceSlice';
 import ticketsReducer from './slices/ticketsSlice';
 import invitesReducer from './slices/invitesSlice';
 import entryLogSlice from './slices/entryLogSlice';
@@ -18,10 +19,11 @@ const store = configureStore({
     tickets: ticketsReducer, 
     member:userSlice.reducer, 
     club:clubSlice.reducer,
-    invites: invitesReducer,
-    entryLog: entryLogSlice.reducer,
+    attendance: attendanceSlice.reducer,
     entryLogs: entryLogsSlice.reducer,
     staff:staffSlice.reducer,
+    invites: invitesReducer,
+    entryLog: entryLogSlice.reducer,
     receipts: receiptsReducer,
 
   },
