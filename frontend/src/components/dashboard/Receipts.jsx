@@ -154,25 +154,25 @@ function Receipts() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h2 className="text-2xl font-bold mb-6">Receipts Management</h2>
+     
       
     
       {/* Receipts List Table */}
       <div className=" rounded-lg shadow-md overflow-hidden">
       <div className="flex items-start space-x-3">
         <HiOutlineDocumentReport className="text-blue-600 w-9 h-9 text-2xl" />
-        <h1 className="text-2xl font-bold mb-4">Receipts</h1>
+        <h2 className="text-2xl font-bold mb-6">الإيصالات</h2>
       </div>
       <button 
         onClick={handleAddReceiptClick}
         className="btn"
       >
-        Add Receipt
+        إضافة إيصال
       </button>
       <form onSubmit={handleSearch} className="flex gap-2">
           <input
             type="text"
-            placeholder="Enter invoice number..."
+            placeholder="أدخل رقم الفاتورة..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-md"
@@ -181,7 +181,7 @@ function Receipts() {
             type="submit"
             className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
           >
-            Search
+            بحث
           </button>
           {searchTerm && (
             <button
@@ -189,7 +189,7 @@ function Receipts() {
               onClick={resetSearch}
               className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
             >
-              Reset
+              إعادة تعيين
             </button>
           )}
         </form>
@@ -200,12 +200,12 @@ function Receipts() {
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invoice #</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Payment Method</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Note</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              <tr>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">رقم الفاتورة</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المبلغ</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">طريقة الدفع</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">ملاحظة</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
                 </tr>
               </thead>
               <tbody className=" divide-y divide-gray-200">
@@ -236,7 +236,7 @@ function Receipts() {
           </div>
         ) : (
           <p className="p-4 text-gray-500">
-          {searchTerm ? 'No receipt found with this invoice number' : 'No receipts found'}
+          {searchTerm ? 'لم يتم العثور على إيصال بهذا الرقم' : 'لم يتم العثور على إيصالات'}
         </p>
         )}
       </div>
@@ -245,14 +245,14 @@ function Receipts() {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
           <div className="modal">
             <div className="p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Add New Receipt</h3>
+              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">إضافة إيصال جديد</h3>
               <AddReceiptForm/>
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={handleCloseForm}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
-                  Cancel
+                  إلغاء
                 </button>
                
               </div>
@@ -266,19 +266,19 @@ function Receipts() {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
           <div className=" modal">
             <div className="p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Are you sure you want to delete this receipt?</h3>
+            <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">هل أنت متأكد من رغبتك في حذف هذا الإيصال؟</h3>
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={cancelDelete}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
-                  Cancel
+                 إلغاء
                 </button>
                 <button
                   onClick={confirmDelete}
                   className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
                 >
-                  Confirm
+                  تأكيد
                 </button>
               </div>
             </div>
@@ -291,10 +291,10 @@ function Receipts() {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
           <div className=" modal">
             <div className="p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">Edit Receipt</h3>
+            <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">تعديل الإيصال</h3>
               <form onSubmit={handleEditSubmit}>
                 <div className="mb-4">
-                  <label className="block text-gray-700 font-medium mb-2">Invoice Number</label>
+                <label className="block text-gray-700 font-medium mb-2">رقم الفاتورة</label>
                   <input
                     type="text"
                     name="invoice_number"
@@ -305,7 +305,7 @@ function Receipts() {
                   />
                 </div>
                 <div className="mb-4">
-                  <label className="block text-gray-700 font-medium mb-2">Amount</label>
+                <label className="block text-gray-700 font-medium mb-2">المبلغ</label>
                   <input
                     type="text"
                     name="amount"
@@ -316,7 +316,7 @@ function Receipts() {
                   />
                 </div>
                 <div className="mb-6">
-                  <label className="block text-gray-700 font-medium mb-2">Message</label>
+                <label className="block text-gray-700 font-medium mb-2">رسالة</label>
                   <textarea
                     name="message"
                     value={editData.message}
@@ -331,13 +331,13 @@ function Receipts() {
                     onClick={() => setShowEditModal(false)}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >
-                    Cancel
+                  إلغاء
                   </button>
                   <button
                     type="submit"
                     className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
                   >
-                    Save Changes
+                    حفظ التغييرات
                   </button>
                 </div>
               </form>
