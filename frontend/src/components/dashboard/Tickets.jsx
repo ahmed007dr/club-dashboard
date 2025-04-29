@@ -1,337 +1,480 @@
-import React, { useState } from 'react';
-import AddTicket from '../modals/AddTicket';  
-import { CiTrash } from 'react-icons/ci';
-import { CiEdit } from 'react-icons/ci';
-import { FaEye } from "react-icons/fa";
-import {  GiTicket } from 'react-icons/gi';
+import React, { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchTickets,
+  deleteTicketById,
+  editTicketById,
+  markTicketAsUsed,
+} from '../../redux/slices/ticketsSlice';
+import { FaEdit, FaTrash, FaCheck, FaEye } from "react-icons/fa"
+import { FaPlus } from 'react-icons/fa';
+import { IoTicketOutline } from "react-icons/io5";
 
+import AddTicket from './AddTicket';
 const Tickets = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false); // Delete confirmation modal state
-  const [isMarkUsedModalOpen, setIsMarkUsedModalOpen] = useState(false); // Mark as Used confirmation modal state
-  const [ticketToDelete, setTicketToDelete] = useState(null); // Ticket selected for deletion
-  const [ticketToMarkUsed, setTicketToMarkUsed] = useState(null); // Ticket selected to mark as used
-
-  const handleCreateTicket = () => {
-    setIsModalOpen(true);  
-  };
-
-  const handleCloseModal = () => {
-    setIsModalOpen(false);  
-  };
-
-  const [tickets, setTickets] = useState([
-    {
-      id: 1,
-      club: { name: "Iron Gym" },
-      buyer_name: "John Doe",
-      ticket_type: "day_pass",
-      price: "25.00",
-      used: false,
-      issue_date: "2025-04-15",
-      used_by: null,
-    },
-    {
-      id: 2,
-      club: { name: "PowerHouse Club" },
-      buyer_name: "Jane Smith",
-      ticket_type: "session",
-      price: "15.50",
-      used: true,
-      issue_date: "2025-04-12",
-      used_by: { name: "Jane Smith" },
-    },
-    {
-      id: 3,
-      club: { name: "Elite Fitness" },
-      buyer_name: "Mike Johnson",
-      ticket_type: "day_pass",
-      price: "30.00",
-      used: false,
-      issue_date: "2025-04-10",
-      used_by: null,
-    },
-  ]);
-
+  const dispatch = useDispatch();
+  const { tickets } = useSelector((state) => state.tickets);
+  console.log('Tickets:', tickets); // Debugging line
   const [selectedTicket, setSelectedTicket] = useState(null);
-  const [modalType, setModalType] = useState(null); // "view" | "edit"
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showMarkAsUsedModal, setShowMarkAsUsedModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const closeModal = () => {
+  const [filterClub, setFilterClub] = useState('');
+const [filterTicketType, setFilterTicketType] = useState('');
+const [filterBuyerName, setFilterBuyerName] = useState('');
+const [filterUsedStatus, setFilterUsedStatus] = useState(''); // 'used', 'unused', or ''
+
+const filteredTickets = tickets.filter(ticket => {
+  const matchesClub = filterClub === '' || ticket.club.toString() === filterClub;
+  const matchesBuyer = filterBuyerName === '' || ticket.buyer_name?.toLowerCase().includes(filterBuyerName.toLowerCase());
+  const matchesType = filterTicketType === '' || ticket.ticket_type === filterTicketType;
+  const matchesStatus =
+    filterUsedStatus === '' ||
+    (filterUsedStatus === 'used' && ticket.used) ||
+    (filterUsedStatus === 'unused' && !ticket.used);
+
+  return matchesClub && matchesBuyer && matchesType && matchesStatus;
+});
+
+
+  const openCreateModal = () => setShowCreateModal(true);
+const closeCreateModal = () => setShowCreateModal(false);
+  const openViewModal = (ticket) => {
+    setSelectedTicket(ticket);
+    setShowViewModal(true);
+  };
+  
+
+  useEffect(() => {
+    dispatch(fetchTickets());
+  }, [dispatch]);
+
+  const openEditModal = (ticket) => {
+    setSelectedTicket(ticket);
+    setShowEditModal(true);
+  };
+
+  const openDeleteModal = (ticket) => {
+    setSelectedTicket(ticket);
+    setShowDeleteModal(true);
+  };
+
+  const openMarkAsUsedModal = (ticket) => {
+    console.log('Opening Mark as Used Modal for ticket:', ticket.id); // Debug
+    setSelectedTicket(ticket);
+    setShowMarkAsUsedModal(true);
+  };
+
+  const closeModals = () => {
+    setShowEditModal(false);
+    setShowDeleteModal(false);
+    setShowMarkAsUsedModal(false);
     setSelectedTicket(null);
-    setModalType(null);
   };
 
-  const handleEditSubmit = (e) => {
-    e.preventDefault();
-    setTickets((prev) =>
-      prev.map((t) => (t.id === selectedTicket.id ? selectedTicket : t))
-    );
-    closeModal();
+
+
+  const handleEditSave = () => {
+    if (selectedTicket) {
+      // Ensure club is a number - if it's an array, take the first element
+      const clubId = Array.isArray(selectedTicket.club) 
+        ? selectedTicket.club[0] 
+        : selectedTicket.club;
+  
+      const updatedTicketData = {
+        club: Number(clubId),  // Force conversion to number
+        buyer_name: selectedTicket.buyer_name,
+        ticket_type: selectedTicket.ticket_type,
+        price: selectedTicket.price,
+        used: selectedTicket.used,
+        used_by: selectedTicket.used ? selectedTicket.used_by : null,
+      };
+  
+      dispatch(editTicketById({ ticketId: selectedTicket.id, ticketData: updatedTicketData }))
+        .then(() => {
+          closeModals();
+          dispatch(fetchTickets());
+        })
+        .catch((error) => {
+          console.error("Error updating ticket:", error);
+        });
+    }
+  };
+  
+  
+  
+
+  const handleDelete = () => {
+    if (selectedTicket) {
+      dispatch(deleteTicketById(selectedTicket.id))
+        .then(() => {
+          closeModals();
+          dispatch(fetchTickets());
+        });
+    }
+  };
+  const handleMarkAsUsed = () => {
+    if (selectedTicket) {
+      dispatch(markTicketAsUsed({
+        ticketId: selectedTicket.id, // numeric ID
+        used_by: selectedTicket.used_by || null // member ID or null
+      }))
+      .then(() => {
+        closeModals();
+        dispatch(fetchTickets());
+      })
+      .catch((error) => {
+        console.error("Error marking ticket as used:", error);
+      });
+    }
   };
 
-  const handleDeleteTicket = (id) => {
-    setTickets(tickets.filter(ticket => ticket.id !== id));
-    setIsDeleteModalOpen(false); // Close delete confirmation modal
-  };
-
-  const handleMarkAsUsed = (ticket) => {
-    setTickets((prev) =>
-      prev.map((t) =>
-        t.id === ticket.id
-          ? { ...t, used: true, used_by: { name: "Admin" } } // You can replace 'Admin' with the current user
-          : t
-      )
-    );
-    setIsMarkUsedModalOpen(false); // Close the "Mark as Used" modal
-  };
+ const handleInputChange = (e) => {
+  const { name, value, type, checked } = e.target;
+  
+  if (type === "checkbox") {
+    setSelectedTicket({
+      ...selectedTicket,
+      [name]: checked,
+    });
+  } else if (name === "club") {
+    // Special handling for club to ensure it's always a number
+    setSelectedTicket({
+      ...selectedTicket,
+      [name]: value === "" ? "" : Number(value),
+    });
+  } else if (name === "used_by") {
+    setSelectedTicket({
+      ...selectedTicket,
+      [name]: value === "" ? "" : Number(value), // Ensure it is a number or empty string
+    });
+  } else {
+    setSelectedTicket({
+      ...selectedTicket,
+      [name]: value,
+    });
+  }
+};
+  
 
   return (
-    <div>
+    <div className="p-6" >
+     <div className="flex justify-between items-start mb-6">
+     <div className="flex items-start space-x-3">   
+     <IoTicketOutline className="text-blue-600 w-9 h-9 text-2xl" />
 
-<div className="flex items-start space-x-3">
-  <GiTicket className="btn-orange text-2xl" />
-  <h2 className="text-2xl font-semibold mb-4">Tickets</h2>
+           <h2 className="text-2xl font-bold mb-6">التذاكر</h2>
+     
+           </div>
+     <button
+    onClick={openCreateModal}
+    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+  >
+    <FaPlus /> 
+
+    إضافة تذكرة جديد
+  </button>   
 </div>
-
-
-      {/* Create Ticket Button */}
-      <button
-        onClick={handleCreateTicket}
-        className="btn"
-      >
-        Create Ticket
-      </button>
-
-      <table className="min-w-full  shadow rounded-lg overflow-hidden">
-        <thead>
-          <tr className=" text-left text-sm font-semibold ">
-            <th className="px-4 py-3">Club</th>
-            <th className="px-4 py-3">Buyer</th>
-            <th className="px-4 py-3">Type</th>
-            <th className="px-4 py-3">Price</th>
-            <th className="px-4 py-3">Used</th>
-            <th className="px-4 py-3">Issue Date</th>
-            <th className="px-4 py-3">Used By</th>
-            <th className="px-4 py-3">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="text-sm divide-y divide-gray-200">
-          {tickets.map((ticket) => (
-            <tr key={ticket.id}>
-              <td className="px-4 py-2">{ticket.club.name}</td>
-              <td className="px-4 py-2">{ticket.buyer_name}</td>
-              <td className="px-4 py-2 capitalize">{ticket.ticket_type.replace("_", " ")}</td>
-              <td className="px-4 py-2">${ticket.price}</td>
-              <td className="px-4 py-2">
-                {ticket.used ? (
-                  <span className="bg-light-green">Yes</span>
-                ) : (
-                  <span className="bg-light-red">No</span>
-                )}
-              </td>
-              <td className="px-4 py-2">{ticket.issue_date}</td>
-              <td className="px-4 py-2">
-                {ticket.used_by ? ticket.used_by.name : "—"}
-              </td>
-              <td className="px-4 py-2 flex gap-2">
-  <button
-    onClick={() => {
-      setSelectedTicket(ticket);
-      setModalType("view");
-    }}
-    className="btn-blue"
+<div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+  <input
+    type="text"
+    placeholder="بحث عن اسم المشتري"
+    className="border p-2 rounded"
+    value={filterBuyerName}
+    onChange={(e) => setFilterBuyerName(e.target.value)}
+  />
+  <input
+    type="number"
+    placeholder="معرف النادي"
+    className="border p-2 rounded"
+    value={filterClub}
+    onChange={(e) => setFilterClub(e.target.value)}
+  />
+  <select
+    className="border p-2 rounded"
+    value={filterTicketType}
+    onChange={(e) => setFilterTicketType(e.target.value)}
   >
-    <FaEye size={20} />
-  </button>
-
-  <button
-    onClick={() => {
-      setSelectedTicket({ ...ticket });
-      setModalType("edit");
-    }}
-    className="btn-green"
+    <option value="">كل الأنواع</option>
+    <option value="session">جلسة</option>
+    <option value="day_pass">تصريح يومي</option>
+    <option value="monthly">شهري</option>
+  </select>
+  <select
+    className="border p-2 rounded"
+    value={filterUsedStatus}
+    onChange={(e) => setFilterUsedStatus(e.target.value)}
   >
-    <CiEdit size={20} />
-  </button>
+    <option value="">كل الحالات</option>
+    <option value="used">مستخدمة</option>
+    <option value="unused">متاحة</option>
+  </select>
+</div>
+      <table className="min-w-full bg-white shadow rounded">
+  <thead>
+    <tr>
+    <th className="py-2 px-4 border-b text-left">النادي (المعرف)</th>
+        <th className="py-2 px-4 border-b text-left">اسم النادي</th>
+        <th className="py-2 px-4 border-b text-left">المشتري</th>
+        <th className="py-2 px-4 border-b text-left">نوع التذكرة</th>
+        <th className="py-2 px-4 border-b text-left">السعر</th>
+        <th className="py-2 px-4 border-b text-left">الحالة</th>
+        <th className="py-2 px-4 border-b text-center">إجراءات</th>
+    </tr>
+  </thead>
+  <tbody>
+    {filteredTickets.map((ticket) => (
+      <tr key={ticket.id} className="hover:bg-gray-100">
+        {/* Display Club ID (hidden or visible as needed) */}
+        <td className="py-2 px-4 border-b">{ticket.club}</td>
 
-  <button
-    onClick={() => {
-      setTicketToDelete(ticket);
-      setIsDeleteModalOpen(true);
-    }}
-    className="btn-red"
-  >
-    <CiTrash size={20} />
-  </button>
+        {/* Display Club Name */}
+        <td className="py-2 px-4 border-b">{ticket.club_name}</td>
 
-  {!ticket.used && (
-    <button
-      onClick={() => {
-        setTicketToMarkUsed(ticket);
-        setIsMarkUsedModalOpen(true);
-      }}
-      className="text-blue-600 cursor-pointer"
-    >
-      Mark as Used
-    </button>
-  )}
+        {/* Display Buyer Name */}
+        <td className="py-2 px-4 border-b">{ticket.buyer_name}</td>
+
+        {/* Display Ticket Type */}
+        <td className="py-2 px-4 border-b">{ticket.ticket_type_display}</td>
+
+        {/* Display Price */}
+        <td className="py-2 px-4 border-b">${ticket.price}</td>
+
+        {/* Display Status (Used or Available) */}
+        <td className="py-2 px-4 border-b">
+  <span className={`px-2 py-1 rounded ${
+    ticket.used ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+  }`}>
+    {ticket.used ? 'مستخدمة' : 'متاحة'}
+  </span>
 </td>
 
-            </tr>
-          ))}
-        </tbody>
-      </table>
 
-      {/* Mark as Used Confirmation Modal */}
-      {isMarkUsedModalOpen && ticketToMarkUsed && (
-        <div className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="modal">
-            <h3 className="text-lg font-bold mb-4">Do you want to mark this ticket as used?</h3>
-            <div className="flex gap-4 justify-center">
+
+        {/* Action Buttons */}
+        <td className="py-2 px-4 border-b">
+  <div className="flex flex-wrap justify-center items-center gap-2">
+    <button
+      onClick={() => openEditModal(ticket)}
+      className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full"
+      title="Edit"
+    >
+      <FaEdit size={16} />
+    </button>
+    <button
+      onClick={() => openDeleteModal(ticket)}
+      className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-full"
+      title="Delete"
+    >
+      <FaTrash size={16} />
+    </button>
+    {!ticket.used && (
+      <button
+        onClick={() => openMarkAsUsedModal(ticket)}
+        className="p-2 bg-green-100 hover:bg-green-200 text-green-600 rounded-full"
+        title="Mark as Used"
+      >
+        <FaCheck size={16} />
+      </button>
+    )}
+    <button
+      onClick={() => openViewModal(ticket)}
+      className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full"
+      title="View"
+    >
+      <FaEye size={16} />
+    </button>
+  </div>
+</td>
+
+      </tr>
+    ))}
+  </tbody>
+</table>
+{showCreateModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+      <div className="flex justify-between items-center border-b p-4">
+        <h2 className="text-xl font-semibold">Create New Ticket</h2>
+        <button
+          onClick={closeCreateModal}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="p-4">
+        <AddTicket onClose={closeCreateModal} />
+      </div>
+    </div>
+  </div>
+)}
+
+      {/* Edit Modal */}
+{showEditModal && selectedTicket && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="bg-white p-6 rounded shadow-lg w-96">
+    <h2 className="text-2xl font-bold mb-4">تعديل التذكرة</h2>
+      <input
+        type="text"
+        name="buyer_name"
+        value={selectedTicket.buyer_name}
+        onChange={handleInputChange}
+        placeholder="اسم المشتري"
+        className="w-full border p-2 mb-4"
+      />
+      <input
+        type="number"
+        name="price"
+        value={selectedTicket.price}
+        onChange={handleInputChange}
+        placeholder="السعر"
+        className="w-full border p-2 mb-4"
+      />
+      {/* Handle Club as a number (Club ID) */}
+      <input
+  type="number"
+  name="club"
+  value={selectedTicket.club}
+  onChange={handleInputChange}
+  placeholder="معرف النادي"
+  className="w-full border p-2 mb-4"
+/>
+      {/* Handle Ticket Type */}
+      <select
+        name="ticket_type"
+        value={selectedTicket.ticket_type}
+        onChange={handleInputChange}
+        className="w-full border p-2 mb-4"
+      >
+       <option value="session">جلسة</option>
+          <option value="day_pass">تصريح يومي</option>
+          <option value="monthly">شهري</option>
+        {/* Add other options as needed */}
+      </select>
+      {/* Handle Used as a boolean (Checkbox) */}
+      <div className="flex items-center mb-4">
+        <input
+          type="checkbox"
+          name="used"
+          checked={selectedTicket.used}  // Used as a boolean
+          onChange={handleInputChange}
+          className="mr-2"
+        />
+        <label>مستخدمة</label>
+      </div>
+      {/* Handle Used By as a number */}
+      {selectedTicket.used && (
+        <input
+          type="number"
+          name="used_by"
+          value={selectedTicket.used_by || ""}
+          onChange={handleInputChange}
+          placeholder="Used By (Member ID)"
+          className="w-full border p-2 mb-4"
+        />
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={closeModals}
+          className="bg-gray-300 px-4 py-2 rounded"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleEditSave}
+          className="bg-blue-500 text-white px-4 py-2 rounded"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+
+      {/* Delete Modal */}
+      {showDeleteModal && selectedTicket && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded shadow-lg w-80">
+          <h2 className="text-2xl font-bold mb-4">حذف التذكرة</h2>
+          <p>هل أنت متأكد أنك تريد حذف "{selectedTicket.title}"؟</p>
+            <div className="flex justify-end gap-2 mt-4">
               <button
-                onClick={() => setIsMarkUsedModalOpen(false)}
-                className="px-4 py-2 bg-gray-300 text-black rounded"
+                onClick={closeModals}
+                className="bg-gray-300 px-4 py-2 rounded"
               >
-                Cancel
+                إلغاء
               </button>
               <button
-                onClick={() => handleMarkAsUsed(ticketToMarkUsed)}
-                className="btn"
+                onClick={handleDelete}
+                className="bg-red-500 text-white px-4 py-2 rounded"
               >
-                Mark as Used
+                حذف
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* EDIT MODAL */}
-      {modalType === "edit" && selectedTicket && (
-        <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="modal">
-            <h3 className="text-lg font-bold mb-4">Edit Ticket</h3>
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              {/* Club Input */}
-              <input
-                className="border p-2 w-full"
-                value={selectedTicket.club.name}
-                onChange={(e) =>
-                  setSelectedTicket((prev) => ({
-                    ...prev,
-                    club: { ...prev.club, name: e.target.value },
-                  }))
-                }
-                placeholder="Club Name"
-              />
-              
-              {/* Buyer Name Input */}
-              <input
-                className="border p-2 w-full"
-                value={selectedTicket.buyer_name}
-                onChange={(e) =>
-                  setSelectedTicket((prev) => ({
-                    ...prev,
-                    buyer_name: e.target.value,
-                  }))
-                }
-                placeholder="Buyer Name"
-              />
-              
-              {/* Ticket Type Input */}
-              <input
-                className="border p-2 w-full"
-                value={selectedTicket.ticket_type}
-                onChange={(e) =>
-                  setSelectedTicket((prev) => ({
-                    ...prev,
-                    ticket_type: e.target.value,
-                  }))
-                }
-                placeholder="Ticket Type"
-              />
-              
-              {/* Price Input */}
-              <input
-                className="border p-2 w-full"
-                value={selectedTicket.price}
-                onChange={(e) =>
-                  setSelectedTicket((prev) => ({
-                    ...prev,
-                    price: e.target.value,
-                  }))
-                }
-                placeholder="Price"
-              />
-              
-              {/* Issue Date Input */}
-              <input
-                className="border p-2 w-full"
-                type="date"
-                value={selectedTicket.issue_date}
-                onChange={(e) =>
-                  setSelectedTicket((prev) => ({
-                    ...prev,
-                    issue_date: e.target.value,
-                  }))
-                }
-                placeholder="Issue Date"
-              />
-              
-              {/* Used By Input */}
-              <input
-                className="border p-2 w-full"
-                value={selectedTicket.used_by ? selectedTicket.used_by.name : ""}
-                onChange={(e) =>
-                  setSelectedTicket((prev) => ({
-                    ...prev,
-                    used_by: e.target.value ? { name: e.target.value } : null,
-                  }))
-                }
-                placeholder="Used By"
-              />
+      {/* Mark as Used Modal */}
+      {showMarkAsUsedModal && selectedTicket && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="bg-white p-6 rounded shadow-lg w-80">
+    <h2 className="text-2xl font-bold mb-4">تحديد التذكرة كمستخدمة</h2>
+      
+      <div className="mb-4">
+      <label htmlFor="usedBy" className="block mb-2">معرف العضو:</label>
+        <input
+          type="number"
+          name="used_by"
+          value={selectedTicket.used_by || ""}
+          onChange={handleInputChange}
+          placeholder="أدخل معرف العضو"
+          className="w-full border p-2 rounded"
+          id="usedBy"
+        />
+      </div>
 
-              <div className="flex justify-between gap-2">
-                <button
-                  type="submit"
-                  className="btn"
-                >
-                  Save
-                </button>
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="bg-gray-300 text-black px-4 py-2 rounded"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <div className="flex justify-end gap-2">
+        <button onClick={closeModals} className="bg-gray-300 px-4 py-2 rounded">
+        إلغاء
+        </button>
+        <button 
+          onClick={handleMarkAsUsed} 
+          className="bg-green-500 text-white px-4 py-2 rounded"
+        >
+          تأكيد
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
-      {/* DELETE CONFIRMATION MODAL */}
-      {isDeleteModalOpen && ticketToDelete && (
-        <div className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="modal">
-            <h3 className="text-lg font-bold mb-4">Are you sure you want to delete this ticket?</h3>
-            <div className="flex gap-4 justify-center">
-              <button
-                onClick={() => setIsDeleteModalOpen(false)}
-                className="px-4 py-2 bg-gray-300 text-black rounded"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDeleteTicket(ticketToDelete.id)}
-                className="btn"
-              >
-                Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{showViewModal && selectedTicket && (
+  <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="bg-white p-6 rounded shadow-lg w-96">
+    <h2 className="text-2xl font-bold mb-4">تفاصيل التذكرة</h2>
+        <p><strong>اسم المشتري:</strong> {selectedTicket.buyer_name}</p>
+        <p><strong>السعر:</strong> ${selectedTicket.price}</p>
+        <p><strong>النادي:</strong> {selectedTicket.club_name}</p>
+        <p><strong>نوع التذكرة:</strong> {selectedTicket.ticket_type_display}</p>
+        <p><strong>الحالة:</strong> {selectedTicket.isUsed ? 'مستخدمة' : 'متاحة'}</p>
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          onClick={closeModals}
+          className="bg-gray-300 px-4 py-2 rounded"
+        >
+          إغلاق
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
     </div>
   );
 };

@@ -1,5 +1,6 @@
 // features/ui/uiSlice.js
 import { createSlice } from '@reduxjs/toolkit';
+import BASE_URL from '../../config/api';
 
 const uiSlice = createSlice({
   name: 'ui',

@@ -1,8 +1,5 @@
 import React from "react";
 import { FaUsers, FaCalendarCheck, FaTicketAlt, FaCheckCircle } from "react-icons/fa"; // Import icons from React Icons
-import ExpenseCategories from './ExpenseCategories'
-import SubscriptionList from './SubscriptionList'
-import MembersList from './MembersList'
 const Main = () => {
   return (
     <div className="p-4">
@@ -51,9 +48,8 @@ const Main = () => {
     </div>
   </div>
 
-  <MembersList />
+  {/* <MembersList /> */}
 </div>
-
     </div>
   );
 };

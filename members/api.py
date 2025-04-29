@@ -1,56 +1,95 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from django.shortcuts import get_object_or_404
+from django.db.models import Q
+from rest_framework.pagination import PageNumberPagination
+from utils.permissions import IsOwnerOrRelatedToClub  #
 from .serializers import MemberSerializer
 from .models import Member
-from django.shortcuts import get_object_or_404
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_list_api(request):
-    members = Member.objects.all()
-    serializer = MemberSerializer(members, many=True)
-    return Response(serializer.data)
+    paginator = PageNumberPagination()
+    paginator.page_size = 20
+
+    if request.user.role == 'owner':
+        members = Member.objects.all() 
+    else:
+        members = Member.objects.filter(club=request.user.club)  
+
+    result_page = paginator.paginate_queryset(members, request)
+    serializer = MemberSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def create_member_api(request):
     serializer = MemberSerializer(data=request.data)
     if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data, status=201)
-    return Response(serializer.errors, status=400)
+        member = serializer.save()
+        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, member):
+            member.delete() 
+            return Response({'error': 'You do not have permission to create a member for this club'}, status=status.HTTP_403_FORBIDDEN)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_detail_api(request, member_id):
     member = get_object_or_404(Member, id=member_id)
     serializer = MemberSerializer(member)
     return Response(serializer.data)
 
 @api_view(['PUT'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def update_member_api(request, member_id):
     member = get_object_or_404(Member, id=member_id)
     serializer = MemberSerializer(member, data=request.data)
     if serializer.is_valid():
-        serializer.save()
+        updated_member = serializer.save()
+        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, updated_member):
+            return Response({'error': 'You do not have permission to update this member to this club'}, status=status.HTTP_403_FORBIDDEN)
         return Response(serializer.data)
-    return Response(serializer.errors, status=400)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_member_api(request, member_id):
     member = get_object_or_404(Member, id=member_id)
     member.delete()
-    return Response(status=204)
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_search_api(request):
+    paginator = PageNumberPagination()
+    paginator.page_size = 20
+
     search_term = request.GET.get('q', '')
-    members = Member.objects.filter(
-        models.Q(name__icontains=search_term) |
-        models.Q(membership_number__icontains=search_term)
-    )
+
+    if request.user.role == 'owner':
+        members = Member.objects.filter(
+            Q(name__icontains=search_term) |
+            Q(membership_number__icontains=search_term)
+        )  
+    else:
+        members = Member.objects.filter(
+            Q(club=request.user.club) &
+            (Q(name__icontains=search_term) | Q(membership_number__icontains=search_term))
+        )  
+
     serializer = MemberSerializer(members, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def api_user_profile(request):
     user = request.user
-    # Add your user profile serialization logic here
-    return Response({'username': user.username, 'email': user.email})
+    profile_data = {
+        'username': user.username,
+        'email': user.email,
+    }
+    return Response(profile_data)

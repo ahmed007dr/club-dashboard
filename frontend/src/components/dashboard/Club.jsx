@@ -1,43 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { CiEdit } from 'react-icons/ci';
 import { HiOutlineDocumentReport } from 'react-icons/hi';
-const fakeClubs = [
-  {
-    id: 1,
-    name: "Sports Club A",
-    location: "New York, USA",
-    logo: "https://via.placeholder.com/150?text=Sports+Club+A",
-    createdAt: "2023-05-10T14:32:00Z",
-  },
-  {
-    id: 2,
-    name: "Fitness Club B",
-    location: "Los Angeles, USA",
-    logo: "https://via.placeholder.com/150?text=Fitness+Club+B",
-    createdAt: "2022-11-15T08:20:00Z",
-  },
-  {
-    id: 3,
-    name: "Elite Sports Club",
-    location: "London, UK",
-    logo: "https://via.placeholder.com/150?text=Elite+Sports+Club",
-    createdAt: "2021-09-01T16:45:00Z",
-  },
-  {
-    id: 4,
-    name: "Champions Club",
-    location: "Paris, France",
-    logo: "https://via.placeholder.com/150?text=Champions+Club",
-    createdAt: "2023-02-25T10:10:00Z",
-  },
-  {
-    id: 5,
-    name: "ProFit Club",
-    location: "Berlin, Germany",
-    logo: "https://via.placeholder.com/150?text=ProFit+Club",
-    createdAt: "2022-06-05T12:00:00Z",
-  },
-];
+import { useDispatch, useSelector } from "react-redux";
+import { Button } from "../ui/button";
+import { editClub, fetchClubs } from "@/redux/slices/clubSlice";
 
 const Club = () => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -49,41 +15,75 @@ const Club = () => {
     createdAt: "",
   });
 
-  // Handle opening the modal and setting selected club
-  const openModal = (club) => {
+  const [clubs, setClubs] = useState([]); // Initialize clubs state
+  const isLoading = useSelector((state) => state.club.isLoading);
+  const error = useSelector((state) => state.club.error);
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await dispatch(fetchClubs()).unwrap();
+        setClubs(res); // Set the fetched clubs to state
+      } catch (error) {
+        console.error("Error fetching Club:", error);
+      }
+    };
+
+    fetchData();
+  }, [dispatch]);
+
+  const formatDateForInput = (dateString) => {
+    const date = new Date(dateString);
+   
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
+  const handleEditClick = (club) => {
     setSelectedClub(club);
     setFormData({
       name: club.name,
       location: club.location,
       logo: club.logo,
-      createdAt: club.createdAt,
+      createdAt: formatDateForInput(club.createdAt),
     });
     setModalOpen(true);
   };
 
-  // Handle closing the modal
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleEditSubmit = () => {
+    const updatedClubs = clubs.map((c) =>
+      c.id === selectedClub.id ? { ...selectedClub, ...formData } : c
+    );
+
+    dispatch(editClub({ id: selectedClub.id, updatedClub: formData }));
+
+    setClubs(updatedClubs); // Update the local state with the edited club
+    setModalOpen(false); // Close the modal
+  };
+
   const closeModal = () => {
     setModalOpen(false);
     setSelectedClub(null);
   };
 
-  // Handle form input changes
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({
-      ...formData,
-      [name]: value,
-    });
-  };
+  if (isLoading) {
+    return <p className="text-center">Loading...</p>;
+  }
 
-  // Handle form submission
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Update club details here, you can send data to the server
-    console.log("Updated Club:", formData);
-    // Close modal after submission
-    closeModal();
-  };
+  if (error) {
+    return <p className="text-red-500 text-center">Error: {error}</p>;
+  }
 
   return (
     <div className="p-4 overflow-x-auto">
@@ -92,7 +92,7 @@ const Club = () => {
         <h2 className="text-2xl font-semibold mb-4">Clubs</h2>
       </div>
       <table className="min-w-full border border-gray-200">
-        <thead className=" text-left">
+        <thead className="text-left">
           <tr>
             <th className="p-3 border-b">#</th>
             <th className="p-3 border-b">Logo</th>
@@ -103,12 +103,12 @@ const Club = () => {
           </tr>
         </thead>
         <tbody>
-          {fakeClubs.map((club, index) => (
+          {clubs.map((club, index) => (
             <tr key={club.id} className="">
               <td className="p-3 border-b">{index + 1}</td>
               <td className="p-3 border-b">
                 <img
-                  src={club.logo}
+                  src={club.logo? club.logo : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"}
                   alt={club.name}
                   className="w-16 h-16 rounded-full object-cover"
                 />
@@ -119,12 +119,9 @@ const Club = () => {
                 {new Date(club.createdAt).toLocaleDateString()}
               </td>
               <td className="p-3 border-b">
-                <button
-                  onClick={() => openModal(club)}
-                  className="btn-green"
-                >
+                <Button onClick={() => handleEditClick(club)} className="bg-light text-green-700 text-2xl">
                   <CiEdit />
-                </button>
+                </Button>
               </td>
             </tr>
           ))}
@@ -133,10 +130,15 @@ const Club = () => {
 
       {/* Modal for editing club */}
       {modalOpen && (
-        <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="modal">
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-[rgba(0,0,0,0.2)] bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
             <h3 className="text-xl font-bold mb-4">Edit Club</h3>
-            <form onSubmit={handleSubmit}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleEditSubmit();
+              }}
+            >
               <div className="mb-4">
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                   Club Name
@@ -148,6 +150,7 @@ const Club = () => {
                   value={formData.name}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded"
+                  required
                 />
               </div>
               <div className="mb-4">
@@ -161,6 +164,7 @@ const Club = () => {
                   value={formData.location}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded"
+                  required
                 />
               </div>
               <div className="mb-4">
@@ -171,7 +175,7 @@ const Club = () => {
                   type="text"
                   id="logo"
                   name="logo"
-                  value={formData.logo}
+                  value={formData.logo? formData.logo : ""}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded"
                 />
@@ -187,19 +191,20 @@ const Club = () => {
                   value={formData.createdAt}
                   onChange={handleInputChange}
                   className="w-full p-2 border border-gray-300 rounded"
+                  required
                 />
               </div>
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={closeModal}
-                  className="mr-2 bg-gray-300 text-black p-2 rounded"
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="btn"
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
                 >
                   Save Changes
                 </button>

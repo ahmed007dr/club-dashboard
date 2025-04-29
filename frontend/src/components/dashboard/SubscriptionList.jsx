@@ -1,30 +1,418 @@
-// components/SubscriptionList.js
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';  // Correct import path
-
+import { fetchSubscriptions, fetchSubscriptionById, updateSubscription, renewSubscription, makePayment  } from '../../redux/slices/subscriptionsSlice';
+import DeleteSubscriptionModal from './DeleteSubscriptionModal'; 
+import UpdateSubscriptionModal from './UpdateSubscriptionModal'; 
+import { Link } from 'react-router-dom';
+import { FaEdit, FaTrash, FaEye, FaRedo } from 'react-icons/fa';
+import { CiCircleList } from "react-icons/ci";
+import CreateSubscription from './CreateSubscription'; 
+import { FaArrowRotateLeft } from "react-icons/fa6";
 const SubscriptionList = () => {
   const dispatch = useDispatch();
-  const { subscriptionTypes, loading, error } = useSelector(state => state.subscriptions);
+  const { subscriptions, status, error, updateStatus } = useSelector((state) => state.subscriptions);
+  console.log('Subscriptions:', subscriptions); // Log the subscriptions data
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false); // Delete modal state
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailSubscriptionId, setDetailSubscriptionId] = useState(null);
+  const [paymentAmounts, setPaymentAmounts] = useState({});
+  const [detailSubscription, setDetailSubscription] = useState(null);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  // Filter states
+  const [filters, setFilters] = useState({
+    memberName: '',
+    status: '',
+    startDate: '',
+    endDate: '' ,
+    clubId: '',       // Add this
+  attendanceDays: ''
+  });
+
+  const filteredSubscriptions = subscriptions.filter(subscription => {
+    const matchesMember = filters.memberName
+      ? subscription.member_name.toLowerCase().includes(filters.memberName.toLowerCase())
+      : true;
+  
+    const matchesStatus = filters.status
+      ? subscription.status === filters.status
+      : true;
+  
+    // Date comparison
+    const subscriptionStartDate = new Date(subscription.start_date);
+    const subscriptionEndDate = new Date(subscription.end_date);
+    const filterStartDate = filters.startDate ? new Date(filters.startDate) : null;
+    const filterEndDate = filters.endDate ? new Date(filters.endDate) : null;
+  
+    const matchesStartDate = filterStartDate
+      ? subscriptionStartDate.setHours(0, 0, 0, 0) === filterStartDate.setHours(0, 0, 0, 0)
+      : true;
+  
+    const matchesEndDate = filterEndDate
+      ? subscriptionEndDate.setHours(0, 0, 0, 0) === filterEndDate.setHours(0, 0, 0, 0)
+      : true;
+  
+    // Club ID filter (exact match)
+    const matchesClubId = filters.clubId
+      ? subscription.club === parseInt(filters.clubId)
+      : true;
+  
+    // Attendance days filter (exact match)
+    const matchesAttendanceDays = filters.attendanceDays
+      ? subscription.attendance_days === parseInt(filters.attendanceDays)
+      : true;
+  
+    return matchesMember && matchesStatus && matchesStartDate && matchesEndDate && 
+           matchesClubId && matchesAttendanceDays;
+  });
+  
+  
+    const handleFilterChange = (e) => {
+      const { name, value } = e.target;
+      setFilters(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    };
+  
+    const resetFilters = () => {
+      setFilters({
+        memberName: '',
+        status: '',
+        startDate: '',
+        endDate: ''
+      });
+    };
+  
+  const handleInputChange = (e, subscriptionId) => {
+    const { value } = e.target;
+    // Allow only numbers and a single decimal point
+    if (/^\d*\.?\d*$/.test(value)) {
+      setPaymentAmounts((prev) => ({
+        ...prev,
+        [subscriptionId]: value, // Store the entered amount for the subscription
+      }));
+    }
+  };
+
+  const handlePayment = (subscription) => {
+    // Get the amount from input or fallback to the remaining_amount
+    let amount = paymentAmounts[subscription.id] || subscription.remaining_amount;
+    
+    // Ensure it's a valid decimal value formatted to 2 decimal places
+    amount = parseFloat(amount).toFixed(2);
+    
+    dispatch(makePayment({
+      subscriptionId: subscription.id,
+      amount: amount, // Sending the amount as a string formatted to 2 decimal places
+    }))
+      .unwrap()
+      .then(() => {
+        alert('Payment successful!');
+        // Clear the payment input after success
+        setPaymentAmounts(prev => ({
+          ...prev,
+          [subscription.id]: ''
+        }));
+      })
+      .catch((error) => {
+        console.error(error);
+        alert(`Payment failed: ${error.message}`);
+      });
+  };
+
+  const openDetailModal = (id) => {
+    dispatch(fetchSubscriptionById(id))
+      .unwrap()
+      .then((data) => {
+        console.log('Fetched subscription:', data);
+        setDetailSubscription(data);  // <-- ✅ Set the fetched subscription
+        setDetailSubscriptionId(id);
+        setDetailModalOpen(true);
+      })
+      .catch((error) => {
+        console.error("Failed to fetch subscription details:", error);
+        alert("Failed to load subscription details");
+      });
+  };
+  
+  
+
+
+
+  
 
   useEffect(() => {
-    dispatch(fetchSubscriptionTypes());
+    dispatch(fetchSubscriptions());
   }, [dispatch]);
 
+  const openModal = (subscription) => {
+    setSelectedSubscription(subscription);
+    setIsModalOpen(true); // Set to true to open modal
+  };
+
+  const openDeleteModal = (subscription) => {
+    setSelectedSubscription(subscription);
+    setDeleteModalOpen(true); // Set to true to open delete modal
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false); // Close modal
+    setSelectedSubscription(null);
+  };
+
+  const handleSubmit = (formData) => {
+    dispatch(
+      updateSubscription({
+        id: selectedSubscription.id,
+        subscriptionData: formData, // Use the form data passed from the modal
+      })
+    ).then(() => {
+      if (updateStatus === 'succeeded') {
+        closeModal();
+        dispatch(fetchSubscriptions());
+      }
+    });
+  };
+
+   const handleRenew = (subscriptionId) => {
+      console.log("Renewing subscription with ID:", subscriptionId);
+      dispatch(renewSubscription({ subscriptionId })); 
+    };
+
+    
+ 
+
+  if (status === 'loading') {
+    return <div className="text-center text-xl text-gray-500">Loading...</div>;
+  }
+
+  if (status === 'failed') {
+    return <div className="text-center text-xl text-red-500">Error: {error}</div>;
+  }
+
   return (
-    <div className="p-4">
-      <h2 className="text-xl font-bold mb-4">Subscription Types</h2>
-      {loading && <p>Loading...</p>}
-      {error && <p className="text-red-500">Error: {error}</p>}
-      <ul className="list-disc pl-6">
-        {subscriptionTypes.map((sub) => (
-          <li key={sub.id} className="mb-2">
-            {sub.name} - {sub.price} USD (Duration: {sub.duration_days} days)
-          </li>
+    <div className=" mx-auto p-6 " dir="rtl">
+     <div className="flex justify-between items-center mb-6">
+     <div className="flex space-x-2 items-start ">
+     <CiCircleList className="text-blue-600 w-9 h-9 text-2xl"/>
+
+      <h2 className="text-2xl font-semibold text-center text-gray-700 mb-4">
+      قائمةالاشتراكات 
+      </h2>
+      </div>
+
+      <button
+          onClick={() => setCreateModalOpen(true)}
+          className="btn"
+        >
+         إضافة اشتراك
+        </button>
+        </div>
+
+        <div className="flex flex-wrap gap-4 my-6 px-4" dir="rtl">
+  {/** Common classes for input containers */}
+  {[
+    { id: 'memberName', label: 'اسم العضو', type: 'text', placeholder: 'بحث باسم العضو' },
+    { id: 'startDate', label: 'تاريخ البدء', type: 'date' },
+    { id: 'endDate', label: 'تاريخ الانتهاء', type: 'date' },
+    { id: 'clubId', label: 'معرف النادي', type: 'number', placeholder: 'تصفية حسب معرف النادي', min: 1 },
+    { id: 'attendanceDays', label: 'أيام الحضور', type: 'number', placeholder: 'تصفية حسب أيام الحضور', min: 0 },
+  ].map(({ id, label, type, placeholder, min }) => (
+    <div key={id} className="flex flex-col w-56">
+      <label htmlFor={id} className="text-sm font-medium text-gray-700 mb-1 text-right">{label}</label>
+      <input
+        type={type}
+        id={id}
+        name={id}
+        value={filters[id]}
+        onChange={handleFilterChange}
+        placeholder={placeholder}
+        min={min}
+        className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
+      />
+    </div>
+  ))}
+
+  <div className="flex flex-col w-56">
+    <label htmlFor="status" className="text-sm font-medium text-gray-700 mb-1 text-right">الحالة</label>
+    <select
+      id="status"
+      name="status"
+      value={filters.status}
+      onChange={handleFilterChange}
+      className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm transition-all duration-200 ease-in-out"
+    >
+      <option value="">كل الحالات</option>
+      <option value="Active">نشط</option>
+      <option value="Expired">منتهي</option>
+      <option value="Pending">قيد الانتظار</option>
+    </select>
+  </div>
+
+  <div className="flex items-end">
+    <button
+      onClick={resetFilters}
+      
+      className="btn"
+    >
+      <FaArrowRotateLeft />
+          </button>
+  </div>
+</div>
+
+
+
+      <div className="overflow-x-auto">
+  {filteredSubscriptions.length === 0 ? (
+    <p className="text-center text-lg text-gray-500">No subscriptions available.</p>
+  ) : (
+    <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
+      <thead className="bg-gray-100">
+      <tr>
+  <th className="py-2 px-4 text-right">العضو</th>
+  <th className="py-2 px-4 text-right">النادي</th>
+  <th className="py-2 px-4 text-right" > اسم النادي</th>
+  <th className="py-2 px-4 text-right">تاريخ البدء</th>
+  <th className="py-2 px-4 text-right">تاريخ الانتهاء</th>
+  <th className="py-2 px-4 text-right">المبلغ المدفوع</th>
+  <th className="py-2 px-4 text-right">المبلغ المتبقي</th>
+  <th className="py-2 px-4 text-right">الحالة</th>
+  <th className="py-2 px-4 text-right">الدفع</th>
+  <th className="py-2 px-4 text-right">الإجراءات</th>
+</tr>
+      </thead>
+      <tbody>
+        {filteredSubscriptions.map((subscription) => (
+          <tr key={subscription.id} className="border-b hover:bg-gray-50 transition">
+            <td className="py-2 px-4">
+              <Link
+                to={`/member-subscriptions/${subscription.member}`}
+                className="text-blue-600 hover:underline"
+              >
+                {subscription.member_name}
+              </Link>
+            </td>
+            <td className="py-2 px-4">{subscription.club}</td>
+            <td className="py-2 px-4">{subscription.club_name}</td>
+            <td className="py-2 px-4">{subscription.start_date}</td>
+            <td className="py-2 px-4">{subscription.end_date}</td>
+            <td className="py-2 px-4">${subscription.paid_amount}</td>
+            <td className="py-2 px-4">${subscription.remaining_amount}</td>
+            <td className="py-2 px-4">{subscription.status}</td>
+
+            {/* Payment Input */}
+            <td className="py-2 px-4">
+              <input
+                type="text"
+                inputMode="decimal"
+                pattern="[0-9]*\.?[0-9]*"
+                placeholder="0.00"
+                value={paymentAmounts[subscription.id] || ''}
+                onChange={(e) => handleInputChange(e, subscription.id)}
+                className="border p-1 rounded w-20"
+              />
+              <button
+                onClick={() => handlePayment(subscription)}
+                className="ml-2 px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 transition"
+              >
+                Pay
+              </button>
+            </td>
+
+            {/* Action Buttons */}
+            <td className="py-2 px-4">
+              <div className="flex items-center gap-2">
+                <button onClick={() => openModal(subscription)} title="Edit">
+                  <FaEdit className="text-blue-500 hover:text-blue-700 text-lg" />
+                </button>
+                <button onClick={() => openDeleteModal(subscription)} title="Delete">
+                  <FaTrash className="text-red-500 hover:text-red-700 text-lg" />
+                </button>
+                <button onClick={() => openDetailModal(subscription.id)} title="View">
+                  <FaEye className="text-green-500 hover:text-green-700 text-lg" />
+                </button>
+                {subscription.status === 'Expired' && (
+                  <button onClick={() => handleRenew(subscription.id)} title="Renew">
+                    <FaRedo className="text-yellow-500 hover:text-yellow-600 text-lg" />
+                  </button>
+                )}
+              </div>
+            </td>
+          </tr>
         ))}
-      </ul>
+      </tbody>
+    </table>
+  )}
+</div>
+
+
+ {/* Create Subscription Modal */}
+ {createModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full relative">
+            <button
+              onClick={() => setCreateModalOpen(false)}
+              className="absolute top-2 right-2 text-gray-600 hover:text-gray-800"
+            >
+              X
+            </button>
+            <h3 className="text-2xl font-semibold mb-4 text-center">Add Subscription</h3>
+            <CreateSubscription />
+          </div>
+        </div>
+      )}
+
+
+      {/* Update Modal */}
+      {isModalOpen && (
+        <UpdateSubscriptionModal
+          isOpen={isModalOpen}
+          onClose={closeModal}
+          subscription={selectedSubscription}
+          onSubmit={handleSubmit}
+        />
+      )}
+
+      {/* Delete Modal */}
+      <DeleteSubscriptionModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        subscription={selectedSubscription}
+      />
+{detailModalOpen && detailSubscription && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+    <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+      <h3 className="text-2xl font-semibold mb-4">Subscription Details</h3>
+      <p><strong>Member Name:</strong> {detailSubscription.member_name}</p>
+      <p><strong>Start Date:</strong> {detailSubscription.start_date}</p>
+      <p><strong>End Date:</strong> {detailSubscription.end_date}</p>
+      <p><strong>Paid Amount:</strong> ${detailSubscription.paid_amount}</p>
+      <p><strong>Remaining Amount:</strong> ${detailSubscription.remaining_amount}</p>
+      <p><strong>Status:</strong> {detailSubscription.status}</p>
+      <p><strong>Attendance Days:</strong> {detailSubscription.attendance_days}</p>
+      <p><strong>Club Name:</strong> {detailSubscription.club_name}</p>
+
+      <button
+        onClick={() => setDetailModalOpen(false)}
+        className="mt-4 px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+)}
+
+   
     </div>
   );
 };
 
 export default SubscriptionList;
+
+
+
+
+
+

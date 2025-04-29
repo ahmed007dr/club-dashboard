@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .serializers import UserSerializer, UserProfileSerializer, LoginSerializer
+from utils.permissions import IsOwnerOrRelatedToClub  
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -28,13 +29,11 @@ def api_login(request):
             'error': 'Invalid credentials'
         }, status=status.HTTP_401_UNAUTHORIZED)
     return Response({'error': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
-    # return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def api_logout(request):
     try:
-        # refresh_token = request.data['refresh']
         refresh_token = request.data.get('refresh')
         if not refresh_token:
             return Response({'error': 'Refresh token is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -45,7 +44,7 @@ def api_logout(request):
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_profile(request):
     serializer = UserProfileSerializer(request.user)
     return Response(serializer.data)

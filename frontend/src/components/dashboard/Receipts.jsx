@@ -1,249 +1,367 @@
-import React, { useState } from 'react';
-import { CiTrash, CiEdit } from 'react-icons/ci';
+import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { 
+  fetchReceipts, 
+  addReceipt, 
+  deleteReceipt, 
+  updateReceipt,
+  fetchReceiptById,
+  fetchReceiptByInvoice,
+  clearCurrentReceipt
+} from '../../redux/slices/receiptsSlice';
+import { CiTrash, CiEdit } from "react-icons/ci";
 import { FaEye } from "react-icons/fa";
-import { HiOutlineDocumentReport } from 'react-icons/hi';
+import { HiOutlineDocumentReport } from "react-icons/hi";
+import AddReceiptForm from './AddReceiptForm'
 
+function Receipts() {
+  const dispatch = useDispatch();
+  const { receipts, status, error, currentReceipt } = useSelector(state => state.receipts);
+  console.log(receipts);
+  // Form state for adding new receipt
+  const [formData, setFormData] = useState({
+    club: '',
+    member: '',
+    subscription: '',
+    amount: '',
+    payment_method: 'cash',
+    note: ''
+  });
+  const [showForm, setShowForm] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
 
-const fakeReceipts = [
-  {
-    id: 1,
-    buyer_name: "Mike Johnson",
-    ticket_type: "day_pass",
-    price: "30.00",
-    used: false,
-    issue_date: "2025-04-10",
-    used_by: null,
-  },
-  {
-    id: 2,
-    buyer_name: "Sarah Parker",
-    ticket_type: "week_pass",
-    price: "50.00",
-    used: true,
-    issue_date: "2025-04-08",
-    used_by: "Sarah Parker",
-  },
-  {
-    id: 3,
-    buyer_name: "David Brown",
-    ticket_type: "month_pass",
-    price: "100.00",
-    used: false,
-    issue_date: "2025-04-01",
-    used_by: null,
-  },
-];
-
-const Receipts = () => {
-  const [receipts, setReceipts] = useState(fakeReceipts);
-  const [selectedReceipt, setSelectedReceipt] = useState(null);
-  const [modalType, setModalType] = useState(null); // 'view' | 'edit' | 'delete'
-
-  const openModal = (type, receipt) => {
-    setSelectedReceipt(receipt);
-    setModalType(type);
+  // Show form to add receipt
+  const handleAddReceiptClick = () => {
+    setShowForm(true); // Show the add receipt form modal
   };
 
-  const closeModal = () => {
-    setSelectedReceipt(null);
-    setModalType(null);
+  // Close the form modal
+  const handleCloseForm = () => {
+    setShowForm(false); // Close the add receipt form modal
   };
+  
+  // State for edit modal
+  const [editData, setEditData] = useState({
+    id: '',
+    amount: '',
+    invoice_number: '',
+    message: ''
+  });
+  
+  const [showEditModal, setShowEditModal] = useState(false);
+    // State for delete confirmation modal
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [receiptToDelete, setReceiptToDelete] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    useEffect(() => {
+      if (searchTerm) {
+        dispatch(fetchReceiptByInvoice(searchTerm));
+      } else {
+        dispatch(fetchReceipts());
+      }
+    }, [dispatch, searchTerm]);
+
+      // Handle search submission
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      dispatch(fetchReceiptByInvoice(searchTerm));
+    } else {
+      dispatch(fetchReceipts());
+    }
+  };
+
+    // Reset search and show all receipts
+    const resetSearch = () => {
+      setSearchTerm('');
+      dispatch(fetchReceipts());
+    };
+  
+
+  useEffect(() => {
+    if (currentReceipt) {
+      setEditData({
+        id: currentReceipt.id,
+        amount: currentReceipt.amount,
+        invoice_number: currentReceipt.invoice_number,
+        message: 'Receipt updated successfully'
+      });
+    }
+  }, [currentReceipt]);
+
+ 
+
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditData({
+      ...editData,
+      [name]: value
+    });
+  };
+
+  const [formErrors, setFormErrors] = useState({});
+ 
+ 
+
+  const handleEditSubmit = (e) => {
+    e.preventDefault();
+    const { id, amount, invoice_number, message } = editData;
+    
+    const receiptData = {
+      amount,
+      invoice_number,
+      message
+    };
+  
+    dispatch(updateReceipt({ receiptId: id, receiptData }));
+    setShowEditModal(false);
+  };
+  
+
+
+  const handleDelete = (receiptId) => {
+    setReceiptToDelete(receiptId); // Store the receipt ID to delete
+    setShowDeleteConfirm(true); // Show the confirmation modal
+  };
+
+  const confirmDelete = () => {
+    dispatch(deleteReceipt(receiptToDelete));
+    setShowDeleteConfirm(false); // Close the confirmation modal after deleting
+    setReceiptToDelete(null); // Reset the receipt ID
+  };
+
+  const cancelDelete = () => {
+    setShowDeleteConfirm(false); // Close the confirmation modal without deleting
+    setReceiptToDelete(null); // Reset the receipt ID
+  };
+
+  const handleEdit = (receiptId) => {
+    dispatch(fetchReceiptById(receiptId));
+    setShowEditModal(true);
+  };
+
+  const handleSearchChange = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const clearSearch = () => {
+    setSearchTerm('');
+    dispatch(fetchReceipts());
+  };
+
+  if (status === 'loading') return <div className="flex justify-center items-center h-screen">Loading...</div>;
+  if (error) return <div className="text-red-500 text-center p-4">Error: {error}</div>;
 
   return (
-    <div>
-          <div className="flex items-start space-x-3">
-        <HiOutlineDocumentReport className='btn-darkblue text-2xl' />
-        <h1 className="text-2xl font-bold mb-4">Receipts</h1>
+    <div className="container mx-auto px-4 py-8" dir="rtl">
+     
+      
+    
+      {/* Receipts List Table */}
+      <div className="  overflow-hidden">
+      <div className="flex items-start justify-between">  
+      
+      <div className="flex items-start space-x-3">  
+      <HiOutlineDocumentReport className="text-blue-600 w-9 h-9 text-2xl" />
+
+      <h2 className="text-2xl font-bold mb-6">الإيصالات</h2>
+
       </div>
-       <div className="mb-4">
-        <input
-          type="text"
-         // value={invoiceNumber}
-          //onChange={(e) => setInvoiceNumber(e.target.value)}
-          className="border px-4 py-2 rounded"
-          placeholder="أدخل رقم الفاتورة"
-        />
-        <button
-         // onClick={handleSearch}
-          className="ml-2 btn"
-        >
-          بحث
-        </button>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full  border border-gray-300 rounded-lg shadow">
-          <thead className="">
-            <tr>
-              <th className="px-4 py-2 text-left">Buyer</th>
-              <th className="px-4 py-2 text-left">Ticket Type</th>
-              <th className="px-4 py-2 text-left">Price</th>
-              <th className="px-4 py-2 text-left">Used</th>
-              <th className="px-4 py-2 text-left">Issue Date</th>
-              <th className="px-4 py-2 text-left">Used By</th>
-              <th className="px-4 py-2 text-left">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {receipts.map((receipt) => (
-              <tr key={receipt.id} className="border-b ">
-                <td className="px-4 py-2">{receipt.buyer_name}</td>
-                <td className="px-4 py-2 capitalize">{receipt.ticket_type}</td>
-                <td className="px-4 py-2">EGP {receipt.price}</td>
-                <td className="px-4 py-2">
-                {receipt.used ? (
-                  <span className="bg-light-green">Yes</span>
-                ) : (
-                  <span className="bg-light-red">No</span>
-                )}
-              </td>
-                <td className="px-4 py-2">{receipt.issue_date}</td>
-                <td className="px-4 py-2">{receipt.used_by || "N/A"}</td>
-                <td className="px-4 py-2 space-x-2">
-                  <button onClick={() => openModal('view', receipt)} className="btn-blue">
-                    <FaEye />
-                  </button>
-                  <button onClick={() => openModal('edit', receipt)} className="btn-green">
-                    <CiEdit />
-                  </button>
-                  <button onClick={() => openModal('delete', receipt)} className="btn-red  ">
-                    <CiTrash />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modals */}
-      {modalType && selectedReceipt && (
-        <div className="fixed inset-0 z-40 flex justify-center items-center" style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}>
-          <div className="modal">
-            {modalType === 'view' && (
-              <>
-                <h3 className="text-xl font-semibold mb-4">Receipt Info</h3>
-                <ul className="space-y-2">
-                  <li><strong>Buyer:</strong> {selectedReceipt.buyer_name}</li>
-                  <li><strong>Ticket Type:</strong> {selectedReceipt.ticket_type}</li>
-                  <li><strong>Price:</strong> EGP {selectedReceipt.price}</li>
-                  <li><strong>Used:</strong> {selectedReceipt.used ? "Yes" : "No"}</li>
-                  <li><strong>Issue Date:</strong> {selectedReceipt.issue_date}</li>
-                  <li><strong>Used By:</strong> {selectedReceipt.used_by || "N/A"}</li>
-                </ul>
-              </>
-            )}
-
-{modalType === 'edit' && (
-  <>
-    <h3 className="text-xl font-semibold mb-4">Edit Receipt</h3>
-    <form
-      className="space-y-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-
-        const updatedReceipt = {
-          ...selectedReceipt,
-          buyer_name: e.target.buyer_name.value,
-          ticket_type: e.target.ticket_type.value,
-          price: e.target.price.value,
-          issue_date: e.target.issue_date.value,
-          used_by: e.target.used_by.value || null,
-        };
-
-        setReceipts((prevReceipts) =>
-          prevReceipts.map((r) =>
-            r.id === selectedReceipt.id ? updatedReceipt : r
-          )
-        );
-
-        closeModal();
-      }}
-    >
-      <input
-        name="buyer_name"
-        className="w-full border rounded px-3 py-2"
-        defaultValue={selectedReceipt.buyer_name}
-        placeholder="Buyer Name"
-      />
-
-      <select
-        name="ticket_type"
-        className="w-full border rounded px-3 py-2"
-        defaultValue={selectedReceipt.ticket_type}
+      <button 
+        onClick={handleAddReceiptClick}
+        className="btn flex items-center"
       >
-        <option value="day_pass">Day Pass</option>
-        <option value="week_pass">Week Pass</option>
-        <option value="month_pass">Month Pass</option>
-      </select>
+        إضافة إيصال
 
-      <input
-        name="price"
-        className="w-full border rounded px-3 py-2"
-        type="number"
-        step="0.01"
-        defaultValue={selectedReceipt.price}
-        placeholder="Price"
-      />
-
-      <input
-        name="issue_date"
-        className="w-full border rounded px-3 py-2"
-        type="date"
-        defaultValue={selectedReceipt.issue_date}
-      />
-
-      <input
-        name="used_by"
-        className="w-full border rounded px-3 py-2"
-        placeholder="Used By"
-        defaultValue={selectedReceipt.used_by || ""}
-      />
-
-      <div className="flex justify-end gap-3 mt-4">
-        
-        <button
-          type="submit"
-          className="btn"
-        >
-          Submit
-        </button>
+        <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+      </button>
+    
       </div>
-    </form>
-  </>
-)}
 
+      <form onSubmit={handleSearch} className="flex gap-2 mb-6 w-full">
+          <input
+            type="text"
+            placeholder="أدخل رقم الفاتورة..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="px-4 w-full py-2 border border-gray-300 rounded-md "
+          />
+          <button 
+            type="submit"
+            className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
+          >
+            بحث
+          </button>
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={resetSearch}
+              className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
+            >
+              إعادة تعيين
+            </button>
+          )}
+        </form>
+        <h3 className="text-xl font-semibold p-4 ">
+          {searchTerm ? `Search Results for Invoice #${searchTerm}` : ''}
+        </h3>
+        {receipts.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+              <tr>
+              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
 
-            {modalType === 'delete' && (
-              <>
-                <h3 className="text-xl font-semibold mb-4 text-red-600">Delete Receipt</h3>
-                <p>Are you sure you want to delete this receipt?</p>
-              </>
-            )}
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المبلغ</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">طريقة الدفع</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">ملاحظة</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">رقم الفاتورة</th>
 
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={closeModal}
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-              >
-                Cancel
-              </button>
-              {modalType === 'delete' && (
+                </tr>
+              </thead>
+              <tbody className=" divide-y divide-gray-200">
+                {receipts.map(receipt => (
+                  <tr key={receipt.id}>
+                       <button
+                        onClick={() => handleEdit(receipt.id)}
+                        className="text-indigo-600 hover:text-indigo-900 mr-4"
+                      >
+                        <CiEdit />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(receipt.id)}
+                        className="text-red-600 hover:text-red-900"
+                      >
+                        <CiTrash />
+                      </button>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{receipt.amount}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">{receipt.payment_method}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{receipt.note}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{receipt.invoice_number}</td>
+
+                   
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="p-4 text-gray-500">
+          {searchTerm ? 'لم يتم العثور على إيصال بهذا الرقم' : 'لم يتم العثور على إيصالات'}
+        </p>
+        )}
+      </div>
+       {/* Add Receipt Form Modal */}
+       {showForm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+          <div className="modal">
+            <div className="p-6">
+              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">إضافة إيصال جديد</h3>
+              <AddReceiptForm/>
+              <div className="flex justify-end space-x-3">
                 <button
-                  onClick={() => {
-                    setReceipts(receipts.filter(r => r.id !== selectedReceipt.id));
-                    closeModal();
-                  }}
-                  className="btn"
+                  onClick={handleCloseForm}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
-                  Confirm Delete
+                  إلغاء
                 </button>
-              )}
+               
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+          <div className=" modal">
+            <div className="p-6">
+            <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">هل أنت متأكد من رغبتك في حذف هذا الإيصال؟</h3>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={cancelDelete}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                 إلغاء
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                >
+                  تأكيد
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+          <div className=" modal">
+            <div className="p-6">
+            <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">تعديل الإيصال</h3>
+              <form onSubmit={handleEditSubmit}>
+                <div className="mb-4">
+                <label className="block text-gray-700 font-medium mb-2">رقم الفاتورة</label>
+                  <input
+                    type="text"
+                    name="invoice_number"
+                    value={editData.invoice_number}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    required
+                  />
+                </div>
+                <div className="mb-4">
+                <label className="block text-gray-700 font-medium mb-2">المبلغ</label>
+                  <input
+                    type="text"
+                    name="amount"
+                    value={editData.amount}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    required
+                  />
+                </div>
+                <div className="mb-6">
+                <label className="block text-gray-700 font-medium mb-2">ملاحظة</label>
+                  <textarea
+                    name="message"
+                    value={editData.message}
+                    onChange={handleEditInputChange}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    rows={3}
+                  />
+                </div>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowEditModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  >
+                  إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                  >
+                    حفظ التغييرات
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-};
+}
 
 export default Receipts;
