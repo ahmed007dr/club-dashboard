@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-
+import BASE_URL from '../../config/api';
+import axios from 'axios';
 // Async thunk for fetching attendances
 export const fetchAttendances = createAsyncThunk(
   'attendance/fetchAttendances',
