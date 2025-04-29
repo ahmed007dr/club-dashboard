@@ -69,7 +69,7 @@ const CreateSubscriptionTypes  = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto p-6 bg-white rounded-lg shadow-md">
+    <form onSubmit={handleSubmit} className="modal">
       <h2 className="text-2xl font-bold text-center mb-6">Create New Subscription Type</h2>
       
       {error && (

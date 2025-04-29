@@ -12,13 +12,29 @@ import { RiVipCrown2Line } from 'react-icons/ri';
 const InviteList = () => {
   const dispatch = useDispatch();
   const { invites, loading, error, currentInvite } = useSelector((state) => state.invites);
-  
+  console.log('Invites:', invites);
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showMarkUsedModal, setShowMarkUsedModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedInviteId, setSelectedInviteId] = useState(null);
+
+  const [filters, setFilters] = useState({
+    status: '',
+    clubName: '',
+    guestName: '',
+    date: ''
+  });
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+  
   
   // Form states
   const [formData, setFormData] = useState({
@@ -63,6 +79,28 @@ const InviteList = () => {
     }));
   };
 
+  const filteredInvites = invites.filter(invite => {
+    const matchesGuest = filters.guestName === '' || 
+      invite.guest_name.toLowerCase().includes(filters.guestName.toLowerCase());
+    const matchesStatus = filters.status === '' || invite.status === filters.status;
+    const matchesClub = filters.clubName === '' || 
+      invite.club_details?.name?.toLowerCase().includes(filters.clubName.toLowerCase());
+    
+    // Single date filtering logic
+    let matchesDate = true;
+    if (filters.date) {
+      const inviteDate = new Date(invite.date);
+      inviteDate.setHours(0, 0, 0, 0); // Normalize time to midnight
+      
+      const selectedDate = new Date(filters.date);
+      selectedDate.setHours(0, 0, 0, 0); // Normalize time to midnight
+      
+      matchesDate = inviteDate.getTime() === selectedDate.getTime();
+    }
+    
+    return matchesGuest && matchesStatus && matchesClub && matchesDate;
+  });
+  
   const validateForm = () => {
     const errors = {};
     if (!formData.club) errors.club = 'Club ID is required';
@@ -223,9 +261,46 @@ const InviteList = () => {
             </div>
       </div>
   
+      <div className="mb-6 flex flex-wrap gap-4 rtl text-right">
+  <input
+    type="text"
+    name="guestName"
+    placeholder="ابحث عن الضيف"
+    className="w-full sm:w-auto flex-1 rounded-xl border border-gray-300 bg-white p-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+    value={filters.guestName}
+    onChange={handleFilterChange}
+  />
+  <select
+    name="status"
+    value={filters.status}
+    onChange={handleFilterChange}
+    className="w-full sm:w-auto flex-1 rounded-xl border border-gray-300 bg-white p-3 text-sm shadow-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+  >
+    <option value="">جميع الحالات</option>
+    <option value="pending">قيد الانتظار</option>
+    <option value="used">تم الاستخدام</option>
+    <option value="cancelled">ملغاة</option>
+  </select>
+  <input
+    type="text"
+    name="clubName"
+    placeholder="اسم النادي"
+    className="w-full sm:w-auto flex-1 rounded-xl border border-gray-300 bg-white p-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+    value={filters.clubName}
+    onChange={handleFilterChange}
+  />
+  <input
+    type="date"
+    name="date"
+    className="w-full sm:w-auto flex-1 rounded-xl border border-gray-300 bg-white p-3 text-sm shadow-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+    value={filters.date}
+    onChange={handleFilterChange}
+  />
+</div>
+
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" dir="rtl">
-        {invites.map((invite) => (
+        {filteredInvites.map((invite) => (
           <div key={invite.id} className=" rounded-lg shadow-md overflow-hidden border border-gray-200">
             <div className="p-6">
               <div className="flex justify-between items-start">

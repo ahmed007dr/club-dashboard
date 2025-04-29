@@ -7,6 +7,7 @@ import SubscriptionTypeDetails from './SubscriptionTypeDetails'; // ✅ Import t
 import { FaEye, FaEdit, FaTrash } from 'react-icons/fa';
 import CreateSubscriptionType from "./CreateSubscriptionType"; // ✅ Import the create modal
 import { FaPlus } from 'react-icons/fa';
+import { CiShoppingTag } from "react-icons/ci";
 const SubscriptionsTypes = () => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error } = useSelector((state) => state.subscriptions);
@@ -20,6 +21,44 @@ console.log(subscriptionTypes);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
   const [subscriptionToView, setSubscriptionToView] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState('');
+const [statusFilter, setStatusFilter] = useState('all');
+const [durationFilter, setDurationFilter] = useState('');
+const [includesGym, setIncludesGym] = useState('');
+const [includesPool, setIncludesPool] = useState('');
+const [includesClasses, setIncludesClasses] = useState('');
+
+const filteredSubscriptions = subscriptionTypes.filter((type) => {
+  const matchesSearch = searchQuery === '' || type.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+  const matchesStatus =
+    statusFilter === 'all' ||
+    (statusFilter === 'active' && type.is_active) ||
+    (statusFilter === 'inactive' && !type.is_active);
+
+    const matchesDuration =
+    durationFilter === '' || type.duration_days === Number(durationFilter);
+
+  const matchesGym =
+    includesGym === '' ||
+    (includesGym === 'yes' && type.includes_gym) ||
+    (includesGym === 'no' && !type.includes_gym);
+
+  const matchesPool =
+    includesPool === '' ||
+    (includesPool === 'yes' && type.includes_pool) ||
+    (includesPool === 'no' && !type.includes_pool);
+
+  const matchesClasses =
+    includesClasses === '' ||
+    (includesClasses === 'yes' && type.includes_classes) ||
+    (includesClasses === 'no' && !type.includes_classes);
+
+  return matchesSearch && matchesStatus && matchesDuration && matchesGym && matchesPool && matchesClasses;
+});
+
+
   const openCreateModal = () => setIsCreateModalOpen(true);
 const closeCreateModal = () => setIsCreateModalOpen(false);
   useEffect(() => {
@@ -61,18 +100,95 @@ const closeCreateModal = () => setIsCreateModalOpen(false);
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-4">          أنواع الاشتراكات
-      </h1>
-      <ul>
-      <button
+     <div className="flex justify-between items-center mb-6 mt-6">
+
+        <div className="flex items-start space-x-3">  
+            <CiShoppingTag className="text-blue-600 w-9 h-9 text-2xl" />
+            <h1 className="text-2xl font-bold mb-4">   أنواع الاشتراكات  </h1>
+            </div>
+            <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center btn"
         >
-           إضافة نوع جديد<FaPlus />
+           <FaPlus />
+
+          إضافة نوع جديد
         </button>
-  {subscriptionTypes.map((type) => (
+        </div>
+
+  {/* ✅ Filter Section goes HERE */}
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <input
+      type="text"
+      placeholder="بحث بالاسم"
+      value={searchQuery}
+      onChange={(e) => setSearchQuery(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    />
+    <select
+      value={statusFilter}
+      onChange={(e) => setStatusFilter(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    >
+      <option value="all">الحالة (الكل)</option>
+      <option value="active">نشط</option>
+      <option value="inactive">غير نشط</option>
+    </select>
+    <input
+      type="text"
+      placeholder="المدة (مثال: 30 )"
+      value={durationFilter}
+      onChange={(e) => setDurationFilter(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    />
+    <select
+      value={includesGym}
+      onChange={(e) => setIncludesGym(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    >
+      <option value="">يشمل الجيم؟</option>
+      <option value="yes">نعم</option>
+      <option value="no">لا</option>
+    </select>
+    <select
+      value={includesPool}
+      onChange={(e) => setIncludesPool(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    >
+      <option value="">يشمل المسبح؟</option>
+      <option value="yes">نعم</option>
+      <option value="no">لا</option>
+    </select>
+    <select
+      value={includesClasses}
+      onChange={(e) => setIncludesClasses(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    >
+      <option value="">يشمل الحصص؟</option>
+      <option value="yes">نعم</option>
+      <option value="no">لا</option>
+    </select>
+  </div>
+        
+
+      <ul>
+     
+  {filteredSubscriptions.map((type) => (
    <li key={type.id} className="mb-4 p-4 border-b border-gray-200 flex items-start justify-between hover:bg-gray-50 transition-colors">
- 
+  <div className="flex flex-col">
+     <span className="text-lg font-semibold">{type.name}</span>
+     <div className="text-sm text-gray-600">
+     <p>
+  نشط:{" "}
+  {type.is_active ? (
+    <span className="text-green-500">نعم</span>
+  ) : (
+    <span className="text-red-500">لا</span>
+  )}
+</p>
+
+     </div>
+   </div>
    <div className="flex space-x-2">
      <div className="relative group">
        <button
@@ -108,20 +224,7 @@ const closeCreateModal = () => setIsCreateModalOpen(false);
        </span>
      </div>
    </div>
-   <div className="flex flex-col">
-     <span className="text-lg font-semibold">{type.name}</span>
-     <div className="text-sm text-gray-600">
-     <p>
-  نشط:{" "}
-  {type.is_active ? (
-    <span className="text-green-500">نعم</span>
-  ) : (
-    <span className="text-red-500">لا</span>
-  )}
-</p>
-
-     </div>
-   </div>
+  
  </li>
  
   ))}

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSubscriptions, fetchSubscriptionById, updateSubscription, renewSubscription, makePayment  } from '../../redux/slices/subscriptionsSlice';
-import DeleteSubscriptionModal from './DeleteSubscriptionModal'; // Import the delete modal
-import UpdateSubscriptionModal from './UpdateSubscriptionModal'; // Import the update modal
+import DeleteSubscriptionModal from './DeleteSubscriptionModal'; 
+import UpdateSubscriptionModal from './UpdateSubscriptionModal'; 
 import { Link } from 'react-router-dom';
 import { FaEdit, FaTrash, FaEye, FaRedo } from 'react-icons/fa';
-import CreateSubscription from './CreateSubscription'; // Import the create subscription component
+import { CiCircleList } from "react-icons/ci";
+import CreateSubscription from './CreateSubscription'; 
+import { FaArrowRotateLeft } from "react-icons/fa6";
 const SubscriptionList = () => {
   const dispatch = useDispatch();
   const { subscriptions, status, error, updateStatus } = useSelector((state) => state.subscriptions);
@@ -191,39 +193,56 @@ const SubscriptionList = () => {
   }
 
   return (
-    <div className=" mx-auto p-6 bg-white shadow-lg rounded-lg" dir="rtl">
+    <div className=" mx-auto p-6 " dir="rtl">
+     <div className="flex justify-between items-center mb-6">
+     <div className="flex space-x-2 items-start ">
+     <CiCircleList className="text-blue-600 w-9 h-9 text-2xl"/>
+
       <h2 className="text-2xl font-semibold text-center text-gray-700 mb-4">
-      الاشتراكات
+      قائمةالاشتراكات 
       </h2>
+      </div>
+
       <button
           onClick={() => setCreateModalOpen(true)}
-          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
+          className="btn"
         >
          إضافة اشتراك
         </button>
+        </div>
 
-        <div className="flex flex-wrap gap-4 my-4" dir="rtl">
-  <div className="flex flex-col">
-    <label htmlFor="memberName" className="text-sm font-medium mb-1 text-right">اسم العضو</label>
-    <input
-      type="text"
-      id="memberName"
-      name="memberName"
-      value={filters.memberName}
-      onChange={handleFilterChange}
-      placeholder="بحث باسم العضو"
-      className="border p-2 rounded text-right"
-    />
-  </div>
+        <div className="flex flex-wrap gap-4 my-6 px-4" dir="rtl">
+  {/** Common classes for input containers */}
+  {[
+    { id: 'memberName', label: 'اسم العضو', type: 'text', placeholder: 'بحث باسم العضو' },
+    { id: 'startDate', label: 'تاريخ البدء', type: 'date' },
+    { id: 'endDate', label: 'تاريخ الانتهاء', type: 'date' },
+    { id: 'clubId', label: 'معرف النادي', type: 'number', placeholder: 'تصفية حسب معرف النادي', min: 1 },
+    { id: 'attendanceDays', label: 'أيام الحضور', type: 'number', placeholder: 'تصفية حسب أيام الحضور', min: 0 },
+  ].map(({ id, label, type, placeholder, min }) => (
+    <div key={id} className="flex flex-col w-56">
+      <label htmlFor={id} className="text-sm font-medium text-gray-700 mb-1 text-right">{label}</label>
+      <input
+        type={type}
+        id={id}
+        name={id}
+        value={filters[id]}
+        onChange={handleFilterChange}
+        placeholder={placeholder}
+        min={min}
+        className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
+      />
+    </div>
+  ))}
 
-  <div className="flex flex-col">
-    <label htmlFor="status" className="text-sm font-medium mb-1 text-right">الحالة</label>
+  <div className="flex flex-col w-56">
+    <label htmlFor="status" className="text-sm font-medium text-gray-700 mb-1 text-right">الحالة</label>
     <select
       id="status"
       name="status"
       value={filters.status}
       onChange={handleFilterChange}
-      className="border p-2 rounded text-right"
+      className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm transition-all duration-200 ease-in-out"
     >
       <option value="">كل الحالات</option>
       <option value="Active">نشط</option>
@@ -232,68 +251,17 @@ const SubscriptionList = () => {
     </select>
   </div>
 
-  <div className="flex flex-col">
-    <label htmlFor="startDate" className="text-sm font-medium mb-1 text-right">تاريخ البدء</label>
-    <input
-      type="date"
-      id="startDate"
-      name="startDate"
-      value={filters.startDate}
-      onChange={handleFilterChange}
-      className="border p-2 rounded text-right"
-    />
-  </div>
-
-  <div className="flex flex-col">
-    <label htmlFor="endDate" className="text-sm font-medium mb-1 text-right">تاريخ الانتهاء</label>
-    <input
-      type="date"
-      id="endDate"
-      name="endDate"
-      value={filters.endDate}
-      onChange={handleFilterChange}
-      className="border p-2 rounded text-right"
-    />
-  </div>
-
-  {/* Club ID filter in Arabic */}
-  <div className="flex flex-col">
-    <label htmlFor="clubId" className="text-sm font-medium mb-1 text-right">معرف النادي</label>
-    <input
-      type="number"
-      id="clubId"
-      name="clubId"
-      value={filters.clubId}
-      onChange={handleFilterChange}
-      placeholder="تصفية حسب معرف النادي"
-      className="border p-2 rounded text-right"
-      min="1"
-    />
-  </div>
-
-  <div className="flex flex-col">
-    <label htmlFor="attendanceDays" className="text-sm font-medium mb-1 text-right">أيام الحضور</label>
-    <input
-      type="number"
-      id="attendanceDays"
-      name="attendanceDays"
-      value={filters.attendanceDays}
-      onChange={handleFilterChange}
-      placeholder="تصفية حسب أيام الحضور"
-      className="border p-2 rounded text-right"
-      min="0"
-    />
-  </div>
-
   <div className="flex items-end">
     <button
       onClick={resetFilters}
-      className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded"
+      
+      className="btn"
     >
-      إعادة تعيين
-    </button>
+      <FaArrowRotateLeft />
+          </button>
   </div>
 </div>
+
 
 
       <div className="overflow-x-auto">

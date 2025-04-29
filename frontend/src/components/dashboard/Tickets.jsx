@@ -8,18 +8,38 @@ import {
 } from '../../redux/slices/ticketsSlice';
 import { FaEdit, FaTrash, FaCheck, FaEye } from "react-icons/fa"
 import { FaPlus } from 'react-icons/fa';
-import { GiTicket } from 'react-icons/gi';
+import { IoTicketOutline } from "react-icons/io5";
 
 import AddTicket from './AddTicket';
 const Tickets = () => {
   const dispatch = useDispatch();
   const { tickets } = useSelector((state) => state.tickets);
+  console.log('Tickets:', tickets); // Debugging line
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showMarkAsUsedModal, setShowMarkAsUsedModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const [filterClub, setFilterClub] = useState('');
+const [filterTicketType, setFilterTicketType] = useState('');
+const [filterBuyerName, setFilterBuyerName] = useState('');
+const [filterUsedStatus, setFilterUsedStatus] = useState(''); // 'used', 'unused', or ''
+
+const filteredTickets = tickets.filter(ticket => {
+  const matchesClub = filterClub === '' || ticket.club.toString() === filterClub;
+  const matchesBuyer = filterBuyerName === '' || ticket.buyer_name?.toLowerCase().includes(filterBuyerName.toLowerCase());
+  const matchesType = filterTicketType === '' || ticket.ticket_type === filterTicketType;
+  const matchesStatus =
+    filterUsedStatus === '' ||
+    (filterUsedStatus === 'used' && ticket.used) ||
+    (filterUsedStatus === 'unused' && !ticket.used);
+
+  return matchesClub && matchesBuyer && matchesType && matchesStatus;
+});
+
+
   const openCreateModal = () => setShowCreateModal(true);
 const closeCreateModal = () => setShowCreateModal(false);
   const openViewModal = (ticket) => {
@@ -141,10 +161,10 @@ const closeCreateModal = () => setShowCreateModal(false);
   
 
   return (
-    <div className="p-6"dir="rtl">
-     <div className="flex justify-between items-center mb-6">
+    <div className="p-6" >
+     <div className="flex justify-between items-start mb-6">
      <div className="flex items-start space-x-3">   
-     <GiTicket className="text-blue-600 w-9 h-9 text-2xl" />
+     <IoTicketOutline className="text-blue-600 w-9 h-9 text-2xl" />
 
            <h2 className="text-2xl font-bold mb-6">التذاكر</h2>
      
@@ -153,12 +173,45 @@ const closeCreateModal = () => setShowCreateModal(false);
     onClick={openCreateModal}
     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
   >
-    إضافة تذكرة جديد
     <FaPlus /> 
-  </button>
-  
-      
 
+    إضافة تذكرة جديد
+  </button>   
+</div>
+<div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+  <input
+    type="text"
+    placeholder="بحث عن اسم المشتري"
+    className="border p-2 rounded"
+    value={filterBuyerName}
+    onChange={(e) => setFilterBuyerName(e.target.value)}
+  />
+  <input
+    type="number"
+    placeholder="معرف النادي"
+    className="border p-2 rounded"
+    value={filterClub}
+    onChange={(e) => setFilterClub(e.target.value)}
+  />
+  <select
+    className="border p-2 rounded"
+    value={filterTicketType}
+    onChange={(e) => setFilterTicketType(e.target.value)}
+  >
+    <option value="">كل الأنواع</option>
+    <option value="session">جلسة</option>
+    <option value="day_pass">تصريح يومي</option>
+    <option value="monthly">شهري</option>
+  </select>
+  <select
+    className="border p-2 rounded"
+    value={filterUsedStatus}
+    onChange={(e) => setFilterUsedStatus(e.target.value)}
+  >
+    <option value="">كل الحالات</option>
+    <option value="used">مستخدمة</option>
+    <option value="unused">متاحة</option>
+  </select>
 </div>
       <table className="min-w-full bg-white shadow rounded">
   <thead>
@@ -173,7 +226,7 @@ const closeCreateModal = () => setShowCreateModal(false);
     </tr>
   </thead>
   <tbody>
-    {tickets.map((ticket) => (
+    {filteredTickets.map((ticket) => (
       <tr key={ticket.id} className="hover:bg-gray-100">
         {/* Display Club ID (hidden or visible as needed) */}
         <td className="py-2 px-4 border-b">{ticket.club}</td>
@@ -191,7 +244,15 @@ const closeCreateModal = () => setShowCreateModal(false);
         <td className="py-2 px-4 border-b">${ticket.price}</td>
 
         {/* Display Status (Used or Available) */}
-        <td className="py-2 px-4 border-b">{ticket.used ? 'مستخدمة' : 'متاحة'}</td>
+        <td className="py-2 px-4 border-b">
+  <span className={`px-2 py-1 rounded ${
+    ticket.used ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
+  }`}>
+    {ticket.used ? 'مستخدمة' : 'متاحة'}
+  </span>
+</td>
+
+
 
         {/* Action Buttons */}
         <td className="py-2 px-4 border-b">

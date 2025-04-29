@@ -1,9 +1,14 @@
-import { useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import SubscriptionList from "./SubscriptionList";
-import SubscriptionsTypes from "./SubscriptionsTypes"; // Removed the extra space// Adjust path as needed
+import SubscriptionsTypes from "./SubscriptionsTypes";
 
 export default function Subscriptions() {
-  const [activeTab, setActiveTab] = useState('list'); // 'list' or 'types'
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'list';
+
+  const handleTabChange = (tab) => {
+    setSearchParams({ tab }); 
+  };
 
   return (
     <div className="max-w-full mx-auto p-4" dir="rtl">
@@ -15,7 +20,7 @@ export default function Subscriptions() {
               ? 'border-b-2 border-blue-500 text-blue-600'
               : 'text-gray-500 hover:text-gray-700'
           }`}
-          onClick={() => setActiveTab('list')}
+          onClick={() => handleTabChange('list')}
         >
           قائمة الاشتراكات
         </button>
@@ -25,19 +30,15 @@ export default function Subscriptions() {
               ? 'border-b-2 border-blue-500 text-blue-600'
               : 'text-gray-500 hover:text-gray-700'
           }`}
-          onClick={() => setActiveTab('types')}
+          onClick={() => handleTabChange('types')}
         >
           أنواع الاشتراكات
         </button>
       </div>
 
       {/* Tab Content */}
-      <div className="">
-        {activeTab === 'list' ? (
-          <SubscriptionList />
-        ) : (
-          <SubscriptionsTypes />
-        )}
+      <div>
+        {activeTab === 'list' ? <SubscriptionList /> : <SubscriptionsTypes />}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 // src/redux/slices/subscriptionSlice.js
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import axios from 'axios';
+import BASE_URL from '../../config/api';
 
 
 export const fetchSubscriptionTypes = createAsyncThunk(
@@ -247,7 +248,7 @@ export const deleteSubscriptionType = createAsyncThunk(
     try {
       const token = localStorage.getItem('token'); // Get the token from localStorage
       const response = await axios.delete(
-        `http://127.0.0.1:8000/subscriptions/api/subscription-types/${id}/`,
+        `${BASE_URL}/subscriptions/api/subscription-types/${id}/`, // Use BASE_URL here
         {
           headers: {
             Authorization: `Bearer ${token}`, // Pass token in the headers
@@ -361,7 +362,7 @@ export const fetchMemberSubscriptions = createAsyncThunk(
       const response = await axios.get(
         `http://127.0.0.1:8000/subscriptions/api/subscriptions/member/`,
         {
-          params: { member_id: memberId },
+          params: { member_id: memberId }, // Pass member_id as query param
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -482,11 +483,12 @@ export const fetchSubscriptions = createAsyncThunk(
       };
 
       const [allRes, activeRes, upcomingRes, expiredRes] = await Promise.all([
-        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/', config),
-        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/active/', config),
-        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/upcoming/', config),
-        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/expired/', config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/`, config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/active/`, config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/upcoming/`, config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/expired/`, config),
       ]);
+      
 
       const activeIds = new Set(activeRes.data.map(sub => sub.id));
       const upcomingIds = new Set(upcomingRes.data.map(sub => sub.id));
@@ -781,6 +783,20 @@ const subscriptionsSlice = createSlice({
       //  state.loading = false;
       //  state.allsubscriptions = action.payload;
      // })
+
+     .addCase(fetchMemberSubscriptions.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    })
+    .addCase(fetchMemberSubscriptions.fulfilled, (state, action) => {
+      state.loading = false;
+      state.memberSubscriptions = action.payload;
+    })
+    .addCase(fetchMemberSubscriptions.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload;
+    })
+    
      
     },
   });
