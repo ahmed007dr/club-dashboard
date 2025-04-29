@@ -50,7 +50,7 @@ const Member = () => {
         {/* Profile Section */}
         <div className="flex items-center gap-6 mb-8">
           <img
-            src={user.photo || "https://i.pravatar.cc/100?img=11"} // Fallback image if no photo exists
+            src={user.photo || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"} // Fallback image if no photo exists
             alt="Profile"
             className="w-24 h-24 rounded-full object-cover border-4 border-blue-500 shadow-md"
           />

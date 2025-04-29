@@ -95,6 +95,42 @@ export const fetchUserById = createAsyncThunk(
     }
   );
 
+  export const searchMember = createAsyncThunk(
+    'users/searchMember',
+    async (query, { rejectWithValue }) => {
+        if (!token) {
+            return rejectWithValue("Authentication token is missing. Please log in again.");
+        }
+
+        try {
+            const res = await fetch(`http://127.0.0.1:8000/members/api/members/search/?q=${query}`, {
+              
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!res.ok) {
+                if (res.status === 401) {
+                    return rejectWithValue("Unauthorized. Please log in again.");
+                } else if (res.status === 404) {
+                    return rejectWithValue("No members found matching the search query.");
+                } else if (res.status === 500) {
+                    return rejectWithValue("Internal Server Error. Please try again later.");
+                }
+            }
+
+            const data = await res.json();
+            return data;
+
+        } catch (error) {
+            console.error("Error searching for members:", error);
+            return rejectWithValue("An unexpected error occurred. Please try again later.");
+        }
+    }
+);
 
 
 // User slice
@@ -131,8 +167,13 @@ const userSlice = createSlice({
                 }
             })
             .addCase(deleteMember.fulfilled, (state, action) => {
-                const id = action.payload;
-                state.items = state.items.filter(user => user.id !== id);
+              const id = action.payload;
+              if (Array.isArray(state.items)) {
+                  const index = state.items.findIndex(user => user.id === id);
+                  if (index !== -1) {
+                      state.items.splice(index, 1); // Remove the user from the array
+                  }
+              }
             }).addCase(fetchUserById.fulfilled, (state, action) => {
                 state.user = action.payload; // Store the fetched user data
                 state.isloading = false;
@@ -144,7 +185,18 @@ const userSlice = createSlice({
               .addCase(fetchUserById.rejected, (state, action) => {
                 state.isloading = false;
                 state.error = action.payload; // Store the error message
-              });
+              }).addCase(searchMember.fulfilled, (state, action) => {
+                state.items = action.payload; // Update the state with the search results
+                state.isloading = false;
+            })
+            .addCase(searchMember.pending, (state) => {
+                state.isloading = true;
+                state.error = null; // Clear any previous errors
+            })
+            .addCase(searchMember.rejected, (state, action) => {
+                state.isloading = false;
+                state.error = action.payload; // Store the error message
+            });
           
     },
 });
