@@ -54,7 +54,7 @@ export const fetchActiveSubscriptionTypes = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        '${BASE_URL}/subscriptions/api/subscription-types/active/',
+        `${BASE_URL}/subscriptions/api/subscription-types/active/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -156,7 +156,7 @@ export const fetchSubscriptions = createAsyncThunk(
       }
 
       // Make a GET request to the subscriptions API with the token in Authorization header
-      const response = await axios.get('${BASE_URL}/subscriptions/api/subscriptions/', {
+      const response = await axios.get(`${BASE_URL}/subscriptions/api/subscriptions/`, {
         headers: {
           Authorization: `Bearer ${token}`, // Attach Bearer token for authentication
           'Content-Type': 'application/json', // Specify the content type
@@ -190,7 +190,7 @@ export const postSubscription = createAsyncThunk(
       if (!token) throw new Error('Access token not found');
 
       const response = await axios.post(
-        '${BASE_URL}/subscriptions/api/subscriptions/',
+        `${BASE_URL}/subscriptions/api/subscriptions/`,
         subscriptionData,
         {
           headers: {
@@ -320,7 +320,7 @@ export const fetchActiveSubscriptions = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
 
-      const response = await axios.get('${BASE_URL}/subscriptions/api/subscriptions/active/', {
+      const response = await axios.get(`${BASE_URL}/subscriptions/api/subscriptions/active/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -340,7 +340,7 @@ export const fetchExpiredSubscriptions = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
 
-      const response = await axios.get('${BASE_URL}/subscriptions/api/subscriptions/expired/', {
+      const response = await axios.get(`${BASE_URL}/subscriptions/api/subscriptions/expired/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -383,7 +383,7 @@ export const fetchSubscriptionStats = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
 
-      const response = await axios.get('${BASE_URL}/subscriptions/api/subscriptions/stats/', {
+      const response = await axios.get(`${BASE_URL}/subscriptions/api/subscriptions/stats/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -402,7 +402,7 @@ export const fetchUpcomingSubscriptions = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('${BASE_URL}/subscriptions/api/subscriptions/upcoming/', {
+      const response = await axios.get(`${BASE_URL}/subscriptions/api/subscriptions/upcoming/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },

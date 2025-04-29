@@ -1,83 +1,93 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import BASE_URL from '../../config/api';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/receipts/api';
+const API_BASE_URL = `${BASE_URL}/receipts/api`;
 
-// Helper function to get headers with token
+// Helper function to get auth headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
   return {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
     'Authorization': `Bearer ${token}`,
-    'accept': 'application/json',
-    'Content-Type': 'application/json'
   };
 };
 
-// Async Thunks for each API endpoint
+// Async Thunks
 export const fetchReceipts = createAsyncThunk(
   'receipts/fetchAll',
-  async () => {
-    const response = await axios.get(`${API_BASE_URL}/receipts/`, {
-      headers: getAuthHeaders()
-    });
-    return response.data;
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/receipts/`, {
+        headers: getAuthHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching receipts:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data || error.message);
+    }
   }
 );
-
 
 export const addReceipt = createAsyncThunk(
   'receipts/addReceipt',
   async (receiptData, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // get token directly
-
-      console.log('Attempting to add receipt:', receiptData); // Log the receipt data being sent
-
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Attempting to add receipt:', receiptData);
+      }
       const response = await axios.post(
-        'http://127.0.0.1:8000/receipts/api/receipts/add/',
+        `${API_BASE_URL}/receipts/add/`,
         receiptData,
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-        }
+        { headers: getAuthHeaders() }
       );
-
-      console.log('Receipt added successfully:', response.data); // Log the successful response
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Receipt added successfully:', response.data);
+      }
       return response.data;
     } catch (error) {
-      console.error('Error adding receipt:', error.response?.data || error.message); // Log the error
-      return rejectWithValue(
-        error.response?.data || error.message
-      );
+      console.error('Error adding receipt:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
 
-
 export const fetchReceiptByInvoice = createAsyncThunk(
   'receipts/fetchByInvoice',
-  async (invoiceNumber) => {
-    const response = await axios.get(`${API_BASE_URL}/receipts/invoice/${invoiceNumber}/`, {
-      headers: getAuthHeaders()
-    });
-    console.log('Fetched receipt by invoice:', response.data); // Log the fetched receipt
-    return response.data;
+  async (invoiceNumber, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/receipts/invoice/${invoiceNumber}/`, {
+        headers: getAuthHeaders(),
+      });
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Fetched receipt by invoice:', response.data);
+      }
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching receipt by invoice:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data || error.message);
+    }
   }
 );
 
 export const fetchReceiptById = createAsyncThunk(
   'receipts/fetchById',
-  async (receiptId) => {
-    const response = await axios.get(`${API_BASE_URL}/receipts/${receiptId}/`, {
-      headers: getAuthHeaders()
-    });
-    return response.data;
+  async (receiptId, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/receipts/${receiptId}/`, {
+        headers: getAuthHeaders(),
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching receipt by ID:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data || error.message);
+    }
   }
 );
-
 export const deleteReceipt = createAsyncThunk(
   'receipts/delete',
   async (receiptId) => {

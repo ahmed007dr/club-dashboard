@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import BASE_URL from '../../config/api';
 
 // Async Thunks for Expense Categories
 export const fetchExpenseCategories = createAsyncThunk(
@@ -6,7 +7,7 @@ export const fetchExpenseCategories = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/finance/api/expense-categories/', {
+      const response = await fetch(`${BASE_URL}/finance/api/expense-categories/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -29,7 +30,7 @@ export const addExpenseCategory = createAsyncThunk(
   async (newCategory, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/finance/api/expense-categories/', {
+      const response = await fetch(`${BASE_URL}/finance/api/expense-categories/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -54,7 +55,7 @@ export const fetchExpenses = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/finance/api/expenses/', {
+      const response = await fetch(`${BASE_URL}/finance/api/expenses/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -77,7 +78,7 @@ export const addExpense = createAsyncThunk(
   async (newExpense, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/finance/api/expenses/', {
+      const response = await fetch(`${BASE_URL}/finance/api/expenses/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -101,7 +102,7 @@ export const updateExpense = createAsyncThunk(
   async ({ id, updatedData }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`http://127.0.0.1:8000/finance/api/expenses/${id}/`, {
+      const response = await fetch(`${BASE_URL}/finance/api/expenses/${id}/`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -125,7 +126,7 @@ export const deleteExpense = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`http://127.0.0.1:8000/finance/api/expenses/${id}/`, {
+      const response = await fetch(`${BASE_URL}/finance/api/expenses/${id}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -149,7 +150,7 @@ export const fetchIncomeSources = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/finance/api/income-sources/', {
+      const response = await fetch(`${BASE_URL}/finance/api/income-sources/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -172,7 +173,7 @@ export const addIncomeSource = createAsyncThunk(
   async (newSource, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/finance/api/income-sources/', {
+      const response = await fetch(`${BASE_URL}/finance/api/income-sources/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -197,7 +198,7 @@ export const fetchIncomes = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/finance/api/incomes/', {
+      const response = await fetch(`${BASE_URL}/finance/api/incomes/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -220,7 +221,7 @@ export const addIncome = createAsyncThunk(
   async (newIncome, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/finance/api/incomes/', {
+      const response = await fetch(`${BASE_URL}/finance/api/incomes/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -244,7 +245,7 @@ export const updateIncome = createAsyncThunk(
   async ({ id, updatedData }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`http://127.0.0.1:8000/finance/api/incomes/${id}/`, {
+      const response = await fetch(`${BASE_URL}/finance/api/incomes/${id}/`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -268,7 +269,7 @@ export const deleteIncome = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`http://127.0.0.1:8000/finance/api/incomes/${id}/`, {
+      const response = await fetch(`${BASE_URL}/finance/api/incomes/${id}/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,

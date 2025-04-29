@@ -1,11 +1,12 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import BASE_URL from '../../config/api';
 
 const token = localStorage.getItem('token');
 
 // Fetch clubs
 export const fetchClubs = createAsyncThunk('clubs/fetchClubs', async (_, { rejectWithValue }) => {
   try {
-    const response = await fetch("http://127.0.0.1:8000/core/api/club/", {
+    const response = await fetch("${BASE_URL}/core/api/club/", {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -31,7 +32,7 @@ export const fetchClubs = createAsyncThunk('clubs/fetchClubs', async (_, { rejec
 // Edit club
 export const editClub = createAsyncThunk('clubs/editClub', async ({ id, updatedClub }, { rejectWithValue }) => {
   try {
-    const response = await fetch(`http://127.0.0.1:8000/core/api/club/edit/`, {
+    const response = await fetch(`${BASE_URL}/core/api/club/edit/`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,

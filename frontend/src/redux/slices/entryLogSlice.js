@@ -1,6 +1,7 @@
 // slices/entryLogSlice.js
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
+import BASE_URL from '../../config/api';
 
 // Fetch entry logs
 export const fetchEntryLogs = createAsyncThunk(
@@ -8,7 +9,7 @@ export const fetchEntryLogs = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://127.0.0.1:8000/attendance/api/entry-logs/', {
+      const response = await axios.get(`${BASE_URL}/attendance/api/entry-logs/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -29,7 +30,7 @@ export const addEntryLog = createAsyncThunk(
   async (newEntryLog, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://127.0.0.1:8000/attendance/api/entry-logs/add/', newEntryLog, {
+      const response = await axios.post(`${BASE_URL}/attendance/api/entry-logs/add/`, newEntryLog, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

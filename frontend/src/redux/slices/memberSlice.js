@@ -1,9 +1,10 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import BASE_URL from '../../config/api';
 
 const token = localStorage.getItem('token'); 
 // Fetch users
 export const fetchUsers = createAsyncThunk('users/fetchUsers', async () => {
-    const res = await fetch("http://127.0.0.1:8000/members/api/members/", {
+    const res = await fetch("${BASE_URL}/members/api/members/", {
         method: 'GET',
         headers: {
              'Authorization': `Bearer ${token}`,
@@ -21,7 +22,7 @@ export const fetchUsers = createAsyncThunk('users/fetchUsers', async () => {
 });
 // Add user
 export const addMember = createAsyncThunk('users/addUser', async (newUser) => {
-    const res = await fetch("http://127.0.0.1:8000/members/api/members/create/", {
+    const res = await fetch("${BASE_URL}/members/api/members/create/", {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -35,7 +36,7 @@ export const addMember = createAsyncThunk('users/addUser', async (newUser) => {
 // Edit user
 export const editMember = createAsyncThunk('users/editUser', async ({ id, updatedUser }) => {
     console.log("Updated user data:",id, updatedUser); // Log the updated user data
-    const res = await fetch(`http://127.0.0.1:8000/members/api/members/${id}/update/`, {
+    const res = await fetch(`${BASE_URL}/members/api/members/${id}/update/`, {
         method: 'PUT',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -48,7 +49,7 @@ export const editMember = createAsyncThunk('users/editUser', async ({ id, update
 
 // Delete user
 export const deleteMember = createAsyncThunk('users/deleteUser', async (id) => {
-    await fetch(`http://127.0.0.1:8000/members/api/members/${id}/delete/`, { 
+    await fetch(`${BASE_URL}/members/api/members/${id}/delete/`, { 
         method: 'DELETE',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -65,7 +66,7 @@ export const fetchUserById = createAsyncThunk(
       }
   
       try {
-        const res = await fetch(`http://127.0.0.1:8000/members/api/members/${userId}/`, {
+        const res = await fetch(`${BASE_URL}/members/api/members/${userId}/`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,

@@ -5,9 +5,8 @@ export const fetchAttendances = createAsyncThunk(
   'attendance/fetchAttendances',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/attendance/api/attendances/', {
-        method: 'GET',
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}/attendance/api/attendances/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -30,9 +29,8 @@ export const addAttendance = createAsyncThunk(
   'attendance/addAttendance',
   async (newAttendance, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/attendance/api/attendances/add/', {
-        method: 'POST',
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${BASE_URL}/attendance/api/attendances/add/`, newAttendance, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -55,9 +53,8 @@ export const deleteAttendance = createAsyncThunk(
   'attendance/deleteAttendance',
   async (id, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`http://127.0.0.1:8000/attendance/api/attendances/${id}/delete/`, {
-        method: 'DELETE',
+      const token = localStorage.getItem('token');
+      const response = await axios.delete(`${BASE_URL}/attendance/api/attendances/${id}/delete/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

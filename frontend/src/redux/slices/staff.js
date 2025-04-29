@@ -1,10 +1,11 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
+import BASE_URL from '../../config/api';
 
 const token = localStorage.getItem('token');
 
 // Fetch staff
 export const fetchStaff = createAsyncThunk('staff/fetchStaff', async () => {
-    const res = await fetch("http://127.0.0.1:8000/staff/api/shifts/", {
+    const res = await fetch("${BASE_URL}/staff/api/shifts/", {
         method: 'GET',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -24,7 +25,7 @@ export const fetchStaff = createAsyncThunk('staff/fetchStaff', async () => {
 
 // Add staff
 export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff) => {
-    const res = await fetch("http://127.0.0.1:8000/staff/api/shifts/create/", {
+    const res = await fetch("${BASE_URL}/staff/api/shifts/create/", {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -39,7 +40,7 @@ export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff) => {
 // Edit staff
 export const editStaff = createAsyncThunk('staff/editStaff', async ({ id, updatedStaff }) => {
     console.log("Editing staff with ID:", id, "Updated data:", updatedStaff);
-    const res = await fetch(`http://127.0.0.1:8000/staff/api/shifts/${id}/edit/`, {
+    const res = await fetch(`${BASE_URL}/staff/api/shifts/${id}/edit/`, {
         method: 'PUT',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -53,7 +54,7 @@ export const editStaff = createAsyncThunk('staff/editStaff', async ({ id, update
 
 // Delete staff
 export const deleteStaff = createAsyncThunk('staff/deleteStaff', async (id) => {
-    await fetch(`http://127.0.0.1:8000/staff/api/shifts/${id}/delete/`, {
+    await fetch(`${BASE_URL}/staff/api/shifts/${id}/delete/`, {
         method: 'DELETE',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -65,7 +66,7 @@ export const deleteStaff = createAsyncThunk('staff/deleteStaff', async (id) => {
 
 // Get staff by ID
 export const getStaffById = createAsyncThunk('staff/getStaffById', async (id) => {
-    const res = await fetch(`http://127.0.0.1:8000/staff/api/staff/${id}/`, {
+    const res = await fetch(`${BASE_URL}/staff/api/staff/${id}/`, {
         method: 'GET',
         headers: {
             'Authorization': `Bearer ${token}`,
