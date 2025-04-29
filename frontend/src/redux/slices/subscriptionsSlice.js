@@ -1,9 +1,7 @@
 // src/redux/slices/subscriptionSlice.js
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import axios from 'axios';
-
-
-
+import BASE_URL from '../../config/api';
 
 
 export const fetchSubscriptionTypes = createAsyncThunk(
@@ -13,14 +11,14 @@ export const fetchSubscriptionTypes = createAsyncThunk(
       const token = localStorage.getItem('token');
 
       // Fetch all subscriptions
-      const allResponse = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscription-types/', {
+      const allResponse = await axios.get(`${BASE_URL}/subscriptions/api/subscription-types/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
       // Fetch active subscriptions
-      const activeResponse = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscription-types/active/', {
+      const activeResponse = await axios.get(`${BASE_URL}/subscriptions/api/subscription-types/active/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -56,7 +54,7 @@ export const fetchActiveSubscriptionTypes = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        'http://127.0.0.1:8000/subscriptions/api/subscription-types/active/',
+        '${BASE_URL}/subscriptions/api/subscription-types/active/',
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -76,7 +74,7 @@ export const fetchSubscriptionTypeById = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(`http://127.0.0.1:8000/subscriptions/api/subscription-types/${id}/`, {
+      const response = await axios.get(`${BASE_URL}/subscriptions/api/subscription-types/${id}/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -100,7 +98,7 @@ export const updateSubscription = createAsyncThunk(
 
     try {
       const response = await axios.put(
-        `http://127.0.0.1:8000/subscriptions/api/subscriptions/${id}/`,
+        `${BASE_URL}/subscriptions/api/subscriptions/${id}/`,
         subscriptionData,
         {
           headers: {
@@ -130,7 +128,7 @@ export const deleteSubscriptionById = createAsyncThunk(
         },
       };
 
-      await axios.delete(`http://127.0.0.1:8000/subscriptions/api/subscriptions/${id}/`, config);
+      await axios.delete(`${BASE_URL}/subscriptions/api/subscriptions/${id}/`, config);
       console.log('Subscription deleted successfully:', id);
       return id;
     } catch (error) {
@@ -158,7 +156,7 @@ export const fetchSubscriptions = createAsyncThunk(
       }
 
       // Make a GET request to the subscriptions API with the token in Authorization header
-      const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/', {
+      const response = await axios.get('${BASE_URL}/subscriptions/api/subscriptions/', {
         headers: {
           Authorization: `Bearer ${token}`, // Attach Bearer token for authentication
           'Content-Type': 'application/json', // Specify the content type
@@ -192,7 +190,7 @@ export const postSubscription = createAsyncThunk(
       if (!token) throw new Error('Access token not found');
 
       const response = await axios.post(
-        'http://127.0.0.1:8000/subscriptions/api/subscriptions/',
+        '${BASE_URL}/subscriptions/api/subscriptions/',
         subscriptionData,
         {
           headers: {
@@ -223,7 +221,7 @@ export const putSubscriptionType = createAsyncThunk(
       }
 
       const response = await axios.put(
-        `http://127.0.0.1:8000/subscriptions/api/subscription-types/${id}/`,
+        `${BASE_URL}/subscriptions/api/subscription-types/${id}/`,
         subscriptionData,
         {
           headers: {
@@ -250,7 +248,7 @@ export const deleteSubscriptionType = createAsyncThunk(
     try {
       const token = localStorage.getItem('token'); // Get the token from localStorage
       const response = await axios.delete(
-        `http://127.0.0.1:8000/subscriptions/api/subscription-types/${id}/`,
+        `${BASE_URL}/subscriptions/api/subscription-types/${id}/`, // Use BASE_URL here
         {
           headers: {
             Authorization: `Bearer ${token}`, // Pass token in the headers
@@ -271,7 +269,7 @@ export const addSubscriptionType = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
-        'http://127.0.0.1:8000/subscriptions/api/subscription-types/',
+        `${BASE_URL}/subscriptions/api/subscription-types/`,
         subscriptionData, 
         {
           headers: {
@@ -298,7 +296,7 @@ export const fetchSubscriptionById = createAsyncThunk(
       if (!token) throw new Error('Access token not found');
 
       const response = await axios.get(
-        `http://127.0.0.1:8000/subscriptions/api/subscriptions/${id}/`,
+        `${BASE_URL}/subscriptions/api/subscriptions/${id}/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -322,7 +320,7 @@ export const fetchActiveSubscriptions = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
 
-      const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/active/', {
+      const response = await axios.get('${BASE_URL}/subscriptions/api/subscriptions/active/', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -342,7 +340,7 @@ export const fetchExpiredSubscriptions = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
 
-      const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/expired/', {
+      const response = await axios.get('${BASE_URL}/subscriptions/api/subscriptions/expired/', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -362,9 +360,9 @@ export const fetchMemberSubscriptions = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        `http://127.0.0.1:8000/subscriptions/api/subscriptions/member/`,
+        `${BASE_URL}/subscriptions/api/subscriptions/member/`,
         {
-          params: { member_id: memberId },
+          params: { member_id: memberId }, // Pass member_id as query param
           headers: {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
@@ -385,7 +383,7 @@ export const fetchSubscriptionStats = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
 
-      const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/stats/', {
+      const response = await axios.get('${BASE_URL}/subscriptions/api/subscriptions/stats/', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -404,7 +402,7 @@ export const fetchUpcomingSubscriptions = createAsyncThunk(
   async (_, thunkAPI) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/upcoming/', {
+      const response = await axios.get('${BASE_URL}/subscriptions/api/subscriptions/upcoming/', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -424,7 +422,7 @@ export const makePayment = createAsyncThunk(
       const token = localStorage.getItem('token'); 
 
       const response = await axios.post(
-        `http://127.0.0.1:8000/subscriptions/api/subscriptions/${subscriptionId}/make-payment/`,
+        `${BASE_URL}/subscriptions/api/subscriptions/${subscriptionId}/make-payment/`,
         { amount },
         {
           headers: {
@@ -445,7 +443,7 @@ export const makePayment = createAsyncThunk(
 export const renewSubscription = createAsyncThunk(
   'subscription/renewSubscription',
   async ({ subscriptionId}, thunkAPI) => {
-    console.log(`API URL: http://127.0.0.1:8000/subscriptions/api/subscriptions/${subscriptionId}/renew/`);
+    console.log(`API URL: ${BASE_URL}/subscriptions/api/subscriptions/${subscriptionId}/renew/`);
     const token = localStorage.getItem('token');  // Retrieve token from localStorage
     
     if (!token) {
@@ -454,7 +452,7 @@ export const renewSubscription = createAsyncThunk(
 
     try {
       const response = await axios.post(
-        `http://127.0.0.1:8000/subscriptions/api/subscriptions/${subscriptionId}/renew/`,
+        `${BASE_URL}/subscriptions/api/subscriptions/${subscriptionId}/renew/`,
         {}, // Empty body
         {
           headers: {
@@ -485,11 +483,12 @@ export const fetchSubscriptions = createAsyncThunk(
       };
 
       const [allRes, activeRes, upcomingRes, expiredRes] = await Promise.all([
-        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/', config),
-        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/active/', config),
-        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/upcoming/', config),
-        axios.get('http://127.0.0.1:8000/subscriptions/api/subscriptions/expired/', config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/`, config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/active/`, config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/upcoming/`, config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/expired/`, config),
       ]);
+      
 
       const activeIds = new Set(activeRes.data.map(sub => sub.id));
       const upcomingIds = new Set(upcomingRes.data.map(sub => sub.id));
@@ -744,7 +743,15 @@ const subscriptionsSlice = createSlice({
       })
       .addCase(makePayment.fulfilled, (state, action) => {
         state.loading = false;
-        state.subscriptions.remaining_amount= action.payload.remaining_amount; // Update the remaining amount in the subscription
+        state.paymentStatus = 'succeeded'; // Optionally set payment status to succeeded
+      
+        // Find the subscription in the subscriptions array and update its remaining_amount
+        const updatedSubscription = state.subscriptions.find(
+          (subscription) => subscription.id === action.payload.subscriptionId
+        );
+        if (updatedSubscription) {
+          updatedSubscription.remaining_amount = action.payload.remaining_amount;
+        }
       })
       .addCase(makePayment.rejected, (state, action) => {
         console.error("Payment Error: ", action.payload);
@@ -776,6 +783,20 @@ const subscriptionsSlice = createSlice({
       //  state.loading = false;
       //  state.allsubscriptions = action.payload;
      // })
+
+     .addCase(fetchMemberSubscriptions.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    })
+    .addCase(fetchMemberSubscriptions.fulfilled, (state, action) => {
+      state.loading = false;
+      state.memberSubscriptions = action.payload;
+    })
+    .addCase(fetchMemberSubscriptions.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload;
+    })
+    
      
     },
   });

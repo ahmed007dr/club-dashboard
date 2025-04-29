@@ -33,7 +33,7 @@ const UpdateSubscriptionTypes = ({ subscriptionId, subscriptionData }) => {
   return (
     <form onSubmit={handleSubmit}>
       <div className="mb-4">
-        <label htmlFor="name" className="block text-gray-700">Name</label>
+      <label htmlFor="name" className="block text-gray-700">الاسم</label>
         <input
           type="text"
           id="name"
@@ -45,7 +45,7 @@ const UpdateSubscriptionTypes = ({ subscriptionId, subscriptionData }) => {
         />
       </div>
       <div className="mb-4">
-        <label htmlFor="duration_days" className="block text-gray-700">Duration (days)</label>
+      <label htmlFor="duration_days" className="block text-gray-700">المدة (أيام)</label>
         <input
           type="number"
           id="duration_days"
@@ -57,7 +57,7 @@ const UpdateSubscriptionTypes = ({ subscriptionId, subscriptionData }) => {
         />
       </div>
       <div className="mb-4">
-        <label htmlFor="price" className="block text-gray-700">Price</label>
+      <label htmlFor="price" className="block text-gray-700">السعر</label>
         <input
           type="number"
           id="price"

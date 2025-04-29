@@ -1,328 +1,294 @@
-import React, { useState } from 'react';
-import { FaEye } from 'react-icons/fa'; 
-import { CiTrash } from 'react-icons/ci';
-import { CiEdit } from 'react-icons/ci';
+import React, { useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';
+import UpdateSubscriptionTypes from './UpdateSubscriptionTypes';
+import DeleteSubscriptionTypesModal from './DeleteSubscriptionTypesModal';
+import SubscriptionTypeDetails from './SubscriptionTypeDetails'; // ✅ Import the details modal
+import { FaEye, FaEdit, FaTrash } from 'react-icons/fa';
+import CreateSubscriptionType from "./CreateSubscriptionType"; // ✅ Import the create modal
+import { FaPlus } from 'react-icons/fa';
+import { CiShoppingTag } from "react-icons/ci";
 const SubscriptionsTypes = () => {
-  const [subscriptions, setSubscriptions] = useState([
-    {
-      id: 1,
-      name: "Basic",
-      durationDays: 30,
-      price: 19.99,
-      includesGym: true,
-      includesPool: false,
-      includesClasses: false
-    },
-    {
-      id: 2,
-      name: "Premium",
-      durationDays: 90,
-      price: 49.99,
-      includesGym: true,
-      includesPool: true,
-      includesClasses: true
-    },
-    {
-      id: 3,
-      name: "Elite",
-      durationDays: 365,
-      price: 119.99,
-      includesGym: true,
-      includesPool: true,
-      includesClasses: true
-    }
-  ]);
-
-  const [newSubscription, setNewSubscription] = useState({
-    name: '',
-    durationDays: '',
-    price: '',
-    includesGym: false,
-    includesPool: false,
-    includesClasses: false
-  });
-
+  const dispatch = useDispatch();
+  const { subscriptionTypes, loading, error } = useSelector((state) => state.subscriptions);
+console.log(subscriptionTypes);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalData, setModalData] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
+
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [subscriptionToDelete, setSubscriptionToDelete] = useState(null);
+
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const openEditModal = (subscription) => {
-    setModalData(subscription);
+  const [subscriptionToView, setSubscriptionToView] = useState(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState('');
+const [statusFilter, setStatusFilter] = useState('all');
+const [durationFilter, setDurationFilter] = useState('');
+const [includesGym, setIncludesGym] = useState('');
+const [includesPool, setIncludesPool] = useState('');
+const [includesClasses, setIncludesClasses] = useState('');
+
+const filteredSubscriptions = subscriptionTypes.filter((type) => {
+  const matchesSearch = searchQuery === '' || type.name.toLowerCase().includes(searchQuery.toLowerCase());
+
+  const matchesStatus =
+    statusFilter === 'all' ||
+    (statusFilter === 'active' && type.is_active) ||
+    (statusFilter === 'inactive' && !type.is_active);
+
+    const matchesDuration =
+    durationFilter === '' || type.duration_days === Number(durationFilter);
+
+  const matchesGym =
+    includesGym === '' ||
+    (includesGym === 'yes' && type.includes_gym) ||
+    (includesGym === 'no' && !type.includes_gym);
+
+  const matchesPool =
+    includesPool === '' ||
+    (includesPool === 'yes' && type.includes_pool) ||
+    (includesPool === 'no' && !type.includes_pool);
+
+  const matchesClasses =
+    includesClasses === '' ||
+    (includesClasses === 'yes' && type.includes_classes) ||
+    (includesClasses === 'no' && !type.includes_classes);
+
+  return matchesSearch && matchesStatus && matchesDuration && matchesGym && matchesPool && matchesClasses;
+});
+
+
+  const openCreateModal = () => setIsCreateModalOpen(true);
+const closeCreateModal = () => setIsCreateModalOpen(false);
+  useEffect(() => {
+    dispatch(fetchSubscriptionTypes());
+  }, [dispatch]);
+
+  const openModal = (subscription) => {
+    setSelectedSubscription(subscription);
     setIsModalOpen(true);
   };
 
+  const closeModal = () => {
+    setSelectedSubscription(null);
+    setIsModalOpen(false);
+  };
+
   const openDeleteModal = (subscription) => {
-    setSelectedSubscription(subscription);
+    setSubscriptionToDelete(subscription);
     setIsDeleteModalOpen(true);
   };
 
+  const closeDeleteModal = () => {
+    setSubscriptionToDelete(null);
+    setIsDeleteModalOpen(false);
+  };
+
   const openDetailsModal = (subscription) => {
-    setModalData(subscription);
+    setSubscriptionToView(subscription);
     setIsDetailsModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setIsDeleteModalOpen(false);
+  const closeDetailsModal = () => {
+    setSubscriptionToView(null);
     setIsDetailsModalOpen(false);
-    setIsAddModalOpen(false);
   };
 
-  const handleDelete = () => {
-    setSubscriptions(subscriptions.filter(sub => sub.id !== selectedSubscription.id));
-    closeModal();
-  };
-
-  const handleEdit = () => {
-    const updatedSubscriptions = subscriptions.map((sub) =>
-      sub.id === modalData.id ? modalData : sub
-    );
-    setSubscriptions(updatedSubscriptions);
-    closeModal();
-  };
-
-  const handleAdd = () => {
-    const newId = Math.max(...subscriptions.map(s => s.id)) + 1;
-    const newSub = { ...newSubscription, id: newId };
-    setSubscriptions([...subscriptions, newSub]);
-    setNewSubscription({
-      name: '',
-      durationDays: '',
-      price: '',
-      includesGym: false,
-      includesPool: false,
-      includesClasses: false
-    });
-    closeModal();
-  };
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
 
   return (
     <div>
-      
-      <button
-          className="btn"
-          onClick={() => setIsAddModalOpen(true)}
-        >
-          + Add Subscription Type
-        </button>
-      <table className="min-w-full table-auto">
-        <thead>
-          <tr>
-            <th className="border px-4 py-2">Name</th>
-            <th className="border px-4 py-2">Duration (days)</th>
-            <th className="border px-4 py-2">Price</th>
-            <th className="border px-4 py-2">Gym</th>
-            <th className="border px-4 py-2">Pool</th>
-            <th className="border px-4 py-2">Classes</th>
-            <th className="border px-4 py-2">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {subscriptions.map((subscription) => (
-            <tr key={subscription.id}>
-              <td className="border px-4 py-2">{subscription.name}</td>
-              <td className="border px-4 py-2">{subscription.durationDays}</td>
-              <td className="border px-4 py-2">${subscription.price}</td>
-              <td className="border px-4 py-2">{subscription.includesGym ? "Included" : "Not Included"}</td>
-              <td className="border px-4 py-2">{subscription.includesPool ? "Included" : "Not Included"}</td>
-              <td className="border px-4 py-2">{subscription.includesClasses ? "Included" : "Not Included"}</td>
-              <td className="border px-4 py-2">
-                <button
-                  className="btn-green"
-                  onClick={() => openEditModal(subscription)}
-                >
-                  <CiEdit />
-                </button>
-                <button
-                  className="btn-red"
-                  onClick={() => openDeleteModal(subscription)}
-                >
-                  <CiTrash />
-                </button>
-                <button
-                  className="btn-blue"
-                  onClick={() => openDetailsModal(subscription)}
-                >
-                  <FaEye /> 
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+     <div className="flex justify-between items-center mb-6 mt-6">
 
-      {/* Add Subscription Modal */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 flex justify-center items-center z-40" style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="modal">
-            <h3 className="text-lg font-bold mb-4">Add Subscription</h3>
-            <div className="mb-2">
-              <label className="block">Name</label>
-              <input type="text" className="border px-2 py-1 w-full" value={newSubscription.name} onChange={(e) => setNewSubscription({ ...newSubscription, name: e.target.value })} />
+        <div className="flex items-start space-x-3">  
+            <CiShoppingTag className="text-blue-600 w-9 h-9 text-2xl" />
+            <h1 className="text-2xl font-bold mb-4">   أنواع الاشتراكات  </h1>
             </div>
-            <div className="mb-2">
-              <label className="block">Duration (days)</label>
-              <input type="number" className="border px-2 py-1 w-full" value={newSubscription.durationDays} onChange={(e) => setNewSubscription({ ...newSubscription, durationDays: +e.target.value })} />
-            </div>
-            <div className="mb-2">
-              <label className="block">Price</label>
-              <input type="number" className="border px-2 py-1 w-full" value={newSubscription.price} onChange={(e) => setNewSubscription({ ...newSubscription, price: +e.target.value })} />
-            </div>
-            <div className="mb-1">
-              <label><input type="checkbox" checked={newSubscription.includesGym} onChange={(e) => setNewSubscription({ ...newSubscription, includesGym: e.target.checked })} /> Gym</label>
-            </div>
-            <div className="mb-1">
-              <label><input type="checkbox" checked={newSubscription.includesPool} onChange={(e) => setNewSubscription({ ...newSubscription, includesPool: e.target.checked })} /> Pool</label>
-            </div>
-            <div className="mb-4">
-              <label><input type="checkbox" checked={newSubscription.includesClasses} onChange={(e) => setNewSubscription({ ...newSubscription, includesClasses: e.target.checked })} /> Classes</label>
-            </div>
-            <div>
-              <button className="btn" onClick={handleAdd}>Add</button>
-              <button className="bg-gray-500 text-white px-4 py-2 rounded" onClick={closeModal}>Cancel</button>
-            </div>
-          </div>
+            <button
+          onClick={openCreateModal}
+          className="flex items-center btn"
+        >
+           <FaPlus />
+
+          إضافة نوع جديد
+        </button>
         </div>
-      )}
+
+  {/* ✅ Filter Section goes HERE */}
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <input
+      type="text"
+      placeholder="بحث بالاسم"
+      value={searchQuery}
+      onChange={(e) => setSearchQuery(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    />
+    <select
+      value={statusFilter}
+      onChange={(e) => setStatusFilter(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    >
+      <option value="all">الحالة (الكل)</option>
+      <option value="active">نشط</option>
+      <option value="inactive">غير نشط</option>
+    </select>
+    <input
+      type="text"
+      placeholder="المدة (مثال: 30 )"
+      value={durationFilter}
+      onChange={(e) => setDurationFilter(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    />
+    <select
+      value={includesGym}
+      onChange={(e) => setIncludesGym(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    >
+      <option value="">يشمل الجيم؟</option>
+      <option value="yes">نعم</option>
+      <option value="no">لا</option>
+    </select>
+    <select
+      value={includesPool}
+      onChange={(e) => setIncludesPool(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    >
+      <option value="">يشمل المسبح؟</option>
+      <option value="yes">نعم</option>
+      <option value="no">لا</option>
+    </select>
+    <select
+      value={includesClasses}
+      onChange={(e) => setIncludesClasses(e.target.value)}
+      className="border px-3 py-2 rounded-md w-full"
+    >
+      <option value="">يشمل الحصص؟</option>
+      <option value="yes">نعم</option>
+      <option value="no">لا</option>
+    </select>
+  </div>
+        
+
+      <ul>
+     
+  {filteredSubscriptions.map((type) => (
+   <li key={type.id} className="mb-4 p-4 border-b border-gray-200 flex items-start justify-between hover:bg-gray-50 transition-colors">
+  <div className="flex flex-col">
+     <span className="text-lg font-semibold">{type.name}</span>
+     <div className="text-sm text-gray-600">
+     <p>
+  نشط:{" "}
+  {type.is_active ? (
+    <span className="text-green-500">نعم</span>
+  ) : (
+    <span className="text-red-500">لا</span>
+  )}
+</p>
+
+     </div>
+   </div>
+   <div className="flex space-x-2">
+     <div className="relative group">
+       <button
+         onClick={() => openDetailsModal(type)}
+         className="text-green-500  p-2 rounded hover:text-green-600 transition-colors"
+       >
+         <FaEye />
+       </button>
+       <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800  text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+         View Details
+       </span>
+     </div>
+     <div className="relative group">
+       <button
+         onClick={() => openModal(type)}
+         className="text-blue-500  p-2 rounded hover:text-blue-600 transition-colors"
+       >
+         <FaEdit />
+       </button>
+       <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800  text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+         Edit
+       </span>
+     </div>
+     <div className="relative group">
+       <button
+         onClick={() => openDeleteModal(type)}
+         className="text-red-500  p-2 rounded hover:text-red-600 transition-colors"
+       >
+         <FaTrash />
+       </button>
+       <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800  text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+         Delete
+       </span>
+     </div>
+   </div>
+  
+ </li>
+ 
+  ))}
+</ul>
+
 
       {/* Edit Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 flex justify-center items-center z-40"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="modal">
-            <h3>Edit Subscription</h3>
-            <div>
-              <label className="block">Name</label>
-              <input
-                type="text"
-                className="border px-2 py-1 w-full"
-                value={modalData.name}
-                onChange={(e) => setModalData({ ...modalData, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block">Duration (days)</label>
-              <input
-                type="number"
-                className="border px-2 py-1 w-full"
-                value={modalData.durationDays}
-                onChange={(e) => setModalData({ ...modalData, durationDays: +e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block">Price</label>
-              <input
-                type="number"
-                className="border px-2 py-1 w-full"
-                value={modalData.price}
-                onChange={(e) => setModalData({ ...modalData, price: +e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block">Gym</label>
-              <input
-                type="checkbox"
-                checked={modalData.includesGym}
-                onChange={(e) => setModalData({ ...modalData, includesGym: e.target.checked })}
-              />
-            </div>
-            <div>
-              <label className="block">Pool</label>
-              <input
-                type="checkbox"
-                checked={modalData.includesPool}
-                onChange={(e) => setModalData({ ...modalData, includesPool: e.target.checked })}
-              />
-            </div>
-            <div>
-              <label className="block">Classes</label>
-              <input
-                type="checkbox"
-                checked={modalData.includesClasses}
-                onChange={(e) => setModalData({ ...modalData, includesClasses: e.target.checked })}
-              />
-            </div>
-            <div className="mt-4">
-              <button
-                className="btn"
-                onClick={handleEdit}
-              >
-                Save
-              </button>
-              <button
-                className="bg-gray-500 text-white px-4 py-2 rounded"
-                onClick={closeModal}
-              >
-                Cancel
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              onClick={closeModal}
+            >
+              ✕
+            </button>
+            <h2 className="text-xl font-semibold mb-4">Update Subscription</h2>
+            <UpdateSubscriptionTypes
+              subscriptionId={selectedSubscription.id}
+              subscriptionData={selectedSubscription}
+            />
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 flex justify-center items-center z-40"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="modal">
-            <h3>Are you sure you want to delete this subscription?</h3>
-            <div className="mt-4">
-              <button
-                className="btn mr-2"
-                onClick={handleDelete}
-              >
-                Yes, Delete
-              </button>
-              <button
-                className="bg-gray-500 text-white px-4 py-2 rounded"
-                onClick={closeModal}
-              >
-                Cancel
-              </button>
-            </div>
+      {/* Delete Modal */}
+      <DeleteSubscriptionTypesModal
+        isOpen={isDeleteModalOpen}
+        onClose={closeDeleteModal}
+        subscription={subscriptionToDelete}
+      />
+
+      {/* Details Modal */}
+      {isDetailsModalOpen && subscriptionToView && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              onClick={closeDetailsModal}
+            >
+              ✕
+            </button>
+            <h2 className="text-xl font-semibold mb-4">Subscription Details</h2>
+            <SubscriptionTypeDetails id={subscriptionToView.id} />
           </div>
         </div>
       )}
 
-      {/* Subscription Details Modal */}
-      {isDetailsModalOpen && (
-        <div className="fixed inset-0 flex justify-center items-center z-40"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}>
-          <div className="modal">
-            <h3>Subscription Details</h3>
-            <div>
-              <strong>Name:</strong> {modalData.name}
-            </div>
-            <div>
-              <strong>Duration (days):</strong> {modalData.durationDays}
-            </div>
-            <div>
-              <strong>Price:</strong> ${modalData.price}
-            </div>
-            <div>
-              <strong>Includes Gym:</strong> {modalData.includesGym ? 'Yes' : 'No'}
-            </div>
-            <div>
-              <strong>Includes Pool:</strong> {modalData.includesPool ? 'Yes' : 'No'}
-            </div>
-            <div>
-              <strong>Includes Classes:</strong> {modalData.includesClasses ? 'Yes' : 'No'}
-            </div>
-            <div className="mt-4">
-              <button
-                className="bg-gray-500 text-white px-4 py-2 rounded"
-                onClick={closeModal}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{isCreateModalOpen && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
+      <button
+        className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+        onClick={closeCreateModal}
+      >
+        ✕
+      </button>
+      <h2 className="text-xl font-semibold mb-4">Create New Subscription</h2>
+      <CreateSubscriptionType />
+    </div>
+  </div>
+)}
     </div>
   );
 };
 
-export default SubscriptionsTypes;
+export default SubscriptionsTypes; 

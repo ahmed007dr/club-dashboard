@@ -58,11 +58,11 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
         >
           X
         </button>
-        <h2 className="text-xl font-bold mb-4">Edit Subscription</h2>
+        <h2 className="text-xl font-bold mb-4">تعديل الاشتراك</h2>
         <form onSubmit={handleSubmit}>
           {/* Club */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-1">Club</label>
+            <label className="block text-gray-700 font-semibold mb-1">النادي</label>
             <input
               type="text"
               name="club"
@@ -74,7 +74,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
 
           {/* Member */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-1">Member</label>
+            <label className="block text-gray-700 font-semibold mb-1">العضو</label>
             <input
               type="text"
               name="member"
@@ -86,7 +86,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
 
           {/* Type */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-1">Type</label>
+            <label className="block text-gray-700 font-semibold mb-1">النوع</label>
             <input
               type="text"
               name="type"
@@ -98,7 +98,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
 
           {/* Start Date */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-1">Start Date</label>
+            <label className="block text-gray-700 font-semibold mb-1">تاريخ البداية</label>
             <input
               type="date"
               name="start_date"
@@ -110,7 +110,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
 
           {/* End Date */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-1">End Date</label>
+            <label className="block text-gray-700 font-semibold mb-1">تاريخ النهاية</label>
             <input
               type="date"
               name="end_date"
@@ -122,7 +122,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
 
           {/* Paid Amount */}
           <div className="mb-4">
-            <label className="block text-gray-700 font-semibold mb-1">Paid Amount</label>
+            <label className="block text-gray-700 font-semibold mb-1">المبلغ المدفوع</label>
             <input
               type="number"
               name="paid_amount"
@@ -138,7 +138,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
               type="submit"
               className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition"
             >
-              Update Subscription
+              تحديث الاشتراك
             </button>
           </div>
         </form>

@@ -202,7 +202,7 @@ const InviteList = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Free Invites</h1>
+        <h1 className="text-2xl font-bold text-gray-800">Free Invit333es</h1>
         <button 
           onClick={() => setShowAddModal(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"

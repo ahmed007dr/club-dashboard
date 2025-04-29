@@ -48,6 +48,7 @@ function App() {
           <Route path="receipts" element={<Receipts />} />
           <Route path="members" element={<Members />} />
           <Route path="/member/:id" element={<Member />} />
+          <Route path="/member-subscriptions/:memberId" element={<MemberSubscriptions />} />
           <Route path="tickets" element={<Tickets />} />
           <Route path="attendance" element={<Attendance />} />
           <Route path="free-invites" element={<FreeInvites />} />
