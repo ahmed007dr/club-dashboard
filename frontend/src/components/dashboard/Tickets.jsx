@@ -8,6 +8,7 @@ import {
 } from '../../redux/slices/ticketsSlice';
 import { FaEdit, FaTrash, FaCheck, FaEye } from "react-icons/fa"
 import { FaPlus } from 'react-icons/fa';
+import { GiTicket } from 'react-icons/gi';
 
 import AddTicket from './AddTicket';
 const Tickets = () => {
@@ -140,15 +141,24 @@ const closeCreateModal = () => setShowCreateModal(false);
   
 
   return (
-    <div className="p-6">
+    <div className="p-6"dir="rtl">
      <div className="flex justify-between items-center mb-6">
-     <h1 className="text-3xl font-bold">قائمة التذاكر</h1>
-  <button
+     <div className="flex items-start space-x-3">   
+     <GiTicket className="text-blue-600 w-9 h-9 text-2xl" />
+
+           <h2 className="text-2xl font-bold mb-6">التذاكر</h2>
+     
+           </div>
+     <button
     onClick={openCreateModal}
     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
   >
-    <FaPlus /> إضافة تذكرة جديد
+    إضافة تذكرة جديد
+    <FaPlus /> 
   </button>
+  
+      
+
 </div>
       <table className="min-w-full bg-white shadow rounded">
   <thead>

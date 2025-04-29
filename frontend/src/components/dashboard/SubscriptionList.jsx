@@ -191,7 +191,7 @@ const SubscriptionList = () => {
   }
 
   return (
-    <div className=" mx-auto p-6 bg-white shadow-lg rounded-lg">
+    <div className=" mx-auto p-6 bg-white shadow-lg rounded-lg" dir="rtl">
       <h2 className="text-2xl font-semibold text-center text-gray-700 mb-4">
       الاشتراكات
       </h2>

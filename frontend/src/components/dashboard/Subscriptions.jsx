@@ -6,7 +6,7 @@ export default function Subscriptions() {
   const [activeTab, setActiveTab] = useState('list'); // 'list' or 'types'
 
   return (
-    <div className="max-w-full mx-auto p-4">
+    <div className="max-w-full mx-auto p-4" dir="rtl">
       {/* Tab Navigation */}
       <div className="flex border-b border-gray-200">
         <button

@@ -8,7 +8,7 @@ import {
   deleteInviteById,
   markInviteAsUsed
 } from '../../redux/slices/invitesSlice';
-
+import { RiVipCrown2Line } from 'react-icons/ri';
 const InviteList = () => {
   const dispatch = useDispatch();
   const { invites, loading, error, currentInvite } = useSelector((state) => state.invites);
@@ -176,12 +176,12 @@ const InviteList = () => {
 
   const getStatusBadge = (status) => {
     let bgColor = 'bg-gray-500';
-    if (status === 'used') bgColor = 'bg-green-500';
-    if (status === 'pending') bgColor = 'bg-yellow-500';
-    if (status === 'cancelled') bgColor = 'bg-red-500';
+    if (status === 'used') bgColor = 'bg-green-100 text-green-600';
+    if (status === 'pending') bgColor = 'bg-yellow-100 text-yellow-600';
+    if (status === 'cancelled') bgColor = 'bg-red-100 text-red-600';
     
     return (
-      <span className={`${bgColor} text-white text-xs px-2 py-1 rounded-full`}>
+      <span className={`${bgColor}  text-xs px-2 py-1 rounded-full`}>
         {status}
       </span>
     );
@@ -201,35 +201,45 @@ const InviteList = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <div className="flex items-start justify-between">
       <div className="flex justify-between items-center mb-8">
-      <h1 className="text-2xl font-bold text-gray-800">الدعوات المجانية</h1>
-        <button 
+      <button 
           onClick={() => setShowAddModal(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
+          className="btn flex items-center"
         >
+          دعوة جديدة
+
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
-          دعوة جديدة
         </button>
+       
       </div>
+        <div className="flex items-start space-x-3">   
+        <h1 className="text-2xl font-bold ">الدعوات المجانية</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      
+              <RiVipCrown2Line className="text-blue-600 w-9 h-9 text-2xl" />
+            </div>
+      </div>
+  
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" dir="rtl">
         {invites.map((invite) => (
-          <div key={invite.id} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+          <div key={invite.id} className=" rounded-lg shadow-md overflow-hidden border border-gray-200">
             <div className="p-6">
               <div className="flex justify-between items-start">
-                <h3 className="text-lg font-semibold text-gray-800">{invite.guest_name}</h3>
+                <h3 className="text-lg font-semibold ">{invite.guest_name}</h3>
                 {getStatusBadge(invite.status)}
               </div>
-              <div className="mt-4 space-y-2 text-sm text-gray-600">
+              <div className="mt-4 space-y-2 text-sm ">
             <p><span className="font-medium">الهاتف:</span> {invite.phone}</p>
             <p><span className="font-medium">التاريخ:</span> {new Date(invite.date).toLocaleDateString()}</p>
             <p><span className="font-medium">النادي:</span> {invite.club_details?.name || 'غير متوفر'}</p>
             <p><span className="font-medium">الموقع:</span> {invite.club_details?.location || 'غير متوفر'}</p>
           </div>
             </div>
-            <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-2">
+            <div className="bg-gray-50 dark:bg-gray-700 px-6 py-3 flex justify-end space-x-2">
               <button
                 onClick={() => openEditModal(invite.id)}
                 className="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50"
@@ -263,9 +273,9 @@ const InviteList = () => {
       {/* Add Invite Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div className=" modal">
             <div className="flex justify-between items-center border-b px-6 py-4">
-            <h3 className="text-lg font-semibold text-gray-800">إضافة دعوة جديدة</h3>
+            <h3 className="text-lg font-semibold ">إضافة دعوة جديدة</h3>
               <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-500">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -361,7 +371,7 @@ const InviteList = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-600  rounded-md hover:bg-blue-700"
                 >
                   حفظ الدعوة
                 </button>
@@ -376,9 +386,9 @@ const InviteList = () => {
       {/* Mark as Used Modal */}
       {showMarkUsedModal && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+    <div className=" modal">
       <div className="flex justify-between items-center border-b px-6 py-4">
-        <h3 className="text-lg font-semibold text-gray-800">تحديد كمستخدم</h3>
+        <h3 className="text-lg font-semibold ">تحديد كمستخدم</h3>
         <button 
           onClick={() => setShowMarkUsedModal(false)} 
           className="text-gray-400 hover:text-gray-500"
@@ -413,7 +423,7 @@ const InviteList = () => {
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600  rounded-md hover:bg-blue-700"
           >
             تحديد كمستخدم
           </button>
@@ -426,9 +436,9 @@ const InviteList = () => {
      {/* Edit Invite Modal */}
      {showEditModal && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+    <div className=" modal">
       <div className="flex justify-between items-center border-b px-6 py-4">
-        <h3 className="text-lg font-semibold text-gray-800">تعديل الدعوة</h3>
+        <h3 className="text-lg font-semibold ">تعديل الدعوة</h3>
         <button 
           onClick={() => setShowEditModal(false)} 
           className="text-gray-400 hover:text-gray-500"
@@ -531,7 +541,7 @@ const InviteList = () => {
           </button>
           <button
             type="submit"
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="px-4 py-2 bg-blue-600  rounded-md hover:bg-blue-700"
           >
             حفظ التغييرات
           </button>
@@ -544,9 +554,9 @@ const InviteList = () => {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div className=" modal">
             <div className="flex justify-between items-center border-b px-6 py-4">
-            <h3 className="text-lg font-semibold text-gray-800">تأكيد الحذف</h3>
+            <h3 className="text-lg font-semibold ">تأكيد الحذف</h3>
               <button onClick={() => setShowDeleteModal(false)} className="text-gray-400 hover:text-gray-500">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -564,7 +574,7 @@ const InviteList = () => {
                 </button>
                 <button
                   onClick={handleDeleteInvite}
-                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                  className="px-4 py-2 bg-red-600  rounded-md hover:bg-red-700"
                 >
                   
             حذف
