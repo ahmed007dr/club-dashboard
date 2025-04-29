@@ -1,6 +1,7 @@
 // src/redux/slices/ticketsSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
+import BASE_URL from '../../config/api';
 
 // Create the async thunk for fetching tickets with token authorization
 export const fetchTickets = createAsyncThunk(
@@ -8,7 +9,7 @@ export const fetchTickets = createAsyncThunk(
   async (_, thunkAPI) => {
     const token = localStorage.getItem('token'); // Retrieve token from localStorage
     try {
-      const response = await axios.get('http://127.0.0.1:8000/tickets/api/tickets/', {
+      const response = await axios.get(`${BASE_URL}/tickets/api/tickets/`, {
         headers: {
           Authorization: `Bearer ${token}`, // Include token in the request header
         },
@@ -27,7 +28,7 @@ export const addTicket = createAsyncThunk(
       
       try {
         const response = await axios.post(
-          'http://127.0.0.1:8000/tickets/api/tickets/add/',
+          `${BASE_URL}/tickets/api/tickets/add/`,
           ticketData,
           {
             headers: {
@@ -53,7 +54,7 @@ export const fetchTicketById = createAsyncThunk(
   
       try {
         const response = await axios.get(
-          `http://127.0.0.1:8000/tickets/api/tickets/${ticketId}/`,
+          `${BASE_URL}/tickets/api/tickets/${ticketId}/`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -75,7 +76,7 @@ export const fetchTicketById = createAsyncThunk(
       const token = localStorage.getItem('token');
       try {
         await axios.delete(
-          `http://127.0.0.1:8000/tickets/api/tickets/${ticketId}/delete/`,
+          `${BASE_URL}/tickets/api/tickets/${ticketId}/delete/`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -99,7 +100,7 @@ export const fetchTicketById = createAsyncThunk(
       const token = localStorage.getItem('token');
       try {
         const response = await axios.put(
-          `http://127.0.0.1:8000/tickets/api/tickets/${ticketId}/edit/`,
+          `${BASE_URL}/tickets/api/tickets/${ticketId}/edit/`,
           ticketData,
           {
             headers: {
@@ -124,7 +125,7 @@ export const fetchTicketById = createAsyncThunk(
       const token = localStorage.getItem('token');
       try {
         const response = await axios.post(
-          `http://127.0.0.1:8000/tickets/api/tickets/${ticketId}/mark-used/`,
+          `${BASE_URL}/tickets/api/tickets/${ticketId}/mark-used/`,
           { used_by }, // Send the used_by in the request body
           {
             headers: {

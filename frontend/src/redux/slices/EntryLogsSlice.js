@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import BASE_URL from '../../config/api';
 
 // Async thunk for fetching entry logs
 export const fetchEntryLogs = createAsyncThunk(
@@ -6,7 +7,7 @@ export const fetchEntryLogs = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/attendance/api/entry-logs/', {
+      const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -31,7 +32,7 @@ export const addEntryLog = createAsyncThunk(
   async (newEntryLog, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch('http://127.0.0.1:8000/attendance/api/entry-logs/add/', {
+      const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/add/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

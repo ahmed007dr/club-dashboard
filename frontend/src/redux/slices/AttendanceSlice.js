@@ -1,6 +1,7 @@
 // slices/attendanceSlice.js
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
+import BASE_URL from '../../config/api';
 
 // Fetch attendances
 export const fetchAttendances = createAsyncThunk(
@@ -8,7 +9,7 @@ export const fetchAttendances = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://127.0.0.1:8000/attendance/api/attendances/', {
+      const response = await axios.get(`${BASE_URL}/attendance/api/attendances/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -28,7 +29,7 @@ export const addAttendance = createAsyncThunk(
   async (newAttendance, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://127.0.0.1:8000/attendance/api/attendances/add/', newAttendance, {
+      const response = await axios.post(`${BASE_URL}/attendance/api/attendances/add/`, newAttendance, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -48,7 +49,7 @@ export const deleteAttendance = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.delete(`http://127.0.0.1:8000/attendance/api/attendances/${id}/delete/`, {
+      const response = await axios.delete(`${BASE_URL}/attendance/api/attendances/${id}/delete/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
