@@ -17,7 +17,7 @@ export default function Subscriptions() {
           }`}
           onClick={() => setActiveTab('list')}
         >
-          Subscription List
+          قائمة الاشتراكات
         </button>
         <button
           className={`py-2 px-4 font-medium text-sm focus:outline-none ${
@@ -27,7 +27,7 @@ export default function Subscriptions() {
           }`}
           onClick={() => setActiveTab('types')}
         >
-          Subscription Types
+          أنواع الاشتراكات
         </button>
       </div>
 

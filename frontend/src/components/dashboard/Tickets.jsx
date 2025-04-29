@@ -13,7 +13,6 @@ import AddTicket from './AddTicket';
 const Tickets = () => {
   const dispatch = useDispatch();
   const { tickets } = useSelector((state) => state.tickets);
-  console.log('Tickets:', tickets); // Debugging line to check the tickets data
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -43,6 +42,7 @@ const closeCreateModal = () => setShowCreateModal(false);
   };
 
   const openMarkAsUsedModal = (ticket) => {
+    console.log('Opening Mark as Used Modal for ticket:', ticket.id); // Debug
     setSelectedTicket(ticket);
     setShowMarkAsUsedModal(true);
   };
@@ -111,50 +111,55 @@ const closeCreateModal = () => setShowCreateModal(false);
     }
   };
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
+ const handleInputChange = (e) => {
+  const { name, value, type, checked } = e.target;
   
-    if (type === "checkbox") {
-      setSelectedTicket({
-        ...selectedTicket,
-        [name]: checked,
-      });
-    } else if (name === "club") {
-      // Special handling for club to ensure it's always a number
-      setSelectedTicket({
-        ...selectedTicket,
-        [name]: value === "" ? "" : Number(value),
-      });
-    } else {
-      setSelectedTicket({
-        ...selectedTicket,
-        [name]: value,
-      });
-    }
-  };
+  if (type === "checkbox") {
+    setSelectedTicket({
+      ...selectedTicket,
+      [name]: checked,
+    });
+  } else if (name === "club") {
+    // Special handling for club to ensure it's always a number
+    setSelectedTicket({
+      ...selectedTicket,
+      [name]: value === "" ? "" : Number(value),
+    });
+  } else if (name === "used_by") {
+    setSelectedTicket({
+      ...selectedTicket,
+      [name]: value === "" ? "" : Number(value), // Ensure it is a number or empty string
+    });
+  } else {
+    setSelectedTicket({
+      ...selectedTicket,
+      [name]: value,
+    });
+  }
+};
   
 
   return (
     <div className="p-6">
      <div className="flex justify-between items-center mb-6">
-  <h1 className="text-3xl font-bold">Ticket List</h1>
+     <h1 className="text-3xl font-bold">قائمة التذاكر</h1>
   <button
     onClick={openCreateModal}
     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
   >
-    <FaPlus /> Add New Ticket
+    <FaPlus /> إضافة تذكرة جديد
   </button>
 </div>
       <table className="min-w-full bg-white shadow rounded">
   <thead>
     <tr>
-      <th className="py-2 px-4 border-b text-left">Club (ID)</th>
-      <th className="py-2 px-4 border-b text-left">Club Name</th>
-      <th className="py-2 px-4 border-b text-left">Buyer</th>
-      <th className="py-2 px-4 border-b text-left">Ticket Type</th>
-      <th className="py-2 px-4 border-b text-left">Price</th>
-      <th className="py-2 px-4 border-b text-left">Status</th>
-      <th className="py-2 px-4 border-b text-center">Actions</th>
+    <th className="py-2 px-4 border-b text-left">النادي (المعرف)</th>
+        <th className="py-2 px-4 border-b text-left">اسم النادي</th>
+        <th className="py-2 px-4 border-b text-left">المشتري</th>
+        <th className="py-2 px-4 border-b text-left">نوع التذكرة</th>
+        <th className="py-2 px-4 border-b text-left">السعر</th>
+        <th className="py-2 px-4 border-b text-left">الحالة</th>
+        <th className="py-2 px-4 border-b text-center">إجراءات</th>
     </tr>
   </thead>
   <tbody>
@@ -176,43 +181,44 @@ const closeCreateModal = () => setShowCreateModal(false);
         <td className="py-2 px-4 border-b">${ticket.price}</td>
 
         {/* Display Status (Used or Available) */}
-        <td className="py-2 px-4 border-b">{ticket.used ? 'Used' : 'Available'}</td>
+        <td className="py-2 px-4 border-b">{ticket.used ? 'مستخدمة' : 'متاحة'}</td>
 
         {/* Action Buttons */}
         <td className="py-2 px-4 border-b">
-          <div className="flex justify-center items-center gap-3">
-            <button
-              onClick={() => openEditModal(ticket)}
-              className="text-blue-500 hover:text-blue-700"
-              title="Edit"
-            >
-              <FaEdit size={18} />
-            </button>
-            <button
-              onClick={() => openDeleteModal(ticket)}
-              className="text-red-500 hover:text-red-700"
-              title="Delete"
-            >
-              <FaTrash size={18} />
-            </button>
-            {!ticket.used && (
-              <button
-                onClick={() => openMarkAsUsedModal(ticket)}
-                className="text-green-500 hover:text-green-700"
-                title="Mark as Used"
-              >
-                <FaCheck size={18} />
-              </button>
-            )}
-            <button
-              onClick={() => openViewModal(ticket)}
-              className="text-gray-500 hover:text-gray-700"
-              title="View"
-            >
-              <FaEye size={18} />
-            </button>
-          </div>
-        </td>
+  <div className="flex flex-wrap justify-center items-center gap-2">
+    <button
+      onClick={() => openEditModal(ticket)}
+      className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full"
+      title="Edit"
+    >
+      <FaEdit size={16} />
+    </button>
+    <button
+      onClick={() => openDeleteModal(ticket)}
+      className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-full"
+      title="Delete"
+    >
+      <FaTrash size={16} />
+    </button>
+    {!ticket.used && (
+      <button
+        onClick={() => openMarkAsUsedModal(ticket)}
+        className="p-2 bg-green-100 hover:bg-green-200 text-green-600 rounded-full"
+        title="Mark as Used"
+      >
+        <FaCheck size={16} />
+      </button>
+    )}
+    <button
+      onClick={() => openViewModal(ticket)}
+      className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full"
+      title="View"
+    >
+      <FaEye size={16} />
+    </button>
+  </div>
+</td>
+
       </tr>
     ))}
   </tbody>
@@ -240,13 +246,13 @@ const closeCreateModal = () => setShowCreateModal(false);
 {showEditModal && selectedTicket && (
   <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
     <div className="bg-white p-6 rounded shadow-lg w-96">
-      <h2 className="text-2xl font-bold mb-4">Edit Ticket</h2>
+    <h2 className="text-2xl font-bold mb-4">تعديل التذكرة</h2>
       <input
         type="text"
         name="buyer_name"
         value={selectedTicket.buyer_name}
         onChange={handleInputChange}
-        placeholder="Buyer Name"
+        placeholder="اسم المشتري"
         className="w-full border p-2 mb-4"
       />
       <input
@@ -254,7 +260,7 @@ const closeCreateModal = () => setShowCreateModal(false);
         name="price"
         value={selectedTicket.price}
         onChange={handleInputChange}
-        placeholder="Price"
+        placeholder="السعر"
         className="w-full border p-2 mb-4"
       />
       {/* Handle Club as a number (Club ID) */}
@@ -263,7 +269,7 @@ const closeCreateModal = () => setShowCreateModal(false);
   name="club"
   value={selectedTicket.club}
   onChange={handleInputChange}
-  placeholder="Club ID"
+  placeholder="معرف النادي"
   className="w-full border p-2 mb-4"
 />
       {/* Handle Ticket Type */}
@@ -273,9 +279,9 @@ const closeCreateModal = () => setShowCreateModal(false);
         onChange={handleInputChange}
         className="w-full border p-2 mb-4"
       >
-        <option value="session">Session</option>
-        <option value="day_pass">Day Pass</option>
-        <option value="monthly">Monthly</option>
+       <option value="session">جلسة</option>
+          <option value="day_pass">تصريح يومي</option>
+          <option value="monthly">شهري</option>
         {/* Add other options as needed */}
       </select>
       {/* Handle Used as a boolean (Checkbox) */}
@@ -287,7 +293,7 @@ const closeCreateModal = () => setShowCreateModal(false);
           onChange={handleInputChange}
           className="mr-2"
         />
-        <label>Used</label>
+        <label>مستخدمة</label>
       </div>
       {/* Handle Used By as a number */}
       {selectedTicket.used && (
@@ -323,20 +329,20 @@ const closeCreateModal = () => setShowCreateModal(false);
       {showDeleteModal && selectedTicket && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white p-6 rounded shadow-lg w-80">
-            <h2 className="text-2xl font-bold mb-4">Delete Ticket</h2>
-            <p>Are you sure you want to delete "{selectedTicket.title}"?</p>
+          <h2 className="text-2xl font-bold mb-4">حذف التذكرة</h2>
+          <p>هل أنت متأكد أنك تريد حذف "{selectedTicket.title}"؟</p>
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={closeModals}
                 className="bg-gray-300 px-4 py-2 rounded"
               >
-                Cancel
+                إلغاء
               </button>
               <button
                 onClick={handleDelete}
                 className="bg-red-500 text-white px-4 py-2 rounded"
               >
-                Delete
+                حذف
               </button>
             </div>
           </div>
@@ -347,16 +353,16 @@ const closeCreateModal = () => setShowCreateModal(false);
       {showMarkAsUsedModal && selectedTicket && (
   <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
     <div className="bg-white p-6 rounded shadow-lg w-80">
-      <h2 className="text-2xl font-bold mb-4">Mark Ticket as Used</h2>
+    <h2 className="text-2xl font-bold mb-4">تحديد التذكرة كمستخدمة</h2>
       
       <div className="mb-4">
-        <label htmlFor="usedBy" className="block mb-2">Member ID:</label>
+      <label htmlFor="usedBy" className="block mb-2">معرف العضو:</label>
         <input
           type="number"
           name="used_by"
           value={selectedTicket.used_by || ""}
           onChange={handleInputChange}
-          placeholder="Enter member ID"
+          placeholder="أدخل معرف العضو"
           className="w-full border p-2 rounded"
           id="usedBy"
         />
@@ -364,13 +370,13 @@ const closeCreateModal = () => setShowCreateModal(false);
 
       <div className="flex justify-end gap-2">
         <button onClick={closeModals} className="bg-gray-300 px-4 py-2 rounded">
-          Cancel
+        إلغاء
         </button>
         <button 
           onClick={handleMarkAsUsed} 
           className="bg-green-500 text-white px-4 py-2 rounded"
         >
-          Confirm
+          تأكيد
         </button>
       </div>
     </div>
@@ -380,18 +386,18 @@ const closeCreateModal = () => setShowCreateModal(false);
 {showViewModal && selectedTicket && (
   <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
     <div className="bg-white p-6 rounded shadow-lg w-96">
-      <h2 className="text-2xl font-bold mb-4">Ticket Details</h2>
-      <p><strong>Buyer Name:</strong> {selectedTicket.buyer_name}</p>
-      <p><strong>Price:</strong> ${selectedTicket.price}</p>
-      <p><strong>Club:</strong> {selectedTicket.club_name}</p>
-      <p><strong>Ticket Type:</strong> {selectedTicket.ticket_type_display}</p>
-      <p><strong>Status:</strong> {selectedTicket.isUsed ? 'Used' : 'Available'}</p>
+    <h2 className="text-2xl font-bold mb-4">تفاصيل التذكرة</h2>
+        <p><strong>اسم المشتري:</strong> {selectedTicket.buyer_name}</p>
+        <p><strong>السعر:</strong> ${selectedTicket.price}</p>
+        <p><strong>النادي:</strong> {selectedTicket.club_name}</p>
+        <p><strong>نوع التذكرة:</strong> {selectedTicket.ticket_type_display}</p>
+        <p><strong>الحالة:</strong> {selectedTicket.isUsed ? 'مستخدمة' : 'متاحة'}</p>
       <div className="flex justify-end gap-2 mt-4">
         <button
           onClick={closeModals}
           className="bg-gray-300 px-4 py-2 rounded"
         >
-          Close
+          إغلاق
         </button>
       </div>
     </div>

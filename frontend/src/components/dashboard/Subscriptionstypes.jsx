@@ -61,29 +61,18 @@ const closeCreateModal = () => setIsCreateModalOpen(false);
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-4">Subscription Types</h1>
+      <h1 className="text-2xl font-bold mb-4">          أنواع الاشتراكات
+      </h1>
       <ul>
       <button
           onClick={openCreateModal}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
         >
-          <FaPlus /> Add New Type
+           إضافة نوع جديد<FaPlus />
         </button>
   {subscriptionTypes.map((type) => (
    <li key={type.id} className="mb-4 p-4 border-b border-gray-200 flex items-start justify-between hover:bg-gray-50 transition-colors">
-   <div className="flex flex-col">
-     <span className="text-lg font-semibold">{type.name}</span>
-     <div className="text-sm text-gray-600">
-       <p>
-         Active:{" "}
-         {type.is_active ? (
-           <span className="text-green-500">Yes</span>
-         ) : (
-           <span className="text-red-500">No</span>
-         )}
-       </p>
-     </div>
-   </div>
+ 
    <div className="flex space-x-2">
      <div className="relative group">
        <button
@@ -117,6 +106,20 @@ const closeCreateModal = () => setIsCreateModalOpen(false);
        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800  text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
          Delete
        </span>
+     </div>
+   </div>
+   <div className="flex flex-col">
+     <span className="text-lg font-semibold">{type.name}</span>
+     <div className="text-sm text-gray-600">
+     <p>
+  نشط:{" "}
+  {type.is_active ? (
+    <span className="text-green-500">نعم</span>
+  ) : (
+    <span className="text-red-500">لا</span>
+  )}
+</p>
+
      </div>
    </div>
  </li>

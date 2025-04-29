@@ -26,14 +26,15 @@ const SubscriptionTypeDetails = ({ id }) => {
   if (!subscriptionType) return <p>No data.</p>;
 
   return (
-    <div>
-      <h2>{subscriptionType.name}</h2>
-      <p>Price: {subscriptionType.price}</p>
-      <p>Duration: {subscriptionType.duration_days} days</p>
-      <p>Includes Gym: {subscriptionType.include_gym ? 'Yes' : 'No'}</p>
-      <p>Includes Pool: {subscriptionType.include_pool ? 'Yes' : 'No'}</p>
-      <p>Includes Classes: {subscriptionType.include_classes ? 'Yes' : 'No'}</p>
-    </div>
+    <div dir="rtl" className="text-right">
+    <h2 className="text-xl font-semibold mb-2">{subscriptionType.name}</h2>
+    <p>السعر: {subscriptionType.price}</p>
+    <p>المدة: {subscriptionType.duration_days} يوم</p>
+    <p>يشمل الجيم: {subscriptionType.include_gym ? 'نعم' : 'لا'}</p>
+    <p>يشمل المسبح: {subscriptionType.include_pool ? 'نعم' : 'لا'}</p>
+    <p>يشمل الحصص: {subscriptionType.include_classes ? 'نعم' : 'لا'}</p>
+  </div>
+  
   );
 };
 

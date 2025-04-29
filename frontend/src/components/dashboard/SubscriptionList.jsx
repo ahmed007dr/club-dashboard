@@ -193,94 +193,94 @@ const SubscriptionList = () => {
   return (
     <div className=" mx-auto p-6 bg-white shadow-lg rounded-lg">
       <h2 className="text-2xl font-semibold text-center text-gray-700 mb-4">
-        Subscriptions 
+      الاشتراكات
       </h2>
       <button
           onClick={() => setCreateModalOpen(true)}
           className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition"
         >
-          Add Subscription
+         إضافة اشتراك
         </button>
 
-        <div className="flex flex-wrap gap-4 my-4">
+        <div className="flex flex-wrap gap-4 my-4" dir="rtl">
   <div className="flex flex-col">
-    <label htmlFor="memberName" className="text-sm font-medium mb-1">Member Name</label>
+    <label htmlFor="memberName" className="text-sm font-medium mb-1 text-right">اسم العضو</label>
     <input
       type="text"
       id="memberName"
       name="memberName"
       value={filters.memberName}
       onChange={handleFilterChange}
-      placeholder="Search by Member Name"
-      className="border p-2 rounded"
+      placeholder="بحث باسم العضو"
+      className="border p-2 rounded text-right"
     />
   </div>
 
   <div className="flex flex-col">
-    <label htmlFor="status" className="text-sm font-medium mb-1">Status</label>
+    <label htmlFor="status" className="text-sm font-medium mb-1 text-right">الحالة</label>
     <select
       id="status"
       name="status"
       value={filters.status}
       onChange={handleFilterChange}
-      className="border p-2 rounded"
+      className="border p-2 rounded text-right"
     >
-      <option value="">All Statuses</option>
-      <option value="Active">Active</option>
-      <option value="Expired">Expired</option>
-      <option value="Pending">Pending</option>
+      <option value="">كل الحالات</option>
+      <option value="Active">نشط</option>
+      <option value="Expired">منتهي</option>
+      <option value="Pending">قيد الانتظار</option>
     </select>
   </div>
 
   <div className="flex flex-col">
-    <label htmlFor="startDate" className="text-sm font-medium mb-1">Start Date</label>
+    <label htmlFor="startDate" className="text-sm font-medium mb-1 text-right">تاريخ البدء</label>
     <input
       type="date"
       id="startDate"
       name="startDate"
       value={filters.startDate}
       onChange={handleFilterChange}
-      className="border p-2 rounded"
+      className="border p-2 rounded text-right"
     />
   </div>
 
   <div className="flex flex-col">
-    <label htmlFor="endDate" className="text-sm font-medium mb-1">End Date</label>
+    <label htmlFor="endDate" className="text-sm font-medium mb-1 text-right">تاريخ الانتهاء</label>
     <input
       type="date"
       id="endDate"
       name="endDate"
       value={filters.endDate}
       onChange={handleFilterChange}
-      className="border p-2 rounded"
+      className="border p-2 rounded text-right"
     />
   </div>
 
-  {/* Add club ID filter */}
+  {/* Club ID filter in Arabic */}
   <div className="flex flex-col">
-    <label htmlFor="clubId" className="text-sm font-medium mb-1">Club ID</label>
+    <label htmlFor="clubId" className="text-sm font-medium mb-1 text-right">معرف النادي</label>
     <input
       type="number"
       id="clubId"
       name="clubId"
       value={filters.clubId}
       onChange={handleFilterChange}
-      placeholder="Filter by Club ID"
-      className="border p-2 rounded"
+      placeholder="تصفية حسب معرف النادي"
+      className="border p-2 rounded text-right"
       min="1"
     />
   </div>
 
   <div className="flex flex-col">
-    <label htmlFor="attendanceDays" className="text-sm font-medium mb-1">Attendance Days</label>
+    <label htmlFor="attendanceDays" className="text-sm font-medium mb-1 text-right">أيام الحضور</label>
     <input
       type="number"
       id="attendanceDays"
       name="attendanceDays"
       value={filters.attendanceDays}
       onChange={handleFilterChange}
-      placeholder="Filter by Attendance Days"
-      className="border p-2 rounded"
+      placeholder="تصفية حسب أيام الحضور"
+      className="border p-2 rounded text-right"
       min="0"
     />
   </div>
@@ -290,7 +290,7 @@ const SubscriptionList = () => {
       onClick={resetFilters}
       className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2 px-4 rounded"
     >
-      Reset
+      إعادة تعيين
     </button>
   </div>
 </div>
@@ -302,17 +302,17 @@ const SubscriptionList = () => {
   ) : (
     <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
       <thead className="bg-gray-100">
-        <tr>
-          <th className="py-2 px-4 text-left">Member</th>
-          <th className="py-2 px-4 text-left">Club </th>
-          <th className="py-2 px-4 text-left">Start Date</th>
-          <th className="py-2 px-4 text-left">End Date</th>
-          <th className="py-2 px-4 text-left">Paid Amount</th>
-          <th className="py-2 px-4 text-left">Remaining Amount</th>
-          <th className="py-2 px-4 text-left">Status</th>
-          <th className="py-2 px-4 text-left">Payment</th>
-          <th className="py-2 px-4 text-left">Actions</th>
-        </tr>
+      <tr>
+  <th className="py-2 px-4 text-right">العضو</th>
+  <th className="py-2 px-4 text-right">النادي</th>
+  <th className="py-2 px-4 text-right">تاريخ البدء</th>
+  <th className="py-2 px-4 text-right">تاريخ الانتهاء</th>
+  <th className="py-2 px-4 text-right">المبلغ المدفوع</th>
+  <th className="py-2 px-4 text-right">المبلغ المتبقي</th>
+  <th className="py-2 px-4 text-right">الحالة</th>
+  <th className="py-2 px-4 text-right">الدفع</th>
+  <th className="py-2 px-4 text-right">الإجراءات</th>
+</tr>
       </thead>
       <tbody>
         {filteredSubscriptions.map((subscription) => (

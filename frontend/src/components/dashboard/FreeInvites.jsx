@@ -202,7 +202,7 @@ const InviteList = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-2xl font-bold text-gray-800">Free Invites</h1>
+      <h1 className="text-2xl font-bold text-gray-800">الدعوات المجانية</h1>
         <button 
           onClick={() => setShowAddModal(true)}
           className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center"
@@ -210,7 +210,7 @@ const InviteList = () => {
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
           </svg>
-          Add New Invite
+          دعوة جديدة
         </button>
       </div>
 
@@ -223,11 +223,11 @@ const InviteList = () => {
                 {getStatusBadge(invite.status)}
               </div>
               <div className="mt-4 space-y-2 text-sm text-gray-600">
-                <p><span className="font-medium">Phone:</span> {invite.phone}</p>
-                <p><span className="font-medium">Date:</span> {new Date(invite.date).toLocaleDateString()}</p>
-                <p><span className="font-medium">Club:</span> {invite.club_details?.name || 'N/A'}</p>
-                <p><span className="font-medium">Location:</span> {invite.club_details?.location || 'N/A'}</p>
-              </div>
+            <p><span className="font-medium">الهاتف:</span> {invite.phone}</p>
+            <p><span className="font-medium">التاريخ:</span> {new Date(invite.date).toLocaleDateString()}</p>
+            <p><span className="font-medium">النادي:</span> {invite.club_details?.name || 'غير متوفر'}</p>
+            <p><span className="font-medium">الموقع:</span> {invite.club_details?.location || 'غير متوفر'}</p>
+          </div>
             </div>
             <div className="bg-gray-50 px-6 py-3 flex justify-end space-x-2">
               <button
@@ -265,7 +265,7 @@ const InviteList = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="flex justify-between items-center border-b px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-800">Add New Invite</h3>
+            <h3 className="text-lg font-semibold text-gray-800">إضافة دعوة جديدة</h3>
               <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-500">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -274,7 +274,7 @@ const InviteList = () => {
             </div>
             <form onSubmit={handleAddInvite} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Club ID</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">معرّف النادي</label>
                 <input
                   type="number"
                   name="club"
@@ -287,7 +287,7 @@ const InviteList = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Guest Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">اسم الضيف</label>
                 <input
                   type="text"
                   name="guest_name"
@@ -300,7 +300,7 @@ const InviteList = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">رقم الهاتف</label>
                 <input
                   type="text"
                   name="phone"
@@ -313,7 +313,7 @@ const InviteList = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">التاريخ</label>
                 <input
                   type="date"
                   name="date"
@@ -326,7 +326,7 @@ const InviteList = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">الحالة</label>
                 <select
                   name="status"
                   value={formData.status}
@@ -341,7 +341,7 @@ const InviteList = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Invited By (Member ID)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">بدعوة من (معرّف العضو)</label>
                 <input
                   type="number"
                   name="invited_by"
@@ -357,13 +357,13 @@ const InviteList = () => {
                   onClick={() => setShowAddModal(false)}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
-                  Cancel
+                  إلغاء
                 </button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
                 >
-                  Save Invite
+                  حفظ الدعوة
                 </button>
               </div>
             </form>
@@ -378,7 +378,7 @@ const InviteList = () => {
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
     <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
       <div className="flex justify-between items-center border-b px-6 py-4">
-        <h3 className="text-lg font-semibold text-gray-800">Mark as Used</h3>
+        <h3 className="text-lg font-semibold text-gray-800">تحديد كمستخدم</h3>
         <button 
           onClick={() => setShowMarkUsedModal(false)} 
           className="text-gray-400 hover:text-gray-500"
@@ -390,7 +390,7 @@ const InviteList = () => {
       </div>
       <form onSubmit={handleMarkAsUsed} className="p-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Member ID (Used By) *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">رقم العضو (المستخدم من قبله) </label>
           <input
             type="number"
             name="used_by"
@@ -409,13 +409,13 @@ const InviteList = () => {
             onClick={() => setShowMarkUsedModal(false)}
             className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
           >
-            Cancel
+            إلغاء
           </button>
           <button
             type="submit"
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
-            Mark as Used
+            تحديد كمستخدم
           </button>
         </div>
       </form>
@@ -428,7 +428,7 @@ const InviteList = () => {
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
     <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
       <div className="flex justify-between items-center border-b px-6 py-4">
-        <h3 className="text-lg font-semibold text-gray-800">Edit Invite</h3>
+        <h3 className="text-lg font-semibold text-gray-800">تعديل الدعوة</h3>
         <button 
           onClick={() => setShowEditModal(false)} 
           className="text-gray-400 hover:text-gray-500"
@@ -440,7 +440,7 @@ const InviteList = () => {
       </div>
       <form onSubmit={handleEditInvite} className="p-6 space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Club ID *</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">رقم النادي *</label>
           <input
             type="number"
             name="club"
@@ -454,7 +454,7 @@ const InviteList = () => {
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Guest Name *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">اسم الضيف *</label>
           <input
             type="text"
             name="guest_name"
@@ -467,7 +467,7 @@ const InviteList = () => {
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">رقم الهاتف *</label>
           <input
             type="text"
             name="phone"
@@ -480,7 +480,7 @@ const InviteList = () => {
         </div>
         
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">التاريخ *</label>
           <input
             type="date"
             name="date"
@@ -490,7 +490,7 @@ const InviteList = () => {
             required
           />
            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status *</label>
+           <label className="block text-sm font-medium text-gray-700 mb-1">الحالة *</label>
                 <select
                   name="status"
                   value={formData.status}
@@ -506,7 +506,7 @@ const InviteList = () => {
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Invited By (Member ID)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">الدعوة من قبل (رقم العضو)</label>
                 <input
                   type="number"
                   name="invited_by"
@@ -515,7 +515,7 @@ const InviteList = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   min="1"
                 />
-                <p className="mt-1 text-xs text-gray-500">Optional - leave blank if not applicable</p>
+                <p className="mt-1 text-xs text-gray-500">اختياري - اتركه فارغًا إذا لم يكن ذلك ممكنًا</p>
               </div>
               
           {formErrors.date && <p className="mt-1 text-sm text-red-600">{formErrors.date}</p>}
@@ -527,13 +527,13 @@ const InviteList = () => {
             onClick={() => setShowEditModal(false)}
             className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
           >
-            Cancel
+            إلغاء
           </button>
           <button
             type="submit"
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
           >
-            Save Changes
+            حفظ التغييرات
           </button>
         </div>
       </form>
@@ -546,7 +546,7 @@ const InviteList = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="flex justify-between items-center border-b px-6 py-4">
-              <h3 className="text-lg font-semibold text-gray-800">Confirm Delete</h3>
+            <h3 className="text-lg font-semibold text-gray-800">تأكيد الحذف</h3>
               <button onClick={() => setShowDeleteModal(false)} className="text-gray-400 hover:text-gray-500">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -554,19 +554,20 @@ const InviteList = () => {
               </button>
             </div>
             <div className="p-6">
-              <p className="text-gray-600 mb-6">Are you sure you want to delete this invite? This action cannot be undone.</p>
+            <p className="text-gray-600 mb-6">هل أنت متأكد أنك تريد حذف هذه الدعوة؟ لا يمكن التراجع عن هذا الإجراء.</p>
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setShowDeleteModal(false)}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
-                  Cancel
+                  إلغاء
                 </button>
                 <button
                   onClick={handleDeleteInvite}
                   className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
                 >
-                  Delete
+                  
+            حذف
                 </button>
               </div>
             </div>
