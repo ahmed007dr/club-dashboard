@@ -50,7 +50,7 @@ const AddMember = () => {
     
     // try { //http://127.0.0.1:8000/members/api/members/create/
     //   console.log(form);
-    //   const response = await fetch('http://127.0.0.1:8000/members/api/members/create/', {
+    //   const response = await fetch(`${BASE_URL}/members/api/members/create/`, {
     //     method: 'POST',
     //     headers: {
     //       Authorization: `Token ${token}`,
