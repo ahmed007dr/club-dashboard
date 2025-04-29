@@ -7,6 +7,8 @@ import {
   markTicketAsUsed,
 } from '../../redux/slices/ticketsSlice';
 import { FaEdit, FaTrash, FaCheck, FaEye } from "react-icons/fa"
+import { FaPlus } from 'react-icons/fa';
+
 import AddTicket from './AddTicket';
 const Tickets = () => {
   const dispatch = useDispatch();
@@ -17,7 +19,9 @@ const Tickets = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showMarkAsUsedModal, setShowMarkAsUsedModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
-
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const openCreateModal = () => setShowCreateModal(true);
+const closeCreateModal = () => setShowCreateModal(false);
   const openViewModal = (ticket) => {
     setSelectedTicket(ticket);
     setShowViewModal(true);
@@ -132,9 +136,15 @@ const Tickets = () => {
 
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Ticket List</h1>
-
-      <AddTicket />
+     <div className="flex justify-between items-center mb-6">
+  <h1 className="text-3xl font-bold">Ticket List</h1>
+  <button
+    onClick={openCreateModal}
+    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+  >
+    <FaPlus /> Add New Ticket
+  </button>
+</div>
       <table className="min-w-full bg-white shadow rounded">
   <thead>
     <tr>
@@ -207,7 +217,24 @@ const Tickets = () => {
     ))}
   </tbody>
 </table>
-
+{showCreateModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+      <div className="flex justify-between items-center border-b p-4">
+        <h2 className="text-xl font-semibold">Create New Ticket</h2>
+        <button
+          onClick={closeCreateModal}
+          className="text-gray-500 hover:text-gray-700"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="p-4">
+        <AddTicket onClose={closeCreateModal} />
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Edit Modal */}
 {showEditModal && selectedTicket && (

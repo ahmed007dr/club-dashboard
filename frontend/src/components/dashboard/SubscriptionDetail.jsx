@@ -1,52 +1,60 @@
-// components/subscriptions/SubscriptionDetailModal.js
-import React, { useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { fetchSubscriptionById } from '../../redux/slices/subscriptionsSlice';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 
 const SubscriptionDetail = ({ isOpen, onClose, subscriptionId }) => {
-    if (!isOpen) return null;
-
-  console.log('Detail modal opened for ID:', subscriptionId);
-  const dispatch = useDispatch();
-  const { subscriptionDetail, status, error } = useSelector(
-    (state) => state.subscriptions
-  );
+  const [subscription, setSubscription] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (isOpen && subscriptionId) {
-      dispatch(fetchSubscriptionById(subscriptionId));
+      fetchSubscriptionDetail();
     }
-  }, [dispatch, isOpen, subscriptionId]);
+  }, [isOpen, subscriptionId]);
+
+  const fetchSubscriptionDetail = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(`http://localhost:4000/api/subscriptions/${subscriptionId}`);
+      setSubscription(response.data); // Adjust according to your backend response shape
+    } catch (err) {
+      setError('Failed to fetch subscription details.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white p-6 rounded-lg max-w-lg w-full">
-        <h2 className="text-xl font-semibold mb-4">Subscription Details</h2>
-
-        {status === 'loading' ? (
-          <p>Loading...</p>
-        ) : status === 'failed' ? (
-          <p className="text-red-500">Error: {error}</p>
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50">
+      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-2xl">
+        <h2 className="text-2xl font-bold mb-4">Subscription Details</h2>
+        {loading ? (
+          <div className="text-center text-gray-500">Loading...</div>
+        ) : error ? (
+          <div className="text-center text-red-500">{error}</div>
+        ) : subscription ? (
+          <div className="space-y-2">
+            <p><strong>Member Name:</strong> {subscription.member_name}</p>
+            <p><strong>Subscription Type:</strong> {subscription.type.name}</p>
+            <p><strong>Start Date:</strong> {subscription.start_date}</p>
+            <p><strong>End Date:</strong> {subscription.end_date}</p>
+            <p><strong>Paid Amount:</strong> ${subscription.paid_amount}</p>
+            <p><strong>Remaining Amount:</strong> ${subscription.remaining_amount}</p>
+            <p><strong>Attendance Days:</strong> {subscription.attendance_days}</p>
+            <p><strong>Status:</strong> {subscription.status}</p>
+            <p><strong>Club Name:</strong> {subscription.club_name}</p>
+            {/* Add more fields if needed */}
+          </div>
         ) : (
-          subscriptionDetail && (
-            <div className="space-y-2">
-              <p><strong>Member:</strong> {subscriptionDetail.member.name}</p>
-              <p><strong>Type:</strong> {subscriptionDetail.type.name}</p>
-              <p><strong>Start Date:</strong> {subscriptionDetail.start_date}</p>
-              <p><strong>End Date:</strong> {subscriptionDetail.end_date}</p>
-              <p><strong>Paid Amount:</strong> ${subscriptionDetail.paid_amount}</p>
-              <p><strong>Remaining Amount:</strong> ${subscriptionDetail.remaining_amount}</p>
-              <p><strong>Attendance Days:</strong> {subscriptionDetail.attendance_days}</p>
-            </div>
-          )
+          <div className="text-center text-gray-500">No details available.</div>
         )}
-
-        <div className="mt-4 text-right">
+        <div className="mt-6 flex justify-end">
           <button
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
             onClick={onClose}
+            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
           >
             Close
           </button>
@@ -57,3 +65,4 @@ const SubscriptionDetail = ({ isOpen, onClose, subscriptionId }) => {
 };
 
 export default SubscriptionDetail;
+

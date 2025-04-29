@@ -3,9 +3,6 @@ import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import axios from 'axios';
 
 
-
-
-
 export const fetchSubscriptionTypes = createAsyncThunk(
   'subscriptionTypes/fetch',
   async (_, { rejectWithValue }) => {
@@ -744,7 +741,15 @@ const subscriptionsSlice = createSlice({
       })
       .addCase(makePayment.fulfilled, (state, action) => {
         state.loading = false;
-        state.subscriptions.remaining_amount= action.payload.remaining_amount; // Update the remaining amount in the subscription
+        state.paymentStatus = 'succeeded'; // Optionally set payment status to succeeded
+      
+        // Find the subscription in the subscriptions array and update its remaining_amount
+        const updatedSubscription = state.subscriptions.find(
+          (subscription) => subscription.id === action.payload.subscriptionId
+        );
+        if (updatedSubscription) {
+          updatedSubscription.remaining_amount = action.payload.remaining_amount;
+        }
       })
       .addCase(makePayment.rejected, (state, action) => {
         console.error("Payment Error: ", action.payload);

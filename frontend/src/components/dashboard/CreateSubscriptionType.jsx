@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { addSubscriptionType } from '../../redux/slices/subscriptionsSlice';
 
-const CreateSubscription = () => {
+const CreateSubscriptionTypes  = () => {
   const dispatch = useDispatch();
   const [formData, setFormData] = useState({
     name: '',
@@ -163,6 +163,6 @@ const CreateSubscription = () => {
   );
 };
 
-export default CreateSubscription;
+export default CreateSubscriptionTypes ;       
 
 

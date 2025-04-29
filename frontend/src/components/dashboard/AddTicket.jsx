@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { addTicket } from '../../redux/slices/ticketsSlice';
 
-const AddTicket = () => {
+const AddTicket = ({ onClose }) => {
   const dispatch = useDispatch();
 
   const [clubNumber, setClubNumber] = useState('');
@@ -54,7 +54,13 @@ const AddTicket = () => {
   return (
     <div className="max-w-xl mx-auto mt-8 p-6 bg-white shadow-md rounded-md">
       <h2 className="text-2xl font-semibold mb-4">Add New Ticket</h2>
-
+      <button
+          type="button"
+          className="px-4 py-2 border rounded-md"
+          onClick={onClose}
+        >
+          Cancel
+        </button>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       {successMessage && <p className="text-green-500 mb-4">{successMessage}</p>}
 
