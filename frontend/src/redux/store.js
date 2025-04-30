@@ -12,6 +12,7 @@ import receiptsReducer from './slices/receiptsSlice';
 
 import entryLogsSlice from './slices/EntryLogsSlice';
 import staffSlice from './slices/staff';
+import financeSlice from './slices/financeSlice';
 const store = configureStore({
   reducer: {
     ui: uiReducer, 
@@ -25,7 +26,7 @@ const store = configureStore({
     invites: invitesReducer,
     entryLog: entryLogSlice.reducer,
     receipts: receiptsReducer,
-
+    finance:financeSlice.reducer,
   },
 });
 
