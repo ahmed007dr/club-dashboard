@@ -23,42 +23,43 @@ const Dashboard = () => {
 
   const navItems = [
     {
-      name: 'Dashboard',
+      name: 'لوحة التحكم',
       icon: <MdOutlineDashboard />,
       children: [
-        { path: '', name: 'Main', icon: <IoMdAnalytics /> },
-        { path: 'profile', name: 'Profile', icon: <BsPersonBoundingBox /> },
+        { path: '', name: 'الرئيسية', icon: <IoMdAnalytics /> },
+        { path: 'profile', name: 'الملف الشخصي', icon: <BsPersonBoundingBox /> },
       ],
     },
     {
-      name: 'Membership',
+      name: 'العضوية',
       icon: <FiUsers />,
       children: [
-        { path: 'members', name: 'Members', icon: <RiGroupLine /> },
-        { path: 'attendance', name: 'Attendance', icon: <AiOutlineSchedule /> },
-        { path: 'free-invites', name: 'Free Invites', icon: <RiVipCrown2Line /> },
-        { path: 'leads', name: 'Leads', icon: <GiTeamIdea /> },
-        { path: 'subscriptions', name: 'Subscription', icon: <MdOutlineSubscriptions /> },
+        { path: 'members', name: 'الأعضاء', icon: <RiGroupLine /> },
+        { path: 'attendance', name: 'الحضور', icon: <AiOutlineSchedule /> },
+        { path: 'free-invites', name: 'الدعوات المجانية', icon: <RiVipCrown2Line /> },
+        { path: 'leads', name: 'العملاء المحتملين', icon: <GiTeamIdea /> },
+        { path: 'subscriptions', name: 'الاشتراكات', icon: <MdOutlineSubscriptions /> },
       ],
     },
     {
-      name: 'Management',
+      name: 'الإدارة',
       icon: <FaRegBuilding />,
       children: [
-        { path: 'staff', name: 'Staff', icon: <RiUserLine /> },
-        { path: 'club', name: 'Club', icon: <HiOutlineDocumentReport /> },
-        { path: 'tickets', name: 'Tickets', icon: <GiTicket /> },
+        { path: 'staff', name: 'الموظفون', icon: <RiUserLine /> },
+        { path: 'club', name: 'النادي', icon: <HiOutlineDocumentReport /> },
+        { path: 'tickets', name: 'التذاكر', icon: <GiTicket /> },
       ],
     },
     {
-      name: 'Accounting',
+      name: 'المحاسبة',
       icon: <TbMoneybag />,
       children: [
-        { path: 'finance', name: 'Finance', icon: <GiMoneyStack /> },
-        { path: 'receipts', name: 'Receipts', icon: <HiOutlineDocumentReport /> },
+        { path: 'finance', name: 'المالية', icon: <GiMoneyStack /> },
+        { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
       ],
     },
   ];
+  
 
   return (
     <div className="flex h-screen overflow-hidden">
