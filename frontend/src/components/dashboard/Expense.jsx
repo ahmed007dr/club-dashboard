@@ -1,12 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { CiEdit, CiTrash } from 'react-icons/ci'; // Icons for Edit and Delete
-import { useDispatch, useSelector } from 'react-redux';
+import React, { useState, useEffect } from "react";
+import { CiEdit, CiTrash } from "react-icons/ci"; // Icons for Edit and Delete
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Plus } from "lucide-react";
+import { useDispatch, useSelector } from "react-redux";
 import {
   fetchExpenses,
   updateExpense,
   addExpense,
   deleteExpense,
-} from '../../redux/slices/financeSlice';
+} from "../../redux/slices/financeSlice";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/DropdownMenu";
+import { MoreVertical } from "lucide-react";
 
 const Expense = () => {
   const dispatch = useDispatch();
@@ -22,6 +34,10 @@ const Expense = () => {
     invoice_number: "",
     attachment: null,
   });
+
+  // State for confirmation modal
+  const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState(null);
 
   // Fetch expenses from the backend
   const { expenses, loading, error } = useSelector((state) => state.finance);
@@ -61,7 +77,6 @@ const Expense = () => {
         invoice_number: currentExpense.invoice_number || "",
         attachment: currentExpense.attachment || null,
       };
-
       // Dispatch the update action
       dispatch(updateExpense({ id: currentExpense.id, updatedData: payload }))
         .unwrap()
@@ -69,7 +84,7 @@ const Expense = () => {
           setShowModal(false); // Close modal after successful update
         })
         .catch((err) => {
-          console.error("Failed to update expense:", err);
+          console.error("فشل في تحديث المصروف:", err);
         });
     } else {
       // Dispatch the add action
@@ -89,7 +104,7 @@ const Expense = () => {
           setShowModal(false); // Close modal after successful addition
         })
         .catch((err) => {
-          console.error("Failed to add expense:", err);
+          console.error("فشل في إضافة المصروف:", err);
         });
     }
   };
@@ -117,128 +132,195 @@ const Expense = () => {
     setShowModal(true);
   };
 
-  // Delete an expense
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to delete this expense?")) {
-      dispatch(deleteExpense(id))
+  // Confirm delete modal logic
+  const handleDeleteClick = (id) => {
+    setExpenseToDelete(id);
+    setConfirmDeleteModal(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (expenseToDelete) {
+      dispatch(deleteExpense(expenseToDelete))
         .unwrap()
         .then(() => {
-          console.log("Expense deleted successfully");
+          console.log("تم حذف المصروف بنجاح");
+          setConfirmDeleteModal(false); // Close modal after deletion
         })
         .catch((err) => {
-          console.error("Failed to delete expense:", err);
+          console.error("فشل في حذف المصروف:", err);
         });
     }
   };
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <h2 className="text-2xl font-bold mb-4">Expense List</h2>
+    <div className="p-6 space-y-6" dir="rtl">
+      {/* Tabs */}
+      <Tabs defaultValue="expenses" dir="rtl">
+        {/* Expenses Tab */}
+        <TabsContent value="expenses" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-right">جميع المصروفات</CardTitle>
+              <CardDescription className="text-right">
+                إدارة جميع المصروفات
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Add Expense Button */}
+              <Button
+                onClick={handleAddClick}
+                className="flex items-center justify-start"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                إضافة مصروف
+              </Button>
 
-      {/* Loading State */}
-      {loading && <p className="text-lg text-gray-600">Loading...</p>}
+              {/* Loading State */}
+              {loading && (
+                <p className="text-lg text-gray-600 text-right">
+                  جاري التحميل...
+                </p>
+              )}
 
-      {/* Error State */}
-      {error && <p className="text-lg text-red-600">Error: {error}</p>}
+              {/* Error State */}
+              {error && (
+                <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
+              )}
 
-      {/* Add Button */}
-      <button
-        onClick={handleAddClick}
-        className="mb-4 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-      >
-        + Add Expense
-      </button>
-
-      {/* Table */}
-      <div className="overflow-x-auto rounded-lg shadow border border-gray-200">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="text-gray-700 text-left text-sm">
-            <tr>
-              <th className="px-4 py-2">Club</th>
-              <th className="px-4 py-2">Category</th>
-              <th className="px-4 py-2">Amount</th>
-              <th className="px-4 py-2">Description</th>
-              <th className="px-4 py-2">Date</th>
-              <th className="px-4 py-2">Paid By</th>
-              <th className="px-4 py-2">Invoice #</th>
-              <th className="px-4 py-2">Attachment</th>
-              <th className="px-4 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="text-sm divide-y divide-gray-100">
-            {expenses.map((expense, index) => (
-              <tr key={index} className="hover:bg-gray-50">
-                <td className="px-4 py-2">{expense.club || "N/A"}</td>
-                <td className="px-4 py-2">{expense.category || "N/A"}</td>
-                <td className="px-4 py-2">{expense.amount ? `${expense.amount} EGP` : "N/A"}</td>
-                <td className="px-4 py-2">{expense.description || "N/A"}</td>
-                <td className="px-4 py-2">{expense.date || "N/A"}</td>
-                <td className="px-4 py-2">{expense.paid_by || "N/A"}</td>
-                <td className="px-4 py-2">{expense.invoice_number || "N/A"}</td>
-                <td className="px-4 py-2 text-blue-500 underline cursor-pointer">
-                  {expense.attachment || "No Attachment"}
-                </td>
-                <td className="px-4 py-2 flex gap-2">
-                  <button
-                    onClick={() => handleEditClick(expense)}
-                    className="text-green-500 hover:text-green-700"
-                  >
-                    <CiEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(expense.id)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <CiTrash />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+              {/* Table */}
+              <div className="rounded-md border" dir="rtl">
+                <table className="min-w-full divide-y divide-border">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="px-4 py-3 text-right text-sm font-medium">
+                        النادي
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium">
+                        الفئة
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium">
+                        المبلغ
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium">
+                        الوصف
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium">
+                        التاريخ
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium">
+                        المدفوع من قبل
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium">
+                        رقم الفاتورة
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium">
+                        المرفق
+                      </th>
+                      <th className="px-4 py-3 text-right text-sm font-medium">
+                        الإجراءات
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border bg-background">
+                    {expenses.map((expense, index) => (
+                      <tr key={index} className="hover:bg-gray-100 transition">
+                        <td className="px-4 py-3 text-sm">
+                          {expense.club || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.category || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.amount
+                            ? `${expense.amount} جنيه`
+                            : "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.description || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.date || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.paid_by || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.invoice_number || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-blue-500 underline cursor-pointer">
+                          {expense.attachment || "لا يوجد مرفق"}
+                        </td>
+                        <td className="px-4 py-3 text-sm flex justify-end">
+                          <DropdownMenu dir="rtl">
+                            <DropdownMenuTrigger asChild>
+                              <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                              <MoreVertical className="h-5 w-5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem
+                                onClick={() => handleEditClick(expense)}
+                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                              >
+                                تعديل
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteClick(expense.id)}
+                                className="cursor-pointer text-red-600 hover:bg-red-50"
+                              >
+                                حذف
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Add/Edit Modal */}
       {showModal && (
         <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
+          className="fixed inset-0 z-40 flex justify-center items-center  bg-opacity-50"
           onClick={() => setShowModal(false)} // Close modal when clicking outside
         >
           <div
             className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
             onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking inside
           >
-            <h3 className="text-xl font-semibold mb-4">
-              {currentExpense ? "Edit Expense" : "Add Expense"}
+            <h3 className="text-xl font-semibold mb-4 text-right">
+              {currentExpense ? "تعديل المصروف" : "إضافة مصروف"}
             </h3>
             <div className="grid grid-cols-1 gap-4">
               {[
-                "club",
-                "category",
-                "amount",
-                "description",
-                "date",
-                "paid_by",
-                "invoice_number",
-                "attachment",
-              ].map((field) => (
-                <div key={field}>
-                  <label className="block text-sm font-medium capitalize mb-1">
-                    {field.replace("_", " ")}
+                { label: "النادي", name: "club" },
+                { label: "الفئة", name: "category" },
+                { label: "المبلغ", name: "amount", type: "number" },
+                { label: "الوصف", name: "description" },
+                { label: "التاريخ", name: "date", type: "date" },
+                { label: "المدفوع من قبل", name: "paid_by" },
+                { label: "رقم الفاتورة", name: "invoice_number" },
+                { label: "المرفق", name: "attachment" },
+              ].map(({ label, name, type = "text" }) => (
+                <div key={name}>
+                  <label className="block text-sm font-medium capitalize mb-1 text-right">
+                    {label}
                   </label>
                   <input
-                    type={
-                      field === "amount"
-                        ? "number"
-                        : field === "date"
-                        ? "date"
-                        : "text"
+                    type={type}
+                    name={name}
+                    value={
+                      currentExpense
+                        ? currentExpense[name] || ""
+                        : newExpense[name] || ""
                     }
-                    name={field}
-                    value={currentExpense ? currentExpense[field] || "" : newExpense[field] || ""}
                     onChange={handleChange}
-                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200"
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
                   />
                 </div>
               ))}
@@ -248,13 +330,47 @@ const Expense = () => {
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
               >
-                Cancel
+                إلغاء
               </button>
               <button
                 onClick={handleSave}
                 className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
               >
-                Save
+                حفظ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Delete Modal */}
+      {confirmDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex justify-center items-center  bg-opacity-50"
+          onClick={() => setConfirmDeleteModal(false)} // Close modal when clicking outside
+        >
+          <div
+            className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md"
+            onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking inside
+          >
+            <h3 className="text-lg font-semibold mb-4 text-right">
+              تأكيد الحذف
+            </h3>
+            <p className="text-sm text-right mb-4">
+              هل أنت متأكد من حذف هذا المصروف؟
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDeleteModal(false)}
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              >
+                لا
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                نعم
               </button>
             </div>
           </div>

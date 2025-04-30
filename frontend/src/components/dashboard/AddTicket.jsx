@@ -61,8 +61,7 @@ const AddTicket = ({ onClose }) => {
         >
           Cancel
         </button>
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-      {successMessage && <p className="text-green-500 mb-4">{successMessage}</p>}
+    
 
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
@@ -94,18 +93,21 @@ const AddTicket = ({ onClose }) => {
         </div>
 
         <div className="mb-4">
-          <label htmlFor="ticket_type" className="block text-sm font-medium text-gray-700">
-            Ticket Type
-          </label>
-          <input
-            type="text"
-            id="ticket_type"
-            value={ticketType}
-            onChange={(e) => setTicketType(e.target.value)}
-            className="w-full mt-1 p-2 border border-gray-300 rounded-md"
-            placeholder="Enter ticket type"
-          />
-        </div>
+  <label htmlFor="ticket_type" className="block text-sm font-medium text-gray-700">
+    Ticket Type
+  </label>
+  <select
+    id="ticket_type"
+    value={ticketType}
+    onChange={(e) => setTicketType(e.target.value)}
+    className="w-full mt-1 p-2 border border-gray-300 rounded-md"
+  >
+    <option value="">Select ticket type</option>
+    <option value="Session">Session</option>
+    <option value="Day Pass">Day Pass</option>
+  </select>
+</div>
+
 
         <div className="mb-4">
           <label htmlFor="price" className="block text-sm font-medium text-gray-700">
