@@ -3,6 +3,7 @@ import img from '../../images/img.png';
 import { toast } from 'react-hot-toast';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom'; // Assuming you're using React Router
+import BASE_URL from '../../config/api';
 
 const Login = () => {
   const [username, setUsername] = useState('');
@@ -15,7 +16,7 @@ const Login = () => {
     setLoading(true);
   
     try {
-      const response = await axios.post('http://127.0.0.1:8000/accounts/api/login/', {
+      const response = await axios.post(`${BASE_URL}/accounts/api/login/`, {
         username,
         password,
       });
