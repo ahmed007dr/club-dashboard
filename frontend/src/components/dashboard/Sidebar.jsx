@@ -28,7 +28,7 @@ const Sidebar = ({ navItems, sidebarOpen, closeSidebar }) => {
         className={`fixed z-20 top-0 left-0 md:relative transform ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0 w-64 h-full border-r border-gray-200 transition-transform duration-300 ease-in-out max-sm:bg-gray-100  `}
-      >
+        dir="rtl">
         <div className="h-full flex flex-col">
           {/* Logo only on small screens */}
           <div className="p-4 border-b border-gray-200 flex items-center justify-between sm:hidden">

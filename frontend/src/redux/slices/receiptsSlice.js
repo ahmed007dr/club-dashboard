@@ -59,17 +59,27 @@ export const addReceipt = createAsyncThunk(
 export const fetchReceiptByInvoice = createAsyncThunk(
   'receipts/fetchByInvoice',
   async (invoiceNumber, { rejectWithValue }) => {
+    const normalizedInvoice = invoiceNumber.toUpperCase();
+    const invoiceRegex = /^INV\d{8}-\d{4}$/;
+
+    if (!normalizedInvoice || !invoiceRegex.test(normalizedInvoice)) {
+      return rejectWithValue('Invalid invoice number format. Expected format: INVYYYYMMDD-NNNN (e.g., INV20250429-0003)');
+    }
+
     try {
-      const response = await axios.get(`${API_BASE_URL}/receipts/invoice/${invoiceNumber}/`, {
+      const response = await axios.get(`${API_BASE_URL}/receipts/invoice/${normalizedInvoice}/`, {
         headers: getAuthHeaders(),
       });
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('Fetched receipt by invoice:', response.data);
-      }
       return response.data;
     } catch (error) {
+      const status = error.response?.status;
+      if (status === 404) {
+        // Gracefully handle not found
+        return null; // or return a specific object like { message: "Not found" }
+      }
+
       console.error('Error fetching receipt by invoice:', error.response?.data || error.message);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue('Something went wrong while fetching the receipt');
     }
   }
 );
@@ -161,20 +171,28 @@ const receiptsSlice = createSlice({
         state.error = action.error.message;
       })
       
-      // Fetch by invoice
       .addCase(fetchReceiptByInvoice.pending, (state) => {
         state.status = 'loading';
+        state.error = null;
+        state.message = null;
       })
-      // In your receiptsSlice.js
-.addCase(fetchReceiptByInvoice.fulfilled, (state, action) => {
-  state.status = 'succeeded';
-  // Convert single object to array if needed
-  state.receipts = Array.isArray(action.payload) ? action.payload : [action.payload];
-  state.error = null;
-})
+  
+      // Fulfilled state
+      .addCase(fetchReceiptByInvoice.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        if (action.payload === null) {
+          state.message = 'No receipt found for this invoice number.';
+          state.receipt = null;
+        } else {
+          state.receipt = action.payload;
+          state.message = null;
+        }
+      })
+  
+      // Rejected state
       .addCase(fetchReceiptByInvoice.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload || action.error.message;
       })
       
       // Fetch by ID
