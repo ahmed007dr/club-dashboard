@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchExpenseCategories,
@@ -19,7 +19,7 @@ const ExpenseCategory = () => {
   const dispatch = useDispatch();
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
-    club: "",
+    club: "", // Will store club ID (string for form, parsed to number for API)
     name: "",
     description: "",
   });
@@ -42,6 +42,20 @@ const ExpenseCategory = () => {
     dispatch(fetchExpenseCategories());
   }, [dispatch]);
 
+  // Extract unique clubs from expenseCategories
+  const uniqueClubs = useMemo(() => {
+    const clubsMap = new Map();
+    expenseCategories.forEach((category) => {
+      if (category.club_details) {
+        clubsMap.set(category.club_details.id, {
+          id: category.club_details.id,
+          name: category.club_details.name,
+        });
+      }
+    });
+    return Array.from(clubsMap.values());
+  }, [expenseCategories]);
+
   // Handle input changes for form
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -59,7 +73,7 @@ const ExpenseCategory = () => {
   // Validate form data
   const validate = () => {
     const newErrors = {};
-    if (!formData.club.trim()) newErrors.club = "النادي مطلوب.";
+    if (!formData.club) newErrors.club = "النادي مطلوب.";
     if (!formData.name.trim()) newErrors.name = "الاسم مطلوب.";
     if (!formData.description.trim()) newErrors.description = "الوصف مطلوب.";
     setErrors(newErrors);
@@ -69,7 +83,12 @@ const ExpenseCategory = () => {
   // Add new expense category via API
   const handleAdd = () => {
     if (validate()) {
-      dispatch(addExpenseCategory(formData))
+      // Convert club to number for API
+      const payload = {
+        ...formData,
+        club: parseInt(formData.club) || null,
+      };
+      dispatch(addExpenseCategory(payload))
         .unwrap()
         .then(() => {
           setFormData({ club: "", name: "", description: "" });
@@ -88,6 +107,7 @@ const ExpenseCategory = () => {
       console.log(`Category ${index}:`, {
         club: category.club,
         clubType: typeof category.club,
+        clubDetails: category.club_details,
         name: category.name,
         nameType: typeof category.name,
         description: category.description,
@@ -104,7 +124,9 @@ const ExpenseCategory = () => {
       return String(value).toLowerCase();
     };
 
-    const club = safeToString(category.club);
+    const club = category.club_details
+      ? safeToString(category.club_details.name)
+      : "";
     const name = safeToString(category.name);
     const description = safeToString(category.description);
 
@@ -203,7 +225,9 @@ const ExpenseCategory = () => {
                   {paginatedCategories.map((category, index) => (
                     <tr key={index} className="hover:bg-gray-100 transition">
                       <td className="px-4 py-3 text-sm">
-                        {category.club ? String(category.club) : "غير متاح"}
+                        {category.club_details?.name
+                          ? String(category.club_details.name)
+                          : "غير متاح"}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {category.name ? String(category.name) : "غير متاح"}
@@ -263,8 +287,33 @@ const ExpenseCategory = () => {
               إضافة فئة مصروف
             </h3>
             <div className="grid grid-cols-1 gap-4">
+              {/* Club Dropdown */}
+              <div>
+                <label className="block text-sm font-medium capitalize mb-1 text-right">
+                  النادي
+                </label>
+                <select
+                  name="club"
+                  value={formData.club}
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                >
+                  <option value="">اختر النادي</option>
+                  {uniqueClubs.map((club) => (
+                    <option key={club.id} value={club.id}>
+                      {club.name}
+                    </option>
+                  ))}
+                </select>
+                {errors.club && (
+                  <p className="text-red-500 text-sm text-right">
+                    {errors.club}
+                  </p>
+                )}
+              </div>
+
+              {/* Name and Description Inputs */}
               {[
-                { label: "النادي", name: "club" },
                 { label: "الاسم", name: "name" },
                 { label: "الوصف", name: "description" },
               ].map(({ label, name }) => (

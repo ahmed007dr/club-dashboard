@@ -87,7 +87,7 @@ const AddMember = () => {
   };
 
   return (
-    <div className="modal max-h-[80vh] overflow-auto">
+    <div className="max-h-[80vh] overflow-auto">
       <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">Add Member</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
