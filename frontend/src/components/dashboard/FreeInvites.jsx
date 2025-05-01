@@ -19,6 +19,7 @@ const InviteList = () => {
   const [showMarkUsedModal, setShowMarkUsedModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedInviteId, setSelectedInviteId] = useState(null);
+  
 
   const [filters, setFilters] = useState({
     status: '',
@@ -27,13 +28,9 @@ const InviteList = () => {
     date: ''
   });
 
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
+  
+
+ 
   
   
   // Form states
@@ -135,25 +132,40 @@ const InviteList = () => {
     }
   };
 
-  const handleEditInvite = async (e) => {
+const handleEditInvite = async (e) => {
     e.preventDefault();
     const errors = validateForm();
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
     }
-    
+
+    const cleanedData = {
+      ...formData,
+      invited_by:
+        formData.invited_by?.toString().trim() === ""
+          ? null
+          : formData.invited_by,
+      club: formData.club?.toString().trim() === "" ? null : formData.club,
+    };
+
     try {
-      await dispatch(editInviteById({
-        inviteId: selectedInviteId,
-        inviteData: formData
-      })).unwrap();
+      await dispatch(
+        editInviteById({
+          inviteId: selectedInviteId,
+          inviteData: cleanedData,
+        })
+      ).unwrap();
       setShowEditModal(false);
       setFormErrors({});
     } catch (error) {
-      console.error('Failed to edit invite:', error);
+      console.error(
+        "Failed to edit invite:",
+        error.response?.data || error.message
+      );
     }
   };
+
 
   const handleDeleteInvite = async () => {
     try {
@@ -212,6 +224,30 @@ const InviteList = () => {
     setShowDeleteModal(true);
   };
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6; // Adjust this number based on your preference
+
+  // Calculate paginated invites
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentInvites = filteredInvites.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredInvites.length / itemsPerPage);
+
+  // Handle page change
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    setCurrentPage(1);
+  };
+
   const getStatusBadge = (status) => {
     let bgColor = 'bg-gray-500';
     if (status === 'used') bgColor = 'bg-green-100 text-green-600';
@@ -261,21 +297,16 @@ const InviteList = () => {
             </div>
       </div>
   
-      <div className="mb-6 flex flex-wrap gap-4 rtl text-right">
+      <div className="mb-6 flex flex-wrap gap-4">
   <input
     type="text"
     name="guestName"
     placeholder="ابحث عن الضيف"
-    className="w-full sm:w-auto flex-1 rounded-xl border border-gray-300 bg-white p-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+    className="input"
     value={filters.guestName}
     onChange={handleFilterChange}
   />
-  <select
-    name="status"
-    value={filters.status}
-    onChange={handleFilterChange}
-    className="w-full sm:w-auto flex-1 rounded-xl border border-gray-300 bg-white p-3 text-sm shadow-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
-  >
+  <select name="status" value={filters.status} onChange={handleFilterChange} className="input">
     <option value="">جميع الحالات</option>
     <option value="pending">قيد الانتظار</option>
     <option value="used">تم الاستخدام</option>
@@ -285,22 +316,21 @@ const InviteList = () => {
     type="text"
     name="clubName"
     placeholder="اسم النادي"
-    className="w-full sm:w-auto flex-1 rounded-xl border border-gray-300 bg-white p-3 text-sm shadow-sm placeholder:text-gray-400 focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+    className="input"
     value={filters.clubName}
     onChange={handleFilterChange}
   />
   <input
     type="date"
     name="date"
-    className="w-full sm:w-auto flex-1 rounded-xl border border-gray-300 bg-white p-3 text-sm shadow-sm focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
+    className="input"
     value={filters.date}
     onChange={handleFilterChange}
   />
 </div>
 
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" dir="rtl">
-        {filteredInvites.map((invite) => (
+        {currentInvites.map((invite) => (
           <div key={invite.id} className=" rounded-lg shadow-md overflow-hidden border border-gray-200">
             <div className="p-6">
               <div className="flex justify-between items-start">
@@ -344,6 +374,49 @@ const InviteList = () => {
           </div>
         ))}
       </div>
+
+      {/* Pagination Controls */}
+      {filteredInvites.length > itemsPerPage && (
+        <div className="mt-6 flex justify-center items-center space-x-2 rtl">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className={`px-3 py-1 rounded-md ${
+              currentPage === 1
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            السابق
+          </button>
+          {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+            (page) => (
+              <button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                className={`px-3 py-1 rounded-md ${
+                  currentPage === page
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {page}
+              </button>
+            )
+          )}
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className={`px-3 py-1 rounded-md ${
+              currentPage === totalPages
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+          >
+            التالي
+          </button>
+        </div>
+      )}
 
       {/* Add Invite Modal */}
       {showAddModal && (

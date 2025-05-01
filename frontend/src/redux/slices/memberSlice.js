@@ -1,14 +1,15 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import BASE_URL from '../../config/api';
 
-const token = localStorage.getItem('token'); 
 // Fetch users
 export const fetchUsers = createAsyncThunk('users/fetchUsers', async () => {
-    const res = await fetch("${BASE_URL}/members/api/members/", {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${BASE_URL}/members/api/members/`, {
         method: 'GET',
         headers: {
-             'Authorization': `Bearer ${token}`,
-             'Content-Type': 'application/json' },
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+        },
     });
     if (!res.ok) {
         if (res.status === 401) {
@@ -20,13 +21,16 @@ export const fetchUsers = createAsyncThunk('users/fetchUsers', async () => {
     const data = await res.json();
     return data;
 });
+
 // Add user
 export const addMember = createAsyncThunk('users/addUser', async (newUser) => {
-    const res = await fetch("${BASE_URL}/members/api/members/create/", {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${BASE_URL}/members/api/members/create/`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json' },
+            'Content-Type': 'application/json',
+        },
         body: JSON.stringify(newUser),
     });
     const data = await res.json();
@@ -35,12 +39,14 @@ export const addMember = createAsyncThunk('users/addUser', async (newUser) => {
 
 // Edit user
 export const editMember = createAsyncThunk('users/editUser', async ({ id, updatedUser }) => {
-    console.log("Updated user data:",id, updatedUser); // Log the updated user data
+    const token = localStorage.getItem('token');
+    console.log("Updated user data:", id, updatedUser);
     const res = await fetch(`${BASE_URL}/members/api/members/${id}/update/`, {
         method: 'PUT',
         headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json' },
+            'Content-Type': 'application/json',
+        },
         body: JSON.stringify(updatedUser),
     });
     const data = await res.json();
@@ -49,63 +55,66 @@ export const editMember = createAsyncThunk('users/editUser', async ({ id, update
 
 // Delete user
 export const deleteMember = createAsyncThunk('users/deleteUser', async (id) => {
-    await fetch(`${BASE_URL}/members/api/members/${id}/delete/`, { 
+    const token = localStorage.getItem('token');
+    await fetch(`${BASE_URL}/members/api/members/${id}/delete/`, {
         method: 'DELETE',
         headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json' }
+            'Content-Type': 'application/json',
+        },
     });
     return id;
 });
 
+// Fetch user by ID
 export const fetchUserById = createAsyncThunk(
     'users/fetchUserById',
     async (userId, { rejectWithValue }) => {
-      if (!token) {
-        return rejectWithValue("Authentication token is missing. Please log in again.");
-      }
-  
-      try {
-        const res = await fetch(`${BASE_URL}/members/api/members/${userId}/`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-  
-        // Check if the response is successful
-        if (!res.ok) {
-          if (res.status === 401) {
-            return rejectWithValue("Unauthorized. Please log in again.");
-          } else if (res.status === 404) {
-            return rejectWithValue("User not found.");
-          } else if (res.status === 500) {
-            return rejectWithValue("Internal Server Error. Please try again later.");
-          }
-        }
-  
-        // Parse and return the user data
-        const data = await res.json();
-        return data;
-  
-      } catch (error) {
-        console.error("Error fetching user by ID:", error);
-        return rejectWithValue("An unexpected error occurred. Please try again later.");
-      }
-    }
-  );
-
-  export const searchMember = createAsyncThunk(
-    'users/searchMember',
-    async (query, { rejectWithValue }) => {
+        const token = localStorage.getItem('token');
         if (!token) {
             return rejectWithValue("Authentication token is missing. Please log in again.");
         }
 
         try {
-            const res = await fetch(`http://127.0.0.1:8000/members/api/members/search/?q=${query}`, {
-              
+            const res = await fetch(`${BASE_URL}/members/api/members/${userId}/`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!res.ok) {
+                if (res.status === 401) {
+                    return rejectWithValue("Unauthorized. Please log in again.");
+                } else if (res.status === 404) {
+                    return rejectWithValue("User not found.");
+                } else if (res.status === 500) {
+                    return rejectWithValue("Internal Server Error. Please try again later.");
+                }
+            }
+
+            const data = await res.json();
+            return data;
+
+        } catch (error) {
+            console.error("Error fetching user by ID:", error);
+            return rejectWithValue("An unexpected error occurred. Please try again later.");
+        }
+    }
+);
+
+// Search members
+export const searchMember = createAsyncThunk(
+    'users/searchMember',
+    async (query, { rejectWithValue }) => {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            return rejectWithValue("Authentication token is missing. Please log in again.");
+        }
+
+        try {
+            const res = await fetch(`${BASE_URL}/members/api/members/search/?q=${query}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -133,15 +142,14 @@ export const fetchUserById = createAsyncThunk(
     }
 );
 
-
 // User slice
 const userSlice = createSlice({
     name: 'userslice',
     initialState: {
         items: [],
         isloading: true,
-        user: null, // To store logged-in user
-        error: null, // To store login/register errors
+        user: null,
+        error: null,
     },
     reducers: {},
     extraReducers: (builder) => {
@@ -168,38 +176,40 @@ const userSlice = createSlice({
                 }
             })
             .addCase(deleteMember.fulfilled, (state, action) => {
-              const id = action.payload;
-              if (Array.isArray(state.items)) {
-                  const index = state.items.findIndex(user => user.id === id);
-                  if (index !== -1) {
-                      state.items.splice(index, 1); // Remove the user from the array
-                  }
-              }
-            }).addCase(fetchUserById.fulfilled, (state, action) => {
-                state.user = action.payload; // Store the fetched user data
+                const id = action.payload;
+                if (Array.isArray(state.items)) {
+                    const index = state.items.findIndex(user => user.id === id);
+                    if (index !== -1) {
+                        state.items.splice(index, 1);
+                    }
+                }
+            })
+            .addCase(fetchUserById.fulfilled, (state, action) => {
+                state.user = action.payload;
                 state.isloading = false;
-              })
-              .addCase(fetchUserById.pending, (state) => {
+            })
+            .addCase(fetchUserById.pending, (state) => {
                 state.isloading = true;
-                state.error = null; // Clear any previous errors
-              })
-              .addCase(fetchUserById.rejected, (state, action) => {
+                state.error = null;
+            })
+            .addCase(fetchUserById.rejected, (state, action) => {
                 state.isloading = false;
-                state.error = action.payload; // Store the error message
-              }).addCase(searchMember.fulfilled, (state, action) => {
-                state.items = action.payload; // Update the state with the search results
+                state.error = action.payload;
+            })
+            .addCase(searchMember.fulfilled, (state, action) => {
+                state.items = action.payload;
                 state.isloading = false;
             })
             .addCase(searchMember.pending, (state) => {
                 state.isloading = true;
-                state.error = null; // Clear any previous errors
+                state.error = null;
             })
             .addCase(searchMember.rejected, (state, action) => {
                 state.isloading = false;
-                state.error = action.payload; // Store the error message
+                state.error = action.payload;
             });
-          
     },
 });
 
-export default userSlice
+export default userSlice;
+

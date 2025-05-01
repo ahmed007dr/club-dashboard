@@ -24,6 +24,13 @@ const ExpenseCategory = () => {
     description: "",
   });
   const [errors, setErrors] = useState({});
+  const [filters, setFilters] = useState({
+    club: "",
+    name: "",
+    description: "",
+  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(5);
 
   // Fetch expense categories from the backend
   const { expenseCategories, loading, error } = useSelector(
@@ -35,11 +42,18 @@ const ExpenseCategory = () => {
     dispatch(fetchExpenseCategories());
   }, [dispatch]);
 
-  // Handle input changes
+  // Handle input changes for form
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: "" })); // Clear error on typing
+    setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  // Handle filter changes
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setFilters((prev) => ({ ...prev, [name]: value }));
+    setCurrentPage(1); // Reset to first page when filters change
   };
 
   // Validate form data
@@ -49,7 +63,7 @@ const ExpenseCategory = () => {
     if (!formData.name.trim()) newErrors.name = "الاسم مطلوب.";
     if (!formData.description.trim()) newErrors.description = "الوصف مطلوب.";
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0; // Return true if no errors
+    return Object.keys(newErrors).length === 0;
   };
 
   // Add new expense category via API
@@ -58,8 +72,8 @@ const ExpenseCategory = () => {
       dispatch(addExpenseCategory(formData))
         .unwrap()
         .then(() => {
-          setFormData({ club: "", name: "", description: "" }); // Reset form
-          setShowModal(false); // Close modal
+          setFormData({ club: "", name: "", description: "" });
+          setShowModal(false);
         })
         .catch((err) => {
           console.error("فشل في إضافة فئة المصروف:", err);
@@ -67,11 +81,56 @@ const ExpenseCategory = () => {
     }
   };
 
+  // Debug: Log expenseCategories to inspect data
+  useEffect(() => {
+    console.log("expenseCategories:", expenseCategories);
+    expenseCategories.forEach((category, index) => {
+      console.log(`Category ${index}:`, {
+        club: category.club,
+        clubType: typeof category.club,
+        name: category.name,
+        nameType: typeof category.name,
+        description: category.description,
+        descriptionType: typeof category.description,
+      });
+    });
+  }, [expenseCategories]);
+
+  // Filter and paginate categories
+  const filteredCategories = expenseCategories.filter((category) => {
+    // Safely convert values to strings, handling all edge cases
+    const safeToString = (value) => {
+      if (value === null || value === undefined) return "";
+      return String(value).toLowerCase();
+    };
+
+    const club = safeToString(category.club);
+    const name = safeToString(category.name);
+    const description = safeToString(category.description);
+
+    return (
+      club.includes(filters.club.toLowerCase()) &&
+      name.includes(filters.name.toLowerCase()) &&
+      description.includes(filters.description.toLowerCase())
+    );
+  });
+
+  const totalPages = Math.ceil(filteredCategories.length / itemsPerPage);
+  const paginatedCategories = filteredCategories.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
   return (
     <div className="p-6 space-y-6" dir="rtl">
-      {/* Tabs */}
       <Tabs defaultValue="categories" dir="rtl">
-        {/* Categories Tab */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-right">جميع فئات المصروفات</CardTitle>
@@ -88,6 +147,29 @@ const ExpenseCategory = () => {
               <Plus className="mr-2 h-4 w-4" />
               إضافة فئة مصروف
             </Button>
+
+            {/* Filters */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+              {[
+                { label: "النادي", name: "club" },
+                { label: "الاسم", name: "name" },
+                { label: "الوصف", name: "description" },
+              ].map(({ label, name }) => (
+                <div key={name}>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    تصفية حسب {label}
+                  </label>
+                  <input
+                    type="text"
+                    name={name}
+                    value={filters[name]}
+                    onChange={handleFilterChange}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                    placeholder={`ابحث عن ${label}`}
+                  />
+                </div>
+              ))}
+            </div>
 
             {/* Loading State */}
             {loading && (
@@ -118,21 +200,50 @@ const ExpenseCategory = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-background">
-                  {expenseCategories.map((category, index) => (
+                  {paginatedCategories.map((category, index) => (
                     <tr key={index} className="hover:bg-gray-100 transition">
                       <td className="px-4 py-3 text-sm">
-                        {category.club || "غير متاح"}
+                        {category.club ? String(category.club) : "غير متاح"}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        {category.name || "غير متاح"}
+                        {category.name ? String(category.name) : "غير متاح"}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        {category.description || "غير متاح"}
+                        {category.description
+                          ? String(category.description)
+                          : "غير متاح"}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex justify-between items-center mt-4">
+              <div className="text-sm text-gray-600">
+                عرض {paginatedCategories.length} من {filteredCategories.length}{" "}
+                فئة
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className="px-4 py-2"
+                >
+                  السابق
+                </Button>
+                <span className="px-4 py-2">
+                  صفحة {currentPage} من {totalPages}
+                </span>
+                <Button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className="px-4 py-2"
+                >
+                  التالي
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -141,12 +252,12 @@ const ExpenseCategory = () => {
       {/* Add/Edit Modal */}
       {showModal && (
         <div
-          className="fixed inset-0 z-40 flex justify-center items-center  bg-opacity-50"
-          onClick={() => setShowModal(false)} // Close modal when clicking outside
+          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
+          onClick={() => setShowModal(false)}
         >
           <div
             className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
-            onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking inside
+            onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-xl font-semibold mb-4 text-right">
               إضافة فئة مصروف

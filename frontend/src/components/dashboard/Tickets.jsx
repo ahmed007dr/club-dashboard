@@ -10,6 +10,8 @@ import { FaEdit, FaTrash, FaCheck, FaEye, FaPlus } from 'react-icons/fa';
 import { IoTicketOutline } from 'react-icons/io5';
 import AddTicket from './AddTicket';
 
+
+
 const Tickets = () => {
   const dispatch = useDispatch();
   const { tickets } = useSelector((state) => state.tickets);
@@ -26,7 +28,10 @@ const Tickets = () => {
   const [filterBuyerName, setFilterBuyerName] = useState('');
   const [filterUsedStatus, setFilterUsedStatus] = useState('');
 
-  // Create ref for action buttons
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6; // Number of tickets per page
+
   const actionButtonsRef = useRef(null);
 
   // Filter tickets
@@ -43,7 +48,18 @@ const Tickets = () => {
     return matchesClub && matchesBuyer && matchesType && matchesStatus;
   });
 
-  // Modal handlers with proper isolation
+  // Calculate paginated tickets
+  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
+  const indexOfLastTicket = currentPage * itemsPerPage;
+  const indexOfFirstTicket = indexOfLastTicket - itemsPerPage;
+  const currentTickets = filteredTickets.slice(indexOfFirstTicket, indexOfLastTicket);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterClub, filterTicketType, filterBuyerName, filterUsedStatus]);
+
+  // Modal handlers
   const openCreateModal = () => {
     closeAllModals();
     setShowCreateModal(true);
@@ -164,6 +180,13 @@ const Tickets = () => {
     dispatch(fetchTickets());
   }, [dispatch]);
 
+  // Pagination handlers
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
   return (
     <div className="p-6" dir="rtl">
       {/* Header and Create Button */}
@@ -232,7 +255,7 @@ const Tickets = () => {
           </tr>
         </thead>
         <tbody>
-          {filteredTickets.map((ticket) => (
+          {currentTickets.map((ticket) => (
             <tr key={ticket.id} className="hover:bg-gray-100">
               <td className="py-2 px-4 border-b">{ticket.club}</td>
               <td className="py-2 px-4 border-b">{ticket.club_name}</td>
@@ -288,6 +311,37 @@ const Tickets = () => {
           ))}
         </tbody>
       </table>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-4">
+          <button
+            onClick={() => goToPage(currentPage - 1)}
+            disabled={currentPage === 1}
+            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            السابق
+          </button>
+          {Array.from({ length: totalPages }, (_, index) => (
+            <button
+              key={index + 1}
+              onClick={() => goToPage(index + 1)}
+              className={`px-3 py-1 rounded ${
+                currentPage === index + 1 ? 'bg-blue-500 text-white' : 'bg-gray-200'
+              }`}
+            >
+              {index + 1}
+            </button>
+          ))}
+          <button
+            onClick={() => goToPage(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
+          >
+            التالي
+          </button>
+        </div>
+      )}
 
       {/* Create Ticket Modal */}
       {showCreateModal && (
