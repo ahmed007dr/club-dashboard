@@ -104,8 +104,9 @@ const Staff = () => {
   return (
     <div className="p-6" dir="rtl">
       <div className="flex items-start space-x-3">
-        <RiUserLine className="btn-brown text-2xl" />
-        <h2 className="text-2xl font-semibold mb-4">Staff</h2>
+        <RiUserLine className=" text-2xl" />
+        <h2 className="text-2xl font-semibold mb-4">الموظفون</h2>
+
       </div>
 
       {/* Filter Inputs */}
@@ -148,7 +149,6 @@ const Staff = () => {
       <table className="w-full border text-sm">
       <thead>
   <tr>
-    <th className="p-2">معرف الوردية</th>
     <th className="p-2">التاريخ</th>
     <th className="p-2">بداية الوردية</th>
     <th className="p-2">نهاية الوردية</th>
@@ -162,7 +162,6 @@ const Staff = () => {
           {Array.isArray(currentItems) &&
             currentItems.map((shift) => (
               <tr key={shift.id} className="text-center">
-                <td className="p-2">{shift.id}</td>
                 <td className="p-2">{shift.date}</td>
                 <td className="p-2">{shift.shift_start}</td>
                 <td className="p-2">{shift.shift_end}</td>

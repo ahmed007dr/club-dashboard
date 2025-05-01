@@ -440,10 +440,9 @@ function Receipts() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
                    <option value="cash">Cash</option>
-  <option value="credit">Credit Card</option>
-  <option value="debit">Debit Card</option>
-  <option value="bank">Bank Transfer</option>
-  <option value="visa">Visa</option>
+                   <option value="cash">Cash</option>
+    <option value="visa">Visa</option>
+    <option value="bank">Bank Transfer</option>
                   </select>
                 </div>
 

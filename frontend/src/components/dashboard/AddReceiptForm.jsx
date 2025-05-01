@@ -51,7 +51,7 @@ const AddReceiptForm = () => {
   return (
     <form onSubmit={handleSubmit} className="max-w-lg mx-auto p-4 border border-gray-300 rounded-lg">
       <div className="mb-4">
-        <label htmlFor="club" className="block text-sm font-medium text-gray-700">Club</label>
+      <label htmlFor="club" className="block text-sm font-medium text-gray-700">النادي</label>
         <input
           type="number"
           id="club"
@@ -64,7 +64,7 @@ const AddReceiptForm = () => {
       </div>
 
       <div className="mb-4">
-        <label htmlFor="member" className="block text-sm font-medium text-gray-700">Member</label>
+      <label htmlFor="member" className="block text-sm font-medium text-gray-700">العضو</label>
         <input
           type="number"
           id="member"
@@ -77,7 +77,7 @@ const AddReceiptForm = () => {
       </div>
 
       <div className="mb-4">
-        <label htmlFor="subscription" className="block text-sm font-medium text-gray-700">Subscription</label>
+      <label htmlFor="subscription" className="block text-sm font-medium text-gray-700">الاشتراك</label>
         <input
           type="text"
           id="subscription"
@@ -89,7 +89,7 @@ const AddReceiptForm = () => {
       </div>
 
       <div className="mb-4">
-        <label htmlFor="amount" className="block text-sm font-medium text-gray-700">Amount</label>
+      <label htmlFor="amount" className="block text-sm font-medium text-gray-700">المبلغ</label>
         <input
           type="text"
           id="amount"
@@ -102,7 +102,7 @@ const AddReceiptForm = () => {
       </div>
 
       <div className="mb-4">
-        <label htmlFor="payment_method" className="block text-sm font-medium text-gray-700">Payment Method</label>
+      <label htmlFor="payment_method" className="block text-sm font-medium text-gray-700">طريقة الدفع</label>
         <select
           id="payment_method"
           name="payment_method"
@@ -110,14 +110,14 @@ const AddReceiptForm = () => {
           onChange={handleChange}
           className="mt-1 p-2 w-full border border-gray-300 rounded-md"
         >
-          <option value="cash">Cash</option>
-          <option value="credit">Credit</option>
-          <option value="debit">Debit</option>
+        <option value="cash">Cash</option>
+    <option value="visa">Visa</option>
+    <option value="bank">Bank Transfer</option>
         </select>
       </div>
 
       <div className="mb-4">
-        <label htmlFor="note" className="block text-sm font-medium text-gray-700">Note</label>
+      <label htmlFor="note" className="block text-sm font-medium text-gray-700">ملاحظة</label>
         <textarea
           id="note"
           name="note"
@@ -128,7 +128,10 @@ const AddReceiptForm = () => {
         />
       </div>
 
-      <button type="submit" className="w-full bg-blue-500 text-white py-2 rounded-md">Submit Receipt</button>
+      <button type="submit" className="btn">
+  إرسال الإيصال
+</button>
+
     </form>
   );
 };

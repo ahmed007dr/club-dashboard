@@ -45,10 +45,11 @@ const MemberSubscriptions = () => {
         <ul className="space-y-6">
           {memberSubscriptions.map((sub) => (
             <li key={sub.id} className="p-6 border border-gray-200 rounded-xl shadow-md bg-gray-50 hover:bg-gray-100 transition">
-              <h3 className="text-2xl font-semibold text-green-700 mb-4 flex items-center gap-2">
-              <CiShoppingTag />
-                {sub.type_details.name}
-              </h3>
+            <h3 className="text-2xl font-semibold text-purple-600 flex items-center gap-2">
+  <CiShoppingTag />
+  {sub.type_details.name}
+</h3>
+
   
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-gray-700 text-[15px]">
                 <p className="flex items-center gap-2"><FaUniversity /> <strong>النادي:</strong> {sub.club_name}</p>
