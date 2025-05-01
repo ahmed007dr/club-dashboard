@@ -120,7 +120,7 @@ const Members = () => {
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   return (
-    <div className="p-4 overflow-x-auto"dir="rtl">
+    <div className="p-4 overflow-x-auto" dir="rtl">
       <div className="flex items-start space-x-3">
         <RiGroupLine className="text-2xl" />
         <h2 className="text-2xl font-semibold mb-4">الأعضاء</h2>

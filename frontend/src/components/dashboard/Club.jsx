@@ -24,14 +24,15 @@ const Club = () => {
     const fetchData = async () => {
       try {
         const res = await dispatch(fetchClubs()).unwrap();
+        console.log('Fetched Clubs:', res); // Log the response
         setClubs(res); // Set the fetched clubs to state
       } catch (error) {
-        console.error("Error fetching Club:", error);
+        console.error('Error fetching Club:', error);
       }
     };
-
     fetchData();
   }, [dispatch]);
+  
 
   const formatDateForInput = (dateString) => {
     const date = new Date(dateString);
@@ -86,22 +87,22 @@ const Club = () => {
   }
 
   return (
-    <div className="p-4 overflow-x-auto" dir="rtl">
+    <div className="p-4 overflow-x-auto">
       <div className="flex items-start space-x-3">
         <HiOutlineDocumentReport className="btn-forest text-2xl" />
         <h2 className="text-2xl font-semibold mb-4">Clubs</h2>
       </div>
       <table className="min-w-full border border-gray-200">
-      <thead className="text-left">
-    <tr>
-      <th className="p-3 border-b">#</th>
-      <th className="p-3 border-b">الشعار</th>
-      <th className="p-3 border-b">الاسم</th>
-      <th className="p-3 border-b">الموقع</th>
-      <th className="p-3 border-b">تاريخ الإنشاء</th>
-      <th className="p-3 border-b">الإجراء</th>
-    </tr>
-  </thead>
+        <thead className="text-left">
+          <tr>
+            <th className="p-3 border-b">#</th>
+            <th className="p-3 border-b">Logo</th>
+            <th className="p-3 border-b">Name</th>
+            <th className="p-3 border-b">Location</th>
+            <th className="p-3 border-b">Created At</th>
+            <th className="p-3 border-b">Action</th>
+          </tr>
+        </thead>
         <tbody>
           {clubs.map((club, index) => (
             <tr key={club.id} className="">
