@@ -23,7 +23,7 @@ const SubscriptionStats = () => {
   ];
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white shadow-lg rounded-lg">
+    <div className=" w-full p-3  bg-white shadow-lg rounded-lg">
       <h2 className="text-2xl font-bold mb-4 text-center text-gray-800">إحصائيات الاشتراكات</h2>
       {/* Recharts BarChart */}
       <ResponsiveContainer width="100%" height={300}>

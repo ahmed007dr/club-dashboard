@@ -120,42 +120,46 @@ const Members = () => {
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
   return (
-    <div className="p-4 overflow-x-auto">
+    <div className="p-4 overflow-x-auto"dir="rtl">
       <div className="flex items-start space-x-3">
         <RiGroupLine className="text-2xl" />
-        <h2 className="text-2xl font-semibold mb-4">Members</h2>
+        <h2 className="text-2xl font-semibold mb-4">الأعضاء</h2>
+
       </div>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       <input
         type="text"
         value={searchQuery}
         onChange={handleSearch}
-        placeholder="Search by name, membership number, or national ID"
+        placeholder="ابحث بالاسم، رقم العضوية، أو الرقم القومي"
+
         className="border p-2 rounded-md mb-4 w-full"
       />
       <div className="flex justify-end mb-4">
-        <button
-          onClick={openAddModal}
-          className="flex justify-end text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
-        >
-          <IoAddOutline className="flex inline-block text-xl" />
-          Add Member
-        </button>
+      <button
+  onClick={openAddModal}
+  className="flex justify-end text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+>
+  <IoAddOutline className="flex inline-block text-xl" />
+  إضافة عضو
+</button>
+
       </div>
 
       <table className="min-w-full border border-gray-200">
-        <thead className="text-left">
-          <tr>
-            <th className="p-3 border-b">#</th>
-            <th className="p-3 border-b">Photo</th>
-            <th className="p-3 border-b">Name</th>
-            <th className="p-3 border-b">Membership Number</th>
-            <th className="p-3 border-b">National ID</th>
-            <th className="p-3 border-b">Phone</th>
-            <th className="p-3 border-b">Club Name</th>
-            <th className="p-3 border-b">Actions</th>
-          </tr>
-        </thead>
+      <thead className="text-right">
+  <tr>
+    <th className="p-3 border-b">#</th>
+    <th className="p-3 border-b">الصورة</th>
+    <th className="p-3 border-b">الاسم</th>
+    <th className="p-3 border-b">رقم العضوية</th>
+    <th className="p-3 border-b">الرقم القومي</th>
+    <th className="p-3 border-b">الهاتف</th>
+    <th className="p-3 border-b">اسم النادي</th>
+    <th className="p-3 border-b">الإجراءات</th>
+  </tr>
+</thead>
+
         <tbody>
           {Array.isArray(currentItems) && currentItems.map((member, index) => (
             <tr key={member.id}>
