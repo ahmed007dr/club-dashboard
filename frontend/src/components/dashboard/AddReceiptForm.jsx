@@ -27,11 +27,7 @@ const AddReceiptForm = () => {
       const token = localStorage.getItem('token');
   
       const response = await axios.post(
-<<<<<<< HEAD
          `${BASE_URL}/receipts/api/receipts/add/`,
-=======
-        `${BASE_URL}/receipts/api/receipts/add/`,
->>>>>>> 2cceb1539d0928804e2db3607e8b000f922f4610
         formData,
         {
           headers: {

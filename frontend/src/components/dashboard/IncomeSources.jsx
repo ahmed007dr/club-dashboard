@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { CiEdit, CiTrash } from "react-icons/ci"; // Icons for Edit and Delete
+import React, { useState, useEffect, useMemo } from "react";
+import { CiEdit, CiTrash } from "react-icons/ci";
 import {
   Card,
   CardContent,
@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, MoreVertical } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchIncomeSources,
@@ -20,7 +20,6 @@ import {
   deleteIncome,
 } from "../../redux/slices/financeSlice";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/DropdownMenu";
-import { MoreVertical } from "lucide-react";
 
 const labelMapping = {
   name: "الاسم",
@@ -35,7 +34,7 @@ const labelMapping = {
 const Income = () => {
   const dispatch = useDispatch();
   const [showModal, setShowModal] = useState(false);
-  const [currentItem, setCurrentItem] = useState(null); // For editing income
+  const [currentItem, setCurrentItem] = useState(null);
   const [newItem, setNewItem] = useState({
     club: "",
     source: "",
@@ -43,21 +42,94 @@ const Income = () => {
     description: "",
     date: "",
     received_by: "",
-  }); // For adding new income or income source
-  const [activeTab, setActiveTab] = useState("incomeSources"); // Toggle between Income Sources and Incomes
+  });
+  const [activeTab, setActiveTab] = useState("incomeSources");
 
-  // Fetch data from Redux state
+  // Filter states
+  const [sourceFilters, setSourceFilters] = useState({
+    name: "",
+    club: "",
+    description: "",
+  });
+  const [incomeFilters, setIncomeFilters] = useState({
+    source: "",
+    amountMin: "",
+    amountMax: "",
+    dateFrom: "",
+    dateTo: "",
+    received_by: "",
+  });
+
+  // Pagination states
+  const [sourcePage, setSourcePage] = useState(1);
+  const [incomePage, setIncomePage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+
   const { incomeSources, incomes, loading, error } = useSelector(
     (state) => state.finance
   );
 
-  // Fetch data on component mount
   useEffect(() => {
     dispatch(fetchIncomeSources());
     dispatch(fetchIncomes());
   }, [dispatch]);
 
-  // Handle input changes in the modal (Edit or Add)
+  // Filter and pagination logic
+  const filteredSources = useMemo(() => {
+    return incomeSources.filter((source) => {
+      return (
+        (!sourceFilters.name ||
+          source.name
+            ?.toLowerCase()
+            .includes(sourceFilters.name.toLowerCase())) &&
+        (!sourceFilters.club ||
+          source.club_details?.name
+            ?.toLowerCase()
+            .includes(sourceFilters.club.toLowerCase())) &&
+        (!sourceFilters.description ||
+          source.description
+            ?.toLowerCase()
+            .includes(sourceFilters.description.toLowerCase()))
+      );
+    });
+  }, [incomeSources, sourceFilters]);
+
+  const filteredIncomes = useMemo(() => {
+    return incomes.filter((income) => {
+      return (
+        (!incomeFilters.source ||
+          income.source_details?.name
+            ?.toLowerCase()
+            .includes(incomeFilters.source.toLowerCase())) &&
+        (!incomeFilters.amountMin ||
+          income.amount >= parseFloat(incomeFilters.amountMin)) &&
+        (!incomeFilters.amountMax ||
+          income.amount <= parseFloat(incomeFilters.amountMax)) &&
+        (!incomeFilters.dateFrom ||
+          new Date(income.date) >= new Date(incomeFilters.dateFrom)) &&
+        (!incomeFilters.dateTo ||
+          new Date(income.date) <= new Date(incomeFilters.dateTo)) &&
+        (!incomeFilters.received_by ||
+          income.received_by_details?.username
+            ?.toLowerCase()
+            .includes(incomeFilters.received_by.toLowerCase()))
+      );
+    });
+  }, [incomes, incomeFilters]);
+
+  // Pagination calculations
+  const sourcePageCount = Math.ceil(filteredSources.length / pageSize);
+  const incomePageCount = Math.ceil(filteredIncomes.length / pageSize);
+
+  const paginatedSources = filteredSources.slice(
+    (sourcePage - 1) * pageSize,
+    sourcePage * pageSize
+  );
+  const paginatedIncomes = filteredIncomes.slice(
+    (incomePage - 1) * pageSize,
+    incomePage * pageSize
+  );
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     const newValue = name === "amount" ? parseFloat(value) || 0 : value;
@@ -69,10 +141,8 @@ const Income = () => {
     }
   };
 
-  // Save the updated item via API
   const handleSave = () => {
     const isIncomeSource = activeTab === "incomeSources";
-    // Prepare the payload based on the active tab
     const payload = currentItem
       ? {
           id: currentItem.id,
@@ -92,17 +162,16 @@ const Income = () => {
           received_by: parseInt(newItem.received_by) || null,
         };
 
-    // Dispatch action based on the active tab and whether editing or adding
     const action = currentItem
-      ? updateIncome({ id: currentItem.id, updatedData: payload }) // Editing an income
+      ? updateIncome({ id: currentItem.id, updatedData: payload })
       : isIncomeSource
-      ? addIncomeSource(newItem) // Adding a new income source
-      : addIncome(payload); // Adding a new income
+      ? addIncomeSource(newItem)
+      : addIncome(payload);
 
     dispatch(action)
       .unwrap()
       .then(() => {
-        setCurrentItem(null); // Reset current item
+        setCurrentItem(null);
         setNewItem({
           club: "",
           source: "",
@@ -110,8 +179,8 @@ const Income = () => {
           description: "",
           date: "",
           received_by: "",
-        }); // Reset new item form
-        setShowModal(false); // Close modal after successful operation
+        });
+        setShowModal(false);
       })
       .catch((err) => {
         console.error(
@@ -123,7 +192,6 @@ const Income = () => {
       });
   };
 
-  // Open the modal for editing an income
   const handleEditClick = (item) => {
     if (activeTab === "incomes") {
       const sanitizedItem = {
@@ -140,17 +208,14 @@ const Income = () => {
     }
   };
 
-  // Open the modal for adding a new item
   const handleAddClick = () => {
-    setCurrentItem(null); // Clear current item for adding a new one
+    setCurrentItem(null);
     setShowModal(true);
   };
 
-  // State for confirmation modal
   const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
 
-  // Delete an income
   const handleDeleteClick = (id) => {
     setItemToDelete(id);
     setConfirmDeleteModal(true);
@@ -162,7 +227,7 @@ const Income = () => {
         .unwrap()
         .then(() => {
           console.log("تم حذف الدخل بنجاح");
-          setConfirmDeleteModal(false); // Close modal after deletion
+          setConfirmDeleteModal(false);
         })
         .catch((err) => {
           console.error("فشل في حذف الدخل:", err);
@@ -170,21 +235,70 @@ const Income = () => {
     }
   };
 
+  // Filter change handlers
+  const handleSourceFilterChange = (e) => {
+    const { name, value } = e.target;
+    setSourceFilters((prev) => ({ ...prev, [name]: value }));
+    setSourcePage(1); // Reset to first page when filters change
+  };
+
+  const handleIncomeFilterChange = (e) => {
+    const { name, value } = e.target;
+    setIncomeFilters((prev) => ({ ...prev, [name]: value }));
+    setIncomePage(1); // Reset to first page when filters change
+  };
+
+  // Pagination controls
+  const PaginationControls = ({ currentPage, setPage, pageCount }) => (
+    <div className="flex items-center justify-between mt-4">
+      <div className="flex items-center gap-2">
+        <select
+          value={pageSize}
+          onChange={(e) => {
+            setPageSize(parseInt(e.target.value));
+            setPage(1);
+          }}
+          className="border rounded px-2 py-1"
+        >
+          {[5, 10, 20, 50].map((size) => (
+            <option key={size} value={size}>
+              {size} لكل صفحة
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1}
+        >
+          السابق
+        </Button>
+        <span>
+          صفحة {currentPage} من {pageCount}
+        </span>
+        <Button
+          onClick={() => setPage((prev) => Math.min(prev + 1, pageCount))}
+          disabled={currentPage === pageCount}
+        >
+          التالي
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="p-6 space-y-6" dir="rtl">
-      {/* Header */}
       <h1 className="text-2xl font-bold tracking-tight text-right">
         إدارة الدخل
       </h1>
 
-      {/* Tabs */}
       <Tabs defaultValue="incomeSources" dir="rtl" onValueChange={setActiveTab}>
         <TabsList dir="rtl">
           <TabsTrigger value="incomeSources">مصادر الدخل</TabsTrigger>
-          <TabsTrigger value="incomes"> الدخل</TabsTrigger>
+          <TabsTrigger value="incomes">الدخل</TabsTrigger>
         </TabsList>
 
-        {/* Income Sources Tab */}
         <TabsContent value="incomeSources" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -194,7 +308,25 @@ const Income = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Add Income Source Button */}
+              {/* Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {["name", "club", "description"].map((field) => (
+                  <div key={field}>
+                    <label className="block text-sm font-medium mb-1 text-right">
+                      {labelMapping[field]}
+                    </label>
+                    <input
+                      type="text"
+                      name={field}
+                      value={sourceFilters[field]}
+                      onChange={handleSourceFilterChange}
+                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                      placeholder={`ابحث بـ ${labelMapping[field]}`}
+                    />
+                  </div>
+                ))}
+              </div>
+
               <Button
                 onClick={handleAddClick}
                 className="flex items-center justify-start"
@@ -203,19 +335,16 @@ const Income = () => {
                 إضافة مصدر دخل
               </Button>
 
-              {/* Loading State */}
               {loading && (
                 <p className="text-lg text-gray-600 text-right">
                   جاري التحميل...
                 </p>
               )}
 
-              {/* Error State */}
               {error && (
                 <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
               )}
 
-              {/* Table */}
               <div className="rounded-md border">
                 <table className="min-w-full divide-y divide-border">
                   <thead>
@@ -235,7 +364,7 @@ const Income = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-background">
-                    {incomeSources.map((source) => (
+                    {paginatedSources.map((source) => (
                       <tr
                         key={source.id}
                         className="hover:bg-gray-100 transition"
@@ -255,11 +384,16 @@ const Income = () => {
                   </tbody>
                 </table>
               </div>
+
+              <PaginationControls
+                currentPage={sourcePage}
+                setPage={setSourcePage}
+                pageCount={sourcePageCount}
+              />
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Incomes Tab */}
         <TabsContent value="incomes" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -269,7 +403,41 @@ const Income = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Add Income Button */}
+              {/* Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                {[
+                  "source",
+                  "amountMin",
+                  "amountMax",
+                  "dateFrom",
+                  "dateTo",
+                  "received_by",
+                ].map((field) => (
+                  <div key={field}>
+                    <label className="block text-sm font-medium mb-1 text-right">
+                      {labelMapping[field] || field.replace(/([A-Z])/g, " $1")}
+                    </label>
+                    <input
+                      type={
+                        field.includes("date")
+                          ? "date"
+                          : field.includes("amount")
+                          ? "number"
+                          : "text"
+                      }
+                      name={field}
+                      value={incomeFilters[field]}
+                      onChange={handleIncomeFilterChange}
+                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                      placeholder={`ابحث بـ ${
+                        labelMapping[field] ||
+                        field.replace(/([A-Z])/g, " $1")
+                      }`}
+                    />
+                  </div>
+                ))}
+              </div>
+
               <Button
                 onClick={handleAddClick}
                 className="flex items-center justify-start"
@@ -278,19 +446,16 @@ const Income = () => {
                 إضافة دخل
               </Button>
 
-              {/* Loading State */}
               {loading && (
                 <p className="text-lg text-gray-600 text-right">
                   جاري التحميل...
                 </p>
               )}
 
-              {/* Error State */}
               {error && (
                 <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
               )}
 
-              {/* Table */}
               <div className="rounded-md border">
                 <table className="min-w-full divide-y divide-border">
                   <thead>
@@ -319,7 +484,7 @@ const Income = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-background">
-                    {incomes.map((income) => (
+                    {paginatedIncomes.map((income) => (
                       <tr
                         key={income.id}
                         className="hover:bg-gray-100 transition"
@@ -341,10 +506,10 @@ const Income = () => {
                           {income.received_by_details?.username || "غير متاح"}
                         </td>
                         <td className="px-4 py-3 text-sm flex gap-2 justify-end">
-                        <DropdownMenu dir="rtl">
+                          <DropdownMenu dir="rtl">
                             <DropdownMenuTrigger asChild>
                               <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                              <MoreVertical className="h-5 w-5" />
+                                <MoreVertical className="h-5 w-5" />
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-40">
@@ -368,20 +533,25 @@ const Income = () => {
                   </tbody>
                 </table>
               </div>
+
+              <PaginationControls
+                currentPage={incomePage}
+                setPage={setIncomePage}
+                pageCount={incomePageCount}
+              />
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* Add/Edit Modal */}
       {showModal && (
         <div
-          className="fixed inset-0 z-40 flex justify-center items-center  bg-opacity-50"
-          onClick={() => setShowModal(false)} // Close modal when clicking outside
+          className="fixed inset-0 z-40 flex justify-center items-center bg-opacity-50"
+          onClick={() => setShowModal(false)}
         >
           <div
             className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
-            onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking inside
+            onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-xl font-semibold mb-4 text-right">
               {currentItem
@@ -413,7 +583,7 @@ const Income = () => {
                         ? "date"
                         : "text"
                     }
-                    name={field} // هنا تبقى بالإنجليزي
+                    name={field}
                     value={
                       currentItem
                         ? currentItem[field] || ""
@@ -443,15 +613,14 @@ const Income = () => {
         </div>
       )}
 
-      {/* Confirmation Delete Modal */}
       {confirmDeleteModal && (
         <div
-          className="fixed inset-0 z-50 flex justify-center items-center  bg-opacity-50"
-          onClick={() => setConfirmDeleteModal(false)} // Close modal when clicking outside
+          className="fixed inset-0 z-50 flex justify-center items-center bg-opacity-50"
+          onClick={() => setConfirmDeleteModal(false)}
         >
           <div
             className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md"
-            onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking inside
+            onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold mb-4 text-right">
               تأكيد الحذف
