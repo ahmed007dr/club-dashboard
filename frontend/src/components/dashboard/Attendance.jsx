@@ -108,17 +108,28 @@ const Attendance = () => {
 
   // Filter and paginate Attendance data
   const filteredAttendances = attendances.filter((attendance) => {
-    const matchesSubscription = attendance.subscription
+    const subscriptionText =
+      typeof attendance.subscription === "string"
+        ? attendance.subscription
+        : attendance.subscription?.name || "";
+  
+    const matchesSubscription = subscriptionText
       .toLowerCase()
       .includes(attendanceFilters.subscription.toLowerCase());
+  
     const matchesDate = attendance.attendance_date.includes(
       attendanceFilters.attendance_date
     );
-    const matchesMemberName = attendance.member_details?.name
-      ?.toLowerCase()
-      .includes(attendanceFilters.member_name.toLowerCase()) || !attendanceFilters.member_name;
+  
+    const matchesMemberName =
+      attendance.member_details?.name
+        ?.toLowerCase()
+        .includes(attendanceFilters.member_name.toLowerCase()) ||
+      !attendanceFilters.member_name;
+  
     return matchesSubscription && matchesDate && matchesMemberName;
   });
+  
 
   const totalAttendancePages = Math.ceil(filteredAttendances.length / attendanceItemsPerPage);
   const paginatedAttendances = filteredAttendances.slice(

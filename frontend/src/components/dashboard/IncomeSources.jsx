@@ -19,7 +19,12 @@ import {
   updateIncome,
   deleteIncome,
 } from "../../redux/slices/financeSlice";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/DropdownMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/DropdownMenu";
 
 const labelMapping = {
   name: "الاسم",
@@ -44,6 +49,7 @@ const Income = () => {
     received_by: "",
   });
   const [activeTab, setActiveTab] = useState("incomeSources");
+  const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
 
   // Filter states
   const [sourceFilters, setSourceFilters] = useState({
@@ -73,6 +79,28 @@ const Income = () => {
     dispatch(fetchIncomeSources());
     dispatch(fetchIncomes());
   }, [dispatch]);
+
+  // Extract unique clubs from incomeSources and incomes
+  const uniqueClubs = useMemo(() => {
+    const clubsMap = new Map();
+    incomeSources.forEach((source) => {
+      if (source.club_details) {
+        clubsMap.set(source.club_details.id, {
+          id: source.club_details.id,
+          name: source.club_details.name,
+        });
+      }
+    });
+    incomes.forEach((income) => {
+      if (income.club_details) {
+        clubsMap.set(income.club_details.id, {
+          id: income.club_details.id,
+          name: income.club_details.name,
+        });
+      }
+    });
+    return Array.from(clubsMap.values());
+  }, [incomeSources, incomes]);
 
   // Filter and pagination logic
   const filteredSources = useMemo(() => {
@@ -165,7 +193,11 @@ const Income = () => {
     const action = currentItem
       ? updateIncome({ id: currentItem.id, updatedData: payload })
       : isIncomeSource
-      ? addIncomeSource(newItem)
+      ? addIncomeSource({
+          name: newItem.name,
+          description: newItem.description,
+          club: parseInt(newItem.club) || null,
+        })
       : addIncome(payload);
 
     dispatch(action)
@@ -179,6 +211,7 @@ const Income = () => {
           description: "",
           date: "",
           received_by: "",
+          name: "", // Added for income source
         });
         setShowModal(false);
       })
@@ -533,12 +566,40 @@ const Income = () => {
                   </tbody>
                 </table>
               </div>
-
               <PaginationControls
                 currentPage={incomePage}
                 setPage={setIncomePage}
                 pageCount={incomePageCount}
               />
+              {/* Compute Total Button */}
+              <div className="flex justify-end mt-4">
+                <Button
+                  onClick={() =>
+                    setTotalInfo({
+                      count: paginatedIncomes.length,
+                      total: paginatedIncomes.reduce(
+                        (acc, income) => acc + (parseFloat(income.amount) || 0),
+                        0
+                      ),
+                    })
+                  }
+                  className="bg-primary text-white px-6"
+                >
+                  حساب الإجمالي
+                </Button>
+              </div>
+
+              {/* Total Info Display */}
+              {totalInfo.count > 0 && (
+                <div className="mt-4 bg-gray-50 border rounded-md p-4 text-right space-y-1">
+                  <p className="text-sm font-semibold text-gray-700">
+                    عدد الدخل: {totalInfo.count}
+                  </p>
+                  <p className="text-sm font-semibold text-gray-700">
+                    إجمالي الدخل: {totalInfo.total} جنيه
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -546,7 +607,7 @@ const Income = () => {
 
       {showModal && (
         <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-opacity-50"
+          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
           onClick={() => setShowModal(false)}
         >
           <div
@@ -575,23 +636,41 @@ const Income = () => {
                   <label className="block text-sm font-medium capitalize mb-1 text-right">
                     {labelMapping[field] || field}
                   </label>
-                  <input
-                    type={
-                      field === "amount"
-                        ? "number"
-                        : field === "date"
-                        ? "date"
-                        : "text"
-                    }
-                    name={field}
-                    value={
-                      currentItem
-                        ? currentItem[field] || ""
-                        : newItem[field] || ""
-                    }
-                    onChange={handleChange}
-                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                  />
+                  {field === "club" ? (
+                    <select
+                      name="club"
+                      value={
+                        currentItem ? currentItem.club : newItem.club
+                      }
+                      onChange={handleChange}
+                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                    >
+                      <option value="">اختر النادي</option>
+                      {uniqueClubs.map((club) => (
+                        <option key={club.id} value={club.id}>
+                          {club.name}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type={
+                        field === "amount"
+                          ? "number"
+                          : field === "date"
+                          ? "date"
+                          : "text"
+                      }
+                      name={field}
+                      value={
+                        currentItem
+                          ? currentItem[field] || ""
+                          : newItem[field] || ""
+                      }
+                      onChange={handleChange}
+                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                    />
+                  )}
                 </div>
               ))}
             </div>
@@ -615,7 +694,7 @@ const Income = () => {
 
       {confirmDeleteModal && (
         <div
-          className="fixed inset-0 z-50 flex justify-center items-center bg-opacity-50"
+          className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50"
           onClick={() => setConfirmDeleteModal(false)}
         >
           <div

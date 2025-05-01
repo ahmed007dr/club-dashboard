@@ -18,20 +18,29 @@ def free_invite_list_api(request):
     serializer = FreeInviteSerializer(invites, many=True)
     return Response(serializer.data)
 
+
+from django.db import transaction
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@transaction.atomic
 def add_free_invite_api(request):
     data = request.data.copy()
+
     if 'handled_by' not in data and request.user.is_staff:
         data['handled_by'] = request.user.id
-    
+
     serializer = FreeInviteSerializer(data=data)
     if serializer.is_valid():
         invite = serializer.save()
+        invite.refresh_from_db()
+
         if not IsOwnerOrRelatedToClub().has_object_permission(request, None, invite):
-            invite.delete()  
-            return Response({'error': 'You do not have permission to create a free invite for this club'}, status=status.HTTP_403_FORBIDDEN)
+            invite.delete()
+            return Response({'detail': 'You do not have permission to create a free invite for this club'}, status=status.HTTP_403_FORBIDDEN)
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])

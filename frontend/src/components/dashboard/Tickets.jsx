@@ -1,20 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { 
+import React, { useState, useEffect, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import {
   fetchTickets,
   editTicketById,
   deleteTicketById,
-  markTicketAsUsed
-} from '../../redux/slices/ticketsSlice';
-import { FaEdit, FaTrash, FaCheck, FaEye, FaPlus } from 'react-icons/fa';
-import { IoTicketOutline } from 'react-icons/io5';
-import AddTicket from './AddTicket';
-
-
+  markTicketAsUsed,
+} from "../../redux/slices/ticketsSlice";
+import { FaEdit, FaTrash, FaCheck, FaEye, FaPlus } from "react-icons/fa";
+import { IoTicketOutline } from "react-icons/io5";
+import AddTicket from "./AddTicket";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/DropdownMenu";
+import { MoreVertical } from "lucide-react";
 
 const Tickets = () => {
   const dispatch = useDispatch();
-  const { tickets } = useSelector((state) => state.tickets);
+  const { tickets, status, error } = useSelector((state) => state.tickets);
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -23,41 +28,103 @@ const Tickets = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Filters
-  const [filterClub, setFilterClub] = useState('');
-  const [filterTicketType, setFilterTicketType] = useState('');
-  const [filterBuyerName, setFilterBuyerName] = useState('');
-  const [filterUsedStatus, setFilterUsedStatus] = useState('');
+  const [filterClub, setFilterClub] = useState("");
+  const [filterTicketType, setFilterTicketType] = useState("");
+  const [filterBuyerName, setFilterBuyerName] = useState("");
+  const [filterUsedStatus, setFilterUsedStatus] = useState("");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6; // Number of tickets per page
-
+  const [itemsPerPage, setItemsPerPage] = useState(6);
+  const itemsPerPageOptions = [5, 10, 20];
   const actionButtonsRef = useRef(null);
 
+  // Extract unique clubs from tickets
+  const clubs = Array.from(
+    new Map(
+      tickets.map((ticket) => [
+        ticket.club,
+        { id: ticket.club, name: ticket.club_name },
+      ])
+    ).values()
+  );
+
   // Filter tickets
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesClub = filterClub === '' || ticket.club.toString() === filterClub;
-    const matchesBuyer = filterBuyerName === '' || 
+  const filteredTickets = tickets.filter((ticket) => {
+    const matchesClub =
+      filterClub === "" || ticket.club.toString() === filterClub;
+    const matchesBuyer =
+      filterBuyerName === "" ||
       ticket.buyer_name?.toLowerCase().includes(filterBuyerName.toLowerCase());
-    const matchesType = filterTicketType === '' || ticket.ticket_type === filterTicketType;
+    const matchesType =
+      filterTicketType === "" || ticket.ticket_type === filterTicketType;
     const matchesStatus =
-      filterUsedStatus === '' ||
-      (filterUsedStatus === 'used' && ticket.used) ||
-      (filterUsedStatus === 'unused' && !ticket.used);
+      filterUsedStatus === "" ||
+      (filterUsedStatus === "used" && ticket.used) ||
+      (filterUsedStatus === "unused" && !ticket.used);
 
     return matchesClub && matchesBuyer && matchesType && matchesStatus;
   });
 
-  // Calculate paginated tickets
-  const totalPages = Math.ceil(filteredTickets.length / itemsPerPage);
+  // Pagination logic
+  const totalItems = filteredTickets.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
   const indexOfLastTicket = currentPage * itemsPerPage;
   const indexOfFirstTicket = indexOfLastTicket - itemsPerPage;
-  const currentTickets = filteredTickets.slice(indexOfFirstTicket, indexOfLastTicket);
+  const currentTickets = filteredTickets.slice(
+    indexOfFirstTicket,
+    indexOfLastTicket
+  );
+  const startIndex = indexOfFirstTicket + 1;
+  const endIndex = Math.min(indexOfLastTicket, totalItems);
 
-  // Reset to first page when filters change
+  // Generate page numbers (limited range)
+  const getPageNumbers = () => {
+    const maxPagesToShow = 5;
+    const halfPages = Math.floor(maxPagesToShow / 2);
+    let startPage = Math.max(1, currentPage - halfPages);
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage + 1 < maxPagesToShow) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    const pages = [];
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i);
+    }
+    return pages;
+  };
+
+  // Pagination handlers
+  const handlePageChange = (pageNumber) => {
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNext = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    const newItemsPerPage = parseInt(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
+
+  // Reset to first page when filters or itemsPerPage change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterClub, filterTicketType, filterBuyerName, filterUsedStatus]);
+  }, [filterClub, filterTicketType, filterBuyerName, filterUsedStatus, itemsPerPage]);
 
   // Modal handlers
   const openCreateModal = () => {
@@ -65,7 +132,8 @@ const Tickets = () => {
     setShowCreateModal(true);
   };
 
-  const openViewModal = (ticket) => {
+  const openViewModal = (ticket, e) => {
+    if (e) e.stopPropagation();
     closeAllModals();
     setSelectedTicket(ticket);
     setShowViewModal(true);
@@ -104,38 +172,43 @@ const Tickets = () => {
   // Handle clicks outside modals
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (actionButtonsRef.current && actionButtonsRef.current.contains(e.target)) {
+      if (
+        actionButtonsRef.current &&
+        actionButtonsRef.current.contains(e.target)
+      ) {
         return;
       }
-      if (!e.target.closest('.modal-container')) {
+      if (!e.target.closest(".modal-container")) {
         closeAllModals();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   // Data handlers
   const handleEditSave = () => {
     if (selectedTicket) {
-      const clubId = Array.isArray(selectedTicket.club) 
-        ? selectedTicket.club[0] 
+      const clubId = Array.isArray(selectedTicket.club)
+        ? selectedTicket.club[0]
         : selectedTicket.club;
-      
+
       const updatedTicketData = {
         club: Number(clubId),
         buyer_name: selectedTicket.buyer_name,
         ticket_type: selectedTicket.ticket_type,
-        price: selectedTicket.price,
+        price: Number(selectedTicket.price), // Parse price to number
         used: selectedTicket.used,
-        used_by: selectedTicket.used ? selectedTicket.used_by : null,
+        used_by: selectedTicket.used ? Number(selectedTicket.used_by) || null : null,
       };
-      
-      dispatch(editTicketById({ 
-        ticketId: selectedTicket.id, 
-        ticketData: updatedTicketData 
-      })).then(() => {
+
+      dispatch(
+        editTicketById({
+          ticketId: selectedTicket.id,
+          ticketData: updatedTicketData,
+        })
+      ).then(() => {
         dispatch(fetchTickets());
         closeAllModals();
       });
@@ -144,20 +217,21 @@ const Tickets = () => {
 
   const handleDelete = () => {
     if (selectedTicket) {
-      dispatch(deleteTicketById(selectedTicket.id))
-        .then(() => {
-          dispatch(fetchTickets());
-          closeAllModals();
-        });
+      dispatch(deleteTicketById(selectedTicket.id)).then(() => {
+        dispatch(fetchTickets());
+        closeAllModals();
+      });
     }
   };
 
   const handleMarkAsUsed = () => {
     if (selectedTicket) {
-      dispatch(markTicketAsUsed({
-        ticketId: selectedTicket.id,
-        used_by: selectedTicket.used_by || null
-      })).then(() => {
+      dispatch(
+        markTicketAsUsed({
+          ticketId: selectedTicket.id,
+          used_by: Number(selectedTicket.used_by) || null,
+        })
+      ).then(() => {
         dispatch(fetchTickets());
         closeAllModals();
       });
@@ -166,12 +240,15 @@ const Tickets = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    
-    setSelectedTicket(prev => ({
+
+    setSelectedTicket((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : 
-              (name === "club" || name === "used_by") ? Number(value) || "" : 
-              value
+      [name]:
+        type === "checkbox"
+          ? checked
+          : name === "club" || name === "used_by" || name === "price"
+          ? Number(value) || ""
+          : value,
     }));
   };
 
@@ -180,18 +257,15 @@ const Tickets = () => {
     dispatch(fetchTickets());
   }, [dispatch]);
 
-  // Pagination handlers
-  const goToPage = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
+  if (status === "loading")
+    return <div className="flex justify-center items-center h-screen">جاري التحميل...</div>;
+  if (error) return <div className="text-red-500 text-center p-4">خطأ: {error}</div>;
 
   return (
     <div className="p-6" dir="rtl">
       {/* Header and Create Button */}
       <div className="flex justify-between items-start mb-6">
-        <div className="flex items-start space-x-3">   
+        <div className="flex items-start space-x-3">
           <IoTicketOutline className="text-blue-600 w-9 h-9 text-2xl" />
           <h2 className="text-2xl font-bold mb-6">التذاكر</h2>
         </div>
@@ -199,9 +273,9 @@ const Tickets = () => {
           onClick={openCreateModal}
           className="flex items-center gap-2 btn"
         >
-          <FaPlus /> 
+          <FaPlus />
           إضافة تذكرة جديد
-        </button>   
+        </button>
       </div>
 
       {/* Filters */}
@@ -213,13 +287,18 @@ const Tickets = () => {
           value={filterBuyerName}
           onChange={(e) => setFilterBuyerName(e.target.value)}
         />
-        <input
-          type="number"
-          placeholder="معرف النادي"
+        <select
           className="border p-2 rounded"
           value={filterClub}
           onChange={(e) => setFilterClub(e.target.value)}
-        />
+        >
+          <option value="">كل الأندية</option>
+          {clubs.map((club) => (
+            <option key={club.id} value={club.id}>
+              {club.name}
+            </option>
+          ))}
+        </select>
         <select
           className="border p-2 rounded"
           value={filterTicketType}
@@ -245,66 +324,77 @@ const Tickets = () => {
       <table className="min-w-full bg-white shadow rounded">
         <thead>
           <tr>
-            <th className="py-2 px-4 border-b text-left">النادي (المعرف)</th>
-            <th className="py-2 px-4 border-b text-left">اسم النادي</th>
-            <th className="py-2 px-4 border-b text-left">المشتري</th>
-            <th className="py-2 px-4 border-b text-left">نوع التذكرة</th>
-            <th className="py-2 px-4 border-b text-left">السعر</th>
-            <th className="py-2 px-4 border-b text-left">الحالة</th>
+            <th className="py-2 px-4 border-b text-center">النادي (المعرف)</th>
+            <th className="py-2 px-4 border-b text-center">اسم النادي</th>
+            <th className="py-2 px-4 border-b text-center">المشتري</th>
+            <th className="py-2 px-4 border-b text-center">نوع التذكرة</th>
+            <th className="py-2 px-4 border-b text-center">السعر</th>
+            <th className="py-2 px-4 border-b text-center">الحالة</th>
             <th className="py-2 px-4 border-b text-center">إجراءات</th>
           </tr>
         </thead>
         <tbody>
           {currentTickets.map((ticket) => (
             <tr key={ticket.id} className="hover:bg-gray-100">
-              <td className="py-2 px-4 border-b">{ticket.club}</td>
-              <td className="py-2 px-4 border-b">{ticket.club_name}</td>
-              <td className="py-2 px-4 border-b">{ticket.buyer_name}</td>
-              <td className="py-2 px-4 border-b">{ticket.ticket_type_display}</td>
-              <td className="py-2 px-4 border-b">${ticket.price}</td>
-              <td className="py-2 px-4 border-b">
-                <span className={`px-2 py-1 rounded ${
-                  ticket.used ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'
-                }`}>
-                  {ticket.used ? 'مستخدمة' : 'متاحة'}
+              <td className="py-2 px-4 border-b text-center">{ticket.club}</td>
+              <td className="py-2 px-4 border-b text-center">{ticket.club_name}</td>
+              <td className="py-2 px-4 border-b text-center">{ticket.buyer_name}</td>
+              <td className="py-2 px-4 border-b text-center">
+                {ticket.ticket_type_display}
+              </td>
+              <td className="py-2 px-4 border-b text-center">${ticket.price}</td>
+              <td className="py-2 px-4 border-b text-center">
+                <span
+                  className={`px-2 py-1 rounded ${
+                    ticket.used
+                      ? "bg-red-100 text-red-600"
+                      : "bg-green-100 text-green-600"
+                  }`}
+                >
+                  {ticket.used ? "مستخدمة" : "متاحة"}
                 </span>
               </td>
               <td className="py-2 px-4 border-b">
-                <div 
+                <div
                   ref={actionButtonsRef}
                   className="flex flex-wrap justify-center items-center gap-2"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <button
-                    onClick={(e) => openEditModal(ticket, e)}
-                    className="p-2 bg-blue-100 hover:bg-blue-200 text-blue-600 rounded-full"
-                    title="Edit"
-                  >
-                    <FaEdit size={16} />
-                  </button>
-                  <button
-                    onClick={(e) => openDeleteModal(ticket, e)}
-                    className="p-2 bg-red-100 hover:bg-red-200 text-red-600 rounded-full"
-                    title="Delete"
-                  >
-                    <FaTrash size={16} />
-                  </button>
-                  {!ticket.used && (
-                    <button
-                      onClick={(e) => openMarkAsUsedModal(ticket, e)}
-                      className="p-2 bg-green-100 hover:bg-green-200 text-green-600 rounded-full"
-                      title="Mark as Used"
-                    >
-                      <FaCheck size={16} />
-                    </button>
-                  )}
-                  <button
-                    onClick={(e) => openViewModal(ticket, e)}
-                    className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full"
-                    title="View"
-                  >
-                    <FaEye size={16} />
-                  </button>
+                  <DropdownMenu dir="rtl">
+                    <DropdownMenuTrigger asChild>
+                      <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                        <MoreVertical className="h-5 w-5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem
+                        onClick={(e) => openViewModal(ticket, e)}
+                        className="cursor-pointer text-green-600 hover:bg-yellow-50"
+                      >
+                        بيانات
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => openEditModal(ticket, e)}
+                        className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                      >
+                        تعديل
+                      </DropdownMenuItem>
+                      {!ticket.used && (
+                        <DropdownMenuItem
+                          onClick={(e) => openMarkAsUsedModal(ticket, e)}
+                          className="cursor-pointer text-green-600 hover:bg-yellow-50"
+                        >
+                          تحديد كمستخدمة
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuItem
+                        onClick={(e) => openDeleteModal(ticket, e)}
+                        className="cursor-pointer text-red-600 hover:bg-red-50"
+                      >
+                        حذف
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </td>
             </tr>
@@ -313,33 +403,68 @@ const Tickets = () => {
       </table>
 
       {/* Pagination Controls */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-4">
-          <button
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            السابق
-          </button>
-          {Array.from({ length: totalPages }, (_, index) => (
+      {totalPages > 0 && (
+        <div className="flex flex-col items-center mt-6 space-y-4">
+          <div className="flex justify-center items-center space-x-2 space-x-reverse">
             <button
-              key={index + 1}
-              onClick={() => goToPage(index + 1)}
-              className={`px-3 py-1 rounded ${
-                currentPage === index + 1 ? 'bg-blue-500 text-white' : 'bg-gray-200'
+              onClick={handlePrevious}
+              disabled={currentPage === 1}
+              className={`px-4 py-2 rounded-md ${
+                currentPage === 1
+                  ? "bg-gray-200 cursor-not-allowed"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
               }`}
+              aria-label="الصفحة السابقة"
             >
-              {index + 1}
+              السابق
             </button>
-          ))}
-          <button
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            التالي
-          </button>
+
+            {getPageNumbers().map((page) => (
+              <button
+                key={page}
+                onClick={() => handlePageChange(page)}
+                className={`px-4 py-2 rounded-md ${
+                  currentPage === page
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200 hover:bg-gray-300"
+                }`}
+                aria-label={`الصفحة ${page}`}
+              >
+                {page}
+              </button>
+            ))}
+
+            <button
+              onClick={handleNext}
+              disabled={currentPage === totalPages}
+              className={`px-4 py-2 rounded-md ${
+                currentPage === totalPages
+                  ? "bg-gray-200 cursor-not-allowed"
+                  : "bg-blue-500 text-white hover:bg-blue-600"
+              }`}
+              aria-label="الصفحة التالية"
+            >
+              التالي
+            </button>
+          </div>
+
+          <div className="flex items-center justify-center gap-4">
+            <span>
+              عرض {startIndex}–{endIndex} من {totalItems} تذكرة
+            </span>
+            <select
+              value={itemsPerPage}
+              onChange={handleItemsPerPageChange}
+              className="border p-2 rounded"
+              aria-label="عدد التذاكر لكل صفحة"
+            >
+              {itemsPerPageOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option} لكل صفحة
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       )}
 
@@ -348,7 +473,7 @@ const Tickets = () => {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="flex justify-between items-center border-b p-4">
-              <h2 className="text-xl font-semibold">Create New Ticket</h2>
+              <h2 className="text-xl font-semibold">إضافة تذكرة جديدة</h2>
               <button
                 onClick={closeAllModals}
                 className="text-gray-500 hover:text-gray-700"
@@ -357,7 +482,7 @@ const Tickets = () => {
               </button>
             </div>
             <div className="p-4">
-              <AddTicket onClose={closeAllModals} />
+              <AddTicket onClose={closeAllModals} clubs={clubs} />
             </div>
           </div>
         </div>
@@ -369,40 +494,67 @@ const Tickets = () => {
 
           <div className="bg-white p-6 rounded shadow-lg w-96">
             <h2 className="text-2xl font-bold mb-4">تعديل التذكرة</h2>
-            <input
-              type="text"
-              name="buyer_name"
-              value={selectedTicket.buyer_name}
-              onChange={handleInputChange}
-              placeholder="اسم المشتري"
-              className="w-full border p-2 mb-4"
-            />
-            <input
-              type="number"
-              name="price"
-              value={selectedTicket.price}
-              onChange={handleInputChange}
-              placeholder="السعر"
-              className="w-full border p-2 mb-4"
-            />
-            <input
-              type="number"
-              name="club"
-              value={selectedTicket.club}
-              onChange={handleInputChange}
-              placeholder="معرف النادي"
-              className="w-full border p-2 mb-4"
-            />
-            <select
-              name="ticket_type"
-              value={selectedTicket.ticket_type}
-              onChange={handleInputChange}
-              className="w-full border p-2 mb-4"
-            >
-              <option value="session">جلسة</option>
-              <option value="day_pass">تصريح يومي</option>
-              <option value="monthly">شهري</option>
-            </select>
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-2">
+                النادي
+              </label>
+              <select
+                name="club"
+                value={selectedTicket.club}
+                onChange={handleInputChange}
+                className="w-full border p-2 rounded"
+                required
+              >
+                <option value="">اختر النادي</option>
+                {clubs.map((club) => (
+                  <option key={club.id} value={club.id}>
+                    {club.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-2">
+                اسم المشتري
+              </label>
+              <input
+                type="text"
+                name="buyer_name"
+                value={selectedTicket.buyer_name}
+                onChange={handleInputChange}
+                placeholder="اسم المشتري"
+                className="w-full border p-2 rounded"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-2">
+                نوع التذكرة
+              </label>
+              <select
+                name="ticket_type"
+                value={selectedTicket.ticket_type}
+                onChange={handleInputChange}
+                className="w-full border p-2 rounded"
+              >
+                <option value="session">جلسة</option>
+                <option value="day_pass">تصريح يومي</option>
+                <option value="monthly">شهري</option>
+              </select>
+            </div>
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-2">
+                السعر
+              </label>
+              <input
+                type="number"
+                name="price"
+                value={selectedTicket.price}
+                onChange={handleInputChange}
+                placeholder="السعر"
+                className="w-full border p-2 rounded"
+                step="0.01"
+              />
+            </div>
             <div className="flex items-center mb-4">
               <input
                 type="checkbox"
@@ -414,27 +566,32 @@ const Tickets = () => {
               <label>مستخدمة</label>
             </div>
             {selectedTicket.used && (
-              <input
-                type="number"
-                name="used_by"
-                value={selectedTicket.used_by || ""}
-                onChange={handleInputChange}
-                placeholder="Used By (Member ID)"
-                className="w-full border p-2 mb-4"
-              />
+              <div className="mb-4">
+                <label className="block text-gray-700 font-medium mb-2">
+                  معرف العضو
+                </label>
+                <input
+                  type="number"
+                  name="used_by"
+                  value={selectedTicket.used_by || ""}
+                  onChange={handleInputChange}
+                  placeholder="معرف العضو"
+                  className="w-full border p-2 rounded"
+                />
+              </div>
             )}
             <div className="flex justify-end gap-2">
               <button
                 onClick={closeAllModals}
                 className="bg-gray-300 px-4 py-2 rounded"
               >
-                Cancel
+                إلغاء
               </button>
               <button
                 onClick={handleEditSave}
                 className="bg-blue-500 text-white px-4 py-2 rounded"
               >
-                Save Changes
+                حفظ التغييرات
               </button>
             </div>
           </div>
@@ -471,7 +628,9 @@ const Tickets = () => {
           <div className="bg-white p-6 rounded shadow-lg w-80">
             <h2 className="text-2xl font-bold mb-4">تحديد التذكرة كمستخدمة</h2>
             <div className="mb-4">
-              <label htmlFor="usedBy" className="block mb-2">معرف العضو:</label>
+              <label htmlFor="usedBy" className="block mb-2">
+                معرف العضو:
+              </label>
               <input
                 type="number"
                 name="used_by"
@@ -483,14 +642,14 @@ const Tickets = () => {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <button 
-                onClick={closeAllModals} 
+              <button
+                onClick={closeAllModals}
                 className="bg-gray-300 px-4 py-2 rounded"
               >
                 إلغاء
               </button>
-              <button 
-                onClick={handleMarkAsUsed} 
+              <button
+                onClick={handleMarkAsUsed}
                 className="bg-green-500 text-white px-4 py-2 rounded"
               >
                 تأكيد
@@ -505,11 +664,22 @@ const Tickets = () => {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
           <div className="bg-white p-6 rounded shadow-lg w-96">
             <h2 className="text-2xl font-bold mb-4">تفاصيل التذكرة</h2>
-            <p><strong>اسم المشتري:</strong> {selectedTicket.buyer_name}</p>
-            <p><strong>السعر:</strong> ${selectedTicket.price}</p>
-            <p><strong>النادي:</strong> {selectedTicket.club_name}</p>
-            <p><strong>نوع التذكرة:</strong> {selectedTicket.ticket_type_display}</p>
-            <p><strong>الحالة:</strong> {selectedTicket.used ? 'مستخدمة' : 'متاحة'}</p>
+            <p>
+              <strong>اسم المشتري:</strong> {selectedTicket.buyer_name}
+            </p>
+            <p>
+              <strong>السعر:</strong> ${selectedTicket.price}
+            </p>
+            <p>
+              <strong>النادي:</strong> {selectedTicket.club_name}
+            </p>
+            <p>
+              <strong>نوع التذكرة:</strong> {selectedTicket.ticket_type_display}
+            </p>
+            <p>
+              <strong>الحالة:</strong>{" "}
+              {selectedTicket.used ? "مستخدمة" : "متاحة"}
+            </p>
             <div className="flex justify-end gap-2 mt-4">
               <button
                 onClick={closeAllModals}
@@ -526,7 +696,3 @@ const Tickets = () => {
 };
 
 export default Tickets;
-
-
-
-

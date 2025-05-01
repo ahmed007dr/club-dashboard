@@ -28,7 +28,6 @@ const ProtectedRoute = ({ element }) => {
   if (!accessToken) {
     return <Navigate to="/login" replace />;
   }
-
   return element;
 };
 
@@ -61,6 +60,7 @@ function App() {
         </Route>
         
       </Routes>
+      
     </div>
   );
 }
