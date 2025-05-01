@@ -71,11 +71,11 @@ class CustomUserAdmin(UserAdmin):
             kwargs['queryset'] = Club.objects.order_by('name')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    # Optional: Add custom CSS for styling
-    class Media:
-        css = {
-            'all': ('css/admin_custom.css',)
-        }
+    # # Optional: Add custom CSS for styling
+    # class Media:
+    #     css = {
+    #         'all': ('css/admin_custom.css',)
+    #     }
 
 # # Optional: Unregister the default Group and Permission admin to avoid clutter
 # admin.site.unregister(Group)
