@@ -1,11 +1,10 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import BASE_URL from '../../config/api';
 
-const token = localStorage.getItem('token');
-
 // Fetch staff
 export const fetchStaff = createAsyncThunk('staff/fetchStaff', async () => {
-    const res = await fetch("${BASE_URL}/staff/api/shifts/", {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${BASE_URL}/staff/api/shifts/`, {
         method: 'GET',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -18,6 +17,7 @@ export const fetchStaff = createAsyncThunk('staff/fetchStaff', async () => {
         } else if (res.status === 500) {
             throw new Error("Internal Server Error. Please try again later.");
         }
+        throw new Error("Failed to fetch staff.");
     }
     const data = await res.json();
     return data;
@@ -25,7 +25,8 @@ export const fetchStaff = createAsyncThunk('staff/fetchStaff', async () => {
 
 // Add staff
 export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff) => {
-    const res = await fetch("${BASE_URL}/staff/api/shifts/create/", {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${BASE_URL}/staff/api/shifts/create/`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -39,7 +40,7 @@ export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff) => {
 
 // Edit staff
 export const editStaff = createAsyncThunk('staff/editStaff', async ({ id, updatedStaff }) => {
-    console.log("Editing staff with ID:", id, "Updated data:", updatedStaff);
+    const token = localStorage.getItem('token');
     const res = await fetch(`${BASE_URL}/staff/api/shifts/${id}/edit/`, {
         method: 'PUT',
         headers: {
@@ -54,6 +55,7 @@ export const editStaff = createAsyncThunk('staff/editStaff', async ({ id, update
 
 // Delete staff
 export const deleteStaff = createAsyncThunk('staff/deleteStaff', async (id) => {
+    const token = localStorage.getItem('token');
     await fetch(`${BASE_URL}/staff/api/shifts/${id}/delete/`, {
         method: 'DELETE',
         headers: {
@@ -66,6 +68,7 @@ export const deleteStaff = createAsyncThunk('staff/deleteStaff', async (id) => {
 
 // Get staff by ID
 export const getStaffById = createAsyncThunk('staff/getStaffById', async (id) => {
+    const token = localStorage.getItem('token');
     const res = await fetch(`${BASE_URL}/staff/api/staff/${id}/`, {
         method: 'GET',
         headers: {
@@ -77,6 +80,7 @@ export const getStaffById = createAsyncThunk('staff/getStaffById', async (id) =>
         if (res.status === 404) {
             throw new Error("Staff not found.");
         }
+        throw new Error("Failed to fetch staff by ID.");
     }
     const data = await res.json();
     return data;
@@ -87,39 +91,50 @@ const staffSlice = createSlice({
     name: 'staffslice',
     initialState: {
         items: [],
-        isloading: true,
+        user: null,
+        isloading: false,
         error: null,
     },
     reducers: {},
     extraReducers: (builder) => {
         builder
+            // fetchStaff
+            .addCase(fetchStaff.pending, (state) => {
+                state.isloading = true;
+                state.error = null;
+            })
             .addCase(fetchStaff.fulfilled, (state, action) => {
                 state.items = action.payload;
                 state.isloading = false;
             })
-            .addCase(fetchStaff.pending, (state) => {
-                state.isloading = true;
+            .addCase(fetchStaff.rejected, (state, action) => {
+                state.isloading = false;
+                state.error = action.error.message;
             })
+
+            // addStaff
             .addCase(addStaff.fulfilled, (state, action) => {
-                if (Array.isArray(state.items)) {
-                    state.items.push(action.payload);
-                }
+                state.items.push(action.payload);
             })
+
+            // editStaff
             .addCase(editStaff.fulfilled, (state, action) => {
                 const { id, updatedStaff } = action.payload;
-                if (Array.isArray(state.items)) {
-                    const index = state.items.findIndex(staff => staff.id === id);
-                    if (index !== -1) {
-                        state.items[index] = { ...state.items[index], ...updatedStaff };
-                    }
+                const index = state.items.findIndex(staff => staff.id === id);
+                if (index !== -1) {
+                    state.items[index] = { ...state.items[index], ...updatedStaff };
                 }
             })
+
+            // deleteStaff
             .addCase(deleteStaff.fulfilled, (state, action) => {
                 const id = action.payload;
                 state.items = state.items.filter(staff => staff.id !== id);
             })
+
+            // getStaffById
             .addCase(getStaffById.fulfilled, (state, action) => {
-                state.user = action.payload; // Store the fetched staff by ID
+                state.user = action.payload;
             });
     },
 });

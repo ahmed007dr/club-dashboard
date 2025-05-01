@@ -13,7 +13,7 @@ import AddReceiptForm from './AddReceiptForm';
 
 function Receipts() {
   const dispatch = useDispatch();
-  const { receipts, status, error, message, currentReceipt } = useSelector(state => state.receipts);
+  const { receipts, status, error, message, currentReceipt } = useSelector(state => state.receipts);       
   
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
