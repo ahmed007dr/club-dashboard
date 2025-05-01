@@ -9,7 +9,7 @@ from drf_yasg import openapi
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 def home_view(request):
-    return redirect('schema-swagger-ui')
+    return redirect("http://localhost:5173/login")
 
 schema_view = get_schema_view(
    openapi.Info(
