@@ -37,11 +37,11 @@ def create_dummy_data():
     roles = ['owner', 'admin', 'reception', 'accountant', 'coach']
     users = []
     for _ in range(5):
-        username = fake.user_name()
+        username = fake.user_name()[:5]
         user = User.objects.create_user(
             username=username,
             email=fake.email(),
-            password='password123',
+            password='123',
             club=random.choice(clubs),
             role=random.choice(roles),
             first_name=fake.first_name(),
