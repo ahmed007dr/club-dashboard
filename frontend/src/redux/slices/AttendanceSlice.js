@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import BASE_URL from '../../config/api';
 import axios from 'axios';
+
 // Async thunk for fetching attendances
 export const fetchAttendances = createAsyncThunk(
   'attendance/fetchAttendances',
@@ -9,18 +10,13 @@ export const fetchAttendances = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.get(`${BASE_URL}/attendance/api/attendances/`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to fetch attendances.');
-      }
-      const data = await response.json();
-      return data;
+      return response.data; // Use response.data instead of response.json()
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch attendances.');
     }
   }
 );
@@ -33,18 +29,13 @@ export const addAttendance = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.post(`${BASE_URL}/attendance/api/attendances/add/`, newAttendance, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newAttendance),
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to add attendance.');
-      }
-      return newAttendance; // Return the added attendance for optimistic updates
+      return response.data; // Use response.data instead of newAttendance for consistency
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to add attendance.');
     }
   }
 );
@@ -57,17 +48,13 @@ export const deleteAttendance = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.delete(`${BASE_URL}/attendance/api/attendances/${id}/delete/`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to delete attendance.');
-      }
-      return id; // Return the ID of the deleted attendance for optimistic updates
+      return id; // Return the ID for optimistic updates
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || 'Failed to delete attendance.');
     }
   }
 );
@@ -103,7 +90,7 @@ const attendanceSlice = createSlice({
       })
       .addCase(addAttendance.fulfilled, (state, action) => {
         state.loading = false;
-        state.attendances.push(action.payload); // Optimistic update
+        state.attendances.push(action.payload); // Update with response.data
       })
       .addCase(addAttendance.rejected, (state, action) => {
         state.loading = false;
@@ -117,7 +104,7 @@ const attendanceSlice = createSlice({
       .addCase(deleteAttendance.fulfilled, (state, action) => {
         state.loading = false;
         const deletedId = action.payload;
-        state.attendances = state.attendances.filter((attendance) => attendance.id !== deletedId); // Remove deleted attendance
+        state.attendances = state.attendances.filter((attendance) => attendance.id !== deletedId);
       })
       .addCase(deleteAttendance.rejected, (state, action) => {
         state.loading = false;

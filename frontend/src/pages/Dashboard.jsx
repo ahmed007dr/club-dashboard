@@ -37,7 +37,6 @@ const Dashboard = () => {
         { path: 'members', name: 'الأعضاء', icon: <RiGroupLine /> },
         { path: 'attendance', name: 'الحضور', icon: <AiOutlineSchedule /> },
         { path: 'free-invites', name: 'الدعوات المجانية', icon: <RiVipCrown2Line /> },
-        { path: 'leads', name: 'العملاء المحتملين', icon: <GiTeamIdea /> },
         { path: 'subscriptions', name: 'الاشتراكات', icon: <MdOutlineSubscriptions /> },
       ],
     },
