@@ -1,16 +1,18 @@
-import { useState } from 'react';
-import axios from 'axios';
-import BASE_URL from '../../config/api';
+import React, { useState } from "react";
+import { useDispatch } from "react-redux";
+import { addReceipt, fetchReceipts } from "../../redux/slices/receiptsSlice";
 
-const AddReceiptForm = () => {
+function AddReceiptForm({ onClose, clubs }) {
+  const dispatch = useDispatch();
   const [formData, setFormData] = useState({
-    club: '',
-    member: '',
-    subscription: null,
-    amount: '',
-    payment_method: 'cash', // default option
-    note: '',
+    club: "",
+    member: "",
+    subscription: "",
+    amount: "",
+    payment_method: "cash",
+    note: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -22,118 +24,132 @@ const AddReceiptForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-  
+    setIsSubmitting(true);
+
+    const receiptData = {
+      ...formData,
+      club: parseInt(formData.club) || null,
+      member: parseInt(formData.member) || null,
+      subscription: formData.subscription || null,
+      amount: parseFloat(formData.amount) || 0,
+    };
+
     try {
-      const token = localStorage.getItem('token');
-  
-      const response = await axios.post(
-         `${BASE_URL}/receipts/api/receipts/add/`,
-        formData,
-        {
-          headers: {
-            Accept: 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-  
-      // Log the success response
-      console.log('Success:', response.data);
-      // Optional: show a success message or reset form
+      await dispatch(addReceipt(receiptData)).unwrap();
+      await dispatch(fetchReceipts());
+      onClose();
     } catch (error) {
-      // Log the error response
-      console.error('Error:', error.response ? error.response.data : error.message);
-      // Optional: handle the error and show an error message
+      console.error("Error adding receipt:", error);
+      // Optional: Show error message to user
+    } finally {
+      setIsSubmitting(false);
     }
   };
-  
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-lg mx-auto p-4 border border-gray-300 rounded-lg">
+    <form onSubmit={handleSubmit} dir="rtl" className="space-y-4">
+      {/* Club Field */}
       <div className="mb-4">
-      <label htmlFor="club" className="block text-sm font-medium text-gray-700">النادي</label>
-        <input
-          type="number"
-          id="club"
+        <label className="block text-gray-700 font-medium mb-2">النادي</label>
+        <select
           name="club"
           value={formData.club}
           onChange={handleChange}
-          className="mt-1 p-2 w-full border border-gray-300 rounded-md"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
           required
-        />
-      </div>
-
-      <div className="mb-4">
-      <label htmlFor="member" className="block text-sm font-medium text-gray-700">العضو</label>
-        <input
-          type="number"
-          id="member"
-          name="member"
-          value={formData.member}
-          onChange={handleChange}
-          className="mt-1 p-2 w-full border border-gray-300 rounded-md"
-          required
-        />
-      </div>
-
-      <div className="mb-4">
-      <label htmlFor="subscription" className="block text-sm font-medium text-gray-700">الاشتراك</label>
-        <input
-          type="text"
-          id="subscription"
-          name="subscription"
-          value={formData.subscription || ''}
-          onChange={handleChange}
-          className="mt-1 p-2 w-full border border-gray-300 rounded-md"
-        />
-      </div>
-
-      <div className="mb-4">
-      <label htmlFor="amount" className="block text-sm font-medium text-gray-700">المبلغ</label>
-        <input
-          type="text"
-          id="amount"
-          name="amount"
-          value={formData.amount}
-          onChange={handleChange}
-          className="mt-1 p-2 w-full border border-gray-300 rounded-md"
-          required
-        />
-      </div>
-
-      <div className="mb-4">
-      <label htmlFor="payment_method" className="block text-sm font-medium text-gray-700">طريقة الدفع</label>
-        <select
-          id="payment_method"
-          name="payment_method"
-          value={formData.payment_method}
-          onChange={handleChange}
-          className="mt-1 p-2 w-full border border-gray-300 rounded-md"
         >
-        <option value="cash">Cash</option>
-    <option value="visa">Visa</option>
-    <option value="bank">Bank Transfer</option>
+          <option value="">اختر النادي</option>
+          {clubs.map((club) => (
+            <option key={club.id} value={club.id}>
+              {club.name}
+            </option>
+          ))}
         </select>
       </div>
 
+      {/* Member Field */}
       <div className="mb-4">
-      <label htmlFor="note" className="block text-sm font-medium text-gray-700">ملاحظة</label>
-        <textarea
-          id="note"
-          name="note"
-          value={formData.note}
+        <label className="block text-gray-700 font-medium mb-2">العضو</label>
+        <input
+          type="number"
+          name="member"
+          value={formData.member}
           onChange={handleChange}
-          className="mt-1 p-2 w-full border border-gray-300 rounded-md"
-          rows="4"
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          required
         />
       </div>
 
-      <button type="submit" className="btn">
-  إرسال الإيصال
-</button>
+      {/* Subscription Field */}
+      <div className="mb-4">
+        <label className="block text-gray-700 font-medium mb-2">الإشتراك</label>
+        <input
+          type="text"
+          name="subscription"
+          value={formData.subscription}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        />
+      </div>
 
+      {/* Amount Field */}
+      <div className="mb-4">
+        <label className="block text-gray-700 font-medium mb-2">المبلغ</label>
+        <input
+          type="text"
+          name="amount"
+          value={formData.amount}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          required
+        />
+      </div>
+
+      {/* Payment Method Field */}
+      <div className="mb-4">
+        <label className="block text-gray-700 font-medium mb-2">طريقة الدفع</label>
+        <select
+          name="payment_method"
+          value={formData.payment_method}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+        >
+          <option value="cash">Cash</option>
+          <option value="bank">Bank Transfer</option>
+          <option value="visa">Visa</option>
+        </select>
+      </div>
+
+      {/* Note Field */}
+      <div className="mb-4">
+        <label className="block text-gray-700 font-medium mb-2">ملاحظة</label>
+        <textarea
+          name="note"
+          value={formData.note}
+          onChange={handleChange}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          rows={4}
+        />
+      </div>
+
+      <div className="flex justify-end space-x-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+        >
+          إلغاء
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "جاري الإضافة..." : "إضافة الإيصال"}
+        </button>
+      </div>
     </form>
   );
-};
+}
 
 export default AddReceiptForm;

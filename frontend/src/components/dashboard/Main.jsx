@@ -1,25 +1,24 @@
-import { deleteStaff, editStaff, fetchStaff } from '@/redux/slices/staff';
-import { fetchFreeInvites } from '../../redux/slices/invitesSlice'; // Changed from fetchInviteById
-import { fetchReceipts } from '../../redux/slices/receiptsSlice'; // Changed from fetchReceiptById
+import { fetchStaff } from "@/redux/slices/staff";
+import { fetchFreeInvites } from "../../redux/slices/invitesSlice";
+import { fetchReceipts } from "../../redux/slices/receiptsSlice";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUsers } from "../../redux/slices/memberSlice";
-import { fetchSubscriptions } from '../../redux/slices/subscriptionsSlice';
-import { fetchTickets } from '../../redux/slices/ticketsSlice';
+import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
+import { fetchTickets } from "../../redux/slices/ticketsSlice";
 import { fetchAttendances } from "@/redux/slices/AttendanceSlice";
 import { RiGroupLine } from "react-icons/ri";
 import { MdSubscriptions } from "react-icons/md";
-import { FaRegCalendarCheck } from "react-icons/fa";
+import { FaRegCalendarCheck, FaReceipt } from "react-icons/fa";
 import { BsPeopleFill } from "react-icons/bs";
-import { BiMailSend } from "react-icons/bi";
-import { FaReceipt } from "react-icons/fa";
 import { Link } from "react-router-dom";
-import { RiVipCrown2Line } from 'react-icons/ri';
+import { RiVipCrown2Line } from "react-icons/ri";
 import { IoTicketOutline } from "react-icons/io5";
-import SubscriptionStats from "./SubscriptionStats"; // Import the SubscriptionStats component
-import SubscriptionChart from "./SubscriptionChart"; // Import the SubscriptionStats component
-import ShiftsPerClubChart from "./ShiftsPerClubChart"; // Import the SubscriptionStats component
-import  ExpenseCategoryChart from "./ExpenseCategoryChart"; // Import the SubscriptionStats component
+import SubscriptionStats from "./SubscriptionStats";
+import SubscriptionChart from "./SubscriptionChart";
+import ShiftsPerClubChart from "./ShiftsPerClubChart ";
+
+
 const Main = () => {
   const dispatch = useDispatch();
   const { invites } = useSelector((state) => state.invites);
@@ -56,100 +55,179 @@ const Main = () => {
     dispatch(fetchReceipts());
   }, [dispatch]);
 
-  const cardClasses = "bg-white shadow-md rounded-2xl p-5 flex items-center justify-between hover:shadow-lg transition";
-  const iconClasses = "text-4xl text-blue-600";
-  const textLinkClasses = "text-sm text-blue-600 hover:underline mt-1 block";
+  const cardClasses =
+    "bg-white rounded-2xl p-4 sm:p-6 shadow transition hover:shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4";
+  const iconClasses =
+    "text-3xl sm:text-4xl text-blue-500 bg-blue-100 p-2 rounded-full shrink-0";
+  const textLinkClasses =
+    "text-xs sm:text-sm text-blue-500 hover:underline mt-2 sm:mt-0 inline-block";
 
   return (
-    <div className="">
-    <div className="p-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-  {/* التذاكر */}
-  <div className={cardClasses}>
-    <div>
-      <h3 className="text-gray-700 text-sm font-medium">إجمالي التذاكر</h3>
-      <p className="text-2xl font-bold text-gray-900">{totalTickets}</p>
-      <Link to="/tickets" className={textLinkClasses}>عرض الكل</Link>
+    <div className="min-h-screen p-4 sm:p-6" dir="rtl">
+      <h2 className="text-xl sm:text-2xl font-bold text-gray-700 dark:text-white mb-4 sm:mb-6">
+        لوحة التحكم
+      </h2>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+        {/* التذاكر */}
+        <div className={cardClasses}>
+          <div className="text-center sm:text-right">
+            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
+              إجمالي التذاكر
+            </h3>
+            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
+              {totalTickets}
+            </p>
+            <Link
+              to="/tickets"
+              className={textLinkClasses}
+              aria-label="عرض جميع التذاكر"
+            >
+              عرض الكل
+            </Link>
+          </div>
+          <IoTicketOutline className={iconClasses} />
+        </div>
+
+        {/* الأعضاء */}
+        <div className={cardClasses}>
+          <div className="text-center sm:text-right">
+            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
+              إجمالي الأعضاء
+            </h3>
+            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
+              {totalMembers}
+            </p>
+            <Link
+              to="/members"
+              className={textLinkClasses}
+              aria-label="عرض جميع الأعضاء"
+            >
+              عرض الكل
+            </Link>
+          </div>
+          <RiGroupLine className={iconClasses} />
+        </div>
+
+        {/* الاشتراكات */}
+        <div className={cardClasses}>
+          <div className="text-center sm:text-right">
+            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
+              إجمالي الاشتراكات
+            </h3>
+            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
+              {totalSubscriptions}
+            </p>
+            <Link
+              to="/subscriptions"
+              className={textLinkClasses}
+              aria-label="إدارة الاشتراكات"
+            >
+              إدارة
+            </Link>
+          </div>
+          <MdSubscriptions className={iconClasses} />
+        </div>
+
+        {/* الحضور */}
+        <div className={cardClasses}>
+          <div className="text-center sm:text-right">
+            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
+              إجمالي الحضور
+            </h3>
+            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
+              {totalAttendances}
+            </p>
+            <Link
+              to="/attendance"
+              className={textLinkClasses}
+              aria-label="تتبع الحضور"
+            >
+              تتبع
+            </Link>
+          </div>
+          <FaRegCalendarCheck className={iconClasses} />
+        </div>
+
+        {/* الموظفين */}
+        <div className={cardClasses}>
+          <div className="text-center sm:text-right">
+            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
+              إجمالي الموظفين
+            </h3>
+            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
+              {totalStaff}
+            </p>
+            <Link
+              to="/staff"
+              className={textLinkClasses}
+              aria-label="إدارة الموظفين"
+            >
+              إدارة
+            </Link>
+          </div>
+          <BsPeopleFill className={iconClasses} />
+        </div>
+
+        {/* الدعوات */}
+        <div className={cardClasses}>
+          <div className="text-center sm:text-right">
+            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
+              الدعوات
+            </h3>
+            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
+              {invites?.length || 0}
+            </p>
+            <Link
+              to="/free-invites"
+              className={textLinkClasses}
+              aria-label="عرض جميع الدعوات"
+            >
+              عرض الكل
+            </Link>
+          </div>
+          <RiVipCrown2Line className={iconClasses} />
+        </div>
+
+        {/* الإيصالات */}
+        <div className={cardClasses}>
+          <div className="text-center sm:text-right">
+            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
+              الإيصالات
+            </h3>
+            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
+              {receipts?.length || 0}
+            </p>
+            <Link
+              to="/receipts"
+              className={textLinkClasses}
+              aria-label="عرض جميع الإيصالات"
+            >
+              عرض الكل
+            </Link>
+          </div>
+          <FaReceipt className={iconClasses} />
+        </div>
+      </div>
+
+      {/* Subscription Stats and Chart Section */}
+      <div className="flex flex-col sm:flex-row items-start justify-between gap-4 sm:gap-6 mt-6">
+        <div className="w-full sm:w-1/2">
+          <SubscriptionStats />
+        </div>
+        <div className="w-full sm:w-1/2">
+          <SubscriptionChart />
+        </div>
+      </div>
+
+      {/* Shifts Per Club Chart Section */}
+      <div className="mt-6">
+        <div className="w-full">
+          <ShiftsPerClubChart />
+        </div>
+      </div>
     </div>
-    <IoTicketOutline className={iconClasses} />
-  </div>
-
-  {/* الأعضاء */}
-  <div className={cardClasses}>
-    <div>
-      <h3 className="text-gray-700 text-sm font-medium">إجمالي الأعضاء</h3>
-      <p className="text-2xl font-bold text-gray-900">{totalMembers}</p>
-      <Link to="/members" className={textLinkClasses}>عرض الكل</Link>
-    </div>
-    <RiGroupLine className={iconClasses} />
-  </div>
-
-  {/* الاشتراكات */}
-  <div className={cardClasses}>
-    <div>
-      <h3 className="text-gray-700 text-sm font-medium">إجمالي الاشتراكات</h3>
-      <p className="text-2xl font-bold text-gray-900">{totalSubscriptions}</p>
-      <Link to="/subscriptions" className={textLinkClasses}>إدارة</Link>
-    </div>
-    <MdSubscriptions className={iconClasses} />
-  </div>
-
-  {/* الحضور */}
-  <div className={cardClasses}>
-    <div>
-      <h3 className="text-gray-700 text-sm font-medium">إجمالي الحضور</h3>
-      <p className="text-2xl font-bold text-gray-900">{totalAttendances}</p>
-      <Link to="/attendances" className={textLinkClasses}>تتبع</Link>
-    </div>
-    <FaRegCalendarCheck className={iconClasses} />
-  </div>
-
-  {/* الموظفين */}
-  <div className={cardClasses}>
-    <div>
-      <h3 className="text-gray-700 text-sm font-medium">إجمالي الموظفين</h3>
-      <p className="text-2xl font-bold text-gray-900">{totalStaff}</p>
-      <Link to="/staff" className={textLinkClasses}>إدارة</Link>
-    </div>
-    <BsPeopleFill className={iconClasses} />
-  </div>
-
-  {/* الدعوات */}
-  <div className={cardClasses}>
-    <div>
-      <h3 className="text-gray-700 text-sm font-medium">الدعوات</h3>
-      <p className="text-2xl font-bold text-gray-900">{invites?.length || 0}</p>
-    </div>
-    <RiVipCrown2Line className={iconClasses} />
-  </div>
-
-  {/* الإيصالات */}
-  <div className={cardClasses}>
-    <div>
-      <h3 className="text-gray-700 text-sm font-medium">الإيصالات</h3>
-      <p className="text-2xl font-bold text-gray-900">{receipts?.length || 0}</p>
-    </div>
-    <FaReceipt className={iconClasses} />
-  </div>
-</div>
-<div className="flex items-center justify-between space-x-4 mt-6">
-
-<SubscriptionStats />
-<SubscriptionChart />
-  </div>
-  <div className="flex items-center justify-between space-x-4 mt-6">
-
-
-<ShiftsPerClubChart />
-  </div>
-  </div>
-  
   );
 };
 
 export default Main;
-
-
-
-
-
-

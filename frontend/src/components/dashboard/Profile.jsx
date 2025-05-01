@@ -25,101 +25,50 @@ const Profile = () => {
   }, []);
 
   return (
-    <div className="p-4 overflow-x-auto" dir="rtl">
-      <div className="flex items-start space-x-3">
-        <BsPersonBoundingBox className='text-blue-600 h-9 w-9 text-2xl' />
-        <h1 className="text-2xl font-bold mb-4">الملف الشخصي</h1>
-
-      </div>
-
+    <div className="p-4 min-h-screen flex items-start justify-center">
       {data ? (
-        <>
-          {/* Card layout for small screens */}
-          <div className="block sm:hidden">
-            <div className=" p-4 border border-gray-200 rounded-lg shadow-md space-y-4">
-              <div className="flex justify-between">
-                <span className="font-semibold">ID:</span>
-                <span>{data.id}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">Username:</span>
-                <span>{data.username}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">First Name:</span>
-                <span>{data.first_name || '-'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">Last Name:</span>
-                <span>{data.last_name || '-'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">Email:</span>
-                <span>{data.email}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">Role:</span>
-                <span className="capitalize">{data.role}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">Club:</span>
-                <span>{data.club || '-'}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="font-semibold">Is Active:</span>
-                <span>
-                  {data.is_active ? (
-                    <span className="bg-light-green px-2 py-1 rounded text-xs">Yes</span>
-                  ) : (
-                    <span className="bg-light-red px-2 py-1 rounded text-xs">No</span>
-                  )}
-                </span>
-              </div>
+        <div className="bg-white rounded-3xl  p-8 w-full max-w-xl text-center">
+          <div className="flex justify-center mb-6">
+            <div className="bg-blue-100 p-4 rounded-full">
+              <BsPersonBoundingBox className="text-blue-600 w-12 h-12" />
             </div>
           </div>
 
-          {/* Table layout for larger screens */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="min-w-full border border-gray-200 table-auto">
-            <thead className="text-left">
-  <tr>
-    <th className="p-3 border-b">المعرف</th>
-    <th className="p-3 border-b">اسم المستخدم</th>
-    <th className="p-3 border-b">الاسم الأول</th>
-    <th className="p-3 border-b">الاسم الأخير</th>
-    <th className="p-3 border-b">البريد الإلكتروني</th>
-    <th className="p-3 border-b">الدور</th>
-    <th className="p-3 border-b">النادي</th>
-    <th className="p-3 border-b">نشط</th>
-  </tr>
-</thead>
+          <h2 className="text-2xl font-bold mb-1 capitalize">{data.username}</h2>
+          <p className="text-gray-500 mb-4">{data.email}</p>
 
-              <tbody>
-                <tr>
-                  <td className="p-3 border-b">{data.id}</td>
-                  <td className="p-3 border-b">{data.username}</td>
-                  <td className="p-3 border-b">{data.first_name || '-'}</td>
-                  <td className="p-3 border-b">{data.last_name || '-'}</td>
-                  <td className="p-3 border-b">{data.email}</td>
-                  <td className="p-3 border-b capitalize">{data.role}</td>
-                  <td className="p-3 border-b">{data.club || '-'}</td>
-                  <td className="p-3 border-b">
-                    {data.is_active ? (
-                      <span className="bg-light-green px-2 py-1 rounded text-xs">Yes</span>
-                    ) : (
-                      <span className="bg-light-red px-2 py-1 rounded text-xs">No</span>
-                    )}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-left mt-6">
+            <ProfileItem label="ID" value={data.id} />
+            <ProfileItem label="Role" value={capitalize(data.role)} />
+            <ProfileItem label="First Name" value={data.first_name || '-'} />
+            <ProfileItem label="Last Name" value={data.last_name || '-'} />
+            <ProfileItem label="Club" value={data.club || '-'} />
+            <ProfileItem
+              label="Is Active"
+              value={
+                data.is_active ? (
+                  <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">Yes</span>
+                ) : (
+                  <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">No</span>
+                )
+              }
+            />
           </div>
-        </>
+        </div>
       ) : (
-        <p className="text-gray-500">Loading profile...</p>
+        <p className="text-gray-500 text-center">Loading profile...</p>
       )}
     </div>
   );
 };
+
+const ProfileItem = ({ label, value }) => (
+  <div className="flex flex-col bg-gray-50 px-4 py-3 rounded-lg shadow-sm">
+    <span className="text-gray-500 text-sm font-semibold">{label}</span>
+    <span className="text-gray-800 mt-1">{value}</span>
+  </div>
+);
+
+const capitalize = (s) => s && s.charAt(0).toUpperCase() + s.slice(1);
 
 export default Profile;

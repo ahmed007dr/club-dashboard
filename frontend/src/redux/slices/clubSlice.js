@@ -3,7 +3,6 @@ import BASE_URL from '../../config/api';
 
 const token = localStorage.getItem('token');
 
-// Fetch clubs
 export const fetchClubs = createAsyncThunk('clubs/fetchClubs', async (_, { rejectWithValue }) => {
   try {
     const response = await fetch(`${BASE_URL}/core/api/club/`, {

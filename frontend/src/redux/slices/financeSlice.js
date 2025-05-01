@@ -66,6 +66,7 @@ export const fetchExpenses = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch expenses.');
       }
+      
       return await response.json();
     } catch (error) {
       return rejectWithValue(error.message);
