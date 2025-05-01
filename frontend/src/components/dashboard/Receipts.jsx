@@ -322,17 +322,30 @@ function Receipts() {
         </div>
       )}
 
-      {/* Add Receipt Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">إضافة إيصال جديد</h3>
-              <AddReceiptForm onClose={() => setShowForm(false)} />
-            </div>
-          </div>
-        </div>
-      )}
+     {/* Add Receipt Form Modal */}
+{/* Add Receipt Form Modal */}
+{showForm && (
+  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
+    <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+      <div className="p-6 relative">
+        <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">إضافة إيصال جديد</h3>
+        
+        {/* Close Button */}
+        <button
+          onClick={() => setShowForm(false)}
+          className="absolute top-2 right-2 text-gray-600 hover:text-gray-900"
+        >
+          &times;
+        </button>
+
+        {/* Form Component */}
+        <AddReceiptForm onClose={() => setShowForm(false)} />
+      </div>
+    </div>
+  </div>
+)}
+
+
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
@@ -427,10 +440,9 @@ function Receipts() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   >
                    <option value="cash">Cash</option>
-  <option value="credit">Credit Card</option>
-  <option value="debit">Debit Card</option>
-  <option value="bank">Bank Transfer</option>
-  <option value="visa">Visa</option>
+                   <option value="cash">Cash</option>
+    <option value="visa">Visa</option>
+    <option value="bank">Bank Transfer</option>
                   </select>
                 </div>
 

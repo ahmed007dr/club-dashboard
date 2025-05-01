@@ -25,10 +25,11 @@ const Profile = () => {
   }, []);
 
   return (
-    <div className="p-4 overflow-x-auto">
+    <div className="p-4 overflow-x-auto" dir="rtl">
       <div className="flex items-start space-x-3">
         <BsPersonBoundingBox className='text-blue-600 h-9 w-9 text-2xl' />
-        <h1 className="text-2xl font-bold mb-4">Profile</h1>
+        <h1 className="text-2xl font-bold mb-4">الملف الشخصي</h1>
+
       </div>
 
       {data ? (
@@ -80,18 +81,19 @@ const Profile = () => {
           {/* Table layout for larger screens */}
           <div className="hidden sm:block overflow-x-auto">
             <table className="min-w-full border border-gray-200 table-auto">
-              <thead className="text-left">
-                <tr>
-                  <th className="p-3 border-b">ID</th>
-                  <th className="p-3 border-b">Username</th>
-                  <th className="p-3 border-b">First Name</th>
-                  <th className="p-3 border-b">Last Name</th>
-                  <th className="p-3 border-b">Email</th>
-                  <th className="p-3 border-b">Role</th>
-                  <th className="p-3 border-b">Club</th>
-                  <th className="p-3 border-b">Is Active</th>
-                </tr>
-              </thead>
+            <thead className="text-left">
+  <tr>
+    <th className="p-3 border-b">المعرف</th>
+    <th className="p-3 border-b">اسم المستخدم</th>
+    <th className="p-3 border-b">الاسم الأول</th>
+    <th className="p-3 border-b">الاسم الأخير</th>
+    <th className="p-3 border-b">البريد الإلكتروني</th>
+    <th className="p-3 border-b">الدور</th>
+    <th className="p-3 border-b">النادي</th>
+    <th className="p-3 border-b">نشط</th>
+  </tr>
+</thead>
+
               <tbody>
                 <tr>
                   <td className="p-3 border-b">{data.id}</td>

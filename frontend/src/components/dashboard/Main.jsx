@@ -17,6 +17,9 @@ import { Link } from "react-router-dom";
 import { RiVipCrown2Line } from 'react-icons/ri';
 import { IoTicketOutline } from "react-icons/io5";
 import SubscriptionStats from "./SubscriptionStats"; // Import the SubscriptionStats component
+import SubscriptionChart from "./SubscriptionChart"; // Import the SubscriptionStats component
+import ShiftsPerClubChart from "./ShiftsPerClubChart"; // Import the SubscriptionStats component
+import  ExpenseCategoryChart from "./ExpenseCategoryChart"; // Import the SubscriptionStats component
 const Main = () => {
   const dispatch = useDispatch();
   const { invites } = useSelector((state) => state.invites);
@@ -128,9 +131,16 @@ const Main = () => {
     <FaReceipt className={iconClasses} />
   </div>
 </div>
+<div className="flex items-center justify-between space-x-4 mt-6">
 
-    {/* Subscription Stats */}
-    <SubscriptionStats />
+<SubscriptionStats />
+<SubscriptionChart />
+  </div>
+  <div className="flex items-center justify-between space-x-4 mt-6">
+
+
+<ShiftsPerClubChart />
+  </div>
   </div>
   
   );

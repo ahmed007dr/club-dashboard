@@ -6,10 +6,10 @@ const token = localStorage.getItem('token');
 // Fetch clubs
 export const fetchClubs = createAsyncThunk('clubs/fetchClubs', async (_, { rejectWithValue }) => {
   try {
-    const response = await fetch("${BASE_URL}/core/api/club/", {
+    const response = await fetch(`${BASE_URL}/core/api/club/`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
+        'Authorization': `Bearer ${token}`, // Make sure token is included
         'Content-Type': 'application/json',
       },
     });
@@ -28,6 +28,7 @@ export const fetchClubs = createAsyncThunk('clubs/fetchClubs', async (_, { rejec
     return rejectWithValue(error.message || "An unexpected error occurred.");
   }
 });
+
 
 // Edit club
 export const editClub = createAsyncThunk('clubs/editClub', async ({ id, updatedClub }, { rejectWithValue }) => {

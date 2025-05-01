@@ -139,45 +139,6 @@ export const deleteSubscriptionById = createAsyncThunk(
 
 
 
-// Create an async thunk for fetching subscriptions
-/*
-export const fetchSubscriptions = createAsyncThunk(
-  'subscriptions/fetchSubscriptions',
-  async (_, { rejectWithValue }) => {
-    try {
-      // Retrieve the access token from localStorage
-      const token = localStorage.getItem('token');
-      console.log('Token from localStorage:', token);  
-
-      // If no token is found, throw an error
-      if (!token) {
-        console.log('No access token found');
-        throw new Error('No access token found');
-      }
-
-      // Make a GET request to the subscriptions API with the token in Authorization header
-      const response = await axios.get(`${BASE_URL}/subscriptions/api/subscriptions/`, {
-        headers: {
-          Authorization: `Bearer ${token}`, // Attach Bearer token for authentication
-          'Content-Type': 'application/json', // Specify the content type
-        },
-      });
-
-      // Log the successful response
-      console.log('Subscriptions fetched successfully:', response.data);
-
-      // Return the fetched subscriptions data
-      return response.data;
-    } catch (error) {
-      // Log detailed error information
-      console.log('Error fetching subscriptions:', error.response ? error.response.data : error.message);
-
-      // Return the error to be handled by the slice
-      return rejectWithValue(error.response ? error.response.data : error.message);
-    }
-  }
-);
-*/
 
 
 
@@ -743,16 +704,16 @@ const subscriptionsSlice = createSlice({
       })
       .addCase(makePayment.fulfilled, (state, action) => {
         state.loading = false;
-        state.paymentStatus = 'succeeded'; // Optionally set payment status to succeeded
+        state.paymentStatus = 'succeeded';
       
-        // Find the subscription in the subscriptions array and update its remaining_amount
-        const updatedSubscription = state.subscriptions.find(
-          (subscription) => subscription.id === action.payload.subscriptionId
+        // Update immutably to ensure re-render
+        state.subscriptions = state.subscriptions.map((subscription) =>
+          subscription.id === action.payload.subscriptionId
+            ? { ...subscription, remaining_amount: action.payload.remaining_amount }
+            : subscription
         );
-        if (updatedSubscription) {
-          updatedSubscription.remaining_amount = action.payload.remaining_amount;
-        }
       })
+      
       .addCase(makePayment.rejected, (state, action) => {
         console.error("Payment Error: ", action.payload);
         state.loading = false;

@@ -63,39 +63,39 @@ const AddTicket = ({ onClose }) => {
         </button>
     
 
-      <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} dir="rtl">
         <div className="mb-4">
-          <label htmlFor="club_number" className="block text-sm font-medium text-gray-700">
-            Club Number
-          </label>
+        <label htmlFor="club_number" className="block text-sm font-medium text-gray-700">
+      رقم النادي
+    </label>
           <input
             type="text"
             id="club_number"
             value={clubNumber}
             onChange={(e) => setClubNumber(e.target.value)}
             className="w-full mt-1 p-2 border border-gray-300 rounded-md"
-            placeholder="Enter club number"
+            placeholder="أدخل رقم النادي"
           />
         </div>
 
         <div className="mb-4">
-          <label htmlFor="buyer_name" className="block text-sm font-medium text-gray-700">
-            Buyer Name
-          </label>
+        <label htmlFor="buyer_name" className="block text-sm font-medium text-gray-700">
+      اسم المشتري
+    </label>
           <input
             type="text"
             id="buyer_name"
             value={buyerName}
             onChange={(e) => setBuyerName(e.target.value)}
             className="w-full mt-1 p-2 border border-gray-300 rounded-md"
-            placeholder="Enter buyer name"
+            placeholder="أدخل اسم المشتري"
           />
         </div>
 
         <div className="mb-4">
-  <label htmlFor="ticket_type" className="block text-sm font-medium text-gray-700">
-    Ticket Type
-  </label>
+        <label htmlFor="ticket_type" className="block text-sm font-medium text-gray-700">
+      نوع التذكرة
+    </label>
   <select
     id="ticket_type"
     value={ticketType}
@@ -110,23 +110,23 @@ const AddTicket = ({ onClose }) => {
 
 
         <div className="mb-4">
-          <label htmlFor="price" className="block text-sm font-medium text-gray-700">
-            Price
-          </label>
+        <label htmlFor="price" className="block text-sm font-medium text-gray-700">
+      السعر
+    </label>
           <input
             type="number"
             id="price"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
             className="w-full mt-1 p-2 border border-gray-300 rounded-md"
-            placeholder="Enter ticket price"
+              placeholder="أدخل سعر التذكرة"
           />
         </div>
 
         <div className="mb-4">
-          <label htmlFor="used" className="block text-sm font-medium text-gray-700">
-            Used
-          </label>
+        <label htmlFor="used" className="block text-sm font-medium text-gray-700">
+      تم الاستخدام
+    </label>
           <input
             type="checkbox"
             id="used"
@@ -138,24 +138,24 @@ const AddTicket = ({ onClose }) => {
 
         {used && (
           <div className="mb-4">
-            <label htmlFor="used_by" className="block text-sm font-medium text-gray-700">
-              Used By (Member ID)
-            </label>
+               <label htmlFor="used_by" className="block text-sm font-medium text-gray-700">
+        تم الاستخدام بواسطة (رقم العضو)
+      </label>
             <input
               type="number"
               id="used_by"
               value={usedBy}
               onChange={(e) => setUsedBy(e.target.value)}
               className="w-full mt-1 p-2 border border-gray-300 rounded-md"
-              placeholder="Enter member ID"
+                   placeholder="أدخل رقم العضو"
             />
           </div>
         )}
 
         <div className="mt-6">
-          <button type="submit" className="w-full bg-blue-500 text-white p-2 rounded-md">
-            Add Ticket
-          </button>
+        <button type="submit" className="btn">
+      إضافة التذكرة
+    </button>
         </div>
       </form>
     </div>

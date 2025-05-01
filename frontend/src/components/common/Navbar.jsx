@@ -100,9 +100,11 @@ const Navbar = ({ hideMenuButton = false }) => {
             </button>
           )}
 
-          <Link to="/" className="flex items-center space-x-2 text-xl font-bold text-blue-600 dark:text-white">
-            <Dumbbell className="w-8 h-8" />
-          </Link>
+<Link to="/" className="flex items-center space-x-2 text-xl font-bold text-blue-600 dark:text-white">
+  <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
+  <span className="hidden sm:inline text-purple-800">Fitness Time</span>
+
+</Link>
 
         </div>
 

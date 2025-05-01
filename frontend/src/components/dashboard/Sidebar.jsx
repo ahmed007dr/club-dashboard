@@ -30,7 +30,11 @@ const Sidebar = ({ navItems, sidebarOpen, closeSidebar }) => {
         } md:translate-x-0 w-64 h-full border-r border-gray-200 transition-transform duration-300 ease-in-out max-sm:bg-gray-100  `}
         dir="rtl">
         <div className="h-full flex flex-col">
-          {/* Logo only on small screens */}
+         <Link to="/" className="flex items-center space-x-2 text-xl font-bold text-blue-600 dark:text-white">
+           <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
+           <span className="hidden sm:inline text-purple-800">Fitness Time</span>
+         
+         </Link>
           <div className="p-4 border-b border-gray-200 flex items-center justify-between sm:hidden">
             <h1 className="text-xl font-semibold">Club</h1>
             <button onClick={closeSidebar} className="sm:hidden hover:text-gray-700">

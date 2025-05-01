@@ -99,6 +99,7 @@ const SubscriptionList = () => {
   const handlePayment = (subscription) => {
     let amount = paymentAmounts[subscription.id] || subscription.remaining_amount;
     amount = parseFloat(amount).toFixed(2);
+    
     dispatch(
       makePayment({
         subscriptionId: subscription.id,
@@ -112,12 +113,14 @@ const SubscriptionList = () => {
           ...prev,
           [subscription.id]: '',
         }));
+        dispatch(fetchSubscriptions()); // <-- Refresh data here
       })
       .catch((error) => {
         console.error(error);
         alert(`Payment failed: ${error.message}`);
       });
   };
+  
 
   const openDetailModal = (id) => {
     dispatch(fetchSubscriptionById(id))
@@ -242,7 +245,6 @@ const SubscriptionList = () => {
             <thead className="bg-gray-100">
               <tr>
                 <th className="py-2 px-4 text-right">العضو</th>
-                <th className="py-2 px-4 text-right">النادي</th>
                 <th className="py-2 px-4 text-right">اسم النادي</th>
                 <th className="py-2 px-4 text-right">تاريخ البدء</th>
                 <th className="py-2 px-4 text-right">تاريخ الانتهاء</th>
@@ -264,13 +266,28 @@ const SubscriptionList = () => {
                       {subscription.member_name}
                     </Link>
                   </td>
-                  <td className="py-2 px-4">{subscription.club}</td>
                   <td className="py-2 px-4">{subscription.club_name}</td>
                   <td className="py-2 px-4">{subscription.start_date}</td>
                   <td className="py-2 px-4">{subscription.end_date}</td>
                   <td className="py-2 px-4">${subscription.paid_amount}</td>
                   <td className="py-2 px-4">${subscription.remaining_amount}</td>
-                  <td className="py-2 px-4">{subscription.status}</td>
+                  <td className="py-2 px-4">
+  <span
+    className={`px-2 py-1 rounded text-sm font-medium
+      ${
+        subscription.status === 'Active'
+          ? 'bg-green-100 text-green-600'
+          : subscription.status === 'Expired'
+          ? 'bg-red-100 text-red-600'
+          : subscription.status === 'Upcoming'
+          ? 'bg-blue-100 text-blue-600'
+          : ''
+      }`}
+  >
+    {subscription.status}
+  </span>
+</td>
+
                   <td className="py-2 px-4">
                     <input
                       type="text"
@@ -283,7 +300,7 @@ const SubscriptionList = () => {
                     />
                     <button
                       onClick={() => handlePayment(subscription)}
-                      className="ml-2 px-3 py-1 bg-purple-500 text-white rounded hover:bg-purple-600 transition"
+                      className="btn"
                     >
                       دفع
                     </button>
@@ -348,7 +365,7 @@ const SubscriptionList = () => {
       )}
 
       {createModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full relative">
             <button
               onClick={() => setCreateModalOpen(false)}

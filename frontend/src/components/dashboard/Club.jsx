@@ -24,14 +24,15 @@ const Club = () => {
     const fetchData = async () => {
       try {
         const res = await dispatch(fetchClubs()).unwrap();
+        console.log('Fetched Clubs:', res); // Log the response
         setClubs(res); // Set the fetched clubs to state
       } catch (error) {
-        console.error("Error fetching Club:", error);
+        console.error('Error fetching Club:', error);
       }
     };
-
     fetchData();
   }, [dispatch]);
+  
 
   const formatDateForInput = (dateString) => {
     const date = new Date(dateString);
