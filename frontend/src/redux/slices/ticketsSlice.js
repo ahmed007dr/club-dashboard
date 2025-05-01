@@ -14,7 +14,9 @@ export const fetchTickets = createAsyncThunk(
           Authorization: `Bearer ${token}`, // Include token in the request header
         },
       });
-      return response.data; // return the response data to the fulfilled action
+      // console.log(response.data)
+      return response.data;
+    // return the response data to the fulfilled action
     } catch (error) {
       return thunkAPI.rejectWithValue(error.response?.data || 'An error occurred'); // handle error response
     }

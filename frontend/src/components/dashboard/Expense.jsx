@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { CiEdit, CiTrash } from "react-icons/ci"; // Icons for Edit and Delete
 import {
   Card,
@@ -17,7 +17,12 @@ import {
   addExpense,
   deleteExpense,
 } from "../../redux/slices/financeSlice";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/DropdownMenu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
 
 const Expense = () => {
@@ -38,6 +43,11 @@ const Expense = () => {
   // State for confirmation modal
   const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
+  const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
   // Fetch expenses from the backend
   const { expenses, loading, error } = useSelector((state) => state.finance);
@@ -46,6 +56,33 @@ const Expense = () => {
   useEffect(() => {
     dispatch(fetchExpenses());
   }, [dispatch]);
+
+  // Extract unique clubs and categories from expenses
+  const uniqueClubs = useMemo(() => {
+    const clubsMap = new Map();
+    expenses.forEach((expense) => {
+      if (expense.club_details) {
+        clubsMap.set(expense.club_details.id, {
+          id: expense.club_details.id,
+          name: expense.club_details.name,
+        });
+      }
+    });
+    return Array.from(clubsMap.values());
+  }, [expenses]);
+
+  const uniqueCategories = useMemo(() => {
+    const categoriesMap = new Map();
+    expenses.forEach((expense) => {
+      if (expense.category_details) {
+        categoriesMap.set(expense.category_details.id, {
+          id: expense.category_details.id,
+          name: expense.category_details.name,
+        });
+      }
+    });
+    return Array.from(categoriesMap.values());
+  }, [expenses]);
 
   // Handle input changes in the modal (Edit or Add)
   const handleChange = (e) => {
@@ -66,7 +103,6 @@ const Expense = () => {
   // Save the updated expense via API
   const handleSave = () => {
     if (currentExpense) {
-      // Prepare the payload to match the backend schema
       const payload = {
         club: parseInt(currentExpense.club) || null,
         category: parseInt(currentExpense.category) || null,
@@ -77,17 +113,15 @@ const Expense = () => {
         invoice_number: currentExpense.invoice_number || "",
         attachment: currentExpense.attachment || null,
       };
-      // Dispatch the update action
       dispatch(updateExpense({ id: currentExpense.id, updatedData: payload }))
         .unwrap()
         .then(() => {
-          setShowModal(false); // Close modal after successful update
+          setShowModal(false);
         })
         .catch((err) => {
           console.error("فشل في تحديث المصروف:", err);
         });
     } else {
-      // Dispatch the add action
       dispatch(addExpense(newExpense))
         .unwrap()
         .then(() => {
@@ -100,14 +134,31 @@ const Expense = () => {
             paid_by: "",
             invoice_number: "",
             attachment: null,
-          }); // Reset form
-          setShowModal(false); // Close modal after successful addition
+          });
+          setShowModal(false);
         })
         .catch((err) => {
           console.error("فشل في إضافة المصروف:", err);
         });
     }
   };
+
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((expense) => {
+      const expenseDate = new Date(expense.date);
+      const from = startDate ? new Date(startDate) : null;
+      const to = endDate ? new Date(endDate) : null;
+
+      if (from && expenseDate < from) return false;
+      if (to && expenseDate > to) return false;
+      return true;
+    });
+  }, [expenses, startDate, endDate]);
+
+  const paginatedExpenses = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredExpenses.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredExpenses, currentPage]);
 
   // Open the modal for editing an expense
   const handleEditClick = (expense) => {
@@ -128,7 +179,7 @@ const Expense = () => {
 
   // Open the modal for adding a new expense
   const handleAddClick = () => {
-    setCurrentExpense(null); // Clear current expense for adding a new one
+    setCurrentExpense(null);
     setShowModal(true);
   };
 
@@ -144,7 +195,7 @@ const Expense = () => {
         .unwrap()
         .then(() => {
           console.log("تم حذف المصروف بنجاح");
-          setConfirmDeleteModal(false); // Close modal after deletion
+          setConfirmDeleteModal(false);
         })
         .catch((err) => {
           console.error("فشل في حذف المصروف:", err);
@@ -156,7 +207,6 @@ const Expense = () => {
     <div className="p-6 space-y-6" dir="rtl">
       {/* Tabs */}
       <Tabs defaultValue="expenses" dir="rtl">
-        {/* Expenses Tab */}
         <TabsContent value="expenses" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -165,15 +215,34 @@ const Expense = () => {
                 إدارة جميع المصروفات
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
               {/* Add Expense Button */}
-              <Button
-                onClick={handleAddClick}
-                className="flex items-center justify-start"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                إضافة مصروف
-              </Button>
+              <div className="flex justify-between mb-4">
+                <div className="flex gap-4 items-center justify-end">
+                  <label className="text-sm">من:</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="border px-2 py-1 rounded"
+                  />
+                  <label className="text-sm">إلى:</label>
+                  <input
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="border px-2 py-1 rounded"
+                  />
+                </div>
+
+                <Button
+                  onClick={handleAddClick}
+                  className="flex items-center justify-start"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  إضافة مصروف
+                </Button>
+              </div>
 
               {/* Loading State */}
               {loading && (
@@ -188,47 +257,38 @@ const Expense = () => {
               )}
 
               {/* Table */}
-              <div className="rounded-md border" dir="rtl">
+              <div className="rounded-md border overflow-x-auto" dir="rtl">
                 <table className="min-w-full divide-y divide-border">
                   <thead>
                     <tr className="bg-muted/50">
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        النادي
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        الفئة
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المبلغ
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        الوصف
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        التاريخ
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المدفوع من قبل
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        رقم الفاتورة
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المرفق
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        الإجراءات
-                      </th>
+                      {[
+                        "النادي",
+                        "الفئة",
+                        "المبلغ",
+                        "الوصف",
+                        "التاريخ",
+                        "المدفوع من قبل",
+                        "رقم الفاتورة",
+                        "المرفق",
+                        "الإجراءات",
+                      ].map((header, idx) => (
+                        <th
+                          key={idx}
+                          className="px-4 py-3 text-right text-sm font-medium whitespace-nowrap"
+                        >
+                          {header}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-background">
-                    {expenses.map((expense, index) => (
+                    {paginatedExpenses.map((expense, index) => (
                       <tr key={index} className="hover:bg-gray-100 transition">
                         <td className="px-4 py-3 text-sm">
-                          {expense.club || "غير متاح"}
+                          {expense.club_details?.name || "غير متاح"}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          {expense.category || "غير متاح"}
+                          {expense.category_details?.name || "غير متاح"}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {expense.amount
@@ -242,7 +302,7 @@ const Expense = () => {
                           {expense.date || "غير متاح"}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          {expense.paid_by || "غير متاح"}
+                          {expense.paid_by_details?.username || "غير متاح"}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {expense.invoice_number || "غير متاح"}
@@ -254,7 +314,7 @@ const Expense = () => {
                           <DropdownMenu dir="rtl">
                             <DropdownMenuTrigger asChild>
                               <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                              <MoreVertical className="h-5 w-5" />
+                                <MoreVertical className="h-5 w-5" />
                               </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-40">
@@ -278,6 +338,68 @@ const Expense = () => {
                   </tbody>
                 </table>
               </div>
+              <div className="flex justify-end gap-2 mt-4">
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  السابق
+                </button>
+                <span className="px-3 py-1">
+                  الصفحة {currentPage} من{" "}
+                  {Math.ceil(filteredExpenses.length / itemsPerPage)}
+                </span>
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) =>
+                      prev < Math.ceil(filteredExpenses.length / itemsPerPage)
+                        ? prev + 1
+                        : prev
+                    )
+                  }
+                  disabled={
+                    currentPage ===
+                    Math.ceil(filteredExpenses.length / itemsPerPage)
+                  }
+                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300"
+                >
+                  التالي
+                </button>
+              </div>
+
+              {/* Compute Total Button */}
+              <div className="flex justify-end mt-4">
+                <Button
+                  onClick={() =>
+                    setTotalInfo({
+                      count: expenses.length,
+                      total: expenses.reduce(
+                        (acc, expense) =>
+                          acc + (parseFloat(expense.amount) || 0),
+                        0
+                      ),
+                    })
+                  }
+                  className="bg-primary text-white px-6"
+                >
+                  حساب الإجمالي
+                </Button>
+              </div>
+
+              {/* Total Info Display */}
+              {totalInfo.count > 0 && (
+                <div className="mt-4 bg-gray-50 border rounded-md p-4 text-right space-y-1">
+                  <p className="text-sm font-semibold text-gray-700">
+                    عدد المصروفات: {totalInfo.count}
+                  </p>
+                  <p className="text-sm font-semibold text-gray-700">
+                    إجمالي المصروفات: {totalInfo.total} جنيه
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -286,20 +408,63 @@ const Expense = () => {
       {/* Add/Edit Modal */}
       {showModal && (
         <div
-          className="fixed inset-0 z-40 flex justify-center items-center  bg-opacity-50"
-          onClick={() => setShowModal(false)} // Close modal when clicking outside
+          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
+          onClick={() => setShowModal(false)}
         >
           <div
             className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
-            onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking inside
+            onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-xl font-semibold mb-4 text-right">
               {currentExpense ? "تعديل المصروف" : "إضافة مصروف"}
             </h3>
             <div className="grid grid-cols-1 gap-4">
+              {/* Club Dropdown */}
+              <div>
+                <label className="block text-sm font-medium capitalize mb-1 text-right">
+                  النادي
+                </label>
+                <select
+                  name="club"
+                  value={
+                    currentExpense ? currentExpense.club : newExpense.club
+                  }
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                >
+                  <option value="">اختر النادي</option>
+                  {uniqueClubs.map((club) => (
+                    <option key={club.id} value={club.id}>
+                      {club.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Category Dropdown */}
+              <div>
+                <label className="block text-sm font-medium capitalize mb-1 text-right">
+                  الفئة
+                </label>
+                <select
+                  name="category"
+                  value={
+                    currentExpense ? currentExpense.category : newExpense.category
+                  }
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                >
+                  <option value="">اختر الفئة</option>
+                  {uniqueCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Other Fields */}
               {[
-                { label: "النادي", name: "club" },
-                { label: "الفئة", name: "category" },
                 { label: "المبلغ", name: "amount", type: "number" },
                 { label: "الوصف", name: "description" },
                 { label: "التاريخ", name: "date", type: "date" },
@@ -346,12 +511,12 @@ const Expense = () => {
       {/* Confirmation Delete Modal */}
       {confirmDeleteModal && (
         <div
-          className="fixed inset-0 z-50 flex justify-center items-center  bg-opacity-50"
-          onClick={() => setConfirmDeleteModal(false)} // Close modal when clicking outside
+          className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50"
+          onClick={() => setConfirmDeleteModal(false)}
         >
           <div
             className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md"
-            onClick={(e) => e.stopPropagation()} // Prevent closing modal when clicking inside
+            onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-semibold mb-4 text-right">
               تأكيد الحذف

@@ -217,7 +217,7 @@ const SubscriptionsTypes = () => {
                 >
                   <FaEye />
                 </button>
-                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                <span className="absolute -top-8 left-1/2 text-white transform -translate-x-1/2 bg-gray-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                   View Details
                 </span>
               </div>
@@ -228,7 +228,7 @@ const SubscriptionsTypes = () => {
                 >
                   <FaEdit />
                 </button>
-                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                   Edit
                 </span>
               </div>
@@ -239,7 +239,7 @@ const SubscriptionsTypes = () => {
                 >
                   <FaTrash />
                 </button>
-                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                <span className="absolute -top-8 left-1/2 transform text-white -translate-x-1/2 bg-gray-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                   Delete
                 </span>
               </div>
