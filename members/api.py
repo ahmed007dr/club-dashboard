@@ -8,6 +8,9 @@ from rest_framework.pagination import PageNumberPagination
 from utils.permissions import IsOwnerOrRelatedToClub  #
 from .serializers import MemberSerializer
 from .models import Member
+from utils.generate_membership_number import generate_membership_number
+from django.db import IntegrityError
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -27,13 +30,22 @@ def member_list_api(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def create_member_api(request):
-    serializer = MemberSerializer(data=request.data)
+    membership_number = generate_membership_number()
+
+    data = request.data.copy()
+    data['membership_number'] = membership_number  
+
+    serializer = MemberSerializer(data=data)
+
     if serializer.is_valid():
-        member = serializer.save()
-        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, member):
-            member.delete() 
-            return Response({'error': 'You do not have permission to create a member for this club'}, status=status.HTTP_403_FORBIDDEN)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        try:
+            member = serializer.save()
+            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, member):
+                member.delete() 
+                return Response({'error': 'You do not have permission to create a member for this club'}, status=status.HTTP_403_FORBIDDEN)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except IntegrityError:
+            return Response({'error': 'Membership number already exists'}, status=status.HTTP_400_BAD_REQUEST)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
