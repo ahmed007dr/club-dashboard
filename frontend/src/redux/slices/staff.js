@@ -26,7 +26,7 @@ export const fetchStaff = createAsyncThunk('staff/fetchStaff', async () => {
 // Add staff
 export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff) => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`${BASE_URL}/staff/api/shifts/create/`, {
+    const res = await fetch(`${BASE_URL}/staff/api/shifts/add/`, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${token}`,
