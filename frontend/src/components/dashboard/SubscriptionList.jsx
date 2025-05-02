@@ -22,6 +22,7 @@ const SubscriptionList = () => {
   const { subscriptions, status, error, updateStatus } = useSelector(
     (state) => state.subscriptions
   );
+  console.log("Subscriptions:", subscriptions);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
