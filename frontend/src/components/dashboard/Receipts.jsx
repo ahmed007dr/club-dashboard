@@ -18,6 +18,8 @@ function Receipts() {
     (state) => state.receipts
   );
 
+  console.log(currentReceipt)
+
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchError, setSearchError] = useState("");
@@ -73,6 +75,10 @@ function Receipts() {
     });
     return Array.from(subsMap.values());
   }, [receipts]);
+
+    // You can now use uniqueClubs, uniqueMembers, and uniqueSubscriptions in your JSX or logic
+    console.log('Unique Clubs:', uniqueClubs);
+    console.log('Unique Subscriptions:', uniqueSubscriptions);
 
   // Payment method choices (adjusted for backend)
   const paymentMethods = [

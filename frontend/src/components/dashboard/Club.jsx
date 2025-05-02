@@ -19,7 +19,7 @@ const Club = () => {
   const isLoading = useSelector((state) => state.club.isLoading);
   const error = useSelector((state) => state.club.error);
   const dispatch = useDispatch();
-
+console.log("Clubs:", clubs); // Log the clubs state
   useEffect(() => {
     const fetchData = async () => {
       try {
