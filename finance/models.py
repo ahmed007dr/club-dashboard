@@ -1,5 +1,6 @@
 from django.db import models
 from accounts.models import User
+from utils.generate_invoice import generate_invoice_number
 
 # Create your models here.
 class ExpenseCategory(models.Model):
@@ -12,7 +13,7 @@ class ExpenseCategory(models.Model):
 
 class Expense(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
-    category = models.ForeignKey(ExpenseCategory, on_delete=models.SET_NULL, null=True)
+    category = models.ForeignKey('ExpenseCategory', on_delete=models.SET_NULL, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True)
     date = models.DateField()
@@ -20,17 +21,13 @@ class Expense(models.Model):
     invoice_number = models.CharField(max_length=100, blank=True, null=True)
     attachment = models.FileField(upload_to='expenses/', null=True, blank=True)
 
+    def save(self, *args, **kwargs):
+        if not self.invoice_number:
+            self.invoice_number = generate_invoice_number(invoice_date=self.date)
+        super(Expense, self).save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.category.name} - {self.amount}"
-
-# class IncomeSource(models.Model):
-#     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
-#     name = models.CharField(max_length=100)
-#     description = models.TextField(blank=True)
-
-#     def __str__(self):
-#         return self.name
-    
 
 class IncomeSource(models.Model):
     Renewal = 'Renewal'
