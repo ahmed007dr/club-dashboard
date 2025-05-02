@@ -23,13 +23,13 @@ class Expense(models.Model):
     def __str__(self):
         return f"{self.category.name} - {self.amount}"
 
-class IncomeSource(models.Model):
-    club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
-    name = models.CharField(max_length=100)
-    description = models.TextField(blank=True)
+# class IncomeSource(models.Model):
+#     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
+#     name = models.CharField(max_length=100)
+#     description = models.TextField(blank=True)
 
-    def __str__(self):
-        return self.name
+#     def __str__(self):
+#         return self.name
     
 
 class IncomeSource(models.Model):

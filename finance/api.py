@@ -39,10 +39,9 @@ def expense_category_api(request):
 def expense_api(request):
     if request.method == 'GET':
         if request.user.role == 'owner':
-            expenses = Expense.objects.select_related('category', 'paid_by').all()  
+            expenses = Expense.objects.select_related('category', 'paid_by').all()
         else:
-            expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)  
-
+            expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)
         serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
         return Response(serializer.data)
     
@@ -50,14 +49,20 @@ def expense_api(request):
         data = request.data.copy()
         data['paid_by'] = request.user.id
         
+        # Check permission before saving
+        club_id = data.get('club')
+        if club_id:
+            from core.models import Club  #
+            club = get_object_or_404(Club, id=club_id)
+            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
+                return Response({'error': 'You do not have permission to create an expense for this club'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = ExpenseSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             expense = serializer.save()
-            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, expense):
-                expense.delete()  
-                return Response({'error': 'You do not have permission to create an expense for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 
 # Income Source Views
 @api_view(['GET', 'POST'])
