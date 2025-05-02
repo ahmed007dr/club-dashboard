@@ -284,7 +284,6 @@ const Expense = () => {
                         "التاريخ",
                         "المدفوع من قبل",
                         "رقم الفاتورة",
-                        "المرفق",
                         "الإجراءات",
                       ].map((header, idx) => (
                         <th
@@ -322,9 +321,7 @@ const Expense = () => {
                         <td className="px-4 py-3 text-sm">
                           {expense.invoice_number || "غير متاح"}
                         </td>
-                        <td className="px-4 py-3 text-sm text-blue-500 underline cursor-pointer">
-                          {expense.attachment || "لا يوجد مرفق"}
-                        </td>
+                       
                         <td className="px-4 py-3 text-sm flex justify-end">
                           <DropdownMenu dir="rtl">
                             <DropdownMenuTrigger asChild>
@@ -484,8 +481,7 @@ const Expense = () => {
                 { label: "الوصف", name: "description" },
                 { label: "التاريخ", name: "date", type: "date" },
                 { label: "المدفوع من قبل", name: "paid_by" },
-                { label: "رقم الفاتورة", name: "invoice_number" },
-                { label: "المرفق", name: "attachment" },
+             
               ].map(({ label, name, type = "text" }) => (
                 <div key={name}>
                   <label className="block text-sm font-medium capitalize mb-1 text-right">

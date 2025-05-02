@@ -47,18 +47,11 @@ const Income = () => {
     description: "",
     date: "",
     received_by: "",
-    name: "", // For income sources
   });
-  const [activeTab, setActiveTab] = useState("incomeSources");
   const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
-  const [userClub, setUserClub] = useState(null); // Store logged-in user's club
+  const [userClub, setUserClub] = useState(null);
 
   // Filter states
-  const [sourceFilters, setSourceFilters] = useState({
-    name: "",
-    description: "",
-    club: "", // Add club filter
-  });
   const [incomeFilters, setIncomeFilters] = useState({
     source: "",
     amountMin: "",
@@ -66,15 +59,14 @@ const Income = () => {
     dateFrom: "",
     dateTo: "",
     received_by: "",
-    club: "", // Add club filter
+    club: "",
   });
 
   // Pagination states
-  const [sourcePage, setSourcePage] = useState(1);
   const [incomePage, setIncomePage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const { incomeSources, incomes, loading, error } = useSelector(
+  const { incomes, loading, error } = useSelector(
     (state) => state.finance
   );
 
@@ -83,7 +75,7 @@ const Income = () => {
     fetch("http://127.0.0.1:8000/accounts/api/profile/", {
       method: "GET",
       headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`, // Adjust based on your auth setup
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
       },
     })
@@ -94,7 +86,6 @@ const Income = () => {
           name: data.club.name,
         });
         setNewItem((prev) => ({ ...prev, club: data.club.id.toString() }));
-        setSourceFilters((prev) => ({ ...prev, club: data.club.id.toString() }));
         setIncomeFilters((prev) => ({ ...prev, club: data.club.id.toString() }));
       })
       .catch((err) => {
@@ -104,28 +95,8 @@ const Income = () => {
 
   // Fetch data on component mount
   useEffect(() => {
-    dispatch(fetchIncomeSources());
     dispatch(fetchIncomes());
   }, [dispatch]);
-
-  // Filter and pagination logic
-  const filteredSources = useMemo(() => {
-    return incomeSources.filter((source) => {
-      return (
-        source.club_details?.id === userClub?.id &&
-        (!sourceFilters.club ||
-          source.club_details?.id.toString() === sourceFilters.club) &&
-        (!sourceFilters.name ||
-          source.name
-            ?.toLowerCase()
-            .includes(sourceFilters.name.toLowerCase())) &&
-        (!sourceFilters.description ||
-          source.description
-            ?.toLowerCase()
-            .includes(sourceFilters.description.toLowerCase()))
-      );
-    });
-  }, [incomeSources, sourceFilters, userClub]);
 
   const filteredIncomes = useMemo(() => {
     return incomes.filter((income) => {
@@ -154,13 +125,7 @@ const Income = () => {
   }, [incomes, incomeFilters, userClub]);
 
   // Pagination calculations
-  const sourcePageCount = Math.ceil(filteredSources.length / pageSize);
   const incomePageCount = Math.ceil(filteredIncomes.length / pageSize);
-
-  const paginatedSources = filteredSources.slice(
-    (sourcePage - 1) * pageSize,
-    sourcePage * pageSize
-  );
   const paginatedIncomes = filteredIncomes.slice(
     (incomePage - 1) * pageSize,
     incomePage * pageSize
@@ -178,7 +143,6 @@ const Income = () => {
   };
 
   const handleSave = () => {
-    const isIncomeSource = activeTab === "incomeSources";
     const payload = currentItem
       ? {
           id: currentItem.id,
@@ -196,17 +160,10 @@ const Income = () => {
           description: newItem.description || "",
           date: newItem.date || "",
           received_by: parseInt(newItem.received_by) || null,
-          name: newItem.name, // For income sources
         };
 
     const action = currentItem
       ? updateIncome({ id: currentItem.id, updatedData: payload })
-      : isIncomeSource
-      ? addIncomeSource({
-          name: newItem.name,
-          description: newItem.description,
-          club: parseInt(newItem.club) || null,
-        })
       : addIncome(payload);
 
     dispatch(action)
@@ -220,34 +177,29 @@ const Income = () => {
           description: "",
           date: "",
           received_by: "",
-          name: "",
         });
         setShowModal(false);
       })
       .catch((err) => {
         console.error(
-          `فشل في ${currentItem ? "تحديث" : "إضافة"} ${
-            isIncomeSource ? "مصدر دخل" : "دخل"
-          }`,
+          `فشل في ${currentItem ? "تحديث" : "إضافة"} دخل`,
           err
         );
       });
   };
 
   const handleEditClick = (item) => {
-    if (activeTab === "incomes") {
-      const sanitizedItem = {
-        ...item,
-        club: item.club?.toString() || userClub?.id.toString() || "",
-        source: item.source?.toString() || "",
-        amount: item.amount?.toString() || "0",
-        description: item.description || "",
-        date: item.date || "",
-        received_by: item.received_by?.toString() || "",
-      };
-      setCurrentItem(sanitizedItem);
-      setShowModal(true);
-    }
+    const sanitizedItem = {
+      ...item,
+      club: item.club?.toString() || userClub?.id.toString() || "",
+      source: item.source?.toString() || "",
+      amount: item.amount?.toString() || "0",
+      description: item.description || "",
+      date: item.date || "",
+      received_by: item.received_by?.toString() || "",
+    };
+    setCurrentItem(sanitizedItem);
+    setShowModal(true);
   };
 
   const handleAddClick = () => {
@@ -277,20 +229,12 @@ const Income = () => {
     }
   };
 
-  // Filter change handlers
-  const handleSourceFilterChange = (e) => {
-    const { name, value } = e.target;
-    setSourceFilters((prev) => ({ ...prev, [name]: value }));
-    setSourcePage(1); // Reset to first page when filters change
-  };
-
   const handleIncomeFilterChange = (e) => {
     const { name, value } = e.target;
     setIncomeFilters((prev) => ({ ...prev, [name]: value }));
-    setIncomePage(1); // Reset to first page when filters change
+    setIncomePage(1);
   };
 
-  // Pagination controls
   const PaginationControls = ({ currentPage, setPage, pageCount }) => (
     <div className="flex items-center justify-between mt-4">
       <div className="flex items-center gap-2">
@@ -335,122 +279,10 @@ const Income = () => {
         إدارة الدخل
       </h1>
 
-      <Tabs defaultValue="incomeSources" dir="rtl" onValueChange={setActiveTab}>
+      <Tabs defaultValue="incomes" dir="rtl">
         <TabsList dir="rtl">
-          <TabsTrigger value="incomeSources">مصادر الدخل</TabsTrigger>
-          <TabsTrigger value="incomes">الدخل</TabsTrigger>
+          <TabsTrigger value="incomes">الايرادات</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="incomeSources" className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-right">جميع مصادر الدخل</CardTitle>
-              <CardDescription className="text-right">
-                إدارة جميع مصادر الدخل لنادي {userClub?.name || "جاري التحميل..."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {["club", "name", "description"].map((field) => (
-                  <div key={field}>
-                    <label className="block text-sm font-medium mb-1 text-right">
-                      {labelMapping[field]}
-                    </label>
-                    {field === "club" ? (
-                      <select
-                        name="club"
-                        value={sourceFilters.club}
-                        onChange={handleSourceFilterChange}
-                        className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                         // Disable since only one club is available
-                      >
-                        {userClub ? (
-                          <option value={userClub.id}>{userClub.name}</option>
-                        ) : (
-                          <option value="">جاري التحميل...</option>
-                        )}
-                      </select>
-                    ) : (
-                      <input
-                        type="text"
-                        name={field}
-                        value={sourceFilters[field]}
-                        onChange={handleSourceFilterChange}
-                        className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                        placeholder={`ابحث بـ ${labelMapping[field]}`}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <Button
-                onClick={handleAddClick}
-                className="flex items-center justify-start"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                إضافة مصدر دخل
-              </Button>
-
-              {loading && (
-                <p className="text-lg text-gray-600 text-right">
-                  جاري التحميل...
-                </p>
-              )}
-
-              {error && (
-                <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
-              )}
-
-              <div className="rounded-md border">
-                <table className="min-w-full divide-y divide-border">
-                  <thead>
-                    <tr className="bg-muted/50">
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المعرف
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        اسم المصدر
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        النادي
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        الوصف
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border bg-background">
-                    {paginatedSources.map((source) => (
-                      <tr
-                        key={source.id}
-                        className="hover:bg-gray-100 transition"
-                      >
-                        <td className="px-4 py-3 text-sm">{source.id}</td>
-                        <td className="px-4 py-3 text-sm">
-                          {source.name || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {source.club_details?.name || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {source.description || "لا يوجد وصف"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <PaginationControls
-                currentPage={sourcePage}
-                setPage={setSourcePage}
-                pageCount={sourcePageCount}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         <TabsContent value="incomes" className="space-y-4">
           <Card>
@@ -475,7 +307,6 @@ const Income = () => {
                           value={incomeFilters.club}
                           onChange={handleIncomeFilterChange}
                           className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                          // Disable since only one club is available
                         >
                           {userClub ? (
                             <option value={userClub.id}>{userClub.name}</option>
@@ -640,6 +471,7 @@ const Income = () => {
         </TabsContent>
       </Tabs>
 
+      {/* Modal for adding/editing income */}
       {showModal && (
         <div
           className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
@@ -650,23 +482,10 @@ const Income = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-xl font-semibold mb-4 text-right">
-              {currentItem
-                ? `تعديل ${activeTab === "incomeSources" ? "مصدر دخل" : "دخل"}`
-                : `إضافة ${activeTab === "incomeSources" ? "مصدر دخل" : "دخل"}`}
+              {currentItem ? "تعديل دخل" : "إضافة دخل"}
             </h3>
             <div className="grid grid-cols-1 gap-4">
-              {[
-                ...(activeTab === "incomeSources"
-                  ? ["name", "description", "club"]
-                  : [
-                      "club",
-                      "source",
-                      "amount",
-                      "description",
-                      "date",
-                      "received_by",
-                    ]),
-              ].map((field) => (
+              {["club", "source", "amount", "description", "date", "received_by"].map((field) => (
                 <div key={field}>
                   <label className="block text-sm font-medium capitalize mb-1 text-right">
                     {labelMapping[field] || field}
@@ -677,7 +496,6 @@ const Income = () => {
                       value={currentItem ? currentItem.club : newItem.club}
                       onChange={handleChange}
                       className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                      
                     >
                       {userClub ? (
                         <option value={userClub.id}>{userClub.name}</option>
@@ -693,11 +511,9 @@ const Income = () => {
                       className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
                     >
                       <option value="">اختر مصدر الدخل</option>
-                      {filteredSources.map((source) => (
-                        <option key={source.id} value={source.id}>
-                          {source.name}
-                        </option>
-                      ))}
+                      {/* You'll need to replace this with your actual sources data */}
+                      <option value="1">مصدر 1</option>
+                      <option value="2">مصدر 2</option>
                     </select>
                   ) : (
                     <input
@@ -739,6 +555,7 @@ const Income = () => {
         </div>
       )}
 
+      {/* Delete confirmation modal */}
       {confirmDeleteModal && (
         <div
           className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50"

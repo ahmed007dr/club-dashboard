@@ -1,10 +1,4 @@
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
 
-=======
->>>>>>> da402ef0cfd0fbb75264711d276c093c35d1b0c8
->>>>>>> 513436ccbd9e5f7646a06a554247b82421ecd456
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated

@@ -17,7 +17,7 @@ const Finance = () => {
         <TabsList dir="rtl" className="grid w-full grid-cols-3">
           <TabsTrigger value="expenseCategories"> فئات المصروفات</TabsTrigger>
           <TabsTrigger value="expenses"> المصروفات</TabsTrigger>
-          <TabsTrigger value="incomeSources"> مصادر الدخل</TabsTrigger>
+          <TabsTrigger value="incomeSources"> الايرادات</TabsTrigger>
         </TabsList>
 
         {/* Expense Categories Tab */}
