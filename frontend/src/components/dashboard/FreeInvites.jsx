@@ -56,7 +56,7 @@ const InviteList = () => {
   useEffect(() => {
     dispatch(fetchFreeInvites());
   }, [dispatch]);
-
+console.log('Unique Clubs:', uniqueClubs);
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -502,7 +502,6 @@ const InviteList = () => {
                 >
                   <option value="pending">Pending</option>
                   <option value="used">Used</option>
-                  <option value="cancelled">Cancelled</option>
                 </select>
               </div>
               <div>

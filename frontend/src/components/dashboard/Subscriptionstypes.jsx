@@ -11,7 +11,7 @@ import { CiShoppingTag } from 'react-icons/ci';
 const SubscriptionsTypes = () => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error } = useSelector((state) => state.subscriptions);
-
+  console.log('Subscription Types:', subscriptionTypes); // Log the subscription types
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
