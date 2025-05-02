@@ -316,7 +316,8 @@ const SubscriptionList = () => {
                 <th className="py-2 px-4 text-right">المبلغ المدفوع</th>
                 <th className="py-2 px-4 text-right">المبلغ المتبقي</th>
                 <th className="py-2 px-4 text-right">الحالة</th>
-                <th className="py-2 px-4 text-right">الدفع</th>
+                <th className="py-2 px-4 text-right">المبلغ</th>
+                <th className="py-2 px-4 text-center">الدفع</th>
                 <th className="py-2 px-4 text-right">الإجراءات</th>
               </tr>
             </thead>
@@ -359,8 +360,7 @@ const SubscriptionList = () => {
                   <td className="py-2 px-4">
                     ${subscription.remaining_amount}
                   </td>
-                  <td className="py-2 px-4">{subscription.status}</td>
-                  <td className="py-2 px-8 flex">
+                  <td className="py-2 px-8 flex ">
                     <input
                       type="text"
                       inputMode="decimal"
