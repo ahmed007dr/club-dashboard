@@ -331,6 +331,7 @@ const Expense = () => {
                   <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
                 )}
 
+<<<<<<< HEAD
                 {/* Table */}
                 <div className="rounded-md border responsive-table">
                   <table className="min-w-full divide-y divide-border">
@@ -353,6 +354,82 @@ const Expense = () => {
                             {header}
                           </th>
                         ))}
+=======
+              {/* Table */}
+              <div className="rounded-md border overflow-x-auto" dir="rtl">
+                <table className="min-w-full divide-y divide-border">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      {[
+                        "النادي",
+                        "الفئة",
+                        "المبلغ",
+                        "الوصف",
+                        "التاريخ",
+                        "المدفوع من قبل",
+                        "رقم الفاتورة",
+                        "الإجراءات",
+                      ].map((header, idx) => (
+                        <th
+                          key={idx}
+                          className="px-4 py-3 text-right text-sm font-medium whitespace-nowrap"
+                        >
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border bg-background">
+                    {paginatedExpenses.map((expense, index) => (
+                      <tr key={index} className="hover:bg-gray-100 transition">
+                        <td className="px-4 py-3 text-sm">
+                          {expense.club_details?.name || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.category_details?.name || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.amount
+                            ? `${expense.amount} جنيه`
+                            : "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.description || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.date || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.paid_by_details?.username || "غير متاح"}
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          {expense.invoice_number || "غير متاح"}
+                        </td>
+                       
+                        <td className="px-4 py-3 text-sm flex justify-end">
+                          <DropdownMenu dir="rtl">
+                            <DropdownMenuTrigger asChild>
+                              <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                                <MoreVertical className="h-5 w-5" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-40">
+                              <DropdownMenuItem
+                                onClick={() => handleEditClick(expense)}
+                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                              >
+                                تعديل
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleDeleteClick(expense.id)}
+                                className="cursor-pointer text-red-600 hover:bg-red-50"
+                              >
+                                حذف
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+>>>>>>> b6817cb28908498734d0fee74c19a39f9cdd7c66
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border bg-background">
@@ -427,6 +504,7 @@ const Expense = () => {
                   </table>
                 </div>
 
+<<<<<<< HEAD
                 {/* Pagination */}
                 <div className="flex flex-col sm:flex-row justify-end gap-2 mt-4">
                   <button
@@ -447,6 +525,85 @@ const Expense = () => {
                           ? prev + 1
                           : prev
                       )
+=======
+      {/* Add/Edit Modal */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-semibold mb-4 text-right">
+              {currentExpense ? "تعديل المصروف" : "إضافة مصروف"}
+            </h3>
+            <div className="grid grid-cols-1 gap-4">
+              {/* Club Dropdown */}
+              <div>
+                <label className="block text-sm font-medium capitalize mb-1 text-right">
+                  النادي
+                </label>
+                <select
+                  name="club"
+                  value={
+                    currentExpense ? currentExpense.club : newExpense.club
+                  }
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                  // Disable to prevent changes, as only one club is available
+                >
+                  {userClub ? (
+                    <option value={userClub.id}>{userClub.name}</option>
+                  ) : (
+                    <option value="">جاري التحميل...</option>
+                  )}
+                </select>
+              </div>
+
+              {/* Category Dropdown */}
+              <div>
+                <label className="block text-sm font-medium capitalize mb-1 text-right">
+                  الفئة
+                </label>
+                <select
+                  name="category"
+                  value={
+                    currentExpense ? currentExpense.category : newExpense.category
+                  }
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                >
+                  <option value="">اختر الفئة</option>
+                  {uniqueCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Other Fields */}
+              {[
+                { label: "المبلغ", name: "amount", type: "number" },
+                { label: "الوصف", name: "description" },
+                { label: "التاريخ", name: "date", type: "date" },
+                { label: "المدفوع من قبل", name: "paid_by" },
+             
+              ].map(({ label, name, type = "text" }) => (
+                <div key={name}>
+                  <label className="block text-sm font-medium capitalize mb-1 text-right">
+                    {label}
+                  </label>
+                  <input
+                    type={type}
+                    name={name}
+                    value={
+                      currentExpense
+                        ? currentExpense[name] || ""
+                        : newExpense[name] || ""
+>>>>>>> b6817cb28908498734d0fee74c19a39f9cdd7c66
                     }
                     disabled={
                       currentPage === Math.ceil(filteredExpenses.length / itemsPerPage)

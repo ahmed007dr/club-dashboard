@@ -106,7 +106,6 @@ const InviteList = () => {
   useEffect(() => {
     dispatch(fetchFreeInvites());
   }, [dispatch]);
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({

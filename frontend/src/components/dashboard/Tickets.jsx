@@ -16,7 +16,8 @@ import {
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
-import BASE_URL from "@/config/api";
+import BASE_URL from '../../config/api';
+
 
 const Tickets = () => {
   const dispatch = useDispatch();
