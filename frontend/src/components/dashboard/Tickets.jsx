@@ -17,6 +17,8 @@ import {
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
+import BASE_URL from '../../config/api';
+
 
 const Tickets = () => {
   const dispatch = useDispatch();
@@ -56,7 +58,7 @@ const Tickets = () => {
   // Fetch user profile to get club details
   useEffect(() => {
     setLoadingProfile(true);
-    fetch("http://127.0.0.1:8000/accounts/api/profile/", {
+    fetch(`${BASE_URL}/accounts/api/profile/`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
