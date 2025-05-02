@@ -10,6 +10,7 @@ from .serializers import SubscriptionSerializer, SubscriptionTypeSerializer
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub  #
 from decimal import Decimal
+from finance.models import Income,IncomeSource
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -86,9 +87,27 @@ def subscription_list(request):
             if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
                 subscription.delete() 
                 return Response({'error': 'You do not have permission to create a subscription for this club'}, status=status.HTTP_403_FORBIDDEN)
-            # Auto-calculate remaining amount
+            
+            if subscription.paid_amount > 0:
+                source, created = IncomeSource.objects.get_or_create(
+                    club=subscription.club,
+                    name='Subscription', 
+                    defaults={'description': 'Income from subscription payments'}
+                )
+
+                income = Income(
+                    club=subscription.club,
+                    source=source,  
+                    amount=subscription.paid_amount,
+                    description=f"Subscription payment for {subscription.member.name}",
+                    date=timezone.now().date(),
+                    received_by=request.user
+                )
+                income.save()
+
             subscription.remaining_amount = subscription.type.price - subscription.paid_amount
             subscription.save()
+
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -179,6 +198,23 @@ def renew_subscription(request, pk):
     )
     subscription.end_date = new_end_date
     subscription.save()
+
+    source, created = IncomeSource.objects.get_or_create(
+        club=subscription.club,
+        name='Renewal', 
+        defaults={'description': 'Income from renewal payments'}
+    )
+
+    income = Income(
+        club=subscription.club,
+        source=source, 
+        amount =Income.amount ,
+        description=f"Renewal payment for {subscription.member.name}",
+        date=timezone.now().date(),
+        received_by=request.user
+    )
+    income.save()
+
     serializer = SubscriptionSerializer(subscription)
     return Response(serializer.data)
 
@@ -200,8 +236,26 @@ def make_payment(request, pk):
         subscription.type.price - subscription.paid_amount
     )
     subscription.save()
+
+    source, created = IncomeSource.objects.get_or_create(
+        club=subscription.club,
+        name='Subscription',  
+        defaults={'description': 'Income from subscription payments'}
+    )
+
+    income = Income(
+        club=subscription.club,
+        source=source, 
+        amount=amount,
+        description=f"Subscription payment for {subscription.member.name}",
+        date=timezone.now().date(),
+        received_by=request.user
+    )
+    income.save()
+
     serializer = SubscriptionSerializer(subscription)
     return Response(serializer.data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

@@ -30,6 +30,30 @@ class IncomeSource(models.Model):
 
     def __str__(self):
         return self.name
+    
+
+class IncomeSource(models.Model):
+    Renewal = 'Renewal'
+    Subscription = 'Subscription'
+    ticket_sales = 'ticket_sales'
+    SPONSORSHIPS = 'SPONSORSHIPS' 
+    EVENTS = 'EVENTS'  
+
+    INCOME_SOURCE_CHOICES = [
+        (Renewal, 'Renewal'),
+        (Subscription, 'Subscription'),
+        (ticket_sales, 'ticket_sales'),
+        (SPONSORSHIPS, 'Sponsorships'), 
+        (EVENTS, 'Events'), 
+
+    ]
+    
+    club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
+    name = models.CharField(max_length=100, choices=INCOME_SOURCE_CHOICES)
+    description = models.TextField(blank=True)
+
+    def __str__(self):
+        return self.name
 
 class Income(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
