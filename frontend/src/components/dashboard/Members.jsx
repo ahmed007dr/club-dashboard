@@ -30,7 +30,6 @@ const Members = () => {
 
   const members = useSelector((state) => state.member.items).results;
   const dispatch = useDispatch();
-console.log(members)
   useEffect(() => {
     const fetchData = async () => {
       try {
