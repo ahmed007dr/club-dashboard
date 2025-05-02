@@ -6,6 +6,8 @@ from .models import Ticket
 from .serializers import TicketSerializer
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub  
+from finance.serializers import IncomeSerializer
+from finance.models import Income
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -25,6 +27,19 @@ def add_ticket_api(request):
     serializer = TicketSerializer(data=request.data)
     if serializer.is_valid():
         ticket = serializer.save()
+        
+        income_data = {
+            'club': ticket.club.id,
+            'source': 'ticket_sales',
+            'amount': ticket.price,
+            'description': f"Ticket sale for {ticket.buyer_name}",
+            'date': ticket.issue_date,
+            'received_by': request.user.id
+        }
+        income_serializer = IncomeSerializer(data=income_data)
+
+        if income_serializer.is_valid():
+            income_serializer.save()
 
         if not IsOwnerOrRelatedToClub().has_object_permission(request, None, ticket):
             ticket.delete()  
