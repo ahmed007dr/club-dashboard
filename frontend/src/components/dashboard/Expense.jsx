@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { CiEdit, CiTrash } from "react-icons/ci"; // Icons for Edit and Delete
+import { CiEdit, CiTrash } from "react-icons/ci";
 import {
   Card,
   CardContent,
@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, MoreVertical } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchExpenses,
@@ -23,7 +23,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
-import { MoreVertical } from "lucide-react";
 
 const Expense = () => {
   const dispatch = useDispatch();
@@ -39,42 +38,50 @@ const Expense = () => {
     invoice_number: "",
     attachment: null,
   });
-
-  // State for confirmation modal
   const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
   const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [userClub, setUserClub] = useState(null); // Store logged-in user's club
   const itemsPerPage = 5;
 
   // Fetch expenses from the backend
   const { expenses, loading, error } = useSelector((state) => state.finance);
 
-  // Fetch data on component mount
+  // Fetch user profile to get club details
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/accounts/api/profile/", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`, // Adjust based on your auth setup
+        "Content-Type": "application/json",
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setUserClub({
+          id: data.club.id,
+          name: data.club.name,
+        });
+        setNewExpense((prev) => ({ ...prev, club: data.club.id.toString() })); // Pre-fill club in new expense
+      })
+      .catch((err) => {
+        console.error("Failed to fetch user profile:", err);
+      });
+  }, []);
+
+  // Fetch expenses on component mount
   useEffect(() => {
     dispatch(fetchExpenses());
   }, [dispatch]);
 
-  // Extract unique clubs and categories from expenses
-  const uniqueClubs = useMemo(() => {
-    const clubsMap = new Map();
-    expenses.forEach((expense) => {
-      if (expense.club_details) {
-        clubsMap.set(expense.club_details.id, {
-          id: expense.club_details.id,
-          name: expense.club_details.name,
-        });
-      }
-    });
-    return Array.from(clubsMap.values());
-  }, [expenses]);
-
+  // Extract unique categories from expenses
   const uniqueCategories = useMemo(() => {
     const categoriesMap = new Map();
     expenses.forEach((expense) => {
-      if (expense.category_details) {
+      if (expense.category_details && expense.club_details?.id === userClub?.id) {
         categoriesMap.set(expense.category_details.id, {
           id: expense.category_details.id,
           name: expense.category_details.name,
@@ -82,7 +89,7 @@ const Expense = () => {
       }
     });
     return Array.from(categoriesMap.values());
-  }, [expenses]);
+  }, [expenses, userClub]);
 
   // Handle input changes in the modal (Edit or Add)
   const handleChange = (e) => {
@@ -122,11 +129,18 @@ const Expense = () => {
           console.error("فشل في تحديث المصروف:", err);
         });
     } else {
-      dispatch(addExpense(newExpense))
+      const payload = {
+        ...newExpense,
+        club: parseInt(newExpense.club) || null,
+        category: parseInt(newExpense.category) || null,
+        amount: parseFloat(newExpense.amount) || 0,
+        paid_by: parseInt(newExpense.paid_by) || null,
+      };
+      dispatch(addExpense(payload))
         .unwrap()
         .then(() => {
           setNewExpense({
-            club: "",
+            club: userClub?.id.toString() || "",
             category: "",
             amount: "",
             description: "",
@@ -143,17 +157,20 @@ const Expense = () => {
     }
   };
 
+  // Filter expenses by date and user's club
   const filteredExpenses = useMemo(() => {
     return expenses.filter((expense) => {
       const expenseDate = new Date(expense.date);
       const from = startDate ? new Date(startDate) : null;
       const to = endDate ? new Date(endDate) : null;
 
-      if (from && expenseDate < from) return false;
-      if (to && expenseDate > to) return false;
-      return true;
+      return (
+        expense.club_details?.id === userClub?.id && // Filter by user's club
+        (!from || expenseDate >= from) &&
+        (!to || expenseDate <= to)
+      );
     });
-  }, [expenses, startDate, endDate]);
+  }, [expenses, startDate, endDate, userClub]);
 
   const paginatedExpenses = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -164,7 +181,7 @@ const Expense = () => {
   const handleEditClick = (expense) => {
     const sanitizedExpense = {
       ...expense,
-      club: expense.club?.toString() || "",
+      club: expense.club?.toString() || userClub?.id.toString() || "",
       category: expense.category?.toString() || "",
       amount: expense.amount?.toString() || "0",
       description: expense.description || "",
@@ -205,18 +222,17 @@ const Expense = () => {
 
   return (
     <div className="p-6 space-y-6" dir="rtl">
-      {/* Tabs */}
       <Tabs defaultValue="expenses" dir="rtl">
         <TabsContent value="expenses" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-right">جميع المصروفات</CardTitle>
               <CardDescription className="text-right">
-                إدارة جميع المصروفات
+                إدارة جميع المصروفات لنادي {userClub?.name || "جاري التحميل..."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Add Expense Button */}
+              {/* Add Expense Button and Date Filters */}
               <div className="flex justify-between mb-4">
                 <div className="flex gap-4 items-center justify-end">
                   <label className="text-sm">من:</label>
@@ -234,7 +250,6 @@ const Expense = () => {
                     className="border px-2 py-1 rounded"
                   />
                 </div>
-
                 <Button
                   onClick={handleAddClick}
                   className="flex items-center justify-start"
@@ -375,8 +390,8 @@ const Expense = () => {
                 <Button
                   onClick={() =>
                     setTotalInfo({
-                      count: expenses.length,
-                      total: expenses.reduce(
+                      count: filteredExpenses.length,
+                      total: filteredExpenses.reduce(
                         (acc, expense) =>
                           acc + (parseFloat(expense.amount) || 0),
                         0
@@ -431,13 +446,13 @@ const Expense = () => {
                   }
                   onChange={handleChange}
                   className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                  // Disable to prevent changes, as only one club is available
                 >
-                  <option value="">اختر النادي</option>
-                  {uniqueClubs.map((club) => (
-                    <option key={club.id} value={club.id}>
-                      {club.name}
-                    </option>
-                  ))}
+                  {userClub ? (
+                    <option value={userClub.id}>{userClub.name}</option>
+                  ) : (
+                    <option value="">جاري التحميل...</option>
+                  )}
                 </select>
               </div>
 

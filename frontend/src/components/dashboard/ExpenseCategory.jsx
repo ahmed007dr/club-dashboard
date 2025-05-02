@@ -31,30 +31,39 @@ const ExpenseCategory = () => {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5);
+  const [userClub, setUserClub] = useState(null); // Store logged-in user's club
 
-  // Fetch expense categories from the backend
+  // Fetch expense categories and user profile from the backend
   const { expenseCategories, loading, error } = useSelector(
     (state) => state.finance
   );
 
-  // Fetch data on component mount
+  // Fetch user profile to get club details
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/accounts/api/profile/", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`, // Adjust based on your auth setup
+        "Content-Type": "application/json",
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setUserClub({
+          id: data.club.id,
+          name: data.club.name,
+        });
+        setFormData((prev) => ({ ...prev, club: data.club.id.toString() })); // Pre-fill club in form
+      })
+      .catch((err) => {
+        console.error("Failed to fetch user profile:", err);
+      });
+  }, []);
+
+  // Fetch expense categories on component mount
   useEffect(() => {
     dispatch(fetchExpenseCategories());
   }, [dispatch]);
-
-  // Extract unique clubs from expenseCategories
-  const uniqueClubs = useMemo(() => {
-    const clubsMap = new Map();
-    expenseCategories.forEach((category) => {
-      if (category.club_details) {
-        clubsMap.set(category.club_details.id, {
-          id: category.club_details.id,
-          name: category.club_details.name,
-        });
-      }
-    });
-    return Array.from(clubsMap.values());
-  }, [expenseCategories]);
 
   // Handle input changes for form
   const handleChange = (e) => {
@@ -83,7 +92,6 @@ const ExpenseCategory = () => {
   // Add new expense category via API
   const handleAdd = () => {
     if (validate()) {
-      // Convert club to number for API
       const payload = {
         ...formData,
         club: parseInt(formData.club) || null,
@@ -91,7 +99,7 @@ const ExpenseCategory = () => {
       dispatch(addExpenseCategory(payload))
         .unwrap()
         .then(() => {
-          setFormData({ club: "", name: "", description: "" });
+          setFormData({ club: userClub?.id.toString() || "", name: "", description: "" });
           setShowModal(false);
         })
         .catch((err) => {
@@ -100,42 +108,29 @@ const ExpenseCategory = () => {
     }
   };
 
-  // Debug: Log expenseCategories to inspect data
-  useEffect(() => {
-    console.log("expenseCategories:", expenseCategories);
-    expenseCategories.forEach((category, index) => {
-      console.log(`Category ${index}:`, {
-        club: category.club,
-        clubType: typeof category.club,
-        clubDetails: category.club_details,
-        name: category.name,
-        nameType: typeof category.name,
-        description: category.description,
-        descriptionType: typeof category.description,
-      });
-    });
-  }, [expenseCategories]);
-
   // Filter and paginate categories
-  const filteredCategories = expenseCategories.filter((category) => {
-    // Safely convert values to strings, handling all edge cases
-    const safeToString = (value) => {
-      if (value === null || value === undefined) return "";
-      return String(value).toLowerCase();
-    };
+  const filteredCategories = useMemo(() => {
+    return expenseCategories.filter((category) => {
+      const safeToString = (value) => {
+        if (value === null || value === undefined) return "";
+        return String(value).toLowerCase();
+      };
 
-    const club = category.club_details
-      ? safeToString(category.club_details.name)
-      : "";
-    const name = safeToString(category.name);
-    const description = safeToString(category.description);
+      const club = category.club_details
+        ? safeToString(category.club_details.name)
+        : "";
+      const name = safeToString(category.name);
+      const description = safeToString(category.description);
 
-    return (
-      club.includes(filters.club.toLowerCase()) &&
-      name.includes(filters.name.toLowerCase()) &&
-      description.includes(filters.description.toLowerCase())
-    );
-  });
+      // Only include categories matching the logged-in user's club
+      return (
+        category.club_details?.id === userClub?.id &&
+        club.includes(filters.club.toLowerCase()) &&
+        name.includes(filters.name.toLowerCase()) &&
+        description.includes(filters.description.toLowerCase())
+      );
+    });
+  }, [expenseCategories, filters, userClub]);
 
   const totalPages = Math.ceil(filteredCategories.length / itemsPerPage);
   const paginatedCategories = filteredCategories.slice(
@@ -157,7 +152,7 @@ const ExpenseCategory = () => {
           <CardHeader className="pb-3">
             <CardTitle className="text-right">جميع فئات المصروفات</CardTitle>
             <CardDescription className="text-right">
-              إدارة جميع فئات المصروفات
+              إدارة جميع فئات المصروفات لنادي {userClub?.name || "جاري التحميل..."}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -173,7 +168,6 @@ const ExpenseCategory = () => {
             {/* Filters */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
               {[
-                { label: "النادي", name: "club" },
                 { label: "الاسم", name: "name" },
                 { label: "الوصف", name: "description" },
               ].map(({ label, name }) => (
@@ -297,13 +291,13 @@ const ExpenseCategory = () => {
                   value={formData.club}
                   onChange={handleChange}
                   className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                   // Disable to prevent changes, as only one club is available
                 >
-                  <option value="">اختر النادي</option>
-                  {uniqueClubs.map((club) => (
-                    <option key={club.id} value={club.id}>
-                      {club.name}
-                    </option>
-                  ))}
+                  {userClub ? (
+                    <option value={userClub.id}>{userClub.name}</option>
+                  ) : (
+                    <option value="">جاري التحميل...</option>
+                  )}
                 </select>
                 {errors.club && (
                   <p className="text-red-500 text-sm text-right">

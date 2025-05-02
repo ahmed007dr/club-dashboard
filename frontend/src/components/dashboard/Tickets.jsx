@@ -6,9 +6,10 @@ import {
   deleteTicketById,
   markTicketAsUsed,
 } from "../../redux/slices/ticketsSlice";
-import { FaEdit, FaTrash, FaCheck, FaEye, FaPlus } from "react-icons/fa";
+import { addTicket } from "../../redux/slices/ticketsSlice";
+
+import { FaPlus } from "react-icons/fa";
 import { IoTicketOutline } from "react-icons/io5";
-import AddTicket from "./AddTicket";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,9 @@ const Tickets = () => {
   const [showMarkAsUsedModal, setShowMarkAsUsedModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [userClub, setUserClub] = useState(null); // Store logged-in user's club
+  const [loadingProfile, setLoadingProfile] = useState(true); // Profile loading state
+  const [formError, setFormError] = useState(null); // Form error state
 
   // Filters
   const [filterClub, setFilterClub] = useState("");
@@ -33,26 +37,56 @@ const Tickets = () => {
   const [filterBuyerName, setFilterBuyerName] = useState("");
   const [filterUsedStatus, setFilterUsedStatus] = useState("");
 
+  // Add Ticket Form
+  const [formData, setFormData] = useState({
+    club: "",
+    buyer_name: "",
+    ticket_type: "",
+    price: "",
+    used: false,
+    used_by: "",
+  });
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(6);
   const itemsPerPageOptions = [5, 10, 20];
   const actionButtonsRef = useRef(null);
 
-  // Extract unique clubs from tickets
-  const clubs = Array.from(
-    new Map(
-      tickets.map((ticket) => [
-        ticket.club,
-        { id: ticket.club, name: ticket.club_name },
-      ])
-    ).values()
-  );
+  // Fetch user profile to get club details
+  useEffect(() => {
+    setLoadingProfile(true);
+    fetch("http://127.0.0.1:8000/accounts/api/profile/", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        "Content-Type": "application/json",
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        const club = { id: data.club.id, name: data.club.name };
+        console.log("Fetched userClub:", club); // Debug log
+        setUserClub(club);
+        setFilterClub(club.id.toString());
+        setFormData((prev) => ({ ...prev, club: club.id.toString() }));
+        setLoadingProfile(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch user profile:", err);
+        setLoadingProfile(false);
+      });
+  }, []);
+
+  // Load tickets on mount
+  useEffect(() => {
+    dispatch(fetchTickets());
+  }, [dispatch]);
 
   // Filter tickets
   const filteredTickets = tickets.filter((ticket) => {
     const matchesClub =
-      filterClub === "" || ticket.club.toString() === filterClub;
+      userClub && ticket.club.toString() === userClub.id.toString();
     const matchesBuyer =
       filterBuyerName === "" ||
       ticket.buyer_name?.toLowerCase().includes(filterBuyerName.toLowerCase());
@@ -129,6 +163,15 @@ const Tickets = () => {
   // Modal handlers
   const openCreateModal = () => {
     closeAllModals();
+    setFormData({
+      club: userClub?.id?.toString() || "",
+      buyer_name: "",
+      ticket_type: "",
+      price: "",
+      used: false,
+      used_by: "",
+    });
+    setFormError(null);
     setShowCreateModal(true);
   };
 
@@ -167,6 +210,7 @@ const Tickets = () => {
     setShowViewModal(false);
     setShowCreateModal(false);
     setSelectedTicket(null);
+    setFormError(null);
   };
 
   // Handle clicks outside modals
@@ -189,16 +233,12 @@ const Tickets = () => {
 
   // Data handlers
   const handleEditSave = () => {
-    if (selectedTicket) {
-      const clubId = Array.isArray(selectedTicket.club)
-        ? selectedTicket.club[0]
-        : selectedTicket.club;
-
+    if (selectedTicket && userClub) {
       const updatedTicketData = {
-        club: Number(clubId),
+        club: Number(userClub.id),
         buyer_name: selectedTicket.buyer_name,
         ticket_type: selectedTicket.ticket_type,
-        price: Number(selectedTicket.price), // Parse price to number
+        price: Number(selectedTicket.price),
         used: selectedTicket.used,
         used_by: selectedTicket.used ? Number(selectedTicket.used_by) || null : null,
       };
@@ -240,24 +280,59 @@ const Tickets = () => {
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-
     setSelectedTicket((prev) => ({
       ...prev,
       [name]:
         type === "checkbox"
           ? checked
-          : name === "club" || name === "used_by" || name === "price"
+          : name === "used_by" || name === "price"
           ? Number(value) || ""
           : value,
     }));
   };
 
-  // Load tickets on mount
-  useEffect(() => {
-    dispatch(fetchTickets());
-  }, [dispatch]);
+  const handleFormChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]:
+        type === "checkbox"
+          ? checked
+          : name === "price" || name === "used_by"
+          ? Number(value) || ""
+          : value,
+    }));
+  };
 
-  if (status === "loading")
+  const handleCreateSubmit = (e) => {
+    e.preventDefault();
+    if (!userClub) {
+      setFormError("النادي غير متاح. يرجى المحاولة لاحقًا.");
+      return;
+    }
+
+    const ticketData = {
+      club: Number(formData.club),
+      buyer_name: formData.buyer_name,
+      ticket_type: formData.ticket_type,
+      price: Number(formData.price),
+      used: formData.used,
+      used_by: formData.used ? Number(formData.used_by) || null : null,
+    };
+
+    dispatch(addTicket(ticketData))
+      .unwrap()
+      .then(() => {
+        dispatch(fetchTickets());
+        closeAllModals();
+      })
+      .catch((err) => {
+        console.error("Failed to create ticket:", err);
+        setFormError("فشل في إضافة التذكرة: " + (err.message || "خطأ غير معروف"));
+      });
+  };
+
+  if (status === "loading" || loadingProfile)
     return <div className="flex justify-center items-center h-screen">جاري التحميل...</div>;
   if (error) return <div className="text-red-500 text-center p-4">خطأ: {error}</div>;
 
@@ -272,6 +347,7 @@ const Tickets = () => {
         <button
           onClick={openCreateModal}
           className="flex items-center gap-2 btn"
+          disabled={loadingProfile || !userClub}
         >
           <FaPlus />
           إضافة تذكرة جديد
@@ -280,51 +356,62 @@ const Tickets = () => {
 
       {/* Filters */}
       <div className="mb-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-        <input
-          type="text"
-          placeholder="بحث عن اسم المشتري"
-          className="border p-2 rounded"
-          value={filterBuyerName}
-          onChange={(e) => setFilterBuyerName(e.target.value)}
-        />
-        <select
-          className="border p-2 rounded"
-          value={filterClub}
-          onChange={(e) => setFilterClub(e.target.value)}
-        >
-          <option value="">كل الأندية</option>
-          {clubs.map((club) => (
-            <option key={club.id} value={club.id}>
-              {club.name}
-            </option>
-          ))}
-        </select>
-        <select
-          className="border p-2 rounded"
-          value={filterTicketType}
-          onChange={(e) => setFilterTicketType(e.target.value)}
-        >
-          <option value="">كل الأنواع</option>
-          <option value="session">جلسة</option>
-          <option value="day_pass">تصريح يومي</option>
-          <option value="monthly">شهري</option>
-        </select>
-        <select
-          className="border p-2 rounded"
-          value={filterUsedStatus}
-          onChange={(e) => setFilterUsedStatus(e.target.value)}
-        >
-          <option value="">كل الحالات</option>
-          <option value="used">مستخدمة</option>
-          <option value="unused">متاحة</option>
-        </select>
+        <div>
+          <label className="block text-gray-700 font-medium mb-2">النادي</label>
+          <select
+            className="border p-2 rounded w-full"
+            value={filterClub}
+            onChange={(e) => setFilterClub(e.target.value)}
+            
+          >
+            {userClub ? (
+              <option value={userClub.id}>{userClub.name}</option>
+            ) : (
+              <option value="">جاري التحميل...</option>
+            )}
+          </select>
+        </div>
+        <div>
+          <label className="block text-gray-700 font-medium mb-2">اسم المشتري</label>
+          <input
+            type="text"
+            placeholder="بحث عن اسم المشتري"
+            className="border p-2 rounded w-full"
+            value={filterBuyerName}
+            onChange={(e) => setFilterBuyerName(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-gray-700 font-medium mb-2">نوع التذكرة</label>
+          <select
+            className="border p-2 rounded w-full"
+            value={filterTicketType}
+            onChange={(e) => setFilterTicketType(e.target.value)}
+          >
+            <option value="">كل الأنواع</option>
+            <option value="session">جلسة</option>
+            <option value="day_pass">تصريح يومي</option>
+            <option value="monthly">شهري</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-gray-700 font-medium mb-2">الحالة</label>
+          <select
+            className="border p-2 rounded w-full"
+            value={filterUsedStatus}
+            onChange={(e) => setFilterUsedStatus(e.target.value)}
+          >
+            <option value="">كل الحالات</option>
+            <option value="used">مستخدمة</option>
+            <option value="unused">متاحة</option>
+          </select>
+        </div>
       </div>
 
       {/* Tickets Table */}
       <table className="min-w-full bg-white shadow rounded">
         <thead>
           <tr>
-            <th className="py-2 px-4 border-b text-center">النادي (المعرف)</th>
             <th className="py-2 px-4 border-b text-center">اسم النادي</th>
             <th className="py-2 px-4 border-b text-center">المشتري</th>
             <th className="py-2 px-4 border-b text-center">نوع التذكرة</th>
@@ -336,7 +423,6 @@ const Tickets = () => {
         <tbody>
           {currentTickets.map((ticket) => (
             <tr key={ticket.id} className="hover:bg-gray-100">
-              <td className="py-2 px-4 border-b text-center">{ticket.club}</td>
               <td className="py-2 px-4 border-b text-center">{ticket.club_name}</td>
               <td className="py-2 px-4 border-b text-center">{ticket.buyer_name}</td>
               <td className="py-2 px-4 border-b text-center">
@@ -418,7 +504,6 @@ const Tickets = () => {
             >
               السابق
             </button>
-
             {getPageNumbers().map((page) => (
               <button
                 key={page}
@@ -433,7 +518,6 @@ const Tickets = () => {
                 {page}
               </button>
             ))}
-
             <button
               onClick={handleNext}
               disabled={currentPage === totalPages}
@@ -447,7 +531,6 @@ const Tickets = () => {
               التالي
             </button>
           </div>
-
           <div className="flex items-center justify-center gap-4">
             <span>
               عرض {startIndex}–{endIndex} من {totalItems} تذكرة
@@ -471,7 +554,7 @@ const Tickets = () => {
       {/* Create Ticket Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md modal-container">
             <div className="flex justify-between items-center border-b p-4">
               <h2 className="text-xl font-semibold">إضافة تذكرة جديدة</h2>
               <button
@@ -482,54 +565,226 @@ const Tickets = () => {
               </button>
             </div>
             <div className="p-4">
-              <AddTicket onClose={closeAllModals} clubs={clubs} />
+              {formError && (
+                <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right">
+                  {formError}
+                </div>
+              )}
+              <form onSubmit={handleCreateSubmit} className="space-y-4">
+                {/* Club */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-right">النادي</label>
+                  <select
+                    name="club"
+                    value={formData.club}
+                    onChange={handleFormChange}
+                    className="w-full border rounded-md p-2 focus:ring focus:ring-green-500 text-right"
+                    
+                    required
+                  >
+                    {userClub ? (
+                      <option value={userClub.id}>{userClub.name}</option>
+                    ) : (
+                      <option value="">جاري التحميل...</option>
+                    )}
+                  </select>
+                </div>
+                {/* Buyer Name */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-right">اسم المشتري</label>
+                  <input
+                    type="text"
+                    name="buyer_name"
+                    value={formData.buyer_name}
+                    onChange={handleFormChange}
+                    className="w-full border rounded-md p-2 focus:ring focus:ring-green-500 text-right"
+                    placeholder="أدخل اسم المشتري"
+                    required
+                  />
+                </div>
+                {/* Ticket Type */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-right">نوع التذكرة</label>
+                  <select
+                    name="ticket_type"
+                    value={formData.ticket_type}
+                    onChange={handleFormChange}
+                    className="w-full border rounded-md p-2 focus:ring focus:ring-green-500 text-right"
+                    required
+                  >
+                    <option value="">اختر نوع التذكرة</option>
+                    <option value="session">جلسة</option>
+                    <option value="day_pass">تصريح يومي</option>
+                    <option value="monthly">شهري</option>
+                  </select>
+                </div>
+                {/* Price */}
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-right">السعر</label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={formData.price}
+                    onChange={handleFormChange}
+                    className="w-full border rounded-md p-2 focus:ring focus:ring-green-500 text-right"
+                    placeholder="أدخل السعر"
+                    min="0"
+                    required
+                  />
+                </div>
+                {/* Used */}
+                <div className="flex items-center space-x-2 space-x-reverse">
+                  <input
+                    type="checkbox"
+                    name="used"
+                    checked={formData.used}
+                    onChange={handleFormChange}
+                    className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <label className="text-sm font-medium">مستخدمة</label>
+                </div>
+                {/* Used By */}
+                {formData.used && (
+                  <div>
+                    <label className="block text-sm font-medium mb-1 text-right">المستخدم</label>
+                    <input
+                      type="number"
+                      name="used_by"
+                      value={formData.used_by}
+                      onChange={handleFormChange}
+                      className="w-full border rounded-md p-2 focus:ring focus:ring-green-500 text-right"
+                      placeholder="أدخل معرف العضو"
+                    />
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={closeAllModals}
+                    className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 transition duration-200"
+                  >
+                    إلغاء
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 transition duration-200"
+                    disabled={!userClub}
+                  >
+                    إضافة التذكرة
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
       )}
 
       {/* Edit Modal */}
-     {showEditModal && selectedTicket && (
-  <div 
-    className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40"
-    onClick={closeAllModals}
-  >
-    <div 
-      className="bg-white p-6 rounded shadow-lg w-96"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <h2 className="text-2xl font-bold mb-4">تعديل التذكرة</h2>
-      <div className="mb-4">
-        <label className="block text-gray-700 font-medium mb-2">
-          النادي
-        </label>
-        <select
-          name="club"
-          value={selectedTicket.club}
-          onChange={(e) => {
-            e.stopPropagation();
-            handleInputChange(e);
-          }}
-          className="w-full border p-2 rounded"
-          required
+      {showEditModal && selectedTicket && (
+        <div
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40"
+          onClick={closeAllModals}
         >
-          <option value="">اختر النادي</option>
-          {clubs.map((club) => (
-            <option key={club.id} value={club.id}>
-              {club.name}
-            </option>
-          ))}
-        </select>
-      </div>
-      {/* rest of your modal content */}
-    </div>
-  </div>
-)}
+          <div
+            className="bg-white p-6 rounded shadow-lg w-96 modal-container"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold mb-4">تعديل التذكرة</h2>
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-2">النادي</label>
+              <select
+                name="club"
+                value={userClub?.id || ""}
+                onChange={handleInputChange}
+                className="w-full border p-2 rounded"
+                disabled
+              >
+                {userClub ? (
+                  <option value={userClub.id}>{userClub.name}</option>
+                ) : (
+                  <option value="">جاري التحميل...</option>
+                )}
+              </select>
+            </div>
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-2">اسم المشتري</label>
+              <input
+                type="text"
+                name="buyer_name"
+                value={selectedTicket.buyer_name || ""}
+                onChange={handleInputChange}
+                className="w-full border p-2 rounded"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-2">نوع التذكرة</label>
+              <select
+                name="ticket_type"
+                value={selectedTicket.ticket_type || ""}
+                onChange={handleInputChange}
+                className="w-full border p-2 rounded"
+              >
+                <option value="">اختر نوع التذكرة</option>
+                <option value="session">جلسة</option>
+                <option value="day_pass">تصريح يومي</option>
+                <option value="monthly">شهري</option>
+              </select>
+            </div>
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-2">السعر</label>
+              <input
+                type="number"
+                name="price"
+                value={selectedTicket.price || ""}
+                onChange={handleInputChange}
+                className="w-full border p-2 rounded"
+              />
+            </div>
+            <div className="mb-4">
+              <label className="block text-gray-700 font-medium mb-2">مستخدم</label>
+              <input
+                type="checkbox"
+                name="used"
+                checked={selectedTicket.used || false}
+                onChange={handleInputChange}
+                className="mr-2"
+              />
+              مستخدمة
+            </div>
+            {selectedTicket.used && (
+              <div className="mb-4">
+                <label className="block text-gray-700 font-medium mb-2">معرف العضو</label>
+                <input
+                  type="number"
+                  name="used_by"
+                  value={selectedTicket.used_by || ""}
+                  onChange={handleInputChange}
+                  className="w-full border p-2 rounded"
+                />
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={closeAllModals}
+                className="bg-gray-300 px-4 py-2 rounded"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleEditSave}
+                className="bg-blue-500 text-white px-4 py-2 rounded"
+              >
+                حفظ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Modal */}
       {showDeleteModal && selectedTicket && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
-          <div className="bg-white p-6 rounded shadow-lg w-80">
+          <div className="bg-white p-6 rounded shadow-lg w-80 modal-container">
             <h2 className="text-2xl font-bold mb-4">حذف التذكرة</h2>
             <p>هل أنت متأكد أنك تريد حذف "{selectedTicket.buyer_name}"؟</p>
             <div className="flex justify-end gap-2 mt-4">
@@ -553,7 +808,7 @@ const Tickets = () => {
       {/* Mark as Used Modal */}
       {showMarkAsUsedModal && selectedTicket && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
-          <div className="bg-white p-6 rounded shadow-lg w-80">
+          <div className="bg-white p-6 rounded shadow-lg w-80 modal-container">
             <h2 className="text-2xl font-bold mb-4">تحديد التذكرة كمستخدمة</h2>
             <div className="mb-4">
               <label htmlFor="usedBy" className="block mb-2">
@@ -590,7 +845,7 @@ const Tickets = () => {
       {/* View Modal */}
       {showViewModal && selectedTicket && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
-          <div className="bg-white p-6 rounded shadow-lg w-96">
+          <div className="bg-white p-6 rounded shadow-lg w-96 modal-container">
             <h2 className="text-2xl font-bold mb-4">تفاصيل التذكرة</h2>
             <p>
               <strong>اسم المشتري:</strong> {selectedTicket.buyer_name}
