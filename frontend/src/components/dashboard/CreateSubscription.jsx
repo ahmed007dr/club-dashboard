@@ -68,50 +68,52 @@ const CreateSubscription = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <h2 className="text-xl font-bold">Create Subscription</h2>
+    <div className="container mx-auto p-4"dir="rtl">
+      
+  <h2 className="text-xl font-bold">إنشاء اشتراك</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block font-medium">Club ID</label>
+        <label className="block font-medium">رقم النادي</label>
           <input
             type="number"
             name="club"
             value={formData.club}
             onChange={handleChange}
             className="w-full p-2 border rounded"
-            placeholder="Enter Club ID"
+             placeholder="أدخل رقم النادي"
             required
           />
         </div>
         
         <div>
-          <label className="block font-medium">Member ID</label>
+        <label className="block font-medium">رقم العضو</label>
           <input
             type="number"
             name="member"
             value={formData.member}
             onChange={handleChange}
             className="w-full p-2 border rounded"
-            placeholder="Enter Member ID"
+          placeholder="أدخل رقم العضو"
             required
           />
         </div>
 
         <div>
-          <label className="block font-medium">Subscription Type ID</label>
+        <label className="block font-medium">رقم نوع الاشتراك</label>
           <input
             type="number"
             name="type"
             value={formData.type}
             onChange={handleChange}
             className="w-full p-2 border rounded"
-            placeholder="Enter Subscription Type ID"
+           placeholder="أدخل رقم نوع الاشتراك"
             required
           />
         </div>
 
         <div>
-          <label className="block font-medium">Start Date</label>
+        
+      <label className="block font-medium">تاريخ البداية</label>
           <input
             type="date"
             name="start_date"
@@ -123,7 +125,7 @@ const CreateSubscription = () => {
         </div>
 
         <div>
-          <label className="block font-medium">End Date</label>
+        <label className="block font-medium">تاريخ النهاية</label>
           <input
             type="date"
             name="end_date"
@@ -135,22 +137,23 @@ const CreateSubscription = () => {
         </div>
 
         <div>
-          <label className="block font-medium">Paid Amount</label>
+        <label className="block font-medium">المبلغ المدفوع</label>
           <input
             type="number"
             name="paid_amount"
             value={formData.paid_amount}
             onChange={handleChange}
             className="w-full p-2 border rounded"
-            placeholder="Enter Paid Amount"
+            placeholder="أدخل المبلغ المدفوع"
             required
             step="0.01"
           />
         </div>
 
-        <button type="submit" className="w-full bg-green-500 text-white p-2 rounded">
-          Create Subscription
-        </button>
+        <button type="submit" className="btn">
+  إنشاء اشتراك
+</button>
+
       </form>
     </div>
   );

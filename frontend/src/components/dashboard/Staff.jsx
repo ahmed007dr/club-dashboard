@@ -154,23 +154,21 @@ const Staff = () => {
       </div>
 
       <table className="w-full border text-sm">
-        <thead>
-          <tr>
-            <th className="p-2">معرف الوردية</th>
-            <th className="p-2">التاريخ</th>
-            <th className="p-2">بداية الوردية</th>
-            <th className="p-2">نهاية الوردية</th>
-            <th className="p-2">النادي</th>
-            <th className="p-2">الموظف</th>
-            <th className="p-2">تمت الموافقة بواسطة</th>
-            <th className="p-2">الإجراءات</th>
-          </tr>
-        </thead>
+      <thead>
+  <tr>
+    <th className="p-2">التاريخ</th>
+    <th className="p-2">بداية الوردية</th>
+    <th className="p-2">نهاية الوردية</th>
+    <th className="p-2">النادي</th>
+    <th className="p-2">الموظف</th>
+    <th className="p-2">تمت الموافقة بواسطة</th>
+    <th className="p-2">الإجراءات</th>
+  </tr>
+</thead>
         <tbody>
           {Array.isArray(currentItems) &&
             currentItems.map((shift) => (
               <tr key={shift.id} className="text-center">
-                <td className="p-2">{shift.id}</td>
                 <td className="p-2">{shift.date}</td>
                 <td className="p-2">{shift.shift_start}</td>
                 <td className="p-2">{shift.shift_end}</td>

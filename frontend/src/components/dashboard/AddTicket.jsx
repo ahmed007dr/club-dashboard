@@ -136,7 +136,6 @@ const AddTicket = ({ onClose, clubs }) => {
           <option value="">اختر نوع التذكرة</option>
           <option value="session">جلسة</option>
           <option value="day_pass">تصريح يومي</option>
-          <option value="monthly">شهري</option>
         </select>
         {errors.ticket_type && (
           <p className="text-red-500 text-xs mt-1">{errors.ticket_type}</p>

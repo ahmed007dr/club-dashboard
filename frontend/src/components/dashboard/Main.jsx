@@ -18,7 +18,6 @@ import SubscriptionStats from "./SubscriptionStats";
 import SubscriptionChart from "./SubscriptionChart";
 import ShiftsPerClubChart from "./ShiftsPerClubChart ";
 
-
 const Main = () => {
   const dispatch = useDispatch();
   const { invites } = useSelector((state) => state.invites);

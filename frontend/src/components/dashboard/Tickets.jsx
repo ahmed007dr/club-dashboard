@@ -271,7 +271,7 @@ const Tickets = () => {
         </div>
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 btn"
         >
           <FaPlus />
           إضافة تذكرة جديد
@@ -470,7 +470,7 @@ const Tickets = () => {
 
       {/* Create Ticket Modal */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 modal-container">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="flex justify-between items-center border-b p-4">
               <h2 className="text-xl font-semibold">إضافة تذكرة جديدة</h2>
@@ -489,117 +489,46 @@ const Tickets = () => {
       )}
 
       {/* Edit Modal */}
-      {showEditModal && selectedTicket && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 modal-container">
-          <div className="bg-white p-6 rounded shadow-lg w-96">
-            <h2 className="text-2xl font-bold mb-4">تعديل التذكرة</h2>
-            <div className="mb-4">
-              <label className="block text-gray-700 font-medium mb-2">
-                النادي
-              </label>
-              <select
-                name="club"
-                value={selectedTicket.club}
-                onChange={handleInputChange}
-                className="w-full border p-2 rounded"
-                required
-              >
-                <option value="">اختر النادي</option>
-                {clubs.map((club) => (
-                  <option key={club.id} value={club.id}>
-                    {club.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mb-4">
-              <label className="block text-gray-700 font-medium mb-2">
-                اسم المشتري
-              </label>
-              <input
-                type="text"
-                name="buyer_name"
-                value={selectedTicket.buyer_name}
-                onChange={handleInputChange}
-                placeholder="اسم المشتري"
-                className="w-full border p-2 rounded"
-              />
-            </div>
-            <div className="mb-4">
-              <label className="block text-gray-700 font-medium mb-2">
-                نوع التذكرة
-              </label>
-              <select
-                name="ticket_type"
-                value={selectedTicket.ticket_type}
-                onChange={handleInputChange}
-                className="w-full border p-2 rounded"
-              >
-                <option value="session">جلسة</option>
-                <option value="day_pass">تصريح يومي</option>
-                <option value="monthly">شهري</option>
-              </select>
-            </div>
-            <div className="mb-4">
-              <label className="block text-gray-700 font-medium mb-2">
-                السعر
-              </label>
-              <input
-                type="number"
-                name="price"
-                value={selectedTicket.price}
-                onChange={handleInputChange}
-                placeholder="السعر"
-                className="w-full border p-2 rounded"
-                step="0.01"
-              />
-            </div>
-            <div className="flex items-center mb-4">
-              <input
-                type="checkbox"
-                name="used"
-                checked={selectedTicket.used}
-                onChange={handleInputChange}
-                className="mr-2"
-              />
-              <label>مستخدمة</label>
-            </div>
-            {selectedTicket.used && (
-              <div className="mb-4">
-                <label className="block text-gray-700 font-medium mb-2">
-                  معرف العضو
-                </label>
-                <input
-                  type="number"
-                  name="used_by"
-                  value={selectedTicket.used_by || ""}
-                  onChange={handleInputChange}
-                  placeholder="معرف العضو"
-                  className="w-full border p-2 rounded"
-                />
-              </div>
-            )}
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={closeAllModals}
-                className="bg-gray-300 px-4 py-2 rounded"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={handleEditSave}
-                className="bg-blue-500 text-white px-4 py-2 rounded"
-              >
-                حفظ التغييرات
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+     {showEditModal && selectedTicket && (
+  <div 
+    className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40"
+    onClick={closeAllModals}
+  >
+    <div 
+      className="bg-white p-6 rounded shadow-lg w-96"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h2 className="text-2xl font-bold mb-4">تعديل التذكرة</h2>
+      <div className="mb-4">
+        <label className="block text-gray-700 font-medium mb-2">
+          النادي
+        </label>
+        <select
+          name="club"
+          value={selectedTicket.club}
+          onChange={(e) => {
+            e.stopPropagation();
+            handleInputChange(e);
+          }}
+          className="w-full border p-2 rounded"
+          required
+        >
+          <option value="">اختر النادي</option>
+          {clubs.map((club) => (
+            <option key={club.id} value={club.id}>
+              {club.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      {/* rest of your modal content */}
+    </div>
+  </div>
+)}
 
       {/* Delete Modal */}
       {showDeleteModal && selectedTicket && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 modal-container">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
           <div className="bg-white p-6 rounded shadow-lg w-80">
             <h2 className="text-2xl font-bold mb-4">حذف التذكرة</h2>
             <p>هل أنت متأكد أنك تريد حذف "{selectedTicket.buyer_name}"؟</p>
@@ -623,7 +552,7 @@ const Tickets = () => {
 
       {/* Mark as Used Modal */}
       {showMarkAsUsedModal && selectedTicket && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 modal-container">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
           <div className="bg-white p-6 rounded shadow-lg w-80">
             <h2 className="text-2xl font-bold mb-4">تحديد التذكرة كمستخدمة</h2>
             <div className="mb-4">
@@ -660,7 +589,7 @@ const Tickets = () => {
 
       {/* View Modal */}
       {showViewModal && selectedTicket && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 modal-container">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
           <div className="bg-white p-6 rounded shadow-lg w-96">
             <h2 className="text-2xl font-bold mb-4">تفاصيل التذكرة</h2>
             <p>

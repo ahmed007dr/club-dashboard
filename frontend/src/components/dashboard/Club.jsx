@@ -19,19 +19,20 @@ const Club = () => {
   const isLoading = useSelector((state) => state.club.isLoading);
   const error = useSelector((state) => state.club.error);
   const dispatch = useDispatch();
-
+console.log("Clubs:", clubs); // Log the clubs state
   useEffect(() => {
     const fetchData = async () => {
       try {
         const res = await dispatch(fetchClubs()).unwrap();
+        console.log('Fetched Clubs:', res); // Log the response
         setClubs(res); // Set the fetched clubs to state
       } catch (error) {
-        console.error("Error fetching Club:", error);
+        console.error('Error fetching Club:', error);
       }
     };
-
     fetchData();
   }, [dispatch]);
+  
 
   const formatDateForInput = (dateString) => {
     const date = new Date(dateString);
