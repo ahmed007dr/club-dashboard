@@ -706,7 +706,7 @@ const InviteList = () => {
                   className={`w-full px-3 py-2 border rounded-md ${
                     formErrors.invited_by ? "border-red-500" : "border-gray-300"
                   }`}
-                  placeholder="أدخل رقم العضوية (مثال: MEM-79831)"
+                  placeholder="أدخل رقم العضوية "
                 />
                 {formErrors.invited_by && (
                   <p className="mt-1 text-sm text-red-600">

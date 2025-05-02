@@ -78,22 +78,24 @@ export const addExpense = createAsyncThunk(
   'finance/addExpense',
   async (newExpense, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
+      const token = localStorage.getItem('token');
       const response = await fetch(`${BASE_URL}/finance/api/expenses/`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          // Do not set Content-Type; browser sets multipart/form-data automatically
         },
-        body: JSON.stringify(newExpense),
+        body: newExpense, // Send FormData directly
       });
+
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to add expense.');
+        return rejectWithValue(errorData || 'Failed to add expense.');
       }
+
       return await response.json();
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.message || 'Network error occurred.');
     }
   }
 );
@@ -107,9 +109,9 @@ export const updateExpense = createAsyncThunk(
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          
         },
-        body: JSON.stringify(updatedData),
+        body:updatedData,
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -178,9 +180,9 @@ export const addIncomeSource = createAsyncThunk(
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          
         },
-        body: JSON.stringify(newSource),
+        body: newSource,
       });
       if (!response.ok) {
         const errorData = await response.json();

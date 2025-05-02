@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { CiEdit } from 'react-icons/ci';
-import { HiOutlineDocumentReport } from 'react-icons/hi';
+import { CiEdit } from "react-icons/ci";
+import { HiOutlineDocumentReport } from "react-icons/hi";
 import { useDispatch, useSelector } from "react-redux";
 import { Button } from "../ui/button";
 import { editClub, fetchClubs } from "@/redux/slices/clubSlice";
@@ -15,29 +15,25 @@ const Club = () => {
     createdAt: "",
   });
 
-  const [clubs, setClubs] = useState([]); // Initialize clubs state
+  const [clubs, setClubs] = useState([]);
   const isLoading = useSelector((state) => state.club.isLoading);
   const error = useSelector((state) => state.club.error);
   const dispatch = useDispatch();
-console.log("Clubs:", clubs); // Log the clubs state
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const res = await dispatch(fetchClubs()).unwrap();
-        console.log('Fetched Clubs:', res); // Log the response
-        setClubs(res); // Set the fetched clubs to state
+        setClubs(res);
       } catch (error) {
-        console.error('Error fetching Club:', error);
+        console.error("Error fetching Club:", error);
       }
     };
     fetchData();
   }, [dispatch]);
-  
 
   const formatDateForInput = (dateString) => {
     const date = new Date(dateString);
-   
-
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const day = String(date.getDate()).padStart(2, "0");
@@ -51,7 +47,7 @@ console.log("Clubs:", clubs); // Log the clubs state
     setFormData({
       name: club.name,
       location: club.location,
-      logo: club.logo,
+      logo: club.logo || "",
       createdAt: formatDateForInput(club.createdAt),
     });
     setModalOpen(true);
@@ -67,10 +63,15 @@ console.log("Clubs:", clubs); // Log the clubs state
       c.id === selectedClub.id ? { ...selectedClub, ...formData } : c
     );
 
-    dispatch(editClub({ id: selectedClub.id, updatedClub: formData }));
-
-    setClubs(updatedClubs); // Update the local state with the edited club
-    setModalOpen(false); // Close the modal
+    dispatch(editClub({ id: selectedClub.id, updatedClub: formData }))
+      .unwrap()
+      .then(() => {
+        setClubs(updatedClubs);
+        setModalOpen(false);
+      })
+      .catch((err) => {
+        console.error("Failed to edit club:", err);
+      });
   };
 
   const closeModal = () => {
@@ -79,11 +80,19 @@ console.log("Clubs:", clubs); // Log the clubs state
   };
 
   if (isLoading) {
-    return <p className="text-center">Loading...</p>;
+    return (
+      <div className="flex justify-center items-center h-screen text-sm sm:text-base">
+        جاري التحميل...
+      </div>
+    );
   }
 
   if (error) {
-    return <p className="text-red-500 text-center">Error: {error}</p>;
+    return (
+      <div className="text-red-500 text-center p-4 text-sm sm:text-base">
+        خطأ: {error}
+      </div>
+    );
   }
 
   return (

@@ -18,8 +18,6 @@ function Receipts() {
     (state) => state.receipts
   );
 
-  console.log(currentReceipt)
-
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchError, setSearchError] = useState("");
@@ -45,7 +43,7 @@ function Receipts() {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5); // Dynamic items per page
+  const [itemsPerPage, setItemsPerPage] = useState(5);
   const itemsPerPageOptions = [5, 10, 20];
 
   // Extract unique clubs from receipts
@@ -62,7 +60,7 @@ function Receipts() {
     return Array.from(clubsMap.values());
   }, [receipts]);
 
-  // Extract unique subscriptions from receipts (temporary until /subscriptions/ endpoint)
+  // Extract unique subscriptions from receipts
   const uniqueSubscriptions = useMemo(() => {
     const subsMap = new Map();
     receipts.forEach((receipt) => {
@@ -76,11 +74,7 @@ function Receipts() {
     return Array.from(subsMap.values());
   }, [receipts]);
 
-    // You can now use uniqueClubs, uniqueMembers, and uniqueSubscriptions in your JSX or logic
-    console.log('Unique Clubs:', uniqueClubs);
-    console.log('Unique Subscriptions:', uniqueSubscriptions);
-
-  // Payment method choices (adjusted for backend)
+  // Payment method choices
   const paymentMethods = [
     { value: "CASH", label: "نقدي" },
     { value: "CREDIT_CARD", label: "بطاقة ائتمان" },
@@ -226,7 +220,7 @@ function Receipts() {
 
   useEffect(() => {
     setFilteredReceipts(receipts);
-    setCurrentPage(1); // Reset to page 1 when receipts change
+    setCurrentPage(1);
   }, [receipts]);
 
   // Pagination logic
@@ -236,7 +230,7 @@ function Receipts() {
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
   const paginatedReceipts = filteredReceipts.slice(startIndex, endIndex);
 
-  // Generate page numbers for display (limited range)
+  // Generate page numbers for display
   const getPageNumbers = () => {
     const maxPagesToShow = 5;
     const halfPages = Math.floor(maxPagesToShow / 2);
@@ -275,28 +269,37 @@ function Receipts() {
   const handleItemsPerPageChange = (e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset to page 1
+    setCurrentPage(1);
   };
 
   if (status === "loading")
-    return <div className="flex justify-center items-center h-screen">جاري التحميل...</div>;
-  if (error) return <div className="text-red-500 text-center p-4">خطأ: {error}</div>;
+    return (
+      <div className="flex justify-center items-center h-screen text-sm sm:text-base">
+        جاري التحميل...
+      </div>
+    );
+  if (error)
+    return (
+      <div className="text-red-500 text-center p-4 text-sm sm:text-base">
+        خطأ: {error}
+      </div>
+    );
 
   return (
-    <div className="container mx-auto px-4 py-8" dir="rtl">
+    <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8" dir="rtl">
       {/* Header and Add Receipt Button */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-start space-x-3">
-          <HiOutlineDocumentReport className="text-blue-600 w-9 h-9 text-2xl" />
-          <h2 className="text-2xl font-bold mb-6">الإيصالات</h2>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
+        <div className="flex items-center space-x-3">
+          <HiOutlineDocumentReport className="text-blue-600 w-6 h-6 sm:w-8 sm:h-8" />
+          <h2 className="text-xl sm:text-2xl font-bold">الإيصالات</h2>
         </div>
-        <button
+        <Button
           onClick={() => setShowForm(true)}
-          className="btn flex items-center bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+          className="flex items-center w-full sm:w-auto bg-blue-500 text-white px-4 py-2 text-sm sm:text-base"
         >
           إضافة إيصال
           <svg
-            className="w-5 h-5 mr-2"
+            className="w-4 h-4 sm:w-5 sm:h-5 mr-2"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -308,95 +311,152 @@ function Receipts() {
               d="M12 6v6m0 0v6m0-6h6m-6 0H6"
             />
           </svg>
-        </button>
+        </Button>
       </div>
 
       {/* Search Form */}
-      <form onSubmit={handleSearch} className="flex gap-2 mb-6 w-full">
+      <form
+        onSubmit={handleSearch}
+        className="flex flex-col sm:flex-row gap-2 mb-6 w-full"
+      >
         <div className="relative w-full">
           <input
             type="text"
             placeholder="أدخل رقم الفاتورة"
             value={searchTerm}
             onChange={handleSearchInputChange}
-            className={`px-4 w-full py-2 border ${
+            className={`w-full px-3 py-2 border text-sm sm:text-base ${
               inputError ? "border-red-500" : "border-gray-300"
-            } rounded-md`}
+            } rounded-md focus:outline-none focus:ring focus:ring-blue-200`}
           />
           {inputError && (
             <p className="absolute text-red-500 text-xs mt-1">{inputError}</p>
           )}
         </div>
-        <button
+        <Button
           type="submit"
-          className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded"
+          className="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white text-sm sm:text-base py-2 px-4"
           disabled={status === "loading"}
         >
           {status === "loading" ? "جاري البحث..." : "بحث"}
-        </button>
+        </Button>
         {searchTerm && (
-          <button
+          <Button
             type="button"
             onClick={resetSearch}
-            className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded"
+            className="w-full sm:w-auto bg-gray-500 hover:bg-gray-600 text-white text-sm sm:text-base py-2 px-4"
           >
             إعادة تعيين
-          </button>
+          </Button>
         )}
       </form>
+      {searchError && (
+        <p className="text-red-500 text-sm mb-4">{searchError}</p>
+      )}
 
       {/* Receipts Table */}
       <div className="overflow-x-auto">
         {paginatedReceipts.length > 0 ? (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  الإجراءات
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  المبلغ
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  طريقة الدفع
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ملاحظة
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  رقم الفاتورة
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {paginatedReceipts.map((receipt) => (
-                <tr key={receipt.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 flex gap-2">
-                    <button
-                      onClick={() => handleEdit(receipt.id)}
-                      className="text-indigo-600 hover:text-indigo-900"
-                      aria-label="تعديل الإيصال"
-                    >
-                      <CiEdit />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(receipt.id)}
-                      className="text-red-600 hover:text-red-900"
-                      aria-label="حذف الإيصال"
-                    >
-                      <CiTrash />
-                    </button>
-                  </td>
-                  <td className="px-6 py-4">{receipt.amount}</td>
-                  <td className="px-6 py-4 capitalize">{receipt.payment_method}</td>
-                  <td className="px-6 py-4">{receipt.note}</td>
-                  <td className="px-6 py-4">{receipt.invoice_number}</td>
+          <>
+            {/* Table for Small Screens and Above */}
+            <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+                    الإجراءات
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+                    المبلغ
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+                    طريقة الدفع
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+                    ملاحظة
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+                    رقم الفاتورة
+                  </th>
                 </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {paginatedReceipts.map((receipt) => (
+                  <tr key={receipt.id}>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm flex gap-2">
+                      <button
+                        onClick={() => handleEdit(receipt.id)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                        aria-label="تعديل الإيصال"
+                      >
+                        <CiEdit className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(receipt.id)}
+                        className="text-red-600 hover:text-red-900"
+                        aria-label="حذف الإيصال"
+                      >
+                        <CiTrash className="w-5 h-5" />
+                      </button>
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm">{receipt.amount}</td>
+                    <td className="px-4 sm:px-6 py-4 text-sm capitalize">
+                      {paymentMethods.find(
+                        (method) => method.value === receipt.payment_method
+                      )?.label || receipt.payment_method}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm">{receipt.note || "لا يوجد"}</td>
+                    <td className="px-4 sm:px-6 py-4 text-sm">{receipt.invoice_number}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Card Layout for Mobile */}
+            <div className="sm:hidden space-y-4">
+              {paginatedReceipts.map((receipt) => (
+                <div
+                  key={receipt.id}
+                  className="border rounded-md p-4 bg-white shadow-sm"
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-semibold">
+                      رقم الفاتورة: {receipt.invoice_number}
+                    </span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEdit(receipt.id)}
+                        className="text-indigo-600 hover:text-indigo-900"
+                        aria-label="تعديل الإيصال"
+                      >
+                        <CiEdit className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(receipt.id)}
+                        className="text-red-600 hover:text-red-900"
+                        aria-label="حذف الإيصال"
+                      >
+                        <CiTrash className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-sm">
+                    <strong>المبلغ:</strong> {receipt.amount}
+                  </p>
+                  <p className="text-sm">
+                    <strong>طريقة الدفع:</strong>{" "}
+                    {paymentMethods.find(
+                      (method) => method.value === receipt.payment_method
+                    )?.label || receipt.payment_method}
+                  </p>
+                  <p className="text-sm">
+                    <strong>ملاحظة:</strong> {receipt.note || "لا يوجد"}
+                  </p>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         ) : (
-          <p className="p-4 text-gray-500">
+          <p className="p-4 text-gray-500 text-sm sm:text-base">
             {searchTerm ? "لم يتم العثور على إيصال بهذا الرقم" : "لم يتم العثور على إيصالات"}
           </p>
         )}
@@ -414,7 +474,7 @@ function Receipts() {
               ),
             })
           }
-          className="bg-primary text-white px-6"
+          className="w-full sm:w-auto bg-primary text-white px-4 sm:px-6 py-2 text-sm sm:text-base"
         >
           حساب الإجمالي
         </Button>
@@ -435,14 +495,14 @@ function Receipts() {
       {totalItems > 0 && (
         <div className="mt-6">
           {/* Items Per Page Selector */}
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex flex-col sm:flex-row justify-between items-center mb-4 space-y-2 sm:space-y-0">
             <div>
               <label className="text-sm text-gray-700">
                 عدد الإيصالات لكل صفحة:
                 <select
                   value={itemsPerPage}
                   onChange={handleItemsPerPageChange}
-                  className="ml-2 px-2 py-1 border border-gray-300 rounded-md"
+                  className="ml-2 px-2 py-1 border border-gray-300 rounded-md text-sm"
                   aria-label="عدد الإيصالات لكل صفحة"
                 >
                   {itemsPerPageOptions.map((size) => (
@@ -460,11 +520,11 @@ function Receipts() {
 
           {/* Page Navigation */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center space-x-2" dir="ltr">
-              <button
+            <div className="flex justify-center items-center space-x-2 space-x-reverse" dir="ltr">
+              <Button
                 onClick={handlePrevious}
                 disabled={currentPage === 1}
-                className={`px-4 py-2 rounded-md ${
+                className={`px-3 py-1 text-sm ${
                   currentPage === 1
                     ? "bg-gray-200 cursor-not-allowed"
                     : "bg-blue-500 text-white hover:bg-blue-600"
@@ -472,13 +532,13 @@ function Receipts() {
                 aria-label="الصفحة السابقة"
               >
                 السابق
-              </button>
+              </Button>
 
               {getPageNumbers().map((page) => (
-                <button
+                <Button
                   key={page}
                   onClick={() => handlePageChange(page)}
-                  className={`px-4 py-2 rounded-md ${
+                  className={`px-3 py-1 text-sm ${
                     currentPage === page
                       ? "bg-blue-500 text-white"
                       : "bg-gray-200 hover:bg-gray-300"
@@ -486,17 +546,18 @@ function Receipts() {
                   aria-label={`الصفحة ${page}`}
                 >
                   {page}
-                </button>
+                </Button>
               ))}
 
-              {totalPages > getPageNumbers().length && getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
-                <span className="px-4 py-2">...</span>
-              )}
+              {totalPages > getPageNumbers().length &&
+                getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
+                  <span className="px-3 py-1 text-sm">...</span>
+                )}
 
-              <button
+              <Button
                 onClick={handleNext}
                 disabled={currentPage === totalPages}
-                className={`px-4 py-2 rounded-md ${
+                className={`px-3 py-1 text-sm ${
                   currentPage === totalPages
                     ? "bg-gray-200 cursor-not-allowed"
                     : "bg-blue-500 text-white hover:bg-blue-600"
@@ -504,7 +565,7 @@ function Receipts() {
                 aria-label="الصفحة التالية"
               >
                 التالي
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -512,10 +573,10 @@ function Receipts() {
 
       {/* Add Receipt Form Modal */}
       {showForm && (
-        <div className="fixed inset-0  bg-gray-600 bg-opacity-50 flex items-center justify-center ">
-          <div className="bg-white h-[90vh] overflow-y-auto rounded-lg shadow-xl w-full max-w-md">
-            <div className="p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
                 إضافة إيصال جديد
               </h3>
               <AddReceiptForm
@@ -532,23 +593,23 @@ function Receipts() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+            <div className="p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
                 هل أنت متأكد من رغبتك في حذف هذا الإيصال؟
               </h3>
-              <div className="flex justify-end space-x-3">
-                <button
+              <div className="flex justify-end space-x-3 space-x-reverse">
+                <Button
                   onClick={cancelDelete}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
                 >
                   إلغاء
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={confirmDelete}
-                  className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600"
+                  className="px-4 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 text-sm sm:text-base"
                 >
                   تأكيد
-                </button>
+                </Button>
               </div>
             </div>
           </div>
@@ -558,21 +619,21 @@ function Receipts() {
       {/* Edit Modal */}
       {showEditModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-            <div className="p-6">
-              <h3 className="text-lg font-medium leading-6 text-gray-900 mb-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
                 تعديل الإيصال
               </h3>
               <form onSubmit={handleEditSubmit}>
                 <div className="mb-4">
-                  <label className="block text-gray-700 font-medium mb-2">
+                  <label className="block text-gray-700 font \ font-medium mb-2 text-sm sm:text-base">
                     النادي
                   </label>
                   <select
                     name="club"
                     value={editData.club}
                     onChange={handleEditInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
                     required
                   >
                     <option value="">اختر النادي</option>
@@ -585,7 +646,7 @@ function Receipts() {
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-gray-700 font-medium mb-2">
+                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                     العضو
                   </label>
                   <input
@@ -593,20 +654,20 @@ function Receipts() {
                     name="member"
                     value={editData.member}
                     onChange={handleEditInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
                     required
                   />
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-gray-700 font-medium mb-2">
+                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                     الإشتراك
                   </label>
                   <select
                     name="subscription"
                     value={editData.subscription}
                     onChange={handleEditInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
                   >
                     <option value="">اختر الإشتراك</option>
                     {uniqueSubscriptions.map((sub) => (
@@ -618,28 +679,28 @@ function Receipts() {
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-gray-700 font-medium mb-2">
+                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                     المبلغ
                   </label>
-                  <input
+                  precautions<input
                     type="text"
                     name="amount"
                     value={editData.amount}
                     onChange={handleEditInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
                     required
                   />
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-gray-700 font-medium mb-2">
+                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                     طريقة الدفع
                   </label>
                   <select
                     name="payment_method"
                     value={editData.payment_method}
                     onChange={handleEditInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
                   >
                     {paymentMethods.map((method) => (
                       <option key={method.value} value={method.value}>
@@ -650,7 +711,7 @@ function Receipts() {
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-gray-700 font-medium mb-2">
+                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                     رقم الفاتورة
                   </label>
                   <p className="mt-1 text-sm text-gray-500">
@@ -659,33 +720,33 @@ function Receipts() {
                 </div>
 
                 <div className="mb-6">
-                  <label className="block text-gray-700 font-medium mb-2">
+                  <label className="block text-gray-700 font-medium mb-2 text-sm sm:text-base">
                     ملاحظة
                   </label>
                   <textarea
                     name="note"
                     value={editData.note}
                     onChange={handleEditInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
                     rows={3}
                   />
                 </div>
 
-                <div className="flex justify-end space-x-3">
-                  <button
+                <div className="flex justify-end space-x-3 space-x-reverse">
+                  <Button
                     type="button"
                     onClick={() => setShowEditModal(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 text-sm sm:text-base"
                   >
                     إلغاء
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
-                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                    className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm sm:text-base"
                     disabled={isUpdating}
                   >
                     {isUpdating ? "جاري الحفظ..." : "حفظ التغييرات"}
-                  </button>
+                  </Button>
                 </div>
               </form>
             </div>
