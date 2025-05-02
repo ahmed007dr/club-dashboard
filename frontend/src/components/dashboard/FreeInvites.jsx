@@ -9,6 +9,8 @@ import {
   markInviteAsUsed,
 } from "../../redux/slices/invitesSlice";
 import { RiVipCrown2Line } from "react-icons/ri";
+import BASE_URL from '../../config/api';
+
 
 const InviteList = () => {
   const dispatch = useDispatch();
@@ -50,7 +52,7 @@ const InviteList = () => {
   // Fetch user profile to get club details
   useEffect(() => {
     setLoadingProfile(true);
-    fetch("http://127.0.0.1:8000/accounts/api/profile/", {
+    fetch(`${BASE_URL}/accounts/api/profile/`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -104,7 +106,7 @@ const InviteList = () => {
   useEffect(() => {
     dispatch(fetchFreeInvites());
   }, [dispatch]);
-
+console.log('Unique Clubs:', uniqueClubs);
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
