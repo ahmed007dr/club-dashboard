@@ -53,6 +53,7 @@ const CreateSubscriptionTypes  = () => {
 
     try {
       await dispatch(addSubscriptionType(submissionData)).unwrap();
+
       // Reset form on success
       setFormData({
         name: '',
@@ -62,6 +63,7 @@ const CreateSubscriptionTypes  = () => {
         include_pool: false,
         include_classes: false,
       });
+    console.log(setFormData)
     } catch (err) {
       console.error('Failed to create subscription:', err);
       setError(err.message || 'Failed to create subscription');

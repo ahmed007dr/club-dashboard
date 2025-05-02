@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch } from "react-redux";
 import { addMember } from '../../redux/slices/memberSlice';
+import { fetchClubs } from '../../redux/slices/clubSlice';
 
 const AddMember = () => {
   const dispatch = useDispatch();
-   
+  const [clubs, setClubs] = useState([]);
+
   const [formData, setFormData] = useState({
     name: '',
-    membership_number: '',
     national_id: '',
     birth_date: '',
     phone: '',
@@ -20,9 +21,9 @@ const AddMember = () => {
     if (type === 'file' && files[0]) {
       const reader = new FileReader();
       reader.onload = () => {
-        setFormData({ ...formData, [name]: reader.result }); // Store Base64 string
+        setFormData({ ...formData, [name]: reader.result });
       };
-      reader.readAsDataURL(files[0]); // Convert file to Base64
+      reader.readAsDataURL(files[0]);
     } else {
       setFormData({ ...formData, [name]: value });
     }
@@ -30,61 +31,31 @@ const AddMember = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // const token = localStorage.getItem('token'); // Adjust key if needed
-    const form = new FormData();
-
-    // Append only valid Django fields
-    form.append('club', formData.club);
-    form.append('name', formData.name);
-    form.append('membership_number', formData.membership_number);
-    form.append('national_id', formData.national_id);
-    form.append('birth_date', formData.birth_date);
-    form.append('phone', formData.phone);
-    // if (formData.photo) {
-    //   form.append('photo', formData.photo);
-    // }
-    form.append('referred_by', formData.referred_by);
-        console.log("Form data:", formData); // Log the form data to check its structure
-        dispatch(addMember(formData));
+    console.log("Form data:", formData);
+    dispatch(addMember(formData));
     
-    // try { //http://127.0.0.1:8000/members/api/members/create/
-    //   console.log(form);
-    //   const response = await fetch(`${BASE_URL}/members/api/members/create/`, {
-    //     method: 'POST',
-    //     headers: {
-    //       Authorization: `Token ${token}`,
-    //       'Content-Type': 'application/json'
-    //     },
-    //     // body: form,
-    //     body: JSON.stringify(form)
-        
-    //   });
-
-    //   if (!response.ok) {
-    //     const errorData = await response.json();
-    //     console.error('Error:', errorData);
-    //     alert('Failed to add member. Please check the input.');
-    //     return;
-    //   }
-
-    //   const result = await response.json();
-    //   console.log('Member added successfully:', result);
-    //   alert('Member added successfully!');
-
-      // Optional: Reset form
-      setFormData({
-        name: '',
-        membership_number: '',
-        national_id: '',
-        birth_date: '',
-        phone: '',
-        photo: null,
-        club: '',
-        referred_by: '',
-      });
-    
+    setFormData({
+      name: '',
+      national_id: '',
+      birth_date: '',
+      phone: '',
+      club: '',
+      referred_by: '',
+    });
   };
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await dispatch(fetchClubs()).unwrap();
+        setClubs(res);
+      } catch (error) {
+        console.error('Error fetching clubs:', error);
+      }
+    };
+
+    fetchData();
+  }, [dispatch]);
 
   return (
     <div className="max-h-[80vh] overflow-auto">
@@ -101,24 +72,10 @@ const AddMember = () => {
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
               placeholder="Enter full name"
+              required
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="membership_number">Membership Number</label>
-            <input
-              id="membership_number"
-              name="membership_number"
-              type="text"
-              value={formData.membership_number}
-              onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
-              placeholder="Enter membership number"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="national_id">National ID</label>
             <input
@@ -129,9 +86,12 @@ const AddMember = () => {
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
               placeholder="Enter national ID"
+              required
             />
           </div>
+        </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="birth_date">Date of Birth</label>
             <input
@@ -141,11 +101,10 @@ const AddMember = () => {
               value={formData.birth_date}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+              required
             />
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="phone">Phone Number</label>
             <input
@@ -156,46 +115,44 @@ const AddMember = () => {
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
               placeholder="Enter phone number"
+              required
             />
           </div>
+        </div>
 
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="club">Club ID</label>
-            <input
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="club">Club</label>
+            <select
               id="club"
               name="club"
-              type="text"
               value={formData.club}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
-              placeholder="Enter club ID"
+              required
+            >
+              <option value="">Select a club</option>
+              {clubs.map((club) => (
+                <option key={club.id} value={club.id}>
+                  {club.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="referred_by">Referred By (Member ID)</label>
+            <input
+              id="referred_by"
+              name="referred_by"
+              type="text"
+              value={formData.referred_by}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+              placeholder="Enter referring member ID"
             />
           </div>
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="referred_by">Referred By (Member ID)</label>
-          <input
-            id="referred_by"
-            name="referred_by"
-            type="text"
-            value={formData.referred_by}
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
-            placeholder="Enter referring member ID"
-          />
-        </div>
-
-        {/* <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="photo">Photo</label>
-          <input
-            id="photo"
-            name="photo"
-            type="file"
-            onChange={handleChange}
-            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
-          />
-        </div> */}
 
         <div>
           <button
