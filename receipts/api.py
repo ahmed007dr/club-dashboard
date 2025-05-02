@@ -2,7 +2,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
-from .models import Receipt
+from .models import Receipt,AutoCorrectionLog
 from subscriptions.models import Subscription , SubscriptionType
 from members.models import Member
 from .serializers import ReceiptSerializer
@@ -24,7 +24,7 @@ def receipt_list_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_receipt_api(request):
     data = request.data.copy()
-    data['issued_by'] = request.user.id  # Auto-set the current user as issued_by
+    data['issued_by'] = request.user.id  
     
     serializer = ReceiptSerializer(data=data)
     if serializer.is_valid():
