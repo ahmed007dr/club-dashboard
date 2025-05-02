@@ -17,12 +17,15 @@ import { FaArrowRotateLeft } from "react-icons/fa6";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
 
+
+
 const SubscriptionList = () => {
   const dispatch = useDispatch();
   const { subscriptions, status, error, updateStatus } = useSelector(
     (state) => state.subscriptions
   );
-  console.log("Subscriptions:", subscriptions);
+
+  // State management
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
@@ -34,15 +37,21 @@ const SubscriptionList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(8);
   const [filters, setFilters] = useState({
-    memberName: "",
-    status: "",
-    startDate: "",
-    endDate: "",
-    clubId: "",
-    attendanceDays: "",
+    memberName: '',
+    status: '',
+    startDate: '',
+    endDate: '',
+    clubId: '',
+    attendanceDays: '',
   });
 
-  const filteredSubscriptions = subscriptions.filter((subscription) => {
+  // Sort subscriptions by start_date (newest first)
+  const sortedSubscriptions = [...subscriptions].sort((a, b) => {
+    return new Date(b.start_date) - new Date(a.start_date);
+  });
+
+  // Apply filters to the sorted array
+  const filteredSubscriptions = sortedSubscriptions.filter((subscription) => {
     const matchesMember = filters.memberName
       ? subscription.member_name
           .toLowerCase()
@@ -81,6 +90,7 @@ const SubscriptionList = () => {
     );
   });
 
+  // Pagination
   const totalItems = filteredSubscriptions.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -90,6 +100,7 @@ const SubscriptionList = () => {
     indexOfLastItem
   );
 
+  // Handlers
   const handlePageChange = (pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
       setCurrentPage(pageNumber);
@@ -107,12 +118,12 @@ const SubscriptionList = () => {
 
   const resetFilters = () => {
     setFilters({
-      memberName: "",
-      status: "",
-      startDate: "",
-      endDate: "",
-      clubId: "",
-      attendanceDays: "",
+      memberName: '',
+      status: '',
+      startDate: '',
+      endDate: '',
+      clubId: '',
+      attendanceDays: '',
     });
     setCurrentPage(1);
   };
@@ -140,19 +151,18 @@ const SubscriptionList = () => {
     )
       .unwrap()
       .then(() => {
-        alert("Payment successful!");
+        alert('Payment successful!');
         setPaymentAmounts((prev) => ({
           ...prev,
-          [subscription.id]: "",
+          [subscription.id]: '',
         }));
-        dispatch(fetchSubscriptions()); // <-- Refresh data here
+        dispatch(fetchSubscriptions());
       })
       .catch((error) => {
         console.error(error);
         alert(`Payment failed: ${error.message}`);
       });
   };
-  
 
   const openDetailModal = (id) => {
     dispatch(fetchSubscriptionById(id))
@@ -163,8 +173,8 @@ const SubscriptionList = () => {
         setDetailModalOpen(true);
       })
       .catch((error) => {
-        console.error("Failed to fetch subscription details:", error);
-        alert("Failed to load subscription details");
+        console.error('Failed to fetch subscription details:', error);
+        alert('Failed to load subscription details');
       });
   };
 
@@ -194,7 +204,7 @@ const SubscriptionList = () => {
         subscriptionData: formData,
       })
     ).then(() => {
-      if (updateStatus === "succeeded") {
+      if (updateStatus === 'succeeded') {
         closeModal();
         dispatch(fetchSubscriptions());
       }
@@ -205,11 +215,11 @@ const SubscriptionList = () => {
     dispatch(renewSubscription({ subscriptionId }));
   };
 
-  if (status === "loading") {
+  if (status === 'loading') {
     return <div className="text-center text-xl text-gray-500">Loading...</div>;
   }
 
-  if (status === "failed") {
+  if (status === 'failed') {
     return (
       <div className="text-center text-xl text-red-500">Error: {error}</div>
     );
@@ -217,6 +227,7 @@ const SubscriptionList = () => {
 
   return (
     <div className="mx-auto p-6" dir="rtl">
+      {/* Header and Create Button */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex space-x-2 items-start">
           <CiCircleList className="text-blue-600 w-9 h-9 text-2xl" />
@@ -224,64 +235,97 @@ const SubscriptionList = () => {
             قائمة الاشتراكات
           </h2>
         </div>
-        <button onClick={() => setCreateModalOpen(true)} className="btn">
+        <button 
+          onClick={() => setCreateModalOpen(true)} 
+          className="btn"
+        >
           إضافة اشتراك
         </button>
       </div>
 
+      {/* Filters */}
       <div className="flex flex-wrap gap-4 my-6 px-4" dir="rtl">
-        {[
-          {
-            id: "memberName",
-            label: "اسم العضو",
-            type: "text",
-            placeholder: "بحث باسم العضو",
-          },
-          { id: "startDate", label: "تاريخ البدء", type: "date" },
-          { id: "endDate", label: "تاريخ الانتهاء", type: "date" },
-          {
-            id: "clubId",
-            label: "معرف النادي",
-            type: "number",
-            placeholder: "تصفية حسب معرف النادي",
-            min: 1,
-          },
-          {
-            id: "attendanceDays",
-            label: "أيام الحضور",
-            type: "number",
-            placeholder: "تصفية حسب أيام الحضور",
-            min: 0,
-          },
-        ].map(({ id, label, type, placeholder, min }) => (
-          <div key={id} className="flex flex-col w-56">
-            <label
-              htmlFor={id}
-              className="text-sm font-medium text-gray-700 mb-1 text-right"
-            >
-              {label}
-            </label>
-            <input
-              type={type}
-              id={id}
-              name={id}
-              value={filters[id]}
-              onChange={handleFilterChange}
-              placeholder={placeholder}
-              min={min}
-              className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
-            />
-          </div>
-        ))}
+        {/* Member Name Filter */}
         <div className="flex flex-col w-56">
-          <label
-            htmlFor="status"
-            className="text-sm font-medium text-gray-700 mb-1 text-right"
-          >
+          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
+            اسم العضو
+          </label>
+          <input
+            type="text"
+            name="memberName"
+            value={filters.memberName}
+            onChange={handleFilterChange}
+            placeholder="بحث باسم العضو"
+            className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
+          />
+        </div>
+
+        {/* Start Date Filter */}
+        <div className="flex flex-col w-56">
+          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
+            تاريخ البدء
+          </label>
+          <input
+            type="date"
+            name="startDate"
+            value={filters.startDate}
+            onChange={handleFilterChange}
+            className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm transition-all duration-200 ease-in-out"
+          />
+        </div>
+
+        {/* End Date Filter */}
+        <div className="flex flex-col w-56">
+          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
+            تاريخ الانتهاء
+          </label>
+          <input
+            type="date"
+            name="endDate"
+            value={filters.endDate}
+            onChange={handleFilterChange}
+            className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm transition-all duration-200 ease-in-out"
+          />
+        </div>
+
+        {/* Club ID Filter */}
+        <div className="flex flex-col w-56">
+          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
+            معرف النادي
+          </label>
+          <input
+            type="number"
+            name="clubId"
+            value={filters.clubId}
+            onChange={handleFilterChange}
+            placeholder="تصفية حسب معرف النادي"
+            min="1"
+            className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
+          />
+        </div>
+
+        {/* Attendance Days Filter */}
+        <div className="flex flex-col w-56">
+          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
+            أيام الحضور
+          </label>
+          <input
+            type="number"
+            name="attendanceDays"
+            value={filters.attendanceDays}
+            onChange={handleFilterChange}
+            placeholder="تصفية حسب أيام الحضور"
+            min="0"
+            className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
+          />
+        </div>
+
+        {/* Status Filter */}
+        <div className="flex flex-col w-56">
+          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
             الحالة
           </label>
           <select
-            id="status"
             name="status"
             value={filters.status}
             onChange={handleFilterChange}
@@ -293,6 +337,8 @@ const SubscriptionList = () => {
             <option value="Pending">قيد الانتظار</option>
           </select>
         </div>
+
+        {/* Reset Filters Button */}
         <div className="flex items-end">
           <button onClick={resetFilters} className="btn">
             <FaArrowRotateLeft />
@@ -300,6 +346,7 @@ const SubscriptionList = () => {
         </div>
       </div>
 
+      {/* Subscriptions Table */}
       <div className="overflow-x-auto">
         {currentSubscriptions.length === 0 ? (
           <p className="text-center text-lg text-gray-500">
@@ -340,33 +387,28 @@ const SubscriptionList = () => {
                   <td className="py-2 px-4">${subscription.paid_amount}</td>
                   <td className="py-2 px-4">${subscription.remaining_amount}</td>
                   <td className="py-2 px-4">
-  <span
-    className={`px-2 py-1 rounded text-sm font-medium
-      ${
-        subscription.status === 'Active'
-          ? 'bg-green-100 text-green-600'
-          : subscription.status === 'Expired'
-          ? 'bg-red-100 text-red-600'
-          : subscription.status === 'Upcoming'
-          ? 'bg-blue-100 text-blue-600'
-          : ''
-      }`}
-  >
-    {subscription.status}
-  </span>
-</td>
-
-                  <td className="py-2 px-4">
-                    ${subscription.remaining_amount}
+                    <span
+                      className={`px-2 py-1 rounded text-sm font-medium
+                        ${
+                          subscription.status === 'Active'
+                            ? 'bg-green-100 text-green-600'
+                            : subscription.status === 'Expired'
+                            ? 'bg-red-100 text-red-600'
+                            : subscription.status === 'Upcoming'
+                            ? 'bg-blue-100 text-blue-600'
+                            : ''
+                        }`}
+                    >
+                      {subscription.status}
+                    </span>
                   </td>
-                  <td className="py-2 px-4">{subscription.status}</td>
                   <td className="py-2 px-8 flex">
                     <input
                       type="text"
                       inputMode="decimal"
                       pattern="[0-9]*\.?[0-9]*"
                       placeholder="0.00"
-                      value={paymentAmounts[subscription.id] || ""}
+                      value={paymentAmounts[subscription.id] || ''}
                       onChange={(e) => handleInputChange(e, subscription.id)}
                       className="border p-1 rounded w-15"
                     />
@@ -398,7 +440,7 @@ const SubscriptionList = () => {
                           >
                             عرض
                           </DropdownMenuItem>
-                          {subscription.status === "Expired" && (
+                          {subscription.status === 'Expired' && (
                             <DropdownMenuItem
                               onClick={() => handleRenew(subscription.id)}
                               className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
@@ -423,18 +465,16 @@ const SubscriptionList = () => {
         )}
       </div>
 
+      {/* Pagination */}
       {totalPages > 1 && (
-        <div
-          className="flex justify-center items-center mt-6 space-x-2"
-          dir="rtl"
-        >
+        <div className="flex justify-center items-center mt-6 space-x-2" dir="rtl">
           <button
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1}
             className={`px-4 py-2 rounded-lg ${
               currentPage === 1
-                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                : "bg-blue-500 text-white hover:bg-blue-600"
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-500 text-white hover:bg-blue-600'
             } transition`}
           >
             السابق
@@ -446,8 +486,8 @@ const SubscriptionList = () => {
                 onClick={() => handlePageChange(page)}
                 className={`px-4 py-2 rounded-lg ${
                   currentPage === page
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                 } transition`}
               >
                 {page}
@@ -459,8 +499,8 @@ const SubscriptionList = () => {
             disabled={currentPage === totalPages}
             className={`px-4 py-2 rounded-lg ${
               currentPage === totalPages
-                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                : "bg-blue-500 text-white hover:bg-blue-600"
+                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                : 'bg-blue-500 text-white hover:bg-blue-600'
             } transition`}
           >
             التالي
@@ -468,6 +508,7 @@ const SubscriptionList = () => {
         </div>
       )}
 
+      {/* Modals */}
       {createModalOpen && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full relative">
