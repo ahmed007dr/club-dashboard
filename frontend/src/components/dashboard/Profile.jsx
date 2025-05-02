@@ -42,7 +42,7 @@ const Profile = () => {
             <ProfileItem label="Role" value={capitalize(data.role)} />
             <ProfileItem label="First Name" value={data.first_name || '-'} />
             <ProfileItem label="Last Name" value={data.last_name || '-'} />
-            <ProfileItem label="Club" value={data.club || '-'} />
+            <ProfileItem label="Club" value={data.club.name || '-'} />
             <ProfileItem
               label="Is Active"
               value={

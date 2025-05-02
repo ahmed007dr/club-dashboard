@@ -47,15 +47,17 @@ const Income = () => {
     description: "",
     date: "",
     received_by: "",
+    name: "", // For income sources
   });
   const [activeTab, setActiveTab] = useState("incomeSources");
   const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
+  const [userClub, setUserClub] = useState(null); // Store logged-in user's club
 
   // Filter states
   const [sourceFilters, setSourceFilters] = useState({
     name: "",
-    club: "",
     description: "",
+    club: "", // Add club filter
   });
   const [incomeFilters, setIncomeFilters] = useState({
     source: "",
@@ -64,6 +66,7 @@ const Income = () => {
     dateFrom: "",
     dateTo: "",
     received_by: "",
+    club: "", // Add club filter
   });
 
   // Pagination states
@@ -75,56 +78,61 @@ const Income = () => {
     (state) => state.finance
   );
 
+  // Fetch user profile to get club details
+  useEffect(() => {
+    fetch("http://127.0.0.1:8000/accounts/api/profile/", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`, // Adjust based on your auth setup
+        "Content-Type": "application/json",
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setUserClub({
+          id: data.club.id,
+          name: data.club.name,
+        });
+        setNewItem((prev) => ({ ...prev, club: data.club.id.toString() }));
+        setSourceFilters((prev) => ({ ...prev, club: data.club.id.toString() }));
+        setIncomeFilters((prev) => ({ ...prev, club: data.club.id.toString() }));
+      })
+      .catch((err) => {
+        console.error("Failed to fetch user profile:", err);
+      });
+  }, []);
+
+  // Fetch data on component mount
   useEffect(() => {
     dispatch(fetchIncomeSources());
     dispatch(fetchIncomes());
   }, [dispatch]);
 
-  // Extract unique clubs from incomeSources and incomes
-  const uniqueClubs = useMemo(() => {
-    const clubsMap = new Map();
-    incomeSources.forEach((source) => {
-      if (source.club_details) {
-        clubsMap.set(source.club_details.id, {
-          id: source.club_details.id,
-          name: source.club_details.name,
-        });
-      }
-    });
-    incomes.forEach((income) => {
-      if (income.club_details) {
-        clubsMap.set(income.club_details.id, {
-          id: income.club_details.id,
-          name: income.club_details.name,
-        });
-      }
-    });
-    return Array.from(clubsMap.values());
-  }, [incomeSources, incomes]);
-
   // Filter and pagination logic
   const filteredSources = useMemo(() => {
     return incomeSources.filter((source) => {
       return (
+        source.club_details?.id === userClub?.id &&
+        (!sourceFilters.club ||
+          source.club_details?.id.toString() === sourceFilters.club) &&
         (!sourceFilters.name ||
           source.name
             ?.toLowerCase()
             .includes(sourceFilters.name.toLowerCase())) &&
-        (!sourceFilters.club ||
-          source.club_details?.name
-            ?.toLowerCase()
-            .includes(sourceFilters.club.toLowerCase())) &&
         (!sourceFilters.description ||
           source.description
             ?.toLowerCase()
             .includes(sourceFilters.description.toLowerCase()))
       );
     });
-  }, [incomeSources, sourceFilters]);
+  }, [incomeSources, sourceFilters, userClub]);
 
   const filteredIncomes = useMemo(() => {
     return incomes.filter((income) => {
       return (
+        income.club_details?.id === userClub?.id &&
+        (!incomeFilters.club ||
+          income.club_details?.id.toString() === incomeFilters.club) &&
         (!incomeFilters.source ||
           income.source_details?.name
             ?.toLowerCase()
@@ -143,7 +151,7 @@ const Income = () => {
             .includes(incomeFilters.received_by.toLowerCase()))
       );
     });
-  }, [incomes, incomeFilters]);
+  }, [incomes, incomeFilters, userClub]);
 
   // Pagination calculations
   const sourcePageCount = Math.ceil(filteredSources.length / pageSize);
@@ -188,6 +196,7 @@ const Income = () => {
           description: newItem.description || "",
           date: newItem.date || "",
           received_by: parseInt(newItem.received_by) || null,
+          name: newItem.name, // For income sources
         };
 
     const action = currentItem
@@ -205,13 +214,13 @@ const Income = () => {
       .then(() => {
         setCurrentItem(null);
         setNewItem({
-          club: "",
+          club: userClub?.id.toString() || "",
           source: "",
           amount: "",
           description: "",
           date: "",
           received_by: "",
-          name: "", // Added for income source
+          name: "",
         });
         setShowModal(false);
       })
@@ -229,7 +238,7 @@ const Income = () => {
     if (activeTab === "incomes") {
       const sanitizedItem = {
         ...item,
-        club: item.club?.toString() || "",
+        club: item.club?.toString() || userClub?.id.toString() || "",
         source: item.source?.toString() || "",
         amount: item.amount?.toString() || "0",
         description: item.description || "",
@@ -337,25 +346,41 @@ const Income = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-right">جميع مصادر الدخل</CardTitle>
               <CardDescription className="text-right">
-                إدارة جميع مصادر الدخل
+                إدارة جميع مصادر الدخل لنادي {userClub?.name || "جاري التحميل..."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {["name", "club", "description"].map((field) => (
+                {["club", "name", "description"].map((field) => (
                   <div key={field}>
                     <label className="block text-sm font-medium mb-1 text-right">
                       {labelMapping[field]}
                     </label>
-                    <input
-                      type="text"
-                      name={field}
-                      value={sourceFilters[field]}
-                      onChange={handleSourceFilterChange}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                      placeholder={`ابحث بـ ${labelMapping[field]}`}
-                    />
+                    {field === "club" ? (
+                      <select
+                        name="club"
+                        value={sourceFilters.club}
+                        onChange={handleSourceFilterChange}
+                        className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                         // Disable since only one club is available
+                      >
+                        {userClub ? (
+                          <option value={userClub.id}>{userClub.name}</option>
+                        ) : (
+                          <option value="">جاري التحميل...</option>
+                        )}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        name={field}
+                        value={sourceFilters[field]}
+                        onChange={handleSourceFilterChange}
+                        className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                        placeholder={`ابحث بـ ${labelMapping[field]}`}
+                      />
+                    )}
                   </div>
                 ))}
               </div>
@@ -432,43 +457,53 @@ const Income = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-right">جميع الدخل</CardTitle>
               <CardDescription className="text-right">
-                إدارة جميع الدخل
+                إدارة جميع الدخل لنادي {userClub?.name || "جاري التحميل..."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {[
-                  "source",
-                  "amountMin",
-                  "amountMax",
-                  "dateFrom",
-                  "dateTo",
-                  "received_by",
-                ].map((field) => (
-                  <div key={field}>
-                    <label className="block text-sm font-medium mb-1 text-right">
-                      {labelMapping[field] || field.replace(/([A-Z])/g, " $1")}
-                    </label>
-                    <input
-                      type={
-                        field.includes("date")
-                          ? "date"
-                          : field.includes("amount")
-                          ? "number"
-                          : "text"
-                      }
-                      name={field}
-                      value={incomeFilters[field]}
-                      onChange={handleIncomeFilterChange}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                      placeholder={`ابحث بـ ${
-                        labelMapping[field] ||
-                        field.replace(/([A-Z])/g, " $1")
-                      }`}
-                    />
-                  </div>
-                ))}
+                {["club", "source", "amountMin", "amountMax", "dateFrom", "dateTo", "received_by"].map(
+                  (field) => (
+                    <div key={field}>
+                      <label className="block text-sm font-medium mb-1 text-right">
+                        {labelMapping[field] || field.replace(/([A-Z])/g, " $1")}
+                      </label>
+                      {field === "club" ? (
+                        <select
+                          name="club"
+                          value={incomeFilters.club}
+                          onChange={handleIncomeFilterChange}
+                          className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                          // Disable since only one club is available
+                        >
+                          {userClub ? (
+                            <option value={userClub.id}>{userClub.name}</option>
+                          ) : (
+                            <option value="">جاري التحميل...</option>
+                          )}
+                        </select>
+                      ) : (
+                        <input
+                          type={
+                            field.includes("date")
+                              ? "date"
+                              : field.includes("amount")
+                              ? "number"
+                              : "text"
+                          }
+                          name={field}
+                          value={incomeFilters[field]}
+                          onChange={handleIncomeFilterChange}
+                          className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                          placeholder={`ابحث بـ ${
+                            labelMapping[field] || field.replace(/([A-Z])/g, " $1")
+                          }`}
+                        />
+                      )}
+                    </div>
+                  )
+                )}
               </div>
 
               <Button
@@ -576,8 +611,8 @@ const Income = () => {
                 <Button
                   onClick={() =>
                     setTotalInfo({
-                      count: paginatedIncomes.length,
-                      total: paginatedIncomes.reduce(
+                      count: filteredIncomes.length,
+                      total: filteredIncomes.reduce(
                         (acc, income) => acc + (parseFloat(income.amount) || 0),
                         0
                       ),
@@ -639,16 +674,28 @@ const Income = () => {
                   {field === "club" ? (
                     <select
                       name="club"
-                      value={
-                        currentItem ? currentItem.club : newItem.club
-                      }
+                      value={currentItem ? currentItem.club : newItem.club}
+                      onChange={handleChange}
+                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                      
+                    >
+                      {userClub ? (
+                        <option value={userClub.id}>{userClub.name}</option>
+                      ) : (
+                        <option value="">جاري التحميل...</option>
+                      )}
+                    </select>
+                  ) : field === "source" ? (
+                    <select
+                      name="source"
+                      value={currentItem ? currentItem.source : newItem.source}
                       onChange={handleChange}
                       className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
                     >
-                      <option value="">اختر النادي</option>
-                      {uniqueClubs.map((club) => (
-                        <option key={club.id} value={club.id}>
-                          {club.name}
+                      <option value="">اختر مصدر الدخل</option>
+                      {filteredSources.map((source) => (
+                        <option key={source.id} value={source.id}>
+                          {source.name}
                         </option>
                       ))}
                     </select>
