@@ -1,435 +1,312 @@
-import os , django
-
+import os ,django
+# Set up Django environment
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
 django.setup()
 
+
+from django.db import IntegrityError
+from django.utils import timezone
+from datetime import timedelta, datetime
 import random
-from datetime import datetime, timedelta
-from django.core.files import File
-from django.core.management.base import BaseCommand
-from django.contrib.auth.hashers import make_password
 from faker import Faker
-from core.models import Club, User
+from core.models import Club
+from accounts.models import User
 from members.models import Member
 from subscriptions.models import SubscriptionType, Subscription
 from tickets.models import Ticket
-from receipts.models import Receipt
-from attendance.models import EntryLog
+from receipts.models import Receipt, AutoCorrectionLog
+from attendance.models import Attendance, EntryLog
 from staff.models import Shift
 from invites.models import FreeInvite
 from finance.models import ExpenseCategory, Expense, IncomeSource, Income
 
+
 fake = Faker()
 
-class Command(BaseCommand):
-    help = 'Generates dummy data for the club management system'
-
-    def handle(self, *args, **options):
-        self.stdout.write(self.style.SUCCESS('Starting to generate dummy data...'))
-        
-        # Create clubs
-        clubs = self.create_clubs()
-        
-        # Create users for each club
-        users = self.create_users(clubs)
-        
-        # Create members
-        members = self.create_members(clubs)
-        
-        # Create subscription types
-        subscription_types = self.create_subscription_types(clubs)
-        
-        # Create subscriptions
-        subscriptions = self.create_subscriptions(clubs, members, subscription_types)
-        
-        # Create tickets
-        tickets = self.create_tickets(clubs, members)
-        
-        # Create receipts
-        receipts = self.create_receipts(clubs, members, subscriptions, users)
-        
-        # Create entry logs
-        entry_logs = self.create_entry_logs(clubs, members, subscriptions, users)
-        
-        # Create shifts
-        shifts = self.create_shifts(clubs, users)
-        
-        # Create free invites
-        free_invites = self.create_free_invites(clubs, members, users)
-        
-        # Create finance data
-        self.create_finance_data(clubs, users, receipts)
-        
-        self.stdout.write(self.style.SUCCESS('Successfully generated dummy data!'))
-
-    def create_clubs(self):
+def create_dummy_data(
+    num_clubs=2,
+    num_users=5,
+    num_members=10,
+    num_subscription_types=3,
+    num_subscriptions=10,
+    num_tickets=5,
+    num_receipts=5,
+    num_attendances=10,
+    num_entry_logs=10,
+    num_shifts=5,
+    num_free_invites=5,
+    num_expense_categories=3,
+    num_expenses=5,
+    num_income_sources=3,
+    num_incomes=5
+):
+    try:
+        # Create Clubs
         clubs = []
-        club_names = ['Elite Fitness', 'Power Gym', 'Olympic Sports Club', 'Royal Health Club']
-        
-        for name in club_names:
+        for _ in range(num_clubs):
             club = Club.objects.create(
-                name=name,
-                location=fake.address(),
-                created_at=fake.date_time_this_year()
+                name=fake.company(),
+                location=fake.address().replace('\n', ', '),
+                created_at=timezone.now()
             )
             clubs.append(club)
-            self.stdout.write(self.style.SUCCESS(f'Created club: {name}'))
-        
-        return clubs
 
-    def create_users(self, clubs):
+        # Create Users (with different roles including owner)
+        roles = ['owner', 'admin', 'reception', 'accountant', 'coach']
         users = []
-        roles = ['admin', 'reception', 'accountant', 'coach']
-        
-        for club in clubs:
-            # Create admin user
-            admin = User.objects.create(
-                username=f"admin_{club.name.lower().replace(' ', '_')}",
-                email=f"admin@{club.name.lower().replace(' ', '_')}.com",
-                password=make_password('admin123'),
-                club=club,
-                role='admin',
-                first_name=fake.first_name(),
-                last_name=fake.last_name()
-            )
-            users.append(admin)
-            
-            # Create other staff users
-            for role in roles[1:]:  # Skip admin as we already created one
-                for i in range(2):  # Create 2 users for each role
-                    user = User.objects.create(
-                        username=f"{role}_{i}_{club.name.lower().replace(' ', '_')}",
-                        email=f"{role}{i}@{club.name.lower().replace(' ', '_')}.com",
-                        password=make_password(f"{role}123"),
-                        club=club,
-                        role=role,
-                        first_name=fake.first_name(),
-                        last_name=fake.last_name()
-                    )
-                    users.append(user)
-        
-        self.stdout.write(self.style.SUCCESS(f'Created {len(users)} users'))
-        return users
+        for _ in range(num_users):
+            username = fake.user_name()[:15]  # Ensure username is not too long
+            try:
+                user = User.objects.create_user(
+                    username=username,
+                    email=fake.email(),
+                    password='password123',
+                    club=random.choice(clubs),
+                    role=random.choice(roles),
+                    first_name=fake.first_name(),
+                    last_name=fake.last_name()
+                )
+                users.append(user)
+            except IntegrityError:
+                continue  # Skip if username/email is not unique
 
-    def create_members(self, clubs):
+        # Create Members
         members = []
-        
-        for club in clubs:
-            # Create 20-30 members per club
-            for _ in range(random.randint(20, 30)):
+        for _ in range(num_members):
+            try:
+                created_at = fake.date_time_this_year(tzinfo=timezone.get_current_timezone())
                 member = Member.objects.create(
-                    club=club,
+                    club=random.choice(clubs),
                     name=fake.name(),
-                    membership_number=fake.unique.bothify(text='M-#####'),
-                    national_id=fake.unique.bothify(text='##############'),
+                    # membership_number is auto-generated by save() method
+                    national_id=fake.unique.numerify(text='##############'),
                     birth_date=fake.date_of_birth(minimum_age=18, maximum_age=70),
-                    phone=fake.phone_number(),
-                    created_at=fake.date_time_this_year()
+                    phone=fake.phone_number()[:20],
+                    created_at=created_at,
+                    referred_by=None
                 )
-                
-                # 30% chance to have a referral
-                if random.random() < 0.3 and members:
-                    member.referred_by = random.choice([m for m in members if m.club == club])
-                    member.save()
-                
                 members.append(member)
-        
-        self.stdout.write(self.style.SUCCESS(f'Created {len(members)} members'))
-        return members
+            except (IntegrityError, ValueError) as e:
+                print(f"Skipping member creation: {str(e)}")
+                continue
 
-    def create_subscription_types(self, clubs):
+        # Update some members with referrals
+        for member in random.sample(members, min(3, len(members))):
+            possible_referrers = [m for m in members if m != member]
+            if possible_referrers:
+                member.referred_by = random.choice(possible_referrers)
+                member.save()
+
+        # Create Subscription Types
         subscription_types = []
-        type_names = [
-            ('Basic', 30, 500, False, False, True),
-            ('Standard', 90, 1200, True, False, True),
-            ('Premium', 180, 2000, True, True, True),
-            ('VIP', 365, 3500, True, True, True),
-            ('Pool Only', 30, 300, False, True, False),
-            ('Gym Only', 30, 400, True, False, False)
-        ]
-        
-        for club in clubs:
-            for name, duration, price, gym, pool, classes in type_names:
-                subscription_type = SubscriptionType.objects.create(
-                    club=club,
-                    name=f"{name} ({club.name})",
-                    duration_days=duration,
-                    price=price,
-                    includes_gym=gym,
-                    includes_pool=pool,
-                    includes_classes=classes
-                )
-                subscription_types.append(subscription_type)
-        
-        self.stdout.write(self.style.SUCCESS(f'Created {len(subscription_types)} subscription types'))
-        return subscription_types
+        for name, duration, price, gym, pool, classes in [
+            ('Basic', 30, 100.00, True, False, False),
+            ('Premium', 90, 250.00, True, True, False),
+            ('Elite', 180, 450.00, True, True, True),
+        ]:
+            sub_type = SubscriptionType.objects.create(
+                name=name,
+                duration_days=duration,
+                price=price,
+                includes_gym=gym,
+                includes_pool=pool,
+                includes_classes=classes,
+                is_active=True
+            )
+            subscription_types.append(sub_type)
 
-    def create_subscriptions(self, clubs, members, subscription_types):
+        # Create Subscriptions
         subscriptions = []
-        
-        for member in members:
-            # Each member has 1-3 subscriptions
-            for _ in range(random.randint(1, 3)):
-                # Get subscription types for this member's club
-                club_types = [st for st in subscription_types if st.club == member.club]
-                if not club_types:
-                    continue
-                
-                sub_type = random.choice(club_types)
-                start_date = fake.date_between(start_date='-1y', end_date='today')
-                end_date = start_date + timedelta(days=sub_type.duration_days)
-                
-                # Create subscription
+        for _ in range(num_subscriptions):
+            member = random.choice(members)
+            sub_type = random.choice(subscription_types)
+            start_date = fake.date_this_year()
+            end_date = start_date + timedelta(days=sub_type.duration_days)
+            try:
                 subscription = Subscription.objects.create(
                     club=member.club,
                     member=member,
                     type=sub_type,
                     start_date=start_date,
                     end_date=end_date,
-                    paid_amount=sub_type.price * random.uniform(0.8, 1.0),  # 80-100% of price
-                    remaining_amount=max(0, sub_type.price * random.uniform(0, 0.2)),  # 0-20% remaining
-                    attendance_days=random.randint(0, sub_type.duration_days)
+                    paid_amount=round(sub_type.price * random.uniform(0.8, 1.0), 2),
+                    remaining_amount=round(sub_type.price * random.uniform(0.0, 0.2), 2),
+                    attendance_days=random.randint(0, 30)
                 )
                 subscriptions.append(subscription)
-        
-        self.stdout.write(self.style.SUCCESS(f'Created {len(subscriptions)} subscriptions'))
-        return subscriptions
+            except IntegrityError:
+                continue
 
-    def create_tickets(self, clubs, members):
-        tickets = []
-        
-        for club in clubs:
-            # Create 10-20 tickets per club
-            for _ in range(random.randint(10, 20)):
-                ticket_type = random.choice(['day_pass', 'session'])
-                price = 100 if ticket_type == 'day_pass' else 50
-                
-                # 50% chance the ticket is used by a member
-                used_by = random.choice(members) if random.random() < 0.5 and members else None
-                
-                ticket = Ticket.objects.create(
-                    club=club,
+        # Create Attendances
+        for _ in range(num_attendances):
+            subscription = random.choice(subscriptions)
+            try:
+                Attendance.objects.create(
+                    subscription=subscription,
+                    attendance_date=fake.date_between(
+                        start_date=subscription.start_date,
+                        end_date=min(subscription.end_date, timezone.now().date())
+                    )
+                )
+            except IntegrityError:
+                continue
+
+        # Create Tickets
+        for _ in range(num_tickets):
+            try:
+                Ticket.objects.create(
+                    club=random.choice(clubs),
                     buyer_name=fake.name(),
-                    ticket_type=ticket_type,
-                    price=price,
-                    used=used_by is not None,
-                    used_by=used_by,
+                    ticket_type=random.choice(['day_pass', 'session']),
+                    price=round(random.uniform(20.00, 100.00), 2),
+                    used=fake.boolean(),
+                    used_by=random.choice(members) if fake.boolean() else None,
                     issue_date=fake.date_this_year()
                 )
-                tickets.append(ticket)
-        
-        self.stdout.write(self.style.SUCCESS(f'Created {len(tickets)} tickets'))
-        return tickets
+            except IntegrityError:
+                continue
 
-    def create_receipts(self, clubs, members, subscriptions, users):
-        receipts = []
-        
-        for club in clubs:
-            club_members = [m for m in members if m.club == club]
-            club_users = [u for u in users if u.club == club]
-            club_subs = [s for s in subscriptions if s.club == club]
-            
-            # Create 20-30 receipts per club
-            for _ in range(random.randint(20, 30)):
-                member = random.choice(club_members)
-                user = random.choice(club_users)
-                
-                # 70% chance it's for a subscription
-                if random.random() < 0.7 and club_subs:
-                    member_subs = [s for s in club_subs if s.member == member]
-                    subscription = random.choice(member_subs) if member_subs else None
-                    amount = subscription.paid_amount if subscription else random.randint(300, 3000)
-                else:
-                    subscription = None
-                    amount = random.randint(100, 1000)
-                
+        # Create Receipts
+        for _ in range(num_receipts):
+            subscription = random.choice(subscriptions) if fake.boolean() else None
+            try:
                 receipt = Receipt.objects.create(
-                    club=club,
-                    member=member,
+                    club=subscription.club if subscription else random.choice(clubs),
+                    member=subscription.member if subscription else random.choice(members),
                     subscription=subscription,
-                    amount=amount,
+                    amount=round(random.uniform(50.00, 500.00), 2),
                     payment_method=random.choice(['cash', 'visa', 'bank']),
-                    issued_by=user,
-                    note=fake.sentence() if random.random() < 0.5 else None
+                    note=fake.sentence(),
+                    issued_by=random.choice(users)
                 )
-                receipts.append(receipt)
-        
-        self.stdout.write(self.style.SUCCESS(f'Created {len(receipts)} receipts'))
-        return receipts
+                # Note: The post_save signal will create the Income record automatically
+            except IntegrityError:
+                continue
 
-    def create_entry_logs(self, clubs, members, subscriptions, users):
-        entry_logs = []
-        
-        for club in clubs:
-            club_members = [m for m in members if m.club == club]
-            club_users = [u for u in users if u.club == club]
-            club_subs = [s for s in subscriptions if s.club == club]
-            
-            # Create 50-100 entry logs per club
-            for _ in range(random.randint(50, 100)):
-                member = random.choice(club_members)
-                user = random.choice(club_users)
-                
-                # Get active subscriptions for this member
-                member_subs = [s for s in club_subs if s.member == member and s.start_date <= datetime.now().date() <= s.end_date]
-                subscription = random.choice(member_subs) if member_subs else None
-                
-                entry_log = EntryLog.objects.create(
-                    club=club,
-                    member=member,
-                    approved_by=user,
-                    related_subscription=subscription,
-                    timestamp=fake.date_time_this_year()
+        # Create Entry Logs
+        for _ in range(num_entry_logs):
+            try:
+                EntryLog.objects.create(
+                    club=random.choice(clubs),
+                    member=random.choice(members),
+                    approved_by=random.choice(users),
+                    related_subscription=random.choice(subscriptions) if fake.boolean() else None
                 )
-                entry_logs.append(entry_log)
-        
-        self.stdout.write(self.style.SUCCESS(f'Created {len(entry_logs)} entry logs'))
-        return entry_logs
+            except IntegrityError:
+                continue
 
-    def create_shifts(self, clubs, users):
-        shifts = []
-        
-        for club in clubs:
-            club_users = [u for u in users if u.club == club and u.role in ['reception', 'coach']]
-            admin_users = [u for u in users if u.club == club and u.role == 'admin']
-            
-            # Create shifts for the past 30 days
-            for i in range(30):
-                date = datetime.now().date() - timedelta(days=30 - i)
-                
-                for user in club_users:
-                    # 80% chance to have a shift on this day
-                    if random.random() < 0.8:
-                        shift_start = fake.time_object(end_datetime=None)
-                        shift_end = (datetime.combine(date, shift_start) + timedelta(hours=8)).time()
-                        
-                        shift = Shift.objects.create(
-                            club=club,
-                            staff=user,
-                            date=date,
-                            shift_start=shift_start,
-                            shift_end=shift_end,
-                            approved_by=random.choice(admin_users) if admin_users and random.random() < 0.7 else None
-                        )
-                        shifts.append(shift)
-        
-        self.stdout.write(self.style.SUCCESS(f'Created {len(shifts)} shifts'))
-        return shifts
+        # Create Shifts
+        for _ in range(num_shifts):
+            date = fake.date_this_month()
+            start_time = fake.time_object()
+            end_time = (datetime.combine(date, start_time) +
+                       timedelta(hours=random.randint(4, 8))).time()
+            try:
+                Shift.objects.create(
+                    club=random.choice(clubs),
+                    staff=random.choice(users),
+                    date=date,
+                    shift_start=start_time,
+                    shift_end=end_time,
+                    approved_by=random.choice(users) if fake.boolean() else None
+                )
+            except IntegrityError:
+                continue
 
-    def create_free_invites(self, clubs, members, users):
-        free_invites = []
-        
-        for club in clubs:
-            club_members = [m for m in members if m.club == club]
-            club_users = [u for u in users if u.club == club]
-            
-            # Create 5-10 free invites per club
-            for _ in range(random.randint(5, 10)):
-                free_invite = FreeInvite.objects.create(
-                    club=club,
+        # Create Free Invites
+        for _ in range(num_free_invites):
+            try:
+                FreeInvite.objects.create(
+                    club=random.choice(clubs),
                     guest_name=fake.name(),
-                    phone=fake.phone_number(),
-                    date=fake.date_this_year(),
+                    phone=fake.phone_number()[:20],
+                    date=fake.date_this_month(),
                     status=random.choice(['pending', 'used']),
-                    invited_by=random.choice(club_members) if club_members and random.random() < 0.7 else None,
-                    handled_by=random.choice(club_users) if random.random() < 0.5 else None
+                    invited_by=random.choice(members) if fake.boolean() else None,
+                    handled_by=random.choice(users) if fake.boolean() else None
                 )
-                free_invites.append(free_invite)
-        
-        self.stdout.write(self.style.SUCCESS(f'Created {len(free_invites)} free invites'))
-        return free_invites
+            except IntegrityError:
+                continue
 
-    def create_finance_data(self, clubs, users, receipts):
-        # Create expense categories
+        # Create Expense Categories
         expense_categories = []
-        category_names = [
-            'Rent', 'Utilities', 'Salaries', 'Equipment', 
-            'Maintenance', 'Cleaning', 'Marketing', 'Insurance'
-        ]
-        
-        for club in clubs:
-            for name in category_names:
+        for _ in range(num_expense_categories):
+            try:
                 category = ExpenseCategory.objects.create(
-                    club=club,
-                    name=f"{name} ({club.name})",
+                    club=random.choice(clubs),
+                    name=fake.word().capitalize(),
                     description=fake.sentence()
                 )
                 expense_categories.append(category)
-        
-        # Create expenses
-        expenses = []
-        for club in clubs:
-            club_categories = [ec for ec in expense_categories if ec.club == club]
-            club_users = [u for u in users if u.club == club]
-            
-            # Create 15-25 expenses per club
-            for _ in range(random.randint(15, 25)):
-                expense = Expense.objects.create(
-                    club=club,
-                    category=random.choice(club_categories),
-                    amount=random.randint(100, 5000),
+            except IntegrityError:
+                continue
+
+        # Create Expenses
+        for _ in range(num_expenses):
+            try:
+                Expense.objects.create(
+                    club=random.choice(clubs),
+                    category=random.choice(expense_categories),
+                    amount=round(random.uniform(50.00, 1000.00), 2),
                     description=fake.sentence(),
                     date=fake.date_this_year(),
-                    paid_by=random.choice(club_users),
-                    invoice_number=fake.bothify(text='INV-#####')
+                    paid_by=random.choice(users),
+                    invoice_number=fake.unique.bothify(text='INV-#####')
                 )
-                expenses.append(expense)
-        
-        # Create income sources
+            except IntegrityError:
+                continue
+
+        # Create Income Sources
         income_sources = []
-        source_names = [
-            'Subscription Payments', 'Personal Training', 
-            'Merchandise Sales', 'Cafe Sales', 'Event Tickets'
+        income_source_choices = [
+            'Renewal', 'Subscription', 'ticket_sales', 'Sponsorships', 'Events'
         ]
-        
-        for club in clubs:
-            for name in source_names:
+        for _ in range(num_income_sources):
+            try:
                 source = IncomeSource.objects.create(
-                    club=club,
-                    name=f"{name} ({club.name})",
+                    club=random.choice(clubs),
+                    name=random.choice(income_source_choices),
                     description=fake.sentence()
                 )
                 income_sources.append(source)
-        
-        # Create incomes (some from receipts, some standalone)
-        incomes = []
-        for club in clubs:
-            club_sources = [isrc for isrc in income_sources if isrc.club == club]
-            club_users = [u for u in users if u.club == club]
-            club_receipts = [r for r in receipts if r.club == club]
-            
-            # Create incomes from receipts
-            for receipt in club_receipts:
-                source_name = 'Subscription Payments' if receipt.subscription else 'General Payments'
-                source = next((s for s in club_sources if source_name in s.name), None)
-                
-                if source:
-                    income = Income.objects.create(
-                        club=club,
-                        source=source,
-                        amount=receipt.amount,
-                        description=f"Payment from {receipt.member.name}",
-                        date=receipt.date.date(),
-                        received_by=receipt.issued_by,
-                        related_receipt=receipt
-                    )
-                    incomes.append(income)
-            
-            # Create some standalone incomes
-            for _ in range(random.randint(5, 10)):
-                source = random.choice(club_sources)
-                income = Income.objects.create(
-                    club=club,
-                    source=source,
-                    amount=random.randint(50, 2000),
+            except IntegrityError:
+                continue
+
+        # Create Incomes (in addition to those created by Receipt signal)
+        for _ in range(num_incomes):
+            receipt = random.choice(Receipt.objects.all()) if fake.boolean() else None
+            try:
+                Income.objects.create(
+                    club=receipt.club if receipt else random.choice(clubs),
+                    source=random.choice(income_sources),
+                    amount=round(random.uniform(50.00, 1000.00), 2),
                     description=fake.sentence(),
                     date=fake.date_this_year(),
-                    received_by=random.choice(club_users)
+                    received_by=random.choice(users),
+                    related_receipt=receipt
                 )
-                incomes.append(income)
-        
-        self.stdout.write(self.style.SUCCESS(
-            f'Created finance data: {len(expense_categories)} categories, '
-            f'{len(expenses)} expenses, {len(income_sources)} sources, '
-            f'{len(incomes)} incomes'
-        ))
+            except IntegrityError:
+                continue
+
+        # Create AutoCorrectionLogs
+        for _ in range(min(3, len(subscriptions))):
+            member = random.choice(members)
+            old_sub = random.choice(subscriptions)
+            new_sub = random.choice([s for s in subscriptions if s != old_sub])
+            try:
+                AutoCorrectionLog.objects.create(
+                    member=member,
+                    old_subscription=old_sub,
+                    new_subscription=new_sub,
+                    note=fake.sentence()
+                )
+            except IntegrityError:
+                continue
+
+        print(f"Dummy data created successfully! Generated {len(clubs)} clubs, {len(users)} users, {len(members)} members, and more.")
+
+    except Exception as e:
+        print(f"Error creating dummy data: {str(e)}")
+
+if __name__ == "__main__":
+    create_dummy_data()

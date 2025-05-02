@@ -5,7 +5,6 @@ import BASE_URL from '../../config/api';
 
 const Profile = () => {
   const [data, setData] = useState(null);
-
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -15,6 +14,8 @@ const Profile = () => {
             Authorization: `Bearer ${token}`,
           },
         });
+ console.log(setData );
+
         setData(response.data);
       } catch (error) {
         console.error('Error fetching profile:', error);
@@ -24,10 +25,11 @@ const Profile = () => {
     fetchProfile();
   }, []);
 
+
   return (
     <div className="p-4 min-h-screen flex items-start justify-center">
       {data ? (
-        <div className="bg-white rounded-3xl  p-8 w-full max-w-xl text-center">
+        <div className="bg-white rounded-3xl p-8 w-full max-w-xl text-center">
           <div className="flex justify-center mb-6">
             <div className="bg-blue-100 p-4 rounded-full">
               <BsPersonBoundingBox className="text-blue-600 w-12 h-12" />
@@ -42,7 +44,7 @@ const Profile = () => {
             <ProfileItem label="Role" value={capitalize(data.role)} />
             <ProfileItem label="First Name" value={data.first_name || '-'} />
             <ProfileItem label="Last Name" value={data.last_name || '-'} />
-            <ProfileItem label="Club" value={data.club || '-'} />
+            <ProfileItem label="Club" value={data.club.name || '-'} />
             <ProfileItem
               label="Is Active"
               value={
@@ -65,7 +67,9 @@ const Profile = () => {
 const ProfileItem = ({ label, value }) => (
   <div className="flex flex-col bg-gray-50 px-4 py-3 rounded-lg shadow-sm">
     <span className="text-gray-500 text-sm font-semibold">{label}</span>
-    <span className="text-gray-800 mt-1">{value}</span>
+    <span className="text-gray-800 mt-1">
+      {value === null || value === undefined ? '-' : value}
+    </span>
   </div>
 );
 

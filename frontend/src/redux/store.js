@@ -9,6 +9,7 @@ import ticketsReducer from './slices/ticketsSlice';
 import invitesReducer from './slices/invitesSlice';
 import entryLogSlice from './slices/entryLogSlice';
 import receiptsReducer from './slices/receiptsSlice';
+import authReducer from './slices/authSlice';
 
 import entryLogsSlice from './slices/EntryLogsSlice';
 import staffSlice from './slices/staff';
@@ -27,6 +28,7 @@ const store = configureStore({
     entryLog: entryLogSlice.reducer,
     receipts: receiptsReducer,
     finance:financeSlice.reducer,
+    auth: authReducer,
   },
 });
 

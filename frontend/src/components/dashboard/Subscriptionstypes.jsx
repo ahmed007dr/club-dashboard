@@ -8,10 +8,12 @@ import { FaEye, FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
 import CreateSubscriptionType from './CreateSubscriptionType';
 import { CiShoppingTag } from 'react-icons/ci';
 
+
+
 const SubscriptionsTypes = () => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error } = useSelector((state) => state.subscriptions);
-
+  console.log('Subscription Types:', subscriptionTypes);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -25,10 +27,9 @@ const SubscriptionsTypes = () => {
   const [includesGym, setIncludesGym] = useState('');
   const [includesPool, setIncludesPool] = useState('');
   const [includesClasses, setIncludesClasses] = useState('');
-
-  // Pagination states
+  
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5); // Adjust the number of items per page as needed
+  const [itemsPerPage] = useState(5);
 
   const openCreateModal = () => setIsCreateModalOpen(true);
   const closeCreateModal = () => setIsCreateModalOpen(false);
@@ -67,8 +68,11 @@ const SubscriptionsTypes = () => {
     setIsDetailsModalOpen(false);
   };
 
+  // Sort subscriptions by id (descending order, assuming higher ID = newer)
+  const sortedSubscriptions = [...subscriptionTypes].sort((a, b) => b.id - a.id);
+
   // Filter logic
-  const filteredSubscriptions = subscriptionTypes.filter((type) => {
+  const filteredSubscriptions = sortedSubscriptions.filter((type) => {
     const matchesSearch =
       searchQuery === '' || type.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
@@ -135,7 +139,6 @@ const SubscriptionsTypes = () => {
         </button>
       </div>
 
-      {/* Filter Section */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <input
           type="text"
@@ -189,7 +192,6 @@ const SubscriptionsTypes = () => {
         </select>
       </div>
 
-      {/* Subscription List */}
       <ul>
         {currentItems.map((type) => (
           <li
@@ -248,7 +250,6 @@ const SubscriptionsTypes = () => {
         ))}
       </ul>
 
-      {/* Pagination Controls */}
       <div className="flex justify-between items-center mt-4">
         <button
           onClick={handlePrevPage}
@@ -277,7 +278,6 @@ const SubscriptionsTypes = () => {
         </button>
       </div>
 
-      {/* Modals */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg w-full max-w-md relative">

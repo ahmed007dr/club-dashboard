@@ -22,6 +22,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
+import {
+  fetchSubscriptions,
+  
+} from "../../redux/slices/subscriptionsSlice";
 
 const Attendance = () => {
   const dispatch = useDispatch();
@@ -32,6 +36,10 @@ const Attendance = () => {
     loading: attendanceLoading,
     error: attendanceError,
   } = useSelector((state) => state.attendance);
+
+    const { subscriptions, status, error, updateStatus } = useSelector(
+      (state) => state.subscriptions
+    );
   console.log(attendances);
   const {
     entryLogs,
@@ -193,6 +201,11 @@ const Attendance = () => {
     }
   };
 
+  useEffect(() => {
+    dispatch(fetchSubscriptions());
+  }, [dispatch]);
+  console.log(subscriptions);
+
   return (
     <div className="space-y-6" dir="rtl">
       <h1 className="text-2xl font-bold tracking-tight">إدارة الحضور و الدخول</h1>
@@ -257,45 +270,51 @@ const Attendance = () => {
 
               {/* Attendance Dialog */}
               {isAttendanceDialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                  <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
-                    <button
-                      onClick={() => setIsAttendanceDialogOpen(false)}
-                      className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                    <h3 className="text-lg font-semibold mb-4">إضافة حضور</h3>
-                    <form onSubmit={handleAddAttendance} className="space-y-4">
-                      <div>
-                        <label className="block text-sm mb-1">رقم الاشتراك</label>
-                        <input
-                          type="text"
-                          name="subscription"
-                          value={newAttendance.subscription}
-                          onChange={handleAttendanceInputChange}
-                          className="border px-3 py-2 rounded w-full"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm mb-1">تاريخ الحضور</label>
-                        <input
-                          type="date"
-                          name="attendance_date"
-                          value={newAttendance.attendance_date}
-                          onChange={handleAttendanceInputChange}
-                          className="border px-3 py-2 rounded w-full"
-                          required
-                        />
-                      </div>
-                      <Button type="submit" className="w-full bg-blue-500">
-                        إضافة الحضور
-                      </Button>
-                    </form>
-                  </div>
-                </div>
-              )}
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
+      <button
+        onClick={() => setIsAttendanceDialogOpen(false)}
+        className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
+      >
+        ×
+      </button>
+      <h3 className="text-lg font-semibold mb-4">إضافة حضور</h3>
+      <form onSubmit={handleAddAttendance} className="space-y-4">
+        <div>
+          <label className="block text-sm mb-1">اسم العضو</label>
+          <select
+            name="subscription"
+            value={newAttendance.subscription}
+            onChange={handleAttendanceInputChange}
+            className="border px-3 py-2 rounded w-full"
+            required
+          >
+            <option value="">اختر العضو</option>
+            {subscriptions.map((sub) => (
+              <option key={sub.id} value={sub.id}>
+                {sub.member_name} (النادي: {sub.club_name})
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm mb-1">تاريخ الحضور</label>
+          <input
+            type="date"
+            name="attendance_date"
+            value={newAttendance.attendance_date}
+            onChange={handleAttendanceInputChange}
+            className="border px-3 py-2 rounded w-full"
+            required
+          />
+        </div>
+        <Button type="submit" className="w-full bg-blue-500">
+          إضافة الحضور
+        </Button>
+      </form>
+    </div>
+  </div>
+)}
 
               {/* Attendance Table */}
               {attendanceLoading && <p>جاري تحميل بيانات الحضور...</p>}
