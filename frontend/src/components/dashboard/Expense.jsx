@@ -12,70 +12,85 @@ import { Button } from "@/components/ui/button";
 import { Plus, MoreVertical } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
-  fetchIncomeSources,
-  addIncomeSource,
-  fetchIncomes,
-  addIncome,
-  updateIncome,
-  deleteIncome,
+  fetchExpenses,
+  updateExpense,
+  addExpense,
+  deleteExpense,
 } from "../../redux/slices/financeSlice";
-import BASE_URL from '../../config/api';
-
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
+import BASE_URL from "@/config/api";
+import {
+  fetchExpenseCategories,
+                              
+} from "../../redux/slices/financeSlice";    
 
-const labelMapping = {
-  name: "الاسم",
-  description: "الوصف",
-  club: "النادي",
-  source: "مصدر الدخل",
-  amount: "المبلغ",
-  date: "التاريخ",
-  received_by: "المستلم",
-};
 
-const Income = () => {
+// Custom CSS for table and modal responsiveness
+const customStyles = `
+  @media (max-width: 640px) {
+    .responsive-table {
+      display: block;
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+    .modal-content {
+      width: 100%;
+      height: 100%;
+      padding: 1rem;
+      border-radius: 0;
+    }
+  }
+  @media (min-width: 641px) {
+    .modal-content {
+      width: 100%;
+      max-width: 48rem; /* max-w-3xl */
+      height: auto;
+      max-height: 90vh;
+      padding: 1.5rem;
+      border-radius: 0.5rem;
+    }
+  }
+`;
+
+const Expense = () => {
   const dispatch = useDispatch();
   const [showModal, setShowModal] = useState(false);
-  const [currentItem, setCurrentItem] = useState(null);
-  const [newItem, setNewItem] = useState({
+  const [currentExpense, setCurrentExpense] = useState(null);
+  const [newExpense, setNewExpense] = useState({
     club: "",
-    source: "",
+    category: "",
     amount: "",
     description: "",
     date: "",
-    received_by: "",
+    invoice_number: "",
+    attachment: null,
   });
+  const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState(null);
   const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [userClub, setUserClub] = useState(null);
+  const [errors, setErrors] = useState({});
+  const itemsPerPage = 5;
 
-  // Filter states
-  const [incomeFilters, setIncomeFilters] = useState({
-    source: "",
-    amountMin: "",
-    amountMax: "",
-    dateFrom: "",
-    dateTo: "",
-    received_by: "",
-    club: "",
-  });
-
-
-  // Pagination states
-  const [incomePage, setIncomePage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-
-  const { incomes, loading, error } = useSelector(
+  const { expenses, loading, error } = useSelector((state) => state.finance);
+  const { expenseCategories } = useSelector(
     (state) => state.finance
   );
+  
+  useEffect(() => {
+    dispatch(fetchExpenseCategories());
+  }, [dispatch]);
 
-  // Fetch user profile to get club details
-   // Fetch user profile to get club details
-   useEffect(() => {
+  // Fetch user profile
+  useEffect(() => {
     fetch(`${BASE_URL}/accounts/api/profile/`, {
       method: "GET",
       headers: {
@@ -85,271 +100,227 @@ const Income = () => {
     })
       .then((response) => response.json())
       .then((data) => {
-        console.log("Fetched user club data:", data.club);
         setUserClub({
           id: data.club.id,
           name: data.club.name,
         });
-        setNewItem((prev) => ({ ...prev, club: data.club.id.toString() }));
+        setNewExpense((prev) => ({ ...prev, club: data.club.id.toString() }));
       })
       .catch((err) => {
         console.error("Failed to fetch user profile:", err);
       });
   }, []);
-  
 
-
-  // Fetch data on component mount
+  // Fetch expenses
   useEffect(() => {
-    dispatch(fetchIncomes());
+    dispatch(fetchExpenses());
   }, [dispatch]);
 
-  const filteredIncomes = useMemo(() => {
-    return incomes.filter((income) => {
-      return (
-        income.club_details?.id === userClub?.id &&
-        (!incomeFilters.club ||
-          income.club_details?.id.toString() === incomeFilters.club) &&
-        (!incomeFilters.source ||
-          income.source_details?.name
-            ?.toLowerCase()
-            .includes(incomeFilters.source.toLowerCase())) &&
-        (!incomeFilters.amountMin ||
-          income.amount >= parseFloat(incomeFilters.amountMin)) &&
-        (!incomeFilters.amountMax ||
-          income.amount <= parseFloat(incomeFilters.amountMax)) &&
-        (!incomeFilters.dateFrom ||
-          new Date(income.date) >= new Date(incomeFilters.dateFrom)) &&
-        (!incomeFilters.dateTo ||
-          new Date(income.date) <= new Date(incomeFilters.dateTo)) &&
-        (!incomeFilters.received_by ||
-          income.received_by_details?.username
-            ?.toLowerCase()
-            .includes(incomeFilters.received_by.toLowerCase()))
-      );
+  // Extract unique categories
+  const uniqueCategories = useMemo(() => {
+    const categoriesMap = new Map();
+    expenses.forEach((expense) => {
+      if (expense.category_details && expense.club_details?.id === userClub?.id) {
+        categoriesMap.set(expense.category_details.id, {
+          id: expense.category_details.id,
+          name: expense.category_details.name,
+        });
+      }
     });
-  }, [incomes, incomeFilters, userClub]);
+    return Array.from(categoriesMap.values());
+  }, [expenses, userClub]);
 
-  // Pagination calculations
-  const incomePageCount = Math.ceil(filteredIncomes.length / pageSize);
-  const paginatedIncomes = filteredIncomes.slice(
-    (incomePage - 1) * pageSize,
-    incomePage * pageSize
-  );
-
+  // Handle text input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
-    const newValue = name === "amount" ? parseFloat(value) || 0 : value;
-
-    if (currentItem) {
-      setCurrentItem((prev) => ({ ...prev, [name]: newValue }));
+    const updatedValue = name === "amount" ? (value === "" ? "" : parseFloat(value) || "") : value;
+    if (currentExpense) {
+      setCurrentExpense((prev) => ({ ...prev, [name]: updatedValue }));
     } else {
-      setNewItem((prev) => ({ ...prev, [name]: newValue }));
+      setNewExpense((prev) => ({ ...prev, [name]: updatedValue }));
     }
+    setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  const handleSave = () => {
-    const payload = currentItem
-      ? {
-          id: currentItem.id,
-          club: parseInt(currentItem.club) || null,
-          source: parseInt(currentItem.source) || null,
-          amount: currentItem.amount || 0,
-          description: currentItem.description || "",
-          date: currentItem.date || "",
-          received_by: parseInt(currentItem.received_by) || null,
-        }
-      : {
-          club: parseInt(newItem.club) || null,
-          source: parseInt(newItem.source) || null,
-          amount: parseFloat(newItem.amount) || 0,
-          description: newItem.description || "",
-          date: newItem.date || "",
-          received_by: parseInt(newItem.received_by) || null,
-        };
+  // Handle file input change
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (currentExpense) {
+      setCurrentExpense((prev) => ({ ...prev, attachment: file }));
+    } else {
+      setNewExpense((prev) => ({ ...prev, attachment: file }));
+    }
+    setErrors((prev) => ({ ...prev, attachment: "" }));
+  };
 
-    const action = currentItem
-      ? updateIncome({ id: currentItem.id, updatedData: payload })
-      : addIncome(payload);
+  // Validate form data
+  const validateForm = (data) => {
+    const newErrors = {};
+    if (!data.club || isNaN(parseInt(data.club))) newErrors.club = "النادي مطلوب.";
+    if (!data.category || isNaN(parseInt(data.category))) newErrors.category = "الفئة مطلوبة.";
+    if (!data.amount && data.amount !== 0) newErrors.amount = "المبلغ مطلوب.";
+    if (!data.date) newErrors.date = "التاريخ مطلوب.";
+    return newErrors;
+  };
+
+  // Save expense (add or update)
+  const handleSave = () => {
+    const data = currentExpense || newExpense;
+    const validationErrors = validateForm(data);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("club", parseInt(data.club));
+    formData.append("category", parseInt(data.category));
+    formData.append("amount", parseFloat(data.amount));
+    formData.append("description", data.description || "");
+    formData.append("date", data.date);
+    formData.append("invoice_number", data.invoice_number || "");
+    if (data.attachment) {
+      formData.append("attachment", data.attachment);
+    }
+
+    const action = currentExpense
+      ? updateExpense({ id: currentExpense.id, updatedData: formData })
+      : addExpense(formData);
 
     dispatch(action)
       .unwrap()
       .then(() => {
-        setCurrentItem(null);
-        setNewItem({
-          club: userClub?.id.toString() || "",
-          source: "",
+        setShowModal(false);
+        setCurrentExpense(null);
+        setNewExpense({
+          club: userClub?.id?.toString() || "",
+          category: "",
           amount: "",
           description: "",
           date: "",
-          received_by: "",
+          invoice_number: "",
+          attachment: null,
         });
-        setShowModal(false);
+        setErrors({});
       })
       .catch((err) => {
-        console.error(
-          `فشل في ${currentItem ? "تحديث" : "إضافة"} دخل`,
-          err
-        );
+        console.error("فشل في حفظ المصروف:", err);
+        if (err && typeof err === "object") {
+          const formattedErrors = {};
+          Object.keys(err).forEach((key) => {
+            formattedErrors[key] = Array.isArray(err[key]) ? err[key][0] : err[key];
+          });
+          setErrors(formattedErrors);
+        } else {
+          setErrors({ general: err || "فشل في حفظ المصروف" });
+        }
       });
   };
 
-  const handleEditClick = (item) => {
-    const sanitizedItem = {
-      ...item,
-      club: item.club?.toString() || userClub?.id.toString() || "",
-      source: item.source?.toString() || "",
-      amount: item.amount?.toString() || "0",
-      description: item.description || "",
-      date: item.date || "",
-      received_by: item.received_by?.toString() || "",
+  // Filter expenses
+  const filteredExpenses = useMemo(() => {
+    return expenses.filter((expense) => {
+      const expenseDate = new Date(expense.date);
+      const from = startDate ? new Date(startDate) : null;
+      const to = endDate ? new Date(endDate) : null;
+
+      return (
+        expense.club_details?.id === userClub?.id &&
+        (!from || expenseDate >= from) &&
+        (!to || expenseDate <= to)
+      );
+    });
+  }, [expenses, startDate, endDate, userClub]);
+
+  const paginatedExpenses = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredExpenses.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredExpenses, currentPage]);
+
+  // Edit expense
+  const handleEditClick = (expense) => {
+    const sanitizedExpense = {
+      ...expense,
+      club: expense.club?.toString() || userClub?.id.toString() || "",
+      category: expense.category?.toString() || "",
+      amount: expense.amount?.toString() || "",
+      description: expense.description || "",
+      date: expense.date || "",
+      invoice_number: expense.invoice_number || "",
+      attachment: null,
     };
-    setCurrentItem(sanitizedItem);
+    setCurrentExpense(sanitizedExpense);
     setShowModal(true);
   };
 
-  const handleAddClick = () => {
-    setCurrentItem(null);
-    setShowModal(true);
-  };
-
-  const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
-
+  // Delete expense
   const handleDeleteClick = (id) => {
-    setItemToDelete(id);
+    setExpenseToDelete(id);
     setConfirmDeleteModal(true);
   };
 
   const handleConfirmDelete = () => {
-    if (itemToDelete) {
-      dispatch(deleteIncome(itemToDelete))
+    if (expenseToDelete) {
+      dispatch(deleteExpense(expenseToDelete))
         .unwrap()
         .then(() => {
-          console.log("تم حذف الدخل بنجاح");
           setConfirmDeleteModal(false);
+          setExpenseToDelete(null);
         })
         .catch((err) => {
-          console.error("فشل في حذف الدخل:", err);
+          console.error("فشل في حذف المصروف:", err);
         });
     }
   };
 
-  const handleIncomeFilterChange = (e) => {
-    const { name, value } = e.target;
-    setIncomeFilters((prev) => ({ ...prev, [name]: value }));
-    setIncomePage(1);
-  };
-
-  const PaginationControls = ({ currentPage, setPage, pageCount }) => (
-    <div className="flex items-center justify-between mt-4">
-      <div className="flex items-center gap-2">
-        <select
-          value={pageSize}
-          onChange={(e) => {
-            setPageSize(parseInt(e.target.value));
-            setPage(1);
-          }}
-          className="border rounded px-2 py-1"
-        >
-          {[5, 10, 20, 50].map((size) => (
-            <option key={size} value={size}>
-              {size} لكل صفحة
-            </option>
-          ))}
-        </select>
-      </div>
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-          disabled={currentPage === 1}
-        >
-          السابق
-        </Button>
-        <span>
-          صفحة {currentPage} من {pageCount}
-        </span>
-        <Button
-          onClick={() => setPage((prev) => Math.min(prev + 1, pageCount))}
-          disabled={currentPage === pageCount}
-        >
-          التالي
-        </Button>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="p-6 space-y-6" dir="rtl">
-      <h1 className="text-2xl font-bold tracking-tight text-right">
-        إدارة الدخل
-      </h1>
-
-      <Tabs defaultValue="incomes" dir="rtl">
-        <TabsList dir="rtl">
-          <TabsTrigger value="incomes">الايرادات</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="incomes" className="space-y-4">
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
+      <Tabs defaultValue="expenses" dir="rtl">
+        <TabsContent value="expenses" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-right">جميع الدخل</CardTitle>
-              <CardDescription className="text-right">
-                إدارة جميع الدخل لنادي {userClub?.name || "جاري التحميل..."}
+              <CardTitle className="text-right text-lg sm:text-xl">
+                جميع المصروفات
+              </CardTitle>
+              <CardDescription className="text-right text-sm sm:text-base">
+                إدارة جميع المصروفات لنادي {userClub?.name || "جاري التحميل..."}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {["club", "source", "amountMin", "amountMax", "dateFrom", "dateTo", "received_by"].map(
-                  (field) => (
-                    <div key={field}>
-                      <label className="block text-sm font-medium mb-1 text-right">
-                        {labelMapping[field] || field.replace(/([A-Z])/g, " $1")}
-                      </label>
-                      {field === "club" ? (
-                        <select
-                          name="club"
-                          value={incomeFilters.club}
-                          onChange={handleIncomeFilterChange}
-                          className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                        >
-                          {userClub ? (
-                            <option value={userClub.id}>{userClub.name}</option>
-                          ) : (
-                            <option value="">جاري التحميل...</option>
-                          )}
-                        </select>
-                      ) : (
-                        <input
-                          type={
-                            field.includes("date")
-                              ? "date"
-                              : field.includes("amount")
-                              ? "number"
-                              : "text"
-                          }
-                          name={field}
-                          value={incomeFilters[field]}
-                          onChange={handleIncomeFilterChange}
-                          className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                          placeholder={`ابحث بـ ${
-                            labelMapping[field] || field.replace(/([A-Z])/g, " $1")
-                          }`}
-                        />
-                      )}
-                    </div>
-                  )
-                )}
+            <CardContent className="space-y-6">
+              {errors.general && (
+                <p className="text-red-500 text-sm text-right">
+                  {errors.general}
+                </p>
+              )}
+              <div className="flex flex-col sm:flex-row justify-between mb-4 gap-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm">من:</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="border px-2 py-1 rounded text-sm sm:text-base"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm">إلى:</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="border px-2 py-1 rounded text-sm sm:text-base"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={() => setShowModal(true)}
+                  className="flex items-center justify-start w-full sm:w-auto text-sm sm:text-base"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  إضافة مصروف
+                </Button>
               </div>
-
-              <Button
-                onClick={handleAddClick}
-                className="flex items-center justify-start"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                إضافة دخل
-              </Button>
 
               {loading && (
                 <p className="text-lg text-gray-600 text-right">
@@ -361,114 +332,145 @@ const Income = () => {
                 <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
               )}
 
-              <div className="rounded-md border">
+              <div className="rounded-md border overflow-x-auto" dir="rtl">
                 <table className="min-w-full divide-y divide-border">
                   <thead>
                     <tr className="bg-muted/50">
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المعرف
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        مصدر الدخل
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المبلغ
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        الوصف
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        التاريخ
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المستلم
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        الإجراءات
-                      </th>
+                      {[
+                        "النادي",
+                        "الفئة",
+                        "المبلغ",
+                        "الوصف",
+                        "التاريخ",
+                        "رقم الفاتورة",
+                        "المرفق",
+                        "الإجراءات",
+                      ].map((header, idx) => (
+                        <th
+                          key={idx}
+                          className="px-4 py-3 text-right text-sm font-medium whitespace-nowrap"
+                        >
+                          {header}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-background">
-                    {paginatedIncomes.map((income) => (
-                      <tr
-                        key={income.id}
-                        className="hover:bg-gray-100 transition"
-                      >
-                        <td className="px-4 py-3 text-sm">{income.id}</td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.source_details?.name || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.amount ? `${income.amount} جنيه` : "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.description || "لا يوجد وصف"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.date || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.received_by_details?.username || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm flex gap-2 justify-end">
-                          <DropdownMenu dir="rtl">
-                            <DropdownMenuTrigger asChild>
-                              <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                                <MoreVertical className="h-5 w-5" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem
-                                onClick={() => handleEditClick(income)}
-                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                    {paginatedExpenses.length > 0 ? (
+                      paginatedExpenses.map((expense, index) => (
+                        <tr key={index} className="hover:bg-gray-100 transition">
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.club_details?.name || "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.category_details?.name || "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.amount ? `${expense.amount} جنيه` : "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.description || "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.date || "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.invoice_number || "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.attachment ? (
+                              <a
+                                href={expense.attachment}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-500 underline"
                               >
-                                تعديل
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteClick(income.id)}
-                                className="cursor-pointer text-red-600 hover:bg-red-50"
-                              >
-                                حذف
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                                عرض المرفق
+                              </a>
+                            ) : (
+                              "لا يوجد مرفق"
+                            )}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-sm flex justify-end">
+                            <DropdownMenu dir="rtl">
+                              <DropdownMenuTrigger asChild>
+                                <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                                  <MoreVertical className="h-5 w-5" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem
+                                  onClick={() => handleEditClick(expense)}
+                                  className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                                >
+                                  تعديل
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteClick(expense.id)}
+                                  className="cursor-pointer text-red-600 hover:bg-red-50"
+                                >
+                                  حذف
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-3 text-center text-sm">
+                          لا توجد مصروفات متاحة
                         </td>
                       </tr>
-                    ))}
+                    )}
                   </tbody>
                 </table>
               </div>
-              <PaginationControls
-                currentPage={incomePage}
-                setPage={setIncomePage}
-                pageCount={incomePageCount}
-              />
-              {/* Compute Total Button */}
+
+              <div className="flex justify-between items-center mt-4">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm disabled:opacity-50"
+                >
+                  السابق
+                </button>
+                <span className="text-sm">
+                  صفحة {currentPage} من {Math.ceil(filteredExpenses.length / itemsPerPage)}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
+                  disabled={currentPage === Math.ceil(filteredExpenses.length / itemsPerPage)}
+                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm disabled:opacity-50"
+                >
+                  التالي
+                </button>
+              </div>
+
               <div className="flex justify-end mt-4">
                 <Button
                   onClick={() =>
                     setTotalInfo({
-                      count: filteredIncomes.length,
-                      total: filteredIncomes.reduce(
-                        (acc, income) => acc + (parseFloat(income.amount) || 0),
+                      count: filteredExpenses.length,
+                      total: filteredExpenses.reduce(
+                        (acc, expense) => acc + (parseFloat(expense.amount) || 0),
                         0
                       ),
                     })
                   }
-                  className="bg-primary text-white px-6"
+                  className="bg-primary text-white px-4 sm:px-6 text-sm sm:text-base"
                 >
                   حساب الإجمالي
                 </Button>
               </div>
 
-              {/* Total Info Display */}
               {totalInfo.count > 0 && (
                 <div className="mt-4 bg-gray-50 border rounded-md p-4 text-right space-y-1">
                   <p className="text-sm font-semibold text-gray-700">
-                    عدد الدخل: {totalInfo.count}
+                    عدد المصروفات: {totalInfo.count}
                   </p>
                   <p className="text-sm font-semibold text-gray-700">
-                    إجمالي الدخل: {totalInfo.total} جنيه
+                    إجمالي المصروفات: {totalInfo.total} جنيه
                   </p>
                 </div>
               )}
@@ -477,116 +479,162 @@ const Income = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Modal for adding/editing income */}
       {showModal && (
         <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
+          className="fixed inset-0 z-40 flex justify-center items-start sm:items-center bg-black bg-opacity-50 overflow-y-auto"
           onClick={() => setShowModal(false)}
         >
           <div
-            className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
+            className="bg-white w-full max-w-md overflow-y-auto max-h-[80vh] rounded-lg shadow-lg"
+            dir="rtl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-xl font-semibold mb-4 text-right">
-              {currentItem ? "تعديل دخل" : "إضافة دخل"}
-            </h3>
-            <div className="grid grid-cols-1 gap-4">
-              {["club", "source", "amount", "description", "date", "received_by"].map((field) => (
-                <div key={field}>
-                  <label className="block text-sm font-medium capitalize mb-1 text-right">
-                    {labelMapping[field] || field}
+            <div className="p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-semibold mb-4 text-right">
+                {currentExpense ? "تعديل المصروف" : "إضافة مصروف"}
+              </h3>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    النادي
                   </label>
-                  {field === "club" ? (
-                    <select
-                      name="club"
-                      value={currentItem ? currentItem.club : newItem.club}
-                      onChange={handleChange}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    >
-                      {userClub ? (
-                        <option value={userClub.id}>{userClub.name}</option>
-                      ) : (
-                        <option value="">جاري التحميل...</option>
-                      )}
-                    </select>
-                  ) : field === "source" ? (
-                    <select
-                      name="source"
-                      value={currentItem ? currentItem.source : newItem.source}
-                      onChange={handleChange}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    >
-                      <option value="">اختر مصدر الدخل</option>
-                      {/* You'll need to replace this with your actual sources data */}
-                      <option value="1">مصدر 1</option>
-                      <option value="2">مصدر 2</option>
-                    </select>
-                  ) : (
-                    <input
-                      type={
-                        field === "amount"
-                          ? "number"
-                          : field === "date"
-                          ? "date"
-                          : "text"
-                      }
-                      name={field}
-                      value={
-                        currentItem
-                          ? currentItem[field] || ""
-                          : newItem[field] || ""
-                      }
-                      onChange={handleChange}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    />
+                  <select
+                    name="club"
+                    value={currentExpense ? currentExpense.club : newExpense.club}
+                    onChange={handleChange}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+                    disabled
+                  >
+                    {userClub ? (
+                      <option value={userClub.id}>{userClub.name}</option>
+                    ) : (
+                      <option value="">جاري التحميل...</option>
+                    )}
+                  </select>
+                  {errors.club && (
+                    <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
+                      {errors.club}
+                    </p>
                   )}
                 </div>
-              ))}
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-              >
-                حفظ
-              </button>
+
+                <div>
+  <label className="block text-sm font-medium mb-1 text-right">
+    الفئة
+  </label>
+  <select
+    name="category"
+    value={currentExpense ? currentExpense.category : newExpense.category}
+    onChange={handleChange}
+    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+  >
+    <option value="">اختر الفئة</option>
+    {loading && <option disabled>جاري التحميل...</option>}
+    {error && <option disabled>خطأ في تحميل الفئات</option>}
+    {expenseCategories?.map((category) => (
+      <option key={category._id} value={category._id}>
+        {category.name}
+      </option>
+    ))}
+  </select>
+  {errors.category && (
+    <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
+      {errors.category}
+    </p>
+  )}
+</div>
+
+
+                {[
+                  { label: "المبلغ", name: "amount", type: "number", step: "0.01" },
+                  { label: "الوصف", name: "description", type: "text" },
+                  { label: "التاريخ", name: "date", type: "date" },
+                  { label: "رقم الفاتورة", name: "invoice_number", type: "text" },
+                ].map(({ label, name, type, step }) => (
+                  <div key={name}>
+                    <label className="block text-sm font-medium mb-1 text-right">
+                      {label}
+                    </label>
+                    <input
+                      type={type}
+                      name={name}
+                      value={currentExpense ? currentExpense[name] || "" : newExpense[name] || ""}
+                      onChange={handleChange}
+                      step={step}
+                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+                    />
+                    {errors[name] && (
+                      <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
+                        {errors[name]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    المرفق
+                  </label>
+                  <input
+                    type="file"
+                    name="attachment"
+                    onChange={handleFileChange}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+                  />
+                  {errors.attachment && (
+                    <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
+                      {errors.attachment}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setShowModal(false);
+                    setErrors({});
+                  }}
+                  className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm sm:text-base"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-3 sm:px-4 py-1 sm:py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm sm:text-base"
+                >
+                  حفظ
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete confirmation modal */}
       {confirmDeleteModal && (
         <div
           className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50"
           onClick={() => setConfirmDeleteModal(false)}
         >
           <div
-            className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md"
+            className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-semibold mb-4 text-right">
+            <h3 className="text-lg sm:text-xl font-semibold mb-4 text-right">
               تأكيد الحذف
             </h3>
             <p className="text-sm text-right mb-4">
-              هل أنت متأكد من حذف هذا الدخل؟
+              هل أنت متأكد من حذف هذا المصروف؟
             </p>
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setConfirmDeleteModal(false)}
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm sm:text-base"
               >
                 لا
               </button>
               <button
                 onClick={handleConfirmDelete}
-                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                className="px-3 sm:px-4 py-1 sm:py-2 bg-red-500 text-white rounded hover:bg-red-600 text-sm sm:text-base"
               >
                 نعم
               </button>
@@ -598,4 +646,4 @@ const Income = () => {
   );
 };
 
-export default Income;
+export default Expense;
