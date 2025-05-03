@@ -56,6 +56,7 @@ const ExpenseCategory = () => {
     (state) => state.finance
   );
 
+
   // Fetch user profile
   useEffect(() => {
     fetch(`${BASE_URL}/accounts/api/profile/`, {
@@ -80,8 +81,14 @@ const ExpenseCategory = () => {
 
   // Fetch expense categories
   useEffect(() => {
+    console.log("Dispatching fetchExpenseCategories...");
     dispatch(fetchExpenseCategories());
   }, [dispatch]);
+
+  useEffect(() => {
+    console.log("Expense Categories:", expenseCategories);
+  }, [expenseCategories]);
+
 
   // Handle form input changes
   const handleChange = (e) => {

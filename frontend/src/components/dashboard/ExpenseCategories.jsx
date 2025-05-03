@@ -1,54 +1,37 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import BASE_URL from '../../config/api';
+import React, { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { 
+  fetchExpenseCategories,
+  addExpenseCategory 
+} from '../../redux/slices/financeSlice';
 
 const ExpenseCategories = () => {
-  const [categories, setCategories] = useState([]);
-  const [error, setError] = useState(null);
+  const dispatch = useDispatch();
+  
+  // Select data from Redux store
+  const { expenseCategories, loading, error } = useSelector(
+    (state) => state.finance
+  );
 
+  // Fetch expense categories on component mount
   useEffect(() => {
-    // Get token from localStorage or any other storage you're using
-    const token = localStorage.getItem('token'); // Adjust this as needed
+    dispatch(fetchExpenseCategories());
+  }, [dispatch]);
 
-    // If there's no token, handle the error accordingly
-    if (!token) {
-      setError('Authentication token is missing');
-      return;
-    }
+  // Display loading state
+  if (loading) return <div>Loading categories...</div>;
 
-    // Fetch data when the component mounts
-    axios
-      .get(`${BASE_URL}/api/finance/api/expense-categories/`, {
-        headers: {
-          'accept': 'application/json',
-          'Authorization': token,  // Directly add token here (without 'Bearer' prefix)
-        },
-      })
-      .then((response) => {
-        console.log("Fetched categories:", response.data);
-        setCategories(response.data); // Set response data to categories state
-      })
-      .catch((err) => {
-        setError('Error fetching data'); // Handle error
-        console.error(err);
-      });
-  }, []); // Empty dependency array to run the effect only once
+  // Display error state
+  if (error) return <div>Error: {error}</div>;
 
-  if (error) {
-    return <div>{error}</div>;
-  }
-
+  // Render categories
   return (
     <div>
-      <h1>Expense Categories</h1>
+      <h2>Expense Categories</h2>
       <ul>
-        {categories.length > 0 ? (
-          categories.map((category) => (
-            <li key={category.id}>{category.name}</li> 
-          ))
-        ) : (
-          <li>No categories available</li>
-        )}
+        {expenseCategories?.map((category) => (
+          <li key={category.id}>{category.name}</li>
+        ))}
       </ul>
     </div>
   );
