@@ -84,7 +84,7 @@ const Expense = () => {
   const { expenseCategories } = useSelector(
     (state) => state.finance
   );
-  
+  console.log("Expense Categories:", expenseCategories);
   useEffect(() => {
     dispatch(fetchExpenseCategories());
   }, [dispatch]);
@@ -343,7 +343,6 @@ const Expense = () => {
                         "الوصف",
                         "التاريخ",
                         "رقم الفاتورة",
-                        "المرفق",
                         "الإجراءات",
                       ].map((header, idx) => (
                         <th
@@ -377,20 +376,7 @@ const Expense = () => {
                           <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
                             {expense.invoice_number || "غير متاح"}
                           </td>
-                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                            {expense.attachment ? (
-                              <a
-                                href={expense.attachment}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-blue-500 underline"
-                              >
-                                عرض المرفق
-                              </a>
-                            ) : (
-                              "لا يوجد مرفق"
-                            )}
-                          </td>
+                         
                           <td className="px-2 sm:px-4 py-3 text-sm flex justify-end">
                             <DropdownMenu dir="rtl">
                               <DropdownMenuTrigger asChild>

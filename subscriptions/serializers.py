@@ -10,6 +10,7 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubscriptionType
         fields = '__all__'
+        read_only_fields = ['end_date', 'remaining_amount']
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):

@@ -17,4 +17,9 @@ urlpatterns = [
     path('api/shifts/<int:shift_id>/edit/', api.edit_shift_api, name='api-edit-shift'),
     path('api/shifts/<int:shift_id>/delete/', api.delete_shift_api, name='api-delete-shift'),
     path('api/shifts/staff/<int:staff_id>/', api.staff_shifts_api, name='api-staff-shifts'),
+
+    path('check-in/', api.staff_check_in_api),
+    path('check-out/', api.staff_check_out_api),
+    path('attendance/<int:attendance_id>/report/', api.staff_attendance_analysis_api),
+
 ]
