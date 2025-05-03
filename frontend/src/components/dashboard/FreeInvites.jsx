@@ -74,7 +74,6 @@ const InviteList = () => {
       });
   }, []);
 
-
   // Fetch invites
   useEffect(() => {
     dispatch(fetchFreeInvites());
