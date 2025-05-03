@@ -17,7 +17,7 @@ import { IoTicketOutline } from "react-icons/io5";
 import SubscriptionStats from "./SubscriptionStats";
 import SubscriptionChart from "./SubscriptionChart";
 import ShiftsPerClubChart from "./ShiftsPerClubChart ";
-
+import ExpenseCategories from "./ExpenseCategories"
 const Main = () => {
   const dispatch = useDispatch();
   const { invites } = useSelector((state) => state.invites);

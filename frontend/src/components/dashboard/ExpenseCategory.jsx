@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import BASE_URL from "@/config/api";
 
+
+
 // Custom CSS for table overflow and modal responsiveness
 const customStyles = `
   @media (max-width: 640px) {
@@ -54,6 +56,7 @@ const ExpenseCategory = () => {
     (state) => state.finance
   );
 
+
   // Fetch user profile
   useEffect(() => {
     fetch(`${BASE_URL}/accounts/api/profile/`, {
@@ -78,8 +81,14 @@ const ExpenseCategory = () => {
 
   // Fetch expense categories
   useEffect(() => {
+    console.log("Dispatching fetchExpenseCategories...");
     dispatch(fetchExpenseCategories());
   }, [dispatch]);
+
+  useEffect(() => {
+    console.log("Expense Categories:", expenseCategories);
+  }, [expenseCategories]);
+
 
   // Handle form input changes
   const handleChange = (e) => {

@@ -74,34 +74,6 @@ const InviteList = () => {
       });
   }, []);
 
-  // Optional: Fetch members to validate membership_number (uncomment if needed)
-  /*
-  const [members, setMembers] = useState([]);
-  const [loadingMembers, setLoadingMembers] = useState(true);
-  useEffect(() => {
-    if (userClub?.id) {
-      setLoadingMembers(true);
-      fetch(`http://127.0.0.1:8000/api/members/?club_id=${userClub.id}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json",
-        },
-      })
-        .then((response) => response.json())
-        .then((data) => {
-          console.log("Fetched members:", data);
-          setMembers(data); // Expecting [{ id, membership_number, name, ... }, ...]
-          setLoadingMembers(false);
-        })
-        .catch((err) => {
-          console.error("Failed to fetch members:", err);
-          setLoadingMembers(false);
-        });
-    }
-  }, [userClub]);
-  */
-
   // Fetch invites
   useEffect(() => {
     dispatch(fetchFreeInvites());

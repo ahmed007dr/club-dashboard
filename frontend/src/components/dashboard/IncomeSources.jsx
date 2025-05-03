@@ -19,6 +19,8 @@ import {
   updateIncome,
   deleteIncome,
 } from "../../redux/slices/financeSlice";
+import BASE_URL from '../../config/api';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +64,7 @@ const Income = () => {
     club: "",
   });
 
+
   // Pagination states
   const [incomePage, setIncomePage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -71,8 +74,9 @@ const Income = () => {
   );
 
   // Fetch user profile to get club details
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/accounts/api/profile/", {
+   // Fetch user profile to get club details
+   useEffect(() => {
+    fetch(`${BASE_URL}/accounts/api/profile/`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -81,17 +85,19 @@ const Income = () => {
     })
       .then((response) => response.json())
       .then((data) => {
+        console.log("Fetched user club data:", data.club);
         setUserClub({
           id: data.club.id,
           name: data.club.name,
         });
         setNewItem((prev) => ({ ...prev, club: data.club.id.toString() }));
-        setIncomeFilters((prev) => ({ ...prev, club: data.club.id.toString() }));
       })
       .catch((err) => {
         console.error("Failed to fetch user profile:", err);
       });
   }, []);
+  
+
 
   // Fetch data on component mount
   useEffect(() => {
@@ -505,16 +511,19 @@ const Income = () => {
                     </select>
                   ) : field === "source" ? (
                     <select
-                      name="source"
-                      value={currentItem ? currentItem.source : newItem.source}
-                      onChange={handleChange}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    >
-                      <option value="">اختر مصدر الدخل</option>
-                      {/* You'll need to replace this with your actual sources data */}
-                      <option value="1">مصدر 1</option>
-                      <option value="2">مصدر 2</option>
-                    </select>
+                    name="source"
+                    value={currentItem ? currentItem.source : newItem.source}
+                    onChange={handleChange}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                  >
+                    <option value="">اختر مصدر الدخل</option>
+                    <option value="Renewal">تجديد</option>
+                    <option value="Subscription">اشتراك</option>
+                    <option value="ticket_sales">مبيعات التذاكر</option>
+                    <option value="SPONSORSHIPS">رعايات</option>
+                    <option value="EVENTS">فعاليات</option>
+                  </select>
+                  
                   ) : (
                     <input
                       type={

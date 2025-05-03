@@ -24,6 +24,11 @@ import {
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
 import BASE_URL from "@/config/api";
+import {
+  fetchExpenseCategories,
+                              
+} from "../../redux/slices/financeSlice";    
+
 
 // Custom CSS for table and modal responsiveness
 const customStyles = `
@@ -76,6 +81,13 @@ const Expense = () => {
   const itemsPerPage = 5;
 
   const { expenses, loading, error } = useSelector((state) => state.finance);
+  const { expenseCategories } = useSelector(
+    (state) => state.finance
+  );
+  console.log("Expense Categories:", expenseCategories);
+  useEffect(() => {
+    dispatch(fetchExpenseCategories());
+  }, [dispatch]);
 
   // Fetch user profile
   useEffect(() => {
@@ -141,7 +153,7 @@ const Expense = () => {
     setErrors((prev) => ({ ...prev, attachment: "" }));
   };
 
-  // Validate form data based on Postman input
+  // Validate form data
   const validateForm = (data) => {
     const newErrors = {};
     if (!data.club || isNaN(parseInt(data.club))) newErrors.club = "النادي مطلوب.";
@@ -171,11 +183,6 @@ const Expense = () => {
       formData.append("attachment", data.attachment);
     }
 
-    // Log FormData for debugging
-    for (let [key, value] of formData.entries()) {
-      console.log(`${key}: ${value}`);
-    }
-
     const action = currentExpense
       ? updateExpense({ id: currentExpense.id, updatedData: formData })
       : addExpense(formData);
@@ -186,7 +193,7 @@ const Expense = () => {
         setShowModal(false);
         setCurrentExpense(null);
         setNewExpense({
-          club: userClub?.id.toString() || "",
+          club: userClub?.id?.toString() || "",
           category: "",
           amount: "",
           description: "",
@@ -267,95 +274,64 @@ const Expense = () => {
   };
 
   return (
-    <>
-      <style>{customStyles}</style>
-      <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
-        <Tabs defaultValue="expenses" dir="rtl">
-          <TabsContent value="expenses" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-right text-lg sm:text-xl">
-                  جميع المصروفات
-                </CardTitle>
-                <CardDescription className="text-right text-sm sm:text-base">
-                  إدارة جميع المصروفات لنادي {userClub?.name || "جاري التحميل..."}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* General Error Display */}
-                {errors.general && (
-                  <p className="text-red-500 text-sm text-right">
-                    {errors.general}
-                  </p>
-                )}
-                {/* Add Expense Button and Date Filters */}
-                <div className="flex flex-col sm:flex-row justify-between mb-4 gap-4">
-                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm">من:</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="border px-2 py-1 rounded text-sm sm:text-base"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <label className="text-sm">إلى:</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="border px-2 py-1 rounded text-sm sm:text-base"
-                      />
-                    </div>
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
+      <Tabs defaultValue="expenses" dir="rtl">
+        <TabsContent value="expenses" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-right text-lg sm:text-xl">
+                جميع المصروفات
+              </CardTitle>
+              <CardDescription className="text-right text-sm sm:text-base">
+                إدارة جميع المصروفات لنادي {userClub?.name || "جاري التحميل..."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {errors.general && (
+                <p className="text-red-500 text-sm text-right">
+                  {errors.general}
+                </p>
+              )}
+              <div className="flex flex-col sm:flex-row justify-between mb-4 gap-4">
+                <div className="flex flex-col sm:flex-row gap-4 items-center justify-end">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm">من:</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="border px-2 py-1 rounded text-sm sm:text-base"
+                    />
                   </div>
-                  <Button
-                    onClick={() => setShowModal(true)}
-                    className="flex items-center justify-start w-full sm:w-auto text-sm sm:text-base"
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    إضافة مصروف
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm">إلى:</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="border px-2 py-1 rounded text-sm sm:text-base"
+                    />
+                  </div>
                 </div>
+                <Button
+                  onClick={() => setShowModal(true)}
+                  className="flex items-center justify-start w-full sm:w-auto text-sm sm:text-base"
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  إضافة مصروف
+                </Button>
+              </div>
 
-                {/* Loading State */}
-                {loading && (
-                  <p className="text-lg text-gray-600 text-right">
-                    جاري التحميل...
-                  </p>
-                )}
+              {loading && (
+                <p className="text-lg text-gray-600 text-right">
+                  جاري التحميل...
+                </p>
+              )}
 
-                {/* Error State */}
-                {error && (
-                  <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
-                )}
+              {error && (
+                <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
+              )}
 
-<<<<<<< HEAD
-                {/* Table */}
-                <div className="rounded-md border responsive-table">
-                  <table className="min-w-full divide-y divide-border">
-                    <thead>
-                      <tr className="bg-muted/50">
-                        {[
-                          "النادي",
-                          "الفئة",
-                          "المبلغ",
-                          "الوصف",
-                          "التاريخ",
-                          "رقم الفاتورة",
-                          "المرفق",
-                          "الإجراءات",
-                        ].map((header, idx) => (
-                          <th
-                            key={idx}
-                            className="px-2 sm:px-4 py-3 text-right text-xs sm:text-sm font-medium whitespace-nowrap"
-                          >
-                            {header}
-                          </th>
-                        ))}
-=======
-              {/* Table */}
               <div className="rounded-md border overflow-x-auto" dir="rtl">
                 <table className="min-w-full divide-y divide-border">
                   <thead>
@@ -366,7 +342,6 @@ const Expense = () => {
                         "المبلغ",
                         "الوصف",
                         "التاريخ",
-                        "المدفوع من قبل",
                         "رقم الفاتورة",
                         "الإجراءات",
                       ].map((header, idx) => (
@@ -380,445 +355,280 @@ const Expense = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-background">
-                    {paginatedExpenses.map((expense, index) => (
-                      <tr key={index} className="hover:bg-gray-100 transition">
-                        <td className="px-4 py-3 text-sm">
-                          {expense.club_details?.name || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {expense.category_details?.name || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {expense.amount
-                            ? `${expense.amount} جنيه`
-                            : "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {expense.description || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {expense.date || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {expense.paid_by_details?.username || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {expense.invoice_number || "غير متاح"}
-                        </td>
-                       
-                        <td className="px-4 py-3 text-sm flex justify-end">
-                          <DropdownMenu dir="rtl">
-                            <DropdownMenuTrigger asChild>
-                              <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                                <MoreVertical className="h-5 w-5" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem
-                                onClick={() => handleEditClick(expense)}
-                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                              >
-                                تعديل
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteClick(expense.id)}
-                                className="cursor-pointer text-red-600 hover:bg-red-50"
-                              >
-                                حذف
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
->>>>>>> b6817cb28908498734d0fee74c19a39f9cdd7c66
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border bg-background">
-                      {paginatedExpenses.length > 0 ? (
-                        paginatedExpenses.map((expense, index) => (
-                          <tr key={index} className="hover:bg-gray-100 transition">
-                            <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                              {expense.club_details?.name || "غير متاح"}
-                            </td>
-                            <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                              {expense.category_details?.name || "غير متاح"}
-                            </td>
-                            <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                              {expense.amount ? `${expense.amount} جنيه` : "غير متاح"}
-                            </td>
-                            <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                              {expense.description || "غير متاح"}
-                            </td>
-                            <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                              {expense.date || "غير متاح"}
-                            </td>
-                            <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                              {expense.invoice_number || "غير متاح"}
-                            </td>
-                            <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                              {expense.attachment ? (
-                                <a
-                                  href={expense.attachment}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-500 underline"
+                    {paginatedExpenses.length > 0 ? (
+                      paginatedExpenses.map((expense, index) => (
+                        <tr key={index} className="hover:bg-gray-100 transition">
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.club_details?.name || "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.category_details?.name || "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.amount ? `${expense.amount} جنيه` : "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.description || "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.date || "غير متاح"}
+                          </td>
+                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                            {expense.invoice_number || "غير متاح"}
+                          </td>
+                         
+                          <td className="px-2 sm:px-4 py-3 text-sm flex justify-end">
+                            <DropdownMenu dir="rtl">
+                              <DropdownMenuTrigger asChild>
+                                <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                                  <MoreVertical className="h-5 w-5" />
+                                </button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuItem
+                                  onClick={() => handleEditClick(expense)}
+                                  className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
                                 >
-                                  عرض المرفق
-                                </a>
-                              ) : (
-                                "لا يوجد مرفق"
-                              )}
-                            </td>
-                            <td className="px-2 sm:px-4 py-3 text-sm flex justify-end">
-                              <DropdownMenu dir="rtl">
-                                <DropdownMenuTrigger asChild>
-                                  <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                                    <MoreVertical className="h-5 w-5" />
-                                  </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40">
-                                  <DropdownMenuItem
-                                    onClick={() => handleEditClick(expense)}
-                                    className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                                  >
-                                    تعديل
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => handleDeleteClick(expense.id)}
-                                    className="cursor-pointer text-red-600 hover:bg-red-50"
-                                  >
-                                    حذف
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={8} className="px-4 py-3 text-center text-sm">
-                            لا توجد مصروفات متاحة
+                                  تعديل
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleDeleteClick(expense.id)}
+                                  className="cursor-pointer text-red-600 hover:bg-red-50"
+                                >
+                                  حذف
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </td>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-3 text-center text-sm">
+                          لا توجد مصروفات متاحة
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-<<<<<<< HEAD
-                {/* Pagination */}
-                <div className="flex flex-col sm:flex-row justify-end gap-2 mt-4">
-                  <button
-                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm"
-                  >
-                    السابق
-                  </button>
-                  <span className="px-3 py-1 text-sm">
-                    الصفحة {currentPage} من{" "}
-                    {Math.ceil(filteredExpenses.length / itemsPerPage)}
-                  </span>
-                  <button
-                    onClick={() =>
-                      setCurrentPage((prev) =>
-                        prev < Math.ceil(filteredExpenses.length / itemsPerPage)
-                          ? prev + 1
-                          : prev
-                      )
-=======
-      {/* Add/Edit Modal */}
+              <div className="flex justify-between items-center mt-4">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm disabled:opacity-50"
+                >
+                  السابق
+                </button>
+                <span className="text-sm">
+                  صفحة {currentPage} من {Math.ceil(filteredExpenses.length / itemsPerPage)}
+                </span>
+                <button
+                  onClick={() => setCurrentPage((prev) => prev + 1)}
+                  disabled={currentPage === Math.ceil(filteredExpenses.length / itemsPerPage)}
+                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm disabled:opacity-50"
+                >
+                  التالي
+                </button>
+              </div>
+
+              <div className="flex justify-end mt-4">
+                <Button
+                  onClick={() =>
+                    setTotalInfo({
+                      count: filteredExpenses.length,
+                      total: filteredExpenses.reduce(
+                        (acc, expense) => acc + (parseFloat(expense.amount) || 0),
+                        0
+                      ),
+                    })
+                  }
+                  className="bg-primary text-white px-4 sm:px-6 text-sm sm:text-base"
+                >
+                  حساب الإجمالي
+                </Button>
+              </div>
+
+              {totalInfo.count > 0 && (
+                <div className="mt-4 bg-gray-50 border rounded-md p-4 text-right space-y-1">
+                  <p className="text-sm font-semibold text-gray-700">
+                    عدد المصروفات: {totalInfo.count}
+                  </p>
+                  <p className="text-sm font-semibold text-gray-700">
+                    إجمالي المصروفات: {totalInfo.total} جنيه
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
       {showModal && (
         <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
+          className="fixed inset-0 z-40 flex justify-center items-start sm:items-center bg-black bg-opacity-50 overflow-y-auto"
           onClick={() => setShowModal(false)}
         >
           <div
-            className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
+            className="bg-white w-full max-w-md overflow-y-auto max-h-[80vh] rounded-lg shadow-lg"
+            dir="rtl"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-xl font-semibold mb-4 text-right">
-              {currentExpense ? "تعديل المصروف" : "إضافة مصروف"}
-            </h3>
-            <div className="grid grid-cols-1 gap-4">
-              {/* Club Dropdown */}
-              <div>
-                <label className="block text-sm font-medium capitalize mb-1 text-right">
-                  النادي
-                </label>
-                <select
-                  name="club"
-                  value={
-                    currentExpense ? currentExpense.club : newExpense.club
-                  }
-                  onChange={handleChange}
-                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                  // Disable to prevent changes, as only one club is available
-                >
-                  {userClub ? (
-                    <option value={userClub.id}>{userClub.name}</option>
-                  ) : (
-                    <option value="">جاري التحميل...</option>
-                  )}
-                </select>
-              </div>
-
-              {/* Category Dropdown */}
-              <div>
-                <label className="block text-sm font-medium capitalize mb-1 text-right">
-                  الفئة
-                </label>
-                <select
-                  name="category"
-                  value={
-                    currentExpense ? currentExpense.category : newExpense.category
-                  }
-                  onChange={handleChange}
-                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                >
-                  <option value="">اختر الفئة</option>
-                  {uniqueCategories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Other Fields */}
-              {[
-                { label: "المبلغ", name: "amount", type: "number" },
-                { label: "الوصف", name: "description" },
-                { label: "التاريخ", name: "date", type: "date" },
-                { label: "المدفوع من قبل", name: "paid_by" },
-             
-              ].map(({ label, name, type = "text" }) => (
-                <div key={name}>
-                  <label className="block text-sm font-medium capitalize mb-1 text-right">
-                    {label}
+            <div className="p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-semibold mb-4 text-right">
+                {currentExpense ? "تعديل المصروف" : "إضافة مصروف"}
+              </h3>
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    النادي
                   </label>
-                  <input
-                    type={type}
-                    name={name}
-                    value={
-                      currentExpense
-                        ? currentExpense[name] || ""
-                        : newExpense[name] || ""
->>>>>>> b6817cb28908498734d0fee74c19a39f9cdd7c66
-                    }
-                    disabled={
-                      currentPage === Math.ceil(filteredExpenses.length / itemsPerPage)
-                    }
-                    className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm"
+                  <select
+                    name="club"
+                    value={currentExpense ? currentExpense.club : newExpense.club}
+                    onChange={handleChange}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+                    disabled
                   >
-                    التالي
-                  </button>
+                    {userClub ? (
+                      <option value={userClub.id}>{userClub.name}</option>
+                    ) : (
+                      <option value="">جاري التحميل...</option>
+                    )}
+                  </select>
+                  {errors.club && (
+                    <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
+                      {errors.club}
+                    </p>
+                  )}
                 </div>
 
-                {/* Compute Total Button */}
-                <div className="flex justify-end mt-4">
-                  <Button
-                    onClick={() =>
-                      setTotalInfo({
-                        count: filteredExpenses.length,
-                        total: filteredExpenses.reduce(
-                          (acc, expense) => acc + (parseFloat(expense.amount) || 0),
-                          0
-                        ),
-                      })
-                    }
-                    className="bg-primary text-white px-4 sm:px-6 text-sm sm:text-base"
-                  >
-                    حساب الإجمالي
-                  </Button>
-                </div>
+                <div>
+  <label className="block text-sm font-medium mb-1 text-right">
+    الفئة
+  </label>
+  <select
+    name="category"
+    value={currentExpense ? currentExpense.category : newExpense.category}
+    onChange={handleChange}
+    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+  >
+    <option value="">اختر الفئة</option>
+    {loading && <option disabled>جاري التحميل...</option>}
+    {error && <option disabled>خطأ في تحميل الفئات</option>}
+    {expenseCategories?.map((category) => (
+      <option key={category._id} value={category._id}>
+        {category.name}
+      </option>
+    ))}
+  </select>
+  {errors.category && (
+    <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
+      {errors.category}
+    </p>
+  )}
+</div>
 
-                {/* Total Info Display */}
-                {totalInfo.count > 0 && (
-                  <div className="mt-4 bg-gray-50 border rounded-md p-4 text-right space-y-1">
-                    <p className="text-sm font-semibold text-gray-700">
-                      عدد المصروفات: {totalInfo.count}
-                    </p>
-                    <p className="text-sm font-semibold text-gray-700">
-                      إجمالي المصروفات: {totalInfo.total} جنيه
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
 
-        {/* Add/Edit Modal */}
-        {showModal && (
-          <div
-            className="fixed inset-0 z-40 flex justify-center items-start sm:items-center bg-black bg-opacity-50 overflow-y-auto"
-            onClick={() => setShowModal(false)}
-          >
-            <div
-              className="bg-white w-full h-full sm:h-auto overflow-y-auto modal-content shadow-lg"
-              dir="rtl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="p-4 sm:p-6 lg:p-8">
-                <h3 className="text-lg sm:text-xl font-semibold mb-4 text-right">
-                  {currentExpense ? "تعديل المصروف" : "إضافة مصروف"}
-                </h3>
-                <div className="grid grid-cols-1 gap-4">
-                  {/* Club Dropdown */}
-                  <div>
+                {[
+                  { label: "المبلغ", name: "amount", type: "number", step: "0.01" },
+                  { label: "الوصف", name: "description", type: "text" },
+                  { label: "التاريخ", name: "date", type: "date" },
+                  { label: "رقم الفاتورة", name: "invoice_number", type: "text" },
+                ].map(({ label, name, type, step }) => (
+                  <div key={name}>
                     <label className="block text-sm font-medium mb-1 text-right">
-                      النادي
-                    </label>
-                    <select
-                      name="club"
-                      value={currentExpense ? currentExpense.club : newExpense.club}
-                      onChange={handleChange}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
-                      
-                    >
-                      {userClub ? (
-                        <option value={userClub.id}>{userClub.name}</option>
-                      ) : (
-                        <option value="">جاري التحميل...</option>
-                      )}
-                    </select>
-                    {errors.club && (
-                      <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
-                        {errors.club}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Category Dropdown */}
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-right">
-                      الفئة
-                    </label>
-                    <select
-                      name="category"
-                      value={
-                        currentExpense ? currentExpense.category : newExpense.category
-                      }
-                      onChange={handleChange}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
-                    >
-                      <option value="">اختر الفئة</option>
-                      {uniqueCategories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                    {errors.category && (
-                      <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
-                        {errors.category}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Other Fields */}
-                  {[
-                    { label: "المبلغ", name: "amount", type: "number", step: "0.01" },
-                    { label: "الوصف", name: "description", type: "text" },
-                    { label: "التاريخ", name: "date", type: "date" },
-                    { label: "رقم الفاتورة", name: "invoice_number", type: "text" },
-                  ].map(({ label, name, type, step }) => (
-                    <div key={name}>
-                      <label className="block text-sm font-medium mb-1 text-right">
-                        {label}
-                      </label>
-                      <input
-                        type={type}
-                        name={name}
-                        value={
-                          currentExpense ? currentExpense[name] || "" : newExpense[name] || ""
-                        }
-                        onChange={handleChange}
-                        step={step}
-                        className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
-                      />
-                      {errors[name] && (
-                        <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
-                          {errors[name]}
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                  {/* File Input for Attachment */}
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-right">
-                      المرفق
+                      {label}
                     </label>
                     <input
-                      type="file"
-                      name="attachment"
-                      onChange={handleFileChange}
+                      type={type}
+                      name={name}
+                      value={currentExpense ? currentExpense[name] || "" : newExpense[name] || ""}
+                      onChange={handleChange}
+                      step={step}
                       className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
                     />
-                    {errors.attachment && (
+                    {errors[name] && (
                       <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
-                        {errors.attachment}
+                        {errors[name]}
                       </p>
                     )}
                   </div>
-                </div>
-                <div className="mt-6 flex justify-end gap-2">
-                  <button
-                    onClick={() => {
-                      setShowModal(false);
-                      setErrors({});
-                    }}
-                    className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm sm:text-base"
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    className="px-3 sm:px-4 py-1 sm:py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm sm:text-base"
-                  >
-                    حفظ
-                  </button>
+                ))}
+
+                <div>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    المرفق
+                  </label>
+                  <input
+                    type="file"
+                    name="attachment"
+                    onChange={handleFileChange}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+                  />
+                  {errors.attachment && (
+                    <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
+                      {errors.attachment}
+                    </p>
+                  )}
                 </div>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Confirmation Delete Modal */}
-        {confirmDeleteModal && (
-          <div
-            className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50"
-            onClick={() => setConfirmDeleteModal(false)}
-          >
-            <div
-              className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm modal-content"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-lg sm:text-xl font-semibold mb-4 text-right">
-                تأكيد الحذف
-              </h3>
-              <p className="text-sm text-right mb-4">
-                هل أنت متأكد من حذف هذا المصروف؟
-              </p>
-              <div className="flex justify-end gap-2">
+              <div className="mt-6 flex justify-end gap-2">
                 <button
-                  onClick={() => setConfirmDeleteModal(false)}
+                  onClick={() => {
+                    setShowModal(false);
+                    setErrors({});
+                  }}
                   className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm sm:text-base"
                 >
-                  لا
+                  إلغاء
                 </button>
                 <button
-                  onClick={handleConfirmDelete}
-                  className="px-3 sm:px-4 py-1 sm:py-2 bg-red-500 text-white rounded hover:bg-red-600 text-sm sm:text-base"
+                  onClick={handleSave}
+                  className="px-3 sm:px-4 py-1 sm:py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm sm:text-base"
                 >
-                  نعم
+                  حفظ
                 </button>
               </div>
             </div>
           </div>
-        )}
-      </div>
-    </>
+        </div>
+      )}
+
+      {confirmDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50"
+          onClick={() => setConfirmDeleteModal(false)}
+        >
+          <div
+            className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg sm:text-xl font-semibold mb-4 text-right">
+              تأكيد الحذف
+            </h3>
+            <p className="text-sm text-right mb-4">
+              هل أنت متأكد من حذف هذا المصروف؟
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setConfirmDeleteModal(false)}
+                className="px-3 sm:px-4 py-1 sm:py-2 bg-gray-300 rounded hover:bg-gray-400 text-sm sm:text-base"
+              >
+                لا
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                className="px-3 sm:px-4 py-1 sm:py-2 bg-red-500 text-white rounded hover:bg-red-600 text-sm sm:text-base"
+              >
+                نعم
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
