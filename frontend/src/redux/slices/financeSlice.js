@@ -175,21 +175,34 @@ export const addIncomeSource = createAsyncThunk(
   'finance/addIncomeSource',
   async (newSource, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
+      console.log('Attempting to add income source with data:', newSource);
+      
+      const token = localStorage.getItem('token');
+      console.log('Retrieved token from localStorage:', token ? 'exists' : 'missing');
+      
       const response = await fetch(`${BASE_URL}/finance/api/income-sources/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          
+          'Content-Type': 'application/json', // Make sure to include this if sending JSON
         },
-        body: newSource,
+        body: JSON.stringify(newSource), // Make sure to stringify if sending JSON
       });
+
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Error response from server:', errorData);
         return rejectWithValue(errorData.message || 'Failed to add income source.');
       }
-      return await response.json();
+      
+      const responseData = await response.json();
+      console.log('Successfully added income source:', responseData);
+      return responseData;
+      
     } catch (error) {
+      console.error('Caught an error:', error);
       return rejectWithValue(error.message);
     }
   }
