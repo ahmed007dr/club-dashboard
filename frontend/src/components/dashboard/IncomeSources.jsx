@@ -19,6 +19,8 @@ import {
   updateIncome,
   deleteIncome,
 } from "../../redux/slices/financeSlice";
+import BASE_URL from '../../config/api';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +64,7 @@ const Income = () => {
     club: "",
   });
 
+
   // Pagination states
   const [incomePage, setIncomePage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -71,8 +74,9 @@ const Income = () => {
   );
 
   // Fetch user profile to get club details
-  useEffect(() => {
-    fetch("http://127.0.0.1:8000/accounts/api/profile/", {
+   // Fetch user profile to get club details
+   useEffect(() => {
+    fetch(`${BASE_URL}/accounts/api/profile/`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -81,17 +85,19 @@ const Income = () => {
     })
       .then((response) => response.json())
       .then((data) => {
+        console.log("Fetched user club data:", data.club);
         setUserClub({
           id: data.club.id,
           name: data.club.name,
         });
         setNewItem((prev) => ({ ...prev, club: data.club.id.toString() }));
-        setIncomeFilters((prev) => ({ ...prev, club: data.club.id.toString() }));
       })
       .catch((err) => {
         console.error("Failed to fetch user profile:", err);
       });
   }, []);
+  
+
 
   // Fetch data on component mount
   useEffect(() => {
