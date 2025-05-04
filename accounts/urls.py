@@ -18,5 +18,6 @@ urlpatterns = [
 
     # API
     path('api/profile/', api.api_user_profile, name='api-user-profile'),
+    path('api/users/', api.api_user_list, name='api_user_list'),
 
 ]

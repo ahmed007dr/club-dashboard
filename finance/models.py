@@ -60,6 +60,7 @@ class Income(models.Model):
     date = models.DateField()
     received_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     related_receipt = models.ForeignKey('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True)
+    # ticket = models.OneToOneField('tickets.Ticket', null=True, blank=True, on_delete=models.SET_NULL, related_name='income')
 
     def __str__(self):
         return f"{self.source.name} - {self.amount}"

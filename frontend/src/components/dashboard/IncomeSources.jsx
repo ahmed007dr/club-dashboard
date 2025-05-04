@@ -510,20 +510,15 @@ const Income = () => {
                       )}
                     </select>
                   ) : field === "source" ? (
-                    <select
-                    name="source"
-                    value={currentItem ? currentItem.source : newItem.source}
-                    onChange={handleChange}
-                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                  >
-                    <option value="">اختر مصدر الدخل</option>
-                    <option value="Renewal">تجديد</option>
-                    <option value="Subscription">اشتراك</option>
-                    <option value="ticket_sales">مبيعات التذاكر</option>
-                    <option value="SPONSORSHIPS">رعايات</option>
-                    <option value="EVENTS">فعاليات</option>
-                  </select>
-                  
+                    <select name="source" onChange={handleChange} value={newItem.source}>
+                <option value=""> مصدر الدخل</option>
+                {incomes.map((src) => (
+                  <option key={src.id} value={src.source_details?.name}>
+                    {src.source_details?.name}
+                  </option>
+                ))}
+              </select>
+                            
                   ) : (
                     <input
                       type={
