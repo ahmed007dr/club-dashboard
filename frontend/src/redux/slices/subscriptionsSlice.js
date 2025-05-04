@@ -473,7 +473,31 @@ export const fetchSubscriptions = createAsyncThunk(
     }
   }
 );
-//
+
+export const addAttendance = createAsyncThunk(
+  'attendance/addAttendance',
+  async (newAttendance, { rejectWithValue }) => {
+    try {
+      console.log('Sending attendance data:', newAttendance); // Log the data being sent
+
+      const token = localStorage.getItem('token');
+      const response = await axios.post(`${BASE_URL}/attendance/api/attendances/add/`, newAttendance, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('Attendance response data:', response.data); // Log the response data
+
+      return response.data; // Use response.data instead of newAttendance for consistency
+    } catch (error) {
+      console.error('Error adding attendance:', error); // Log the error if it occurs
+      return rejectWithValue(error.response?.data?.message || 'Failed to add attendance.');
+    }
+  }
+);
+
 const subscriptionsSlice = createSlice({
     name: 'subscriptions',
     initialState: {
@@ -485,6 +509,7 @@ const subscriptionsSlice = createSlice({
       expiredSubscriptions: [],
       memberSubscriptions: [],
       upcomingSubscriptions: [],
+      attendances: [],
       stats: null,
       subscriptionType: null, 
       subscription: null,
@@ -758,7 +783,55 @@ const subscriptionsSlice = createSlice({
       state.error = action.payload;
     })
     
-     
+    .addCase(addAttendance.fulfilled, (state, action) => {
+      state.loading = false;
+      
+      // Always add to attendances array
+      state.attendances.push(action.payload);
+    
+      // If subscriptions aren't loaded, skip the subscription update
+      if (!state.memberSubscriptions?.length) {
+        console.warn("Subscriptions not loaded - attendance recorded but not linked to subscription");
+        return;
+      }
+    
+      const { member_details, attendance_date, subscription } = action.payload;
+      
+      // Find the specific subscription (using both member ID and subscription ID for accuracy)
+      const subscriptionIndex = state.memberSubscriptions.findIndex(
+        sub => sub.id === subscription && sub.member === member_details.id
+      );
+    
+      if (subscriptionIndex === -1) {
+        console.error("Matching subscription not found");
+        return;
+      }
+    
+      // Initialize attendance_dates array if it doesn't exist
+      if (!state.memberSubscriptions[subscriptionIndex].attendance_dates) {
+        state.memberSubscriptions[subscriptionIndex].attendance_dates = [];
+      }
+    
+      // Check for duplicate dates before adding
+      const existingDates = state.memberSubscriptions[subscriptionIndex].attendance_dates;
+      const isDuplicate = existingDates.some(date => date === attendance_date);
+      
+      if (!isDuplicate) {
+        // Add new attendance date and update count
+        state.memberSubscriptions[subscriptionIndex].attendance_dates = [
+          ...existingDates,
+          attendance_date
+        ];
+        
+        state.memberSubscriptions[subscriptionIndex].attendance_days = 
+          state.memberSubscriptions[subscriptionIndex].attendance_dates.length;
+      } else {
+        console.warn(`Attendance already recorded for date: ${attendance_date}`);
+      }
+    })
+    
+    
+    
     },
   });
   

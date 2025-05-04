@@ -236,7 +236,11 @@ export const addIncome = createAsyncThunk(
   'finance/addIncome',
   async (newIncome, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
+      console.log('Starting income submission with data:', newIncome);
+      
+      const token = localStorage.getItem('token');
+      console.log('Retrieved auth token:', token ? 'exists' : 'missing');
+      
       const response = await fetch(`${BASE_URL}/finance/api/incomes/`, {
         method: 'POST',
         headers: {
@@ -245,12 +249,27 @@ export const addIncome = createAsyncThunk(
         },
         body: JSON.stringify(newIncome),
       });
+
+      console.log('Received response with status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('Server responded with error:', {
+          status: response.status,
+          error: errorData
+        });
         return rejectWithValue(errorData.message || 'Failed to add income.');
       }
-      return await response.json();
+      
+      const responseData = await response.json();
+      console.log('Income successfully recorded:', responseData);
+      return responseData;
+      
     } catch (error) {
+      console.error('Error occurred during income submission:', {
+        error: error.message,
+        stack: error.stack
+      });
       return rejectWithValue(error.message);
     }
   }

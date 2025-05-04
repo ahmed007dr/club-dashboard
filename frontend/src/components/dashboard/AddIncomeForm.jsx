@@ -1,0 +1,188 @@
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { addIncome } from '../../redux/slices/financeSlice';
+import BASE_URL from '../../config/api';
+import { toast } from 'react-hot-toast';
+
+const AddIncomeForm = () => {
+  const dispatch = useDispatch();
+  const { isLoading } = useSelector((state) => state.finance);
+
+  const [formData, setFormData] = useState({
+    club: '',
+    source: '',
+    amount: '',
+    description: '',
+    date: new Date().toISOString().split('T')[0],
+  });
+
+  const [userClub, setUserClub] = useState(null);
+  const [userId, setUserId] = useState(null);
+
+  const incomeSources = [
+    { id: 1, name: 'اشتراك' },         // Subscription
+    { id: 2, name: 'تسديد اشتراك' },   // Subscription Payment
+  ];
+
+  useEffect(() => {
+    fetch(`${BASE_URL}/accounts/api/profile/`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem('token')}`,
+        'Content-Type': 'application/json',
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.club) {
+          setUserClub({ id: data.club.id, name: data.club.name });
+          setFormData((prev) => ({ ...prev, club: data.club.id }));
+        }
+        if (data.id) {
+          setUserId(data.id);
+        }
+      })
+      .catch((err) => {
+        console.error('فشل في جلب الملف الشخصي للمستخدم:', err);
+      });
+  }, []);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    const allowedSources = [1, 2];
+    const sourceId = parseInt(formData.source);
+
+    if (!allowedSources.includes(sourceId)) {
+      toast.error('يُسمح فقط بمصدر "اشتراك" أو "تسديد اشتراك"');
+      return;
+    }
+
+    if (!formData.source || !formData.club || !userId) {
+      toast.error('الرجاء تعبئة جميع الحقول المطلوبة');
+      return;
+    }
+
+    const incomeData = {
+      ...formData,
+      amount: parseFloat(formData.amount),
+      source: sourceId,
+      club: parseInt(formData.club),
+      received_by: userId,
+    };
+
+    try {
+      await dispatch(addIncome(incomeData)).unwrap();
+      toast.success('تم تسجيل الدخل بنجاح');
+      setFormData({
+        club: userClub?.id || '',
+        source: '',
+        amount: '',
+        description: '',
+        date: new Date().toISOString().split('T')[0],
+      });
+    } catch (error) {
+      console.error('خطأ أثناء إضافة الدخل:', error);
+      toast.error('فشل في تسجيل الدخل');
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="max-w-xl mx-auto p-6 bg-white shadow-lg rounded-lg space-y-6"
+    >
+      <h2 className="text-2xl font-semibold text-gray-800">إضافة الدخل</h2>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">النادي</label>
+        <select
+          name="club"
+          value={formData.club}
+          onChange={handleChange}
+          disabled={!!userClub}
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 bg-gray-100 disabled:cursor-not-allowed"
+        >
+          <option value="">اختر النادي</option>
+          {userClub && <option value={userClub.id}>{userClub.name}</option>}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">المصدر</label>
+        <select
+          name="source"
+          value={formData.source}
+          onChange={handleChange}
+          required
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2"
+        >
+          <option value="">اختر المصدر</option>
+          {incomeSources.map((source) => (
+            <option key={source.id} value={source.id}>
+              {source.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">المبلغ</label>
+        <input
+          type="number"
+          name="amount"
+          value={formData.amount}
+          onChange={handleChange}
+          required
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">الوصف</label>
+        <textarea
+          name="description"
+          value={formData.description}
+          onChange={handleChange}
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700">التاريخ</label>
+        <input
+          type="date"
+          name="date"
+          value={formData.date}
+          onChange={handleChange}
+          required
+          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2"
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={isLoading}
+        className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition duration-150"
+      >
+        {isLoading ? 'جاري الإرسال...' : 'إرسال'}
+      </button>
+    </form>
+  );
+};
+
+export default AddIncomeForm;
+
+ 
+
+
+
+

@@ -13,9 +13,15 @@ import {
 import { MoreVertical } from "lucide-react";
 import BASE_URL from "@/config/api";
 
+
+import axios from 'axios';
+
+
+
 const Staff = () => {
   const dispatch = useDispatch();
   const staff = useSelector((state) => state.staff.items || []);
+  console.log(staff)
   const [selectedShift, setSelectedShift] = useState(null);
   const [modalType, setModalType] = useState(""); // 'view' | 'edit' | 'delete' | 'add'
   const [formData, setFormData] = useState({}); // Form inputs for add/edit
@@ -29,6 +35,61 @@ const Staff = () => {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [clubs, setClubs] = useState([]);
+  const [selectedClubId, setSelectedClubId] = useState('');
+  const [selectedClubUsers, setSelectedClubUsers] = useState([]);
+
+  // Fetch users grouped by club
+  useEffect(() => {
+    const fetchUsersGroupedByClub = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const headers = {
+          Authorization: `Bearer ${token}`,
+        };
+  
+        const response = await axios.get(`${BASE_URL}/accounts/api/users/`, { headers });
+        const users = response.data;
+  
+        const clubsMap = {};
+  
+        users.forEach(user => {
+          const { club } = user;
+          if (!club) return;
+  
+          if (!clubsMap[club.id]) {
+            clubsMap[club.id] = {
+              club_id: club.id,
+              club_name: club.name,
+              club_logo: club.logo,
+              users: []
+            };
+          }
+  
+          clubsMap[club.id].users.push({
+            id: user.id,
+            username: user.username,
+            first_name: user.first_name,
+            last_name: user.last_name
+          });
+        });
+  
+        const clubArray = Object.values(clubsMap);
+        setClubs(clubArray);
+      } catch (error) {
+        console.error('Failed to fetch users:', error);
+      }
+    };
+  
+    fetchUsersGroupedByClub();
+  }, []);
+
+  const handleClubChange = (e) => {
+    const clubId = e.target.value;
+    setSelectedClubId(clubId);
+    const selected = clubs.find(c => c.club_id.toString() === clubId);
+    setSelectedClubUsers(selected ? selected.users : []);
+  };
 
   // Fetch user profile to get club details
   useEffect(() => {
@@ -46,13 +107,19 @@ const Staff = () => {
         setUserClub(club);
         setFilters((prev) => ({ ...prev, club: club.id.toString() }));
         setFormData((prev) => ({ ...prev, club: club.id.toString() }));
+        setSelectedClubId(club.id.toString());
+        // Find and set users for the user's club
+        const userClubData = clubs.find(c => c.club_id === club.id);
+        if (userClubData) {
+          setSelectedClubUsers(userClubData.users);
+        }
         setLoadingProfile(false);
       })
       .catch((err) => {
         console.error("Failed to fetch user profile:", err);
         setLoadingProfile(false);
       });
-  }, []);
+  }, [clubs]);
 
   // Fetch staff data
   useEffect(() => {
@@ -113,6 +180,11 @@ const Staff = () => {
           ? `${shift.approved_by_details.id}`
           : null,
       });
+      // Set the selected club and users for edit modal
+      const clubId = userClub?.id?.toString() || shift.club_details.id.toString();
+      setSelectedClubId(clubId);
+      const selected = clubs.find(c => c.club_id.toString() === clubId);
+      setSelectedClubUsers(selected ? selected.users : []);
     } else if (type === "add") {
       setFormData({
         date: "",
@@ -318,10 +390,8 @@ const Staff = () => {
                       {`${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`}
                     </td>
                     <td className="p-2 sm:p-3">
-                      {shift.approved_by_details
-                        ? `${shift.approved_by_details.first_name} ${shift.approved_by_details.last_name}`
-                        : "غير موافق عليه"}
-                    </td>
+  {shift.approved_by_details ? shift.approved_by_details.username : "غير موافق عليه"}
+</td>
                     <td className="p-2 sm:p-3 flex gap-2 justify-center">
                       <DropdownMenu dir="rtl">
                         <DropdownMenuTrigger asChild>
@@ -536,39 +606,63 @@ const Staff = () => {
                 <select
                   name="club"
                   value={formData.club || ""}
-                  onChange={handleFormChange}
+                  onChange={(e) => {
+                    handleFormChange(e);
+                    handleClubChange(e);
+                  }}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
                   required
-                  disabled
                 >
-                  {userClub ? (
-                    <option value={userClub.id}>{userClub.name}</option>
-                  ) : (
-                    <option value="">جاري التحميل...</option>
-                  )}
+                  <option value="">اختر نادي</option>
+                  {clubs.map(club => (
+                    <option key={club.club_id} value={club.club_id}>
+                      {club.club_name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">الموظف (معرف)</label>
-                <input
-                  type="number"
+                <label className="block text-sm font-medium mb-1">الموظف</label>
+                <select
                   name="staff"
                   value={formData.staff || ""}
                   onChange={handleFormChange}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-                  placeholder="أدخل معرف الموظف"
-                />
+                  required
+                  disabled={!formData.club}
+                >
+                  <option value="">اختر موظف</option>
+                  {selectedClubUsers.length > 0 ? (
+                    selectedClubUsers.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.first_name} {user.last_name} ({user.username})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">لا يوجد موظفين متاحين</option>
+                  )}
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة (معرف)</label>
-                <input
-                  type="number"
+                <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
+                <select
                   name="approved_by"
                   value={formData.approved_by || ""}
                   onChange={handleFormChange}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-                  placeholder="أدخل معرف الموافق"
-                />
+                  disabled={!formData.club}
+                >
+                  <option value="">اختر موافق</option>
+                  {selectedClubUsers.length > 0 ? (
+                    selectedClubUsers.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.first_name} {user.last_name} ({user.username})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">لا يوجد موظفين متاحين</option>
+                  )}
+                </select>
               </div>
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -581,7 +675,7 @@ const Staff = () => {
                 <button
                   type="submit"
                   className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                  disabled={!userClub}
+                  disabled={!formData.club || !formData.staff || !formData.date || !formData.shift_start || !formData.shift_end}
                 >
                   إضافة
                 </button>
@@ -646,39 +740,61 @@ const Staff = () => {
                 <select
                   name="club"
                   value={formData.club || ""}
-                  onChange={handleFormChange}
+                  onChange={(e) => {
+                    handleFormChange(e);
+                    handleClubChange(e);
+                  }}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
                   required
                   disabled
                 >
-                  {userClub ? (
-                    <option value={userClub.id}>{userClub.name}</option>
-                  ) : (
-                    <option value="">جاري التحميل...</option>
-                  )}
+                  {clubs.map(club => (
+                    <option key={club.club_id} value={club.club_id}>
+                      {club.club_name}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">الموظف (معرف)</label>
-                <input
-                  type="number"
+                <label className="block text-sm font-medium mb-1">الموظف</label>
+                <select
                   name="staff"
                   value={formData.staff || ""}
                   onChange={handleFormChange}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-                  placeholder="أدخل معرف الموظف"
-                />
+                  required
+                >
+                  <option value="">اختر موظف</option>
+                  {selectedClubUsers.length > 0 ? (
+                    selectedClubUsers.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.first_name} {user.last_name} ({user.username})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">لا يوجد موظفين متاحين</option>
+                  )}
+                </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة (معرف)</label>
-                <input
-                  type="number"
+                <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
+                <select
                   name="approved_by"
                   value={formData.approved_by || ""}
                   onChange={handleFormChange}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-                  placeholder="أدخل معرف الموافق"
-                />
+                >
+                  <option value="">اختر موافق</option>
+                  {selectedClubUsers.length > 0 ? (
+                    selectedClubUsers.map(user => (
+                      <option key={user.id} value={user.id}>
+                        {user.first_name} {user.last_name} ({user.username})
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">لا يوجد موظفين متاحين</option>
+                  )}
+                </select>
               </div>
               <div className="mt-4 flex justify-end gap-2">
                 <button

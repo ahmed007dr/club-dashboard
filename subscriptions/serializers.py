@@ -1,11 +1,6 @@
 from rest_framework import serializers
 from .models import Subscription, SubscriptionType
 
-# class SubscriptionSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Subscription
-#         fields = '__all__'
-
 class SubscriptionTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = SubscriptionType
@@ -39,6 +34,9 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, data):
-        if data['start_date'] > data['end_date']:
-            raise serializers.ValidationError("End date must be after start date")
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+
+        if start_date and end_date and start_date > end_date:
+            raise serializers.ValidationError("End date must be after start date.")
         return data

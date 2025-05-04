@@ -40,7 +40,6 @@ const Attendance = () => {
     const { subscriptions, status, error, updateStatus } = useSelector(
       (state) => state.subscriptions
     );
-  console.log(attendances);
   const {
     entryLogs,
     loading: entryLogsLoading,
@@ -204,7 +203,6 @@ const Attendance = () => {
   useEffect(() => {
     dispatch(fetchSubscriptions());
   }, [dispatch]);
-  console.log(subscriptions);
 
   return (
     <div className="space-y-6" dir="rtl">

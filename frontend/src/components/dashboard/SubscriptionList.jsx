@@ -25,6 +25,8 @@ const SubscriptionList = () => {
     (state) => state.subscriptions
   );
 
+  console.log("Subscriptions:", subscriptions);
+
   // State management
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -41,7 +43,7 @@ const SubscriptionList = () => {
     status: '',
     startDate: '',
     endDate: '',
-    clubId: '',
+    clubName: '', 
     attendanceDays: '',
   });
 
@@ -74,8 +76,10 @@ const SubscriptionList = () => {
       ? subscriptionEndDate.setHours(0, 0, 0, 0) ===
         filterEndDate.setHours(0, 0, 0, 0)
       : true;
-    const matchesClubId = filters.clubId
-      ? subscription.club === parseInt(filters.clubId)
+      const matchesClubName = filters.clubName
+      ? subscription.club_name
+          .toLowerCase()
+          .includes(filters.clubName.toLowerCase())
       : true;
     const matchesAttendanceDays = filters.attendanceDays
       ? subscription.attendance_days === parseInt(filters.attendanceDays)
@@ -85,7 +89,7 @@ const SubscriptionList = () => {
       matchesStatus &&
       matchesStartDate &&
       matchesEndDate &&
-      matchesClubId &&
+      matchesClubName&&
       matchesAttendanceDays
     );
   });
@@ -122,7 +126,7 @@ const SubscriptionList = () => {
       status: '',
       startDate: '',
       endDate: '',
-      clubId: '',
+      clubName: '',  
       attendanceDays: '',
     });
     setCurrentPage(1);
@@ -288,21 +292,20 @@ const SubscriptionList = () => {
           />
         </div>
 
-        {/* Club ID Filter */}
-        <div className="flex flex-col w-56">
-          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
-            معرف النادي
-          </label>
-          <input
-            type="number"
-            name="clubId"
-            value={filters.clubId}
-            onChange={handleFilterChange}
-            placeholder="تصفية حسب معرف النادي"
-            min="1"
-            className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
-          />
-        </div>
+    {/* Club Name Filter - Replaced Club ID Filter */}
+<div className="flex flex-col w-56">
+  <label className="text-sm font-medium text-gray-700 mb-1 text-right">
+    اسم النادي
+  </label>
+  <input
+    type="text"
+    name="clubName"
+    value={filters.clubName}
+    onChange={handleFilterChange}
+    placeholder="بحث باسم النادي"
+    className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
+  />
+</div>
 
         {/* Attendance Days Filter */}
         <div className="flex flex-col w-56">
@@ -363,7 +366,6 @@ const SubscriptionList = () => {
                 <th className="py-2 px-4 text-right">المبلغ المدفوع</th>
                 <th className="py-2 px-4 text-right">المبلغ المتبقي</th>
                 <th className="py-2 px-4 text-right">الحالة</th>
-                <th className="py-2 px-4 text-right">المبلغ</th>
                 <th className="py-2 px-4 text-center">الدفع</th>
                 <th className="py-2 px-4 text-right">الإجراءات</th>
               </tr>

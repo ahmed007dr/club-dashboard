@@ -6,6 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .serializers import UserSerializer, UserProfileSerializer, LoginSerializer
 from utils.permissions import IsOwnerOrRelatedToClub  
+from .models import User
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -47,4 +48,17 @@ def api_logout(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_profile(request):
     serializer = UserProfileSerializer(request.user)
+    return Response(serializer.data)
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def api_user_list(request):
+    if request.user.role == 'owner':
+        users = User.objects.all()
+    else:
+        users = User.objects.filter(club=request.user.club)
+
+    serializer = UserProfileSerializer(users, many=True)
     return Response(serializer.data)

@@ -38,7 +38,7 @@ class IncomeSourceSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = IncomeSource
-        fields = ['id', 'club', 'club_details', 'name', 'description']
+        fields = '__all__'
 
 class IncomeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
