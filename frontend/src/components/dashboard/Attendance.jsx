@@ -36,7 +36,7 @@ const Attendance = () => {
     loading: attendanceLoading,
     error: attendanceError,
   } = useSelector((state) => state.attendance);
-
+  
     const { subscriptions, status, error, updateStatus } = useSelector(
       (state) => state.subscriptions
     );
@@ -342,7 +342,7 @@ const Attendance = () => {
                             <td className="px-4 py-3 text-sm">{attendance.subscription}</td>
                             <td className="px-4 py-3 text-sm">{attendance.attendance_date}</td>
                             <td className="px-4 py-3 text-sm">
-                              {attendance.member_details?.name || "غير متاح"}
+                              {attendance.member_name || "غير متاح"}
                             </td>
                             <td className="px-4 py-3 text-sm">
                               <DropdownMenu dir="rtl">
