@@ -157,7 +157,7 @@ const AddMember = () => {
         <div>
           <button
             type="submit"
-            className="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 transition"
+            className="btn"
           >
             Add Member
           </button>
