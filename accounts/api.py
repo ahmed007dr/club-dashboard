@@ -50,8 +50,6 @@ def api_user_profile(request):
     serializer = UserProfileSerializer(request.user)
     return Response(serializer.data)
 
-
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_list(request):
