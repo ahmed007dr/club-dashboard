@@ -8,21 +8,25 @@ import { useSelector, useDispatch } from "react-redux";
 import { deleteMember, editMember, fetchUsers, searchMember } from "../../redux/slices/memberSlice";
 import { IoAddOutline } from "react-icons/io5";
 
+
+
 const Members = () => {
-  const [data, setData] = useState([{
-    id: "4",
-    photo: "https://i.pravatar.cc/100?img=11",
-    name: "ahmed El-Zahrani",
-    membership_number: "1008",
-    national_id: "102030405066",
-    phone: "0101234566",
-    club_name: "Sports Club"
-  }]);
+  const [data, setData] = useState([
+    {
+      id: '4',
+      photo: 'https://i.pravatar.cc/100?img=11',
+      name: 'ahmed El-Zahrani',
+      membership_number: '1008',
+      national_id: '102030405066',
+      phone: '0101234566',
+      club_name: 'Sports Club',
+    },
+  ]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState(null);
   const [searchResult, setSearchResult] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -30,34 +34,41 @@ const Members = () => {
 
   const members = useSelector((state) => state.member.items).results;
   const dispatch = useDispatch();
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const fetchedData = await dispatch(fetchUsers()).unwrap();
-        setSearchResult(fetchedData.results);
-        setData(fetchedData.results);
+        // Sort by id in descending order (newest to oldest)
+        const sortedData = [...fetchedData.results].sort((a, b) => b.id - a.id);
+        setSearchResult(sortedData);
+        setData(sortedData);
       } catch (error) {
-        setError("Failed to fetch members. Please try again later: " + error.message);
+        setError('Failed to fetch members. Please try again later: ' + error.message);
       }
     };
 
     fetchData();
-  }, []);
+  }, [dispatch]);
 
   const handleSearch = async (e) => {
     const query = e.target.value.toLowerCase();
     setSearchQuery(query);
     setCurrentPage(1); // Reset to first page on search
 
-    if (query.trim() === "") {
-      setSearchResult(data);
+    if (query.trim() === '') {
+      // Sort data by id in descending order when resetting search
+      const sortedData = [...data].sort((a, b) => b.id - a.id);
+      setSearchResult(sortedData);
       return;
     }
     try {
       const result = await dispatch(searchMember(query)).unwrap();
-      setSearchResult(result);
+      // Sort search results by id in descending order
+      const sortedResult = [...result].sort((a, b) => b.id - a.id);
+      setSearchResult(sortedResult);
     } catch (error) {
-      setError("Failed to search members. Please try again later: " + error);
+      setError('Failed to search members. Please try again later: ' + error);
     }
   };
 
@@ -68,23 +79,25 @@ const Members = () => {
 
   const confirmDelete = async () => {
     if (!selectedMember) {
-      setError("No member selected for deletion.");
+      setError('No member selected for deletion.');
       return;
     }
 
     try {
       await dispatch(deleteMember(selectedMember.id)).unwrap();
       const updatedData = data.filter((m) => m.id !== selectedMember.id);
-      setData(updatedData);
-      setSearchResult(updatedData);
+      // Sort updated data by id in descending order
+      const sortedUpdatedData = [...updatedData].sort((a, b) => b.id - a.id);
+      setData(sortedUpdatedData);
+      setSearchResult(sortedUpdatedData);
       setIsDeleteModalOpen(false);
       // Adjust current page if necessary
-      const totalPages = Math.ceil(updatedData.length / itemsPerPage);
+      const totalPages = Math.ceil(sortedUpdatedData.length / itemsPerPage);
       if (currentPage > totalPages) {
         setCurrentPage(totalPages || 1);
       }
     } catch (error) {
-      setError("Failed to delete member. Please try again later: " + error.message);
+      setError('Failed to delete member. Please try again later: ' + error.message);
     }
   };
 
@@ -102,8 +115,10 @@ const Members = () => {
       m.id === selectedMember.id ? selectedMember : m
     );
     dispatch(editMember({ id: selectedMember.id, updatedUser: selectedMember }));
-    setData(updatedData);
-    setSearchResult(updatedData);
+    // Sort updated data by id in descending order
+    const sortedUpdatedData = [...updatedData].sort((a, b) => b.id - a.id);
+    setData(sortedUpdatedData);
+    setSearchResult(sortedUpdatedData);
     setIsEditModalOpen(false);
   };
 
@@ -123,7 +138,6 @@ const Members = () => {
       <div className="flex items-start space-x-3">
         <RiGroupLine className="text-2xl" />
         <h2 className="text-2xl font-semibold mb-4">الأعضاء</h2>
-
       </div>
       {error && <p className="text-red-500 mb-4">{error}</p>}
       <input
@@ -131,79 +145,83 @@ const Members = () => {
         value={searchQuery}
         onChange={handleSearch}
         placeholder="ابحث بالاسم، رقم العضوية، أو الرقم القومي"
-
         className="border p-2 rounded-md mb-4 w-full"
       />
       <div className="flex justify-end mb-4">
-      <button
-  onClick={openAddModal}
-  className="flex justify-end text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
->
-  <IoAddOutline className="flex inline-block text-xl" />
-  إضافة عضو
-</button>
-
+        <button
+          onClick={openAddModal}
+          className="flex justify-end text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+        >
+          <IoAddOutline className="flex inline-block text-xl" />
+          إضافة عضو
+        </button>
       </div>
 
       <table className="min-w-full border border-gray-200">
-      <thead className="text-right">
-  <tr>
-    <th className="p-3 border-b">#</th>
-    <th className="p-3 border-b">الصورة</th>
-    <th className="p-3 border-b">الاسم</th>
-    <th className="p-3 border-b">رقم العضوية</th>
-    <th className="p-3 border-b">الرقم القومي</th>
-    <th className="p-3 border-b">الهاتف</th>
-    <th className="p-3 border-b">اسم النادي</th>
-    <th className="p-3 border-b">الإجراءات</th>
-  </tr>
-</thead>
-
+        <thead className="text-right">
+          <tr>
+            <th className="p-3 border-b">#</th>
+            <th className="p-3 border-b">الصورة</th>
+            <th className="p-3 border-b">الاسم</th>
+            <th className="p-3 border-b">رقم العضوية</th>
+            <th className="p-3 border-b">الرقم القومي</th>
+            <th className="p-3 border-b">الهاتف</th>
+            <th className="p-3 border-b">اسم النادي</th>
+            <th className="p-3 border-b">الإجراءات</th>
+          </tr>
+        </thead>
         <tbody>
-          {Array.isArray(currentItems) && currentItems.map((member, index) => (
-            <tr key={member.id}>
-              <td className="p-3 border-b">{indexOfFirstItem + index + 1}</td>
-              <td className="p-3 border-b">
-                <Link to={`/member/${member.id}`}>
-                  <img
-                    src={member.photo ? member.photo : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"}
-                    alt="member"
-                    className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
-                  />
-                </Link>
-              </td>
-              <td className="p-3 border-b">{member.name}</td>
-              <td className="p-3 border-b">{member.membership_number}</td>
-              <td className="p-3 border-b">{member.national_id}</td>
-              <td className="p-3 border-b">{member.phone}</td>
-              <td className="p-3 border-b">{member.club_name}</td>
-              <td className="p-3 border-b">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEditClick(member)}
-                    className="text-green-700 text-xl"
-                    title="Edit"
-                  >
-                    <CiEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteClick(member)}
-                    className="text-red-500 text-xl"
-                    title="Delete"
-                  >
-                    <CiTrash />
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
+          {Array.isArray(currentItems) &&
+            currentItems.map((member, index) => (
+              <tr key={member.id}>
+                <td className="p-3 border-b">{indexOfFirstItem + index + 1}</td>
+                <td className="p-3 border-b">
+                  <Link to={`/member/${member.id}`}>
+                    <img
+                      src={
+                        member.photo
+                          ? member.photo
+                          : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s'
+                      }
+                      alt="member"
+                      className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
+                    />
+                  </Link>
+                </td>
+                <td className="p-3 border-b">{member.name}</td>
+                <td className="p-3 border-b">{member.membership_number}</td>
+                <td className="p-3 border-b">{member.national_id}</td>
+                <td className="p-3 border-b">{member.phone}</td>
+                <td className="p-3 border-b">{member.club_name}</td>
+                <td className="p-3 border-b">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEditClick(member)}
+                      className="text-green-700 text-xl"
+                      title="Edit"
+                    >
+                      <CiEdit />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteClick(member)}
+                      className="text-red-500 text-xl"
+                      title="Delete"
+                    >
+                      <CiTrash />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
         </tbody>
       </table>
 
       {/* Pagination Controls */}
       <div className="flex justify-between items-center mt-4">
         <div>
-          Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, searchResult.length)} of {searchResult.length} members
+          Showing {indexOfFirstItem + 1} to{' '}
+          {Math.min(indexOfLastItem, searchResult.length)} of {searchResult.length}{' '}
+          members
         </div>
         <div className="flex gap-2">
           <button
@@ -217,7 +235,9 @@ const Members = () => {
             <button
               key={page}
               onClick={() => paginate(page)}
-              className={`px-3 py-1 rounded ${currentPage === page ? 'bg-blue-700 text-white' : 'bg-gray-200'}`}
+              className={`px-3 py-1 rounded ${
+                currentPage === page ? 'bg-blue-700 text-white' : 'bg-gray-200'
+              }`}
             >
               {page}
             </button>
@@ -234,9 +254,12 @@ const Members = () => {
 
       {/* Add Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(255, 255, 255, 0.2)]">
+        <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0 был:2)] dark:bg-[rgba(255, 255, 255, 0.2)]">
           <div className="bg-white p-6 rounded-lg w-1/3 relative">
-            <button onClick={closeAddModal} className="absolute top-2 right-3 text-xl">
+            <button
+              onClick={closeAddModal}
+              className="absolute top-2 right-3 text-xl"
+            >
               ×
             </button>
             <AddMember />
@@ -248,12 +271,13 @@ const Members = () => {
       {isDeleteModalOpen && (
         <div
           className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(249, 236, 236, 0.2)]"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
         >
           <div className="modal relative">
             <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
             <p>
-              Are you sure you want to delete <strong>{selectedMember?.name}</strong>?
+              Are you sure you want to delete{' '}
+              <strong>{selectedMember?.name}</strong>?
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -274,7 +298,7 @@ const Members = () => {
       {isEditModalOpen && selectedMember && (
         <div
           className="fixed inset-0 flex justify-center items-center z-40"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
         >
           <div className="modal relative">
             <h3 className="text-lg font-semibold mb-4">Edit Member</h3>

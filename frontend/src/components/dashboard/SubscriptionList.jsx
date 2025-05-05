@@ -338,7 +338,7 @@ const SubscriptionList = () => {
             <option value="">كل الحالات</option>
             <option value="Active">نشط</option>
             <option value="Expired">منتهي</option>
-            <option value="Pending">قيد الانتظار</option>
+            <option value="Upcoming">قادمة</option>
           </select>
         </div>
 
