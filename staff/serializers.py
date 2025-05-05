@@ -3,13 +3,14 @@ from .models import Shift
 from core.serializers import ClubSerializer
 from accounts.serializers import UserSerializer
 from .models import StaffAttendance
-
+from datetime import datetime
+from django.utils import timezone
 
 class ShiftSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     staff_details = UserSerializer(source='staff', read_only=True)
     approved_by_details = UserSerializer(source='approved_by', read_only=True)
-    
+
     class Meta:
         model = Shift
         fields = [
@@ -24,14 +25,17 @@ class ShiftSerializer(serializers.ModelSerializer):
             'approved_by',
             'approved_by_details'
         ]
+        read_only_fields = ['date', 'shift_start']
         extra_kwargs = {
             'approved_by': {'required': False}
         }
 
     def validate(self, data):
-        if data.get('shift_start') and data.get('shift_end'):
-            if data['shift_start'] >= data['shift_end']:
-                raise serializers.ValidationError("Shift end time must be after start time")
+        shift_end = data.get('shift_end')
+        if shift_end:
+            now_time = timezone.now().time()
+            if now_time >= shift_end:
+                raise serializers.ValidationError("Shift end time must be after current time")
         return data
 
 class StaffAttendanceSerializer(serializers.ModelSerializer):
