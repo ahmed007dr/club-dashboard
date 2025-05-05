@@ -14,7 +14,7 @@ import { BsPeopleFill } from "react-icons/bs";
 import { Link } from "react-router-dom";
 import { RiVipCrown2Line } from "react-icons/ri";
 import { IoTicketOutline } from "react-icons/io5";
-import IncomeSourcesList from "./IncomeSourcesList";
+import SubscriptionStats from "./SubscriptionStats";
 import SubscriptionChart from "./SubscriptionChart";
 import ShiftsPerClubChart from "./ShiftsPerClubChart ";
 import ExpenseCategories from "./ExpenseCategories"
@@ -212,7 +212,7 @@ const Main = () => {
       {/* Subscription Stats and Chart Section */}
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4 sm:gap-6 mt-6">
         <div className="w-full sm:w-1/2">
-          <IncomeSourcesList />
+          <SubscriptionStats />
         </div>
         <div className="w-full sm:w-1/2">
           <SubscriptionChart />
