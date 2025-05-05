@@ -12,6 +12,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
     membership_number = serializers.SerializerMethodField()
     member_name = serializers.SerializerMethodField()
     subscription_details = SubscriptionSerializer(source='subscription', read_only=True)
+    read_only_fields = ['attendance_date']
 
     class Meta:
         model = Attendance

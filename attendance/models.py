@@ -9,7 +9,8 @@ User = get_user_model()
 
 class Attendance(models.Model):
     subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='attendances')
-    attendance_date = models.DateField(default=timezone.now)
+    attendance_date = models.DateField(auto_now_add=True)
+    # attendance_date =models.DateField(default=timezone.now)
 
     def __str__(self):
         return f"{self.subscription.member.name} - {self.attendance_date}"

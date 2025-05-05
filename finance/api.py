@@ -70,9 +70,9 @@ def expense_api(request):
 def income_source_api(request):
     if request.method == 'GET':
         if request.user.role == 'owner':
-            sources = IncomeSource.objects.all()  
+            sources = IncomeSource.objects.all()
         else:
-            sources = IncomeSource.objects.filter(club=request.user.club)  
+            sources = IncomeSource.objects.filter(club=request.user.club)
 
         serializer = IncomeSourceSerializer(sources, many=True)
         return Response(serializer.data)
@@ -82,7 +82,7 @@ def income_source_api(request):
         if serializer.is_valid():
             source = serializer.save()
             if not IsOwnerOrRelatedToClub().has_object_permission(request, None, source):
-                source.delete() 
+                source.delete()
                 return Response({'error': 'You do not have permission to create an income source for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
