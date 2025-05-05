@@ -14,17 +14,24 @@ export const fetchEntryLogs = createAsyncThunk(
           'Content-Type': 'application/json',
         },
       });
+
       if (!response.ok) {
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch entry logs.');
       }
+
       const data = await response.json();
+
+      // ✅ Log fetched data after successful response
+      console.log('Fetched entry logs:', data);
+
       return data;
     } catch (error) {
       return rejectWithValue(error.message);
     }
   }
 );
+
 
 // Async thunk for adding entry log
 export const addEntryLog = createAsyncThunk(

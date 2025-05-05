@@ -30,23 +30,9 @@ class Expense(models.Model):
         return f"{self.category.name} - {self.amount}"
 
 class IncomeSource(models.Model):
-    Renewal = 'Renewal'
-    Subscription = 'Subscription'
-    ticket_sales = 'ticket_sales'
-    SPONSORSHIPS = 'SPONSORSHIPS' 
-    EVENTS = 'EVENTS'  
-
-    INCOME_SOURCE_CHOICES = [
-        (Renewal, 'Renewal'),
-        (Subscription, 'Subscription'),
-        (ticket_sales, 'ticket_sales'),
-        (SPONSORSHIPS, 'Sponsorships'), 
-        (EVENTS, 'Events'), 
-
-    ]
     
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
-    name = models.CharField(max_length=100, choices=INCOME_SOURCE_CHOICES)
+    name = models.CharField(max_length=100)  
     description = models.TextField(blank=True)
 
     def __str__(self):
@@ -60,6 +46,7 @@ class Income(models.Model):
     date = models.DateField()
     received_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     related_receipt = models.ForeignKey('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True)
+    # ticket = models.OneToOneField('tickets.Ticket', null=True, blank=True, on_delete=models.SET_NULL, related_name='income')
 
     def __str__(self):
         return f"{self.source.name} - {self.amount}"

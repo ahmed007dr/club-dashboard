@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { addSubscriptionType } from '../../redux/slices/subscriptionsSlice';
 
-const CreateSubscriptionTypes  = () => {
+const CreateSubscriptionTypes = () => {
   const dispatch = useDispatch();
   const [formData, setFormData] = useState({
     name: '',
     price: '',
-    durationDays: '',
-    include_gym: false,
-    include_pool: false,
-    include_classes: false,
+    duration_days: '',
+    includes_gym: false,
+    includes_pool: false,
+    includes_classes: false,
   });
 
   const [error, setError] = useState(null);
@@ -27,29 +27,26 @@ const CreateSubscriptionTypes  = () => {
     e.preventDefault();
     setError(null);
 
-    // Prepare data in the format expected by the backend
-    const submissionData = {
-      name: formData.name.trim(),
-      price: formData.price ? parseFloat(formData.price) : 0,
-      duration_days: formData.durationDays ? parseInt(formData.durationDays, 10) : 0,
-      include_gym: formData.include_gym,
-      include_pool: formData.include_pool,
-      include_classes: formData.include_classes,
-    };
-
     // Basic validation
-    if (!submissionData.name) {
+    if (!formData.name.trim()) {
       setError('Name is required');
       return;
     }
-    if (submissionData.duration_days <= 0) {
+    if (parseInt(formData.duration_days) <= 0) {
       setError('Duration must be positive');
       return;
     }
-    if (submissionData.price < 0) {
+    if (parseFloat(formData.price) < 0) {
       setError('Price cannot be negative');
       return;
     }
+
+    const submissionData = {
+      ...formData,
+      name: formData.name.trim(),
+      price: parseFloat(formData.price),
+      duration_days: parseInt(formData.duration_days, 10),
+    };
 
     try {
       await dispatch(addSubscriptionType(submissionData)).unwrap();
@@ -58,12 +55,11 @@ const CreateSubscriptionTypes  = () => {
       setFormData({
         name: '',
         price: '',
-        durationDays: '',
-        include_gym: false,
-        include_pool: false,
-        include_classes: false,
+        duration_days: '',
+        includes_gym: false,
+        includes_pool: false,
+        includes_classes: false,
       });
-    console.log(setFormData)
     } catch (err) {
       console.error('Failed to create subscription:', err);
       setError(err.message || 'Failed to create subscription');
@@ -71,28 +67,28 @@ const CreateSubscriptionTypes  = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="modal">
+    <form onSubmit={handleSubmit} className="max-w-md mx-auto bg-white p-6 rounded shadow">
       <h2 className="text-2xl font-bold text-center mb-6">Create New Subscription Type</h2>
-      
+
       {error && (
         <div className="p-3 bg-red-100 text-red-700 rounded mb-4">
           {error}
         </div>
       )}
 
-      <div>
+      <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
         <input
           type="text"
           name="name"
           value={formData.name}
           onChange={handleChange}
-          className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          className="w-full p-2 border border-gray-300 rounded-md"
           required
         />
       </div>
 
-      <div>
+      <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
         <input
           type="number"
@@ -101,54 +97,54 @@ const CreateSubscriptionTypes  = () => {
           step="0.01"
           value={formData.price}
           onChange={handleChange}
-          className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          className="w-full p-2 border border-gray-300 rounded-md"
           required
         />
       </div>
 
-      <div>
+      <div className="mb-4">
         <label className="block text-sm font-medium text-gray-700 mb-1">Duration (days)</label>
         <input
           type="number"
-          name="durationDays"
+          name="duration_days"
           min="1"
-          value={formData.durationDays}
+          value={formData.duration_days}
           onChange={handleChange}
-          className="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          className="w-full p-2 border border-gray-300 rounded-md"
           required
         />
       </div>
 
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Facilities Included:</label>
-        <div className="flex items-center space-x-4">
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Facilities Included:</label>
+        <div className="space-y-2">
           <label className="inline-flex items-center">
             <input
               type="checkbox"
-              name="include_gym"
-              checked={formData.include_gym}
+              name="includes_gym"
+              checked={formData.includes_gym}
               onChange={handleChange}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              className="h-4 w-4 text-blue-600"
             />
             <span className="ml-2 text-sm text-gray-700">Gym</span>
           </label>
           <label className="inline-flex items-center">
             <input
               type="checkbox"
-              name="include_pool"
-              checked={formData.include_pool}
+              name="includes_pool"
+              checked={formData.includes_pool}
               onChange={handleChange}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              className="h-4 w-4 text-blue-600"
             />
             <span className="ml-2 text-sm text-gray-700">Pool</span>
           </label>
           <label className="inline-flex items-center">
             <input
               type="checkbox"
-              name="include_classes"
-              checked={formData.include_classes}
+              name="includes_classes"
+              checked={formData.includes_classes}
               onChange={handleChange}
-              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              className="h-4 w-4 text-blue-600"
             />
             <span className="ml-2 text-sm text-gray-700">Classes</span>
           </label>
@@ -157,7 +153,7 @@ const CreateSubscriptionTypes  = () => {
 
       <button
         type="submit"
-        className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
       >
         Create Subscription
       </button>
@@ -165,6 +161,7 @@ const CreateSubscriptionTypes  = () => {
   );
 };
 
-export default CreateSubscriptionTypes ;       
+export default CreateSubscriptionTypes;
+     
 
 

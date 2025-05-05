@@ -26,6 +26,7 @@ import {
   fetchSubscriptions,
   
 } from "../../redux/slices/subscriptionsSlice";
+import EntryForm from "./EntryForm";
 
 const Attendance = () => {
   const dispatch = useDispatch();
@@ -36,11 +37,10 @@ const Attendance = () => {
     loading: attendanceLoading,
     error: attendanceError,
   } = useSelector((state) => state.attendance);
-
+  
     const { subscriptions, status, error, updateStatus } = useSelector(
       (state) => state.subscriptions
     );
-  console.log(attendances);
   const {
     entryLogs,
     loading: entryLogsLoading,
@@ -204,7 +204,6 @@ const Attendance = () => {
   useEffect(() => {
     dispatch(fetchSubscriptions());
   }, [dispatch]);
-  console.log(subscriptions);
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -344,7 +343,7 @@ const Attendance = () => {
                             <td className="px-4 py-3 text-sm">{attendance.subscription}</td>
                             <td className="px-4 py-3 text-sm">{attendance.attendance_date}</td>
                             <td className="px-4 py-3 text-sm">
-                              {attendance.member_details?.name || "غير متاح"}
+                              {attendance.member_name || "غير متاح"}
                             </td>
                             <td className="px-4 py-3 text-sm">
                               <DropdownMenu dir="rtl">
@@ -446,45 +445,20 @@ const Attendance = () => {
 
               {/* Entry Log Dialog */}
               {isEntryLogDialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                  <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
-                    <button
-                      onClick={() => setIsEntryLogDialogOpen(false)}
-                      className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                    <h3 className="text-lg font-semibold mb-4">إضافة سجل دخول</h3>
-                    <form onSubmit={handleAddEntryLog} className="space-y-4">
-                      <div>
-                        <label className="block text-sm mb-1">رقم النادي</label>
-                        <input
-                          type="text"
-                          name="club"
-                          value={newEntryLog.club}
-                          onChange={handleEntryLogInputChange}
-                          className="border px-3 py-2 rounded w-full"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm mb-1">رقم العضو</label>
-                        <input
-                          type="text"
-                          name="member"
-                          value={newEntryLog.member}
-                          onChange={handleEntryLogInputChange}
-                          className="border px-3 py-2 rounded w-full"
-                          required
-                        />
-                      </div>
-                      <Button type="submit" className="w-full bg-green-500">
-                        إضافة سجل الدخول
-                      </Button>
-                    </form>
-                  </div>
-                </div>
-              )}
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
+      <button
+        onClick={() => setIsEntryLogDialogOpen(false)}
+        className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
+      >
+        ×
+      </button>
+      <h3 className="text-lg font-semibold mb-4">إضافة سجل دخول</h3>
+      <EntryForm />
+    </div>
+  </div>
+)}
+
 
               {/* Entry Logs Table */}
               {entryLogsLoading && <p>جاري تحميل سجلات الدخول...</p>}
@@ -514,7 +488,7 @@ const Attendance = () => {
                               {log.club_details?.name || "غير متاح"}
                             </td>
                             <td className="px-4 py-3 text-sm">
-                              {log.member_details?.name || "غير متاح"}
+                              {log.member_name || "غير متاح"}
                             </td>
                             <td className="px-4 py-3 text-sm">{log.timestamp}</td>
                           </tr>
