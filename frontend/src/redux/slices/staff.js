@@ -24,18 +24,33 @@ export const fetchStaff = createAsyncThunk('staff/fetchStaff', async () => {
 });
 
 // Add staff
-export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff) => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${BASE_URL}/staff/api/shifts/add/`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(newStaff),
-    });
-    const data = await res.json();
-    return data;
+export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff, { rejectWithValue }) => {
+    try {
+        const token = localStorage.getItem('token');
+        console.log('Attempting to add staff shift with data:', newStaff);
+        
+        const res = await fetch(`${BASE_URL}/staff/api/shifts/add/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(newStaff),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            console.error('Failed to add staff shift. Server responded with:', data);
+            return rejectWithValue(data);
+        }
+
+        console.log('Successfully added staff shift:', data);
+        return data;
+    } catch (error) {
+        console.error('Error while adding staff shift:', error);
+        return rejectWithValue(error.response ? error.response.data : error.message);
+    }
 });
 
 // Edit staff

@@ -26,6 +26,8 @@ export const addAttendance = createAsyncThunk(
   'attendance/addAttendance',
   async (newAttendance, { rejectWithValue }) => {
     try {
+      console.log('Sending attendance data:', newAttendance); // Log the data being sent
+
       const token = localStorage.getItem('token');
       const response = await axios.post(`${BASE_URL}/attendance/api/attendances/add/`, newAttendance, {
         headers: {
@@ -33,12 +35,17 @@ export const addAttendance = createAsyncThunk(
           'Content-Type': 'application/json',
         },
       });
+
+      console.log('Attendance response data:', response.data); // Log the response data
+
       return response.data; // Use response.data instead of newAttendance for consistency
     } catch (error) {
+      console.error('Error adding attendance:', error); // Log the error if it occurs
       return rejectWithValue(error.response?.data?.message || 'Failed to add attendance.');
     }
   }
 );
+
 
 // Async thunk for deleting attendance
 export const deleteAttendance = createAsyncThunk(

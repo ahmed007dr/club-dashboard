@@ -518,7 +518,7 @@ const Expense = () => {
     {loading && <option disabled>جاري التحميل...</option>}
     {error && <option disabled>خطأ في تحميل الفئات</option>}
     {expenseCategories?.map((category) => (
-      <option key={category._id} value={category._id}>
+      <option key={category.id} value={category.id.toString()}>
         {category.name}
       </option>
     ))}
@@ -535,7 +535,7 @@ const Expense = () => {
                   { label: "المبلغ", name: "amount", type: "number", step: "0.01" },
                   { label: "الوصف", name: "description", type: "text" },
                   { label: "التاريخ", name: "date", type: "date" },
-                  { label: "رقم الفاتورة", name: "invoice_number", type: "text" },
+                 
                 ].map(({ label, name, type, step }) => (
                   <div key={name}>
                     <label className="block text-sm font-medium mb-1 text-right">
@@ -557,22 +557,7 @@ const Expense = () => {
                   </div>
                 ))}
 
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-right">
-                    المرفق
-                  </label>
-                  <input
-                    type="file"
-                    name="attachment"
-                    onChange={handleFileChange}
-                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
-                  />
-                  {errors.attachment && (
-                    <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
-                      {errors.attachment}
-                    </p>
-                  )}
-                </div>
+          
               </div>
               <div className="mt-6 flex justify-end gap-2">
                 <button

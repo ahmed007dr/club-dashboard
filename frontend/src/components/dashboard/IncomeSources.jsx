@@ -20,7 +20,7 @@ import {
   deleteIncome,
 } from "../../redux/slices/financeSlice";
 import BASE_URL from '../../config/api';
-
+import AddIncomeForm from "./AddIncomeForm";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -343,13 +343,7 @@ const Income = () => {
                 )}
               </div>
 
-              <Button
-                onClick={handleAddClick}
-                className="flex items-center justify-start"
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                إضافة دخل
-              </Button>
+              <AddIncomeForm />
 
               {loading && (
                 <p className="text-lg text-gray-600 text-right">

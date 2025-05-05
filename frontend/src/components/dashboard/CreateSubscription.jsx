@@ -9,12 +9,12 @@ const CreateSubscription = () => {
   const { subscriptionTypes, loading, error: subscriptionError } = useSelector(
     (state) => state.subscriptions
   );
+
   const [formData, setFormData] = useState({
     club: "",
     member: "",
     type: "",
     start_date: "",
-    end_date: "",
     paid_amount: "",
   });
 
@@ -72,10 +72,9 @@ const CreateSubscription = () => {
   // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
+    const { club, member, type, start_date, paid_amount } = formData;
 
-    const { club, member, type, start_date, end_date, paid_amount } = formData;
-
-    if (!club || !member || !type || !start_date || !end_date || !paid_amount) {
+    if (!club || !member || !type || !start_date || !paid_amount) {
       alert("Please fill in all fields.");
       return;
     }
@@ -85,7 +84,6 @@ const CreateSubscription = () => {
       member: parseInt(member),
       type: parseInt(type),
       start_date,
-      end_date,
       paid_amount: parseFloat(paid_amount),
     };
 
@@ -170,19 +168,6 @@ const CreateSubscription = () => {
           />
         </div>
 
-        {/* End Date */}
-        <div>
-          <label className="block font-medium">تاريخ النهاية</label>
-          <input
-            type="date"
-            name="end_date"
-            value={formData.end_date}
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
-          />
-        </div>
-
         {/* Paid Amount */}
         <div>
           <label className="block font-medium">المبلغ المدفوع</label>
@@ -211,6 +196,7 @@ const CreateSubscription = () => {
 };
 
 export default CreateSubscription;
+
 
 
 
