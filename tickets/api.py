@@ -8,6 +8,9 @@ from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub  
 from finance.serializers import IncomeSerializer
 from finance.models import Income
+from django.utils import timezone
+from django.forms.models import model_to_dict
+from finance.models import Income,IncomeSource
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -28,15 +31,24 @@ def add_ticket_api(request):
     if serializer.is_valid():
         ticket = serializer.save()
         
-        income_data = {
-            'club': ticket.club.id,
-            'source': 'ticket_sales',
-            'amount': ticket.price,
-            'description': f"Ticket sale for {ticket.buyer_name}",
-            'date': ticket.issue_date,
-            'received_by': request.user.id
-        }
-        income_serializer = IncomeSerializer(data=income_data)
+    if ticket.price > 0:
+        source, _ = IncomeSource.objects.get_or_create(
+            club=ticket.club,
+            name='Ticket',
+            defaults={'description': 'Income from Ticket payments'}
+        )
+
+        income = Income.objects.create(
+            club=ticket.club,
+            source=source,
+            amount=ticket.price,
+            description=f"Ticket sale for {ticket.ticket_type}",
+            date=timezone.now().date(),
+            received_by=request.user
+        )
+
+
+        income_serializer = IncomeSerializer(data=income)
 
         if income_serializer.is_valid():
             income_serializer.save()
