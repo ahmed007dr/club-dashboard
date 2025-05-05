@@ -27,14 +27,35 @@ def add_receipt_api(request):
     data['issued_by'] = request.user.id  
     
     serializer = ReceiptSerializer(data=data)
+    # add_receipt_api
     if serializer.is_valid():
         receipt = serializer.save()
-
+    
         if not IsOwnerOrRelatedToClub().has_object_permission(request, None, receipt):
-            receipt.delete()  
+            receipt.delete()
             return Response({'error': 'You do not have permission to create a receipt for this club'}, status=status.HTTP_403_FORBIDDEN)
+    
+        # signal
+        source_name = 'Subscription Payment' if receipt.subscription else 'General Payment'
+        source, _ = IncomeSource.objects.get_or_create(club=receipt.club, name=source_name)
+    
+        Income.objects.create(
+            club=receipt.club,
+            source=source,
+            amount=receipt.amount,
+            date=receipt.date.date(),
+            received_by=receipt.issued_by,
+            related_receipt=receipt
+        )
+    
+        if not receipt.invoice_number:
+            today_str = now().strftime('%Y%m%d')
+            invoice_id = f"INV{today_str}-{receipt.id:04d}"
+            receipt.invoice_number = invoice_id
+            receipt.save(update_fields=['invoice_number'])
+    
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

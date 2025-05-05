@@ -11,10 +11,7 @@ class SubscriptionType(models.Model):
     includes_pool = models.BooleanField(default=False)
     includes_classes = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-
+    
     def __str__(self):
         return self.name
 

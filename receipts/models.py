@@ -36,23 +36,23 @@ class AutoCorrectionLog(models.Model):
 
 
 
-@receiver(post_save, sender=Receipt)
-def create_income_for_receipt(sender, instance, created, **kwargs):
-    if created:
-        source_name = 'Subscription Payment' if instance.subscription else 'General Payment'
-        source, _ = IncomeSource.objects.get_or_create(club=instance.club, name=source_name)
+# @receiver(post_save, sender=Receipt)
+# def create_income_for_receipt(sender, instance, created, **kwargs):
+#     if created:
+#         source_name = 'Subscription Payment' if instance.subscription else 'General Payment'
+#         source, _ = IncomeSource.objects.get_or_create(club=instance.club, name=source_name)
 
-        Income.objects.create(
-            club=instance.club,
-            source=source,
-            amount=instance.amount,
-            date=instance.date.date(),
-            received_by=instance.issued_by,
-            related_receipt=instance
-        )
+#         Income.objects.create(
+#             club=instance.club,
+#             source=source,
+#             amount=instance.amount,
+#             date=instance.date.date(),
+#             received_by=instance.issued_by,
+#             related_receipt=instance
+#         )
 
-        if not instance.invoice_number:
-            today_str = now().strftime('%Y%m%d')
-            invoice_id = f"INV{today_str}-{instance.id:04d}"
-            Receipt.objects.filter(id=instance.id).update(invoice_number=invoice_id)
+#         if not instance.invoice_number:
+#             today_str = now().strftime('%Y%m%d')
+#             invoice_id = f"INV{today_str}-{instance.id:04d}"
+#             Receipt.objects.filter(id=instance.id).update(invoice_number=invoice_id)
 

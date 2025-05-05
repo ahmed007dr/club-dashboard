@@ -53,3 +53,8 @@ class IncomeSerializer(serializers.ModelSerializer):
             'amount', 'description', 'date', 'received_by', 'received_by_details',
             'related_receipt', 'receipt_details'
         ]
+        
+class IncomeSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Income
+        fields = ['id', 'amount', 'date', 'source', 'received_by']
