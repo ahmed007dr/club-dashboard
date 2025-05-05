@@ -67,8 +67,8 @@ const CreateSubscriptionTypes = () => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md mx-auto bg-white p-6 rounded shadow">
-      <h2 className="text-2xl font-bold text-center mb-6">Create New Subscription Type</h2>
+    <form onSubmit={handleSubmit} className="max-w-md mx-auto bg-white p-6 rounded shadow"  dir="rtl">
+     <h2 className="text-2xl font-bold text-center mb-6">إنشاء نوع اشتراك جديد</h2>
 
       {error && (
         <div className="p-3 bg-red-100 text-red-700 rounded mb-4">
@@ -77,7 +77,7 @@ const CreateSubscriptionTypes = () => {
       )}
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">الاسم</label>
         <input
           type="text"
           name="name"
@@ -89,7 +89,7 @@ const CreateSubscriptionTypes = () => {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Price ($)</label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">السعر </label>
         <input
           type="number"
           name="price"
@@ -103,7 +103,7 @@ const CreateSubscriptionTypes = () => {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">Duration (days)</label>
+      <label className="block text-sm font-medium text-gray-700 mb-1">المدة (بالأيام)</label>
         <input
           type="number"
           name="duration_days"
@@ -116,7 +116,7 @@ const CreateSubscriptionTypes = () => {
       </div>
 
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">Facilities Included:</label>
+      <label className="block text-sm font-medium text-gray-700 mb-2">المرافق المشمولة:</label>
         <div className="space-y-2">
           <label className="inline-flex items-center">
             <input
@@ -126,7 +126,7 @@ const CreateSubscriptionTypes = () => {
               onChange={handleChange}
               className="h-4 w-4 text-blue-600"
             />
-            <span className="ml-2 text-sm text-gray-700">Gym</span>
+            <span className="mr-2 text-sm text-gray-700">صالة الألعاب الرياضية</span>
           </label>
           <label className="inline-flex items-center">
             <input
@@ -136,7 +136,8 @@ const CreateSubscriptionTypes = () => {
               onChange={handleChange}
               className="h-4 w-4 text-blue-600"
             />
-            <span className="ml-2 text-sm text-gray-700">Pool</span>
+           
+        <span className="mr-2 text-sm text-gray-700">المسبح</span>
           </label>
           <label className="inline-flex items-center">
             <input
@@ -146,16 +147,16 @@ const CreateSubscriptionTypes = () => {
               onChange={handleChange}
               className="h-4 w-4 text-blue-600"
             />
-            <span className="ml-2 text-sm text-gray-700">Classes</span>
+             <span className="mr-2 text-sm text-gray-700">الحصص التدريبية</span>
           </label>
         </div>
       </div>
 
       <button
         type="submit"
-        className="w-full py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
+        className="btn"
       >
-        Create Subscription
+          إنشاء الاشتراك
       </button>
     </form>
   );

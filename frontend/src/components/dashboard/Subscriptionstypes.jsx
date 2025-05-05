@@ -326,7 +326,6 @@ const SubscriptionsTypes = () => {
             >
               ✕
             </button>
-            <h2 className="text-xl font-semibold mb-4">Create New Subscription</h2>
             <CreateSubscriptionType />
           </div>
         </div>
