@@ -251,6 +251,24 @@ const Staff = () => {
     return pages;
   };
 
+  const parseTime = (timeStr) => {
+    // If timeStr includes microseconds, remove them
+    if (timeStr.includes('.')) {
+      timeStr = timeStr.split('.')[0]; // Keep only the time (HH:mm:ss)
+    }
+  
+    // Check if the value is a valid time string
+    if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) {
+      // Assuming it's a time-only format, we can use today's date as the base
+      const today = new Date();
+      const [hours, minutes, seconds] = timeStr.split(':');
+      today.setHours(hours, minutes, seconds, 0); // Set time to today with provided hours, minutes, and seconds
+      return today;
+    }
+  
+    return new Date(timeStr); // Return a new date object (for timestamps or invalid formats)
+  };
+
   if (loadingProfile)
     return (
       <div className="flex justify-center items-center h-screen text-sm sm:text-base">
@@ -324,50 +342,65 @@ const Staff = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {currentItems.map((shift) => (
-                  <tr key={shift.id} className="hover:bg-gray-50">
-                     <td>{shift.date}</td> {/* Auto-generated */}
-                     <td>{shift.shift_start}</td> 
-                    <td className="p-2 sm:p-3">{shift.shift_end}</td>
-                    <td className="p-2 sm:p-3">{shift.club_details?.name}</td>
-                    <td className="p-2 sm:p-3">
-                      {`${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`}
-                    </td>
-                    <td className="p-2 sm:p-3">
-                      {shift.approved_by_details ? shift.approved_by_details.username : "غير موافق عليه"}
-                    </td>
-                    <td className="p-2 sm:p-3 flex gap-2 justify-center">
-                      <DropdownMenu dir="rtl">
-                        <DropdownMenuTrigger asChild>
-                          <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                            <MoreVertical className="h-5 w-5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem
-                            onClick={() => handleOpenModal("view", shift)}
-                            className="cursor-pointer text-green-600 hover:bg-green-50"
-                          >
-                            <FaEye className="mr-2" /> بيانات
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleOpenModal("edit", shift)}
-                            className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                          >
-                            <CiEdit className="mr-2" /> تعديل
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleOpenModal("delete", shift)}
-                            className="cursor-pointer text-red-600 hover:bg-red-50"
-                          >
-                            <CiTrash className="mr-2" /> حذف
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
+  {currentItems.map((shift) => (
+    <tr key={shift.id} className="hover:bg-gray-50">
+       <td className="p-2 sm:p-3">
+        {shift.date ? new Date(shift.date).toLocaleDateString('en-GB') : 'N/A'}
+      </td>{/* Auto-generated */}
+      
+      {/* Handle shift start time */}
+      <td className="p-2 sm:p-3">
+        {shift.shift_start 
+          ? parseTime(shift.shift_start).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) 
+          : 'Invalid date'}
+      </td>
+      
+      {/* Handle shift end time */}
+      <td className="p-2 sm:p-3">
+        {shift.shift_end 
+          ? parseTime(shift.shift_end).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) 
+          : 'Invalid date'}
+      </td>
+      
+      <td className="p-2 sm:p-3">{shift.club_details?.name}</td>
+      <td className="p-2 sm:p-3">
+        {`${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`}
+      </td>
+      <td className="p-2 sm:p-3">
+        {shift.approved_by_details ? shift.approved_by_details.username : "غير موافق عليه"}
+      </td>
+      <td className="p-2 sm:p-3 flex gap-2 justify-center">
+        <DropdownMenu dir="rtl">
+          <DropdownMenuTrigger asChild>
+            <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+              <MoreVertical className="h-5 w-5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem
+              onClick={() => handleOpenModal("view", shift)}
+              className="cursor-pointer text-green-600 hover:bg-green-50"
+            >
+              <FaEye className="mr-2" /> بيانات
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleOpenModal("edit", shift)}
+              className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+            >
+              <CiEdit className="mr-2" /> تعديل
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleOpenModal("delete", shift)}
+              className="cursor-pointer text-red-600 hover:bg-red-50"
+            >
+              <CiTrash className="mr-2" /> حذف
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </td>
+    </tr>
+  ))}
+</tbody>
             </table>
 
             {/* Mobile View */}

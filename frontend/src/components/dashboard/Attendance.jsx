@@ -202,6 +202,20 @@ const Attendance = () => {
     }
   };
 
+  // Function to parse and format the timestamp
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr);  // Parse the timestamp string
+  return date.toLocaleString('en-GB', {  // Format the date to a specific format
+    weekday: 'short', // Optional: to include the weekday (Mon, Tue, etc.)
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+};
+
   useEffect(() => {
     dispatch(fetchSubscriptions());
   }, [dispatch]);
@@ -481,7 +495,9 @@ const Attendance = () => {
                             <td className="px-4 py-3 text-sm">
                               {log.member_name || "غير متاح"}
                             </td>
-                            <td className="px-4 py-3 text-sm">{log.timestamp}</td>
+                            <td className="px-4 py-3 text-sm">
+        {log.timestamp ? formatDate(log.timestamp) : 'Invalid date'}
+      </td>
                           </tr>
                         ))}
                       </tbody>
