@@ -28,6 +28,8 @@ import {
 } from "../../redux/slices/subscriptionsSlice";
 import EntryForm from "./EntryForm";
 
+
+
 const Attendance = () => {
   const dispatch = useDispatch();
 
@@ -50,7 +52,6 @@ const Attendance = () => {
   // Form states
   const [newAttendance, setNewAttendance] = useState({
     subscription: "",
-    attendance_date: "",
   });
   const [newEntryLog, setNewEntryLog] = useState({
     club: "",
@@ -166,12 +167,12 @@ const Attendance = () => {
   // Handle adding new attendance
   const handleAddAttendance = (e) => {
     e.preventDefault();
-    if (!newAttendance.subscription || !newAttendance.attendance_date) {
+    if (!newAttendance.subscription ) {
       alert("الرجاء ملء جميع الحقول الخاصة بالحضور.");
       return;
     }
     dispatch(addAttendance(newAttendance));
-    setNewAttendance({ subscription: "", attendance_date: "" });
+    setNewAttendance({ subscription: "", });
     setIsAttendanceDialogOpen(false);
   };
 
@@ -296,17 +297,7 @@ const Attendance = () => {
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-sm mb-1">تاريخ الحضور</label>
-          <input
-            type="date"
-            name="attendance_date"
-            value={newAttendance.attendance_date}
-            onChange={handleAttendanceInputChange}
-            className="border px-3 py-2 rounded w-full"
-            required
-          />
-        </div>
+   
         <Button type="submit" className="w-full bg-blue-500">
           إضافة الحضور
         </Button>

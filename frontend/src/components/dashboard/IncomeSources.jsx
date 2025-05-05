@@ -38,6 +38,9 @@ const labelMapping = {
   received_by: "المستلم",
 };
 
+import IncomeSourcesList from './IncomeSourcesList'; // Adjust the path as needed
+import IncomeSourceForm from './IncomeSourceForm';   // Adjust the path as needed
+
 const Income = () => {
   const dispatch = useDispatch();
   const [showModal, setShowModal] = useState(false);
@@ -285,191 +288,208 @@ const Income = () => {
         إدارة الدخل
       </h1>
 
-      <Tabs defaultValue="incomes" dir="rtl">
-        <TabsList dir="rtl">
-          <TabsTrigger value="incomes">الايرادات</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="sources" dir="rtl">
+  <TabsList dir="rtl">
+    <TabsTrigger value="sources">مصادر الايرادات</TabsTrigger>
+    <TabsTrigger value="incomes">الايرادات</TabsTrigger>
+  </TabsList>
 
-        <TabsContent value="incomes" className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-right">جميع الدخل</CardTitle>
-              <CardDescription className="text-right">
-                إدارة جميع الدخل لنادي {userClub?.name || "جاري التحميل..."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {["club", "source", "amountMin", "amountMax", "dateFrom", "dateTo", "received_by"].map(
-                  (field) => (
-                    <div key={field}>
-                      <label className="block text-sm font-medium mb-1 text-right">
-                        {labelMapping[field] || field.replace(/([A-Z])/g, " $1")}
-                      </label>
-                      {field === "club" ? (
-                        <select
-                          name="club"
-                          value={incomeFilters.club}
-                          onChange={handleIncomeFilterChange}
-                          className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                        >
-                          {userClub ? (
-                            <option value={userClub.id}>{userClub.name}</option>
-                          ) : (
-                            <option value="">جاري التحميل...</option>
-                          )}
-                        </select>
-                      ) : (
-                        <input
-                          type={
-                            field.includes("date")
-                              ? "date"
-                              : field.includes("amount")
-                              ? "number"
-                              : "text"
-                          }
-                          name={field}
-                          value={incomeFilters[field]}
-                          onChange={handleIncomeFilterChange}
-                          className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                          placeholder={`ابحث بـ ${
-                            labelMapping[field] || field.replace(/([A-Z])/g, " $1")
-                          }`}
-                        />
-                      )}
-                    </div>
-                  )
+  {/* Revenue Sources Tab (now first) */}
+  <TabsContent value="sources" className="space-y-4">
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-right">مصادر الايرادات</CardTitle>
+        <CardDescription className="text-right">
+          إدارة مصادر الايرادات لنادي {userClub?.name || "جاري التحميل..."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+      <IncomeSourcesList />
+    </CardContent>
+    </Card>
+  </TabsContent>
+
+  {/* Incomes Tab (now second) */}
+  <TabsContent value="incomes" className="space-y-4">
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-right">جميع الدخل</CardTitle>
+        <CardDescription className="text-right">
+          إدارة جميع الدخل لنادي {userClub?.name || "جاري التحميل..."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {["club", "source", "amountMin", "amountMax", "dateFrom", "dateTo", "received_by"].map(
+            (field) => (
+              <div key={field}>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  {labelMapping[field] || field.replace(/([A-Z])/g, " $1")}
+                </label>
+                {field === "club" ? (
+                  <select
+                    name="club"
+                    value={incomeFilters.club}
+                    onChange={handleIncomeFilterChange}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                  >
+                    {userClub ? (
+                      <option value={userClub.id}>{userClub.name}</option>
+                    ) : (
+                      <option value="">جاري التحميل...</option>
+                    )}
+                  </select>
+                ) : (
+                  <input
+                    type={
+                      field.includes("date")
+                        ? "date"
+                        : field.includes("amount")
+                        ? "number"
+                        : "text"
+                    }
+                    name={field}
+                    value={incomeFilters[field]}
+                    onChange={handleIncomeFilterChange}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                    placeholder={`ابحث بـ ${
+                      labelMapping[field] || field.replace(/([A-Z])/g, " $1")
+                    }`}
+                  />
                 )}
               </div>
+            )
+          )}
+        </div>
 
-              <AddIncomeForm />
+        <AddIncomeForm />
 
-              {loading && (
-                <p className="text-lg text-gray-600 text-right">
-                  جاري التحميل...
-                </p>
-              )}
+        {loading && (
+          <p className="text-lg text-gray-600 text-right">
+            جاري التحميل...
+          </p>
+        )}
 
-              {error && (
-                <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
-              )}
+        {error && (
+          <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
+        )}
 
-              <div className="rounded-md border">
-                <table className="min-w-full divide-y divide-border">
-                  <thead>
-                    <tr className="bg-muted/50">
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المعرف
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        مصدر الدخل
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المبلغ
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        الوصف
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        التاريخ
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المستلم
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        الإجراءات
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border bg-background">
-                    {paginatedIncomes.map((income) => (
-                      <tr
-                        key={income.id}
-                        className="hover:bg-gray-100 transition"
-                      >
-                        <td className="px-4 py-3 text-sm">{income.id}</td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.source_details?.name || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.amount ? `${income.amount} جنيه` : "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.description || "لا يوجد وصف"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.date || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.received_by_details?.username || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm flex gap-2 justify-end">
-                          <DropdownMenu dir="rtl">
-                            <DropdownMenuTrigger asChild>
-                              <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                                <MoreVertical className="h-5 w-5" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem
-                                onClick={() => handleEditClick(income)}
-                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                              >
-                                تعديل
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteClick(income.id)}
-                                className="cursor-pointer text-red-600 hover:bg-red-50"
-                              >
-                                حذف
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <PaginationControls
-                currentPage={incomePage}
-                setPage={setIncomePage}
-                pageCount={incomePageCount}
-              />
-              {/* Compute Total Button */}
-              <div className="flex justify-end mt-4">
-                <Button
-                  onClick={() =>
-                    setTotalInfo({
-                      count: filteredIncomes.length,
-                      total: filteredIncomes.reduce(
-                        (acc, income) => acc + (parseFloat(income.amount) || 0),
-                        0
-                      ),
-                    })
-                  }
-                  className="bg-primary text-white px-6"
+        <div className="rounded-md border">
+          <table className="min-w-full divide-y divide-border">
+            <thead>
+              <tr className="bg-muted/50">
+                <th className="px-4 py-3 text-right text-sm font-medium">
+                  المعرف
+                </th>
+                <th className="px-4 py-3 text-right text-sm font-medium">
+                  مصدر الدخل
+                </th>
+                <th className="px-4 py-3 text-right text-sm font-medium">
+                  المبلغ
+                </th>
+                <th className="px-4 py-3 text-right text-sm font-medium">
+                  الوصف
+                </th>
+                <th className="px-4 py-3 text-right text-sm font-medium">
+                  التاريخ
+                </th>
+                <th className="px-4 py-3 text-right text-sm font-medium">
+                  المستلم
+                </th>
+                <th className="px-4 py-3 text-right text-sm font-medium">
+                  الإجراءات
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-background">
+              {paginatedIncomes.map((income) => (
+                <tr
+                  key={income.id}
+                  className="hover:bg-gray-100 transition"
                 >
-                  حساب الإجمالي
-                </Button>
-              </div>
+                  <td className="px-4 py-3 text-sm">{income.id}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {income.source_details?.name || "غير متاح"}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {income.amount ? `${income.amount} جنيه` : "غير متاح"}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {income.description || "لا يوجد وصف"}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {income.date || "غير متاح"}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {income.received_by_details?.username || "غير متاح"}
+                  </td>
+                  <td className="px-4 py-3 text-sm flex gap-2 justify-end">
+                    <DropdownMenu dir="rtl">
+                      <DropdownMenuTrigger asChild>
+                        <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                          <MoreVertical className="h-5 w-5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuItem
+                          onClick={() => handleEditClick(income)}
+                          className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                        >
+                          تعديل
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteClick(income.id)}
+                          className="cursor-pointer text-red-600 hover:bg-red-50"
+                        >
+                          حذف
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <PaginationControls
+          currentPage={incomePage}
+          setPage={setIncomePage}
+          pageCount={incomePageCount}
+        />
+        {/* Compute Total Button */}
+        <div className="flex justify-end mt-4">
+          <Button
+            onClick={() =>
+              setTotalInfo({
+                count: filteredIncomes.length,
+                total: filteredIncomes.reduce(
+                  (acc, income) => acc + (parseFloat(income.amount) || 0),
+                  0
+                ),
+              })
+            }
+            className="bg-primary text-white px-6"
+          >
+            حساب الإجمالي
+          </Button>
+        </div>
 
-              {/* Total Info Display */}
-              {totalInfo.count > 0 && (
-                <div className="mt-4 bg-gray-50 border rounded-md p-4 text-right space-y-1">
-                  <p className="text-sm font-semibold text-gray-700">
-                    عدد الدخل: {totalInfo.count}
-                  </p>
-                  <p className="text-sm font-semibold text-gray-700">
-                    إجمالي الدخل: {totalInfo.total} جنيه
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+        {/* Total Info Display */}
+        {totalInfo.count > 0 && (
+          <div className="mt-4 bg-gray-50 border rounded-md p-4 text-right space-y-1">
+            <p className="text-sm font-semibold text-gray-700">
+              عدد الدخل: {totalInfo.count}
+            </p>
+            <p className="text-sm font-semibold text-gray-700">
+              إجمالي الدخل: {totalInfo.total} جنيه
+            </p>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  </TabsContent>
+</Tabs>
 
       {/* Modal for adding/editing income */}
       {showModal && (

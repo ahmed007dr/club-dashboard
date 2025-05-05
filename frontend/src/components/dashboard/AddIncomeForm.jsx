@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { addIncome } from '../../redux/slices/financeSlice';
 import BASE_URL from '../../config/api';
 import { toast } from 'react-hot-toast';
+import axios from 'axios';
 
 const AddIncomeForm = () => {
   const dispatch = useDispatch();
@@ -18,13 +19,10 @@ const AddIncomeForm = () => {
 
   const [userClub, setUserClub] = useState(null);
   const [userId, setUserId] = useState(null);
-
-  const incomeSources = [
-    { id: 1, name: 'اشتراك' },         // Subscription
-    { id: 2, name: 'تسديد اشتراك' },   // Subscription Payment
-  ];
+  const [incomeSources, setIncomeSources] = useState([]);
 
   useEffect(() => {
+    // Fetch user profile
     fetch(`${BASE_URL}/accounts/api/profile/`, {
       method: 'GET',
       headers: {
@@ -47,6 +45,26 @@ const AddIncomeForm = () => {
       });
   }, []);
 
+  useEffect(() => {
+    // Fetch income sources
+    const fetchSources = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${BASE_URL}/finance/api/income-sources/`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setIncomeSources(response.data);
+      } catch (err) {
+        console.error('فشل في جلب مصادر الدخل:', err);
+        toast.error('فشل في تحميل مصادر الدخل');
+      }
+    };
+
+    fetchSources();
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -58,13 +76,7 @@ const AddIncomeForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const allowedSources = [1, 2];
     const sourceId = parseInt(formData.source);
-
-    if (!allowedSources.includes(sourceId)) {
-      toast.error('يُسمح فقط بمصدر "اشتراك" أو "تسديد اشتراك"');
-      return;
-    }
 
     if (!formData.source || !formData.club || !userId) {
       toast.error('الرجاء تعبئة جميع الحقول المطلوبة');
