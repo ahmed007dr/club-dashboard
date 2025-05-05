@@ -3,7 +3,8 @@ import { useDispatch } from 'react-redux';
 import { fetchClubs } from '../../redux/slices/clubSlice';
 import toast from 'react-hot-toast';
 import BASE_URL from '../../config/api';
-const EntryForm = () => {
+
+const EntryForm = ({ onSuccess }) => {
   const dispatch = useDispatch();
 
   const [formData, setFormData] = useState({
@@ -40,34 +41,45 @@ const EntryForm = () => {
   
     try {
       const token = localStorage.getItem('token');
-  
+
+      const requestBody = {
+        club: Number(formData.club),
+        membership_number: Number(formData.membership_number),
+        membership_name: formData.membership_name,
+      };
+
       const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/add/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          club: Number(formData.club),
-          membership_number: Number(formData.membership_number),
-          membership_name: formData.membership_name,
-        }),
+        body: JSON.stringify(requestBody),
       });
-  
+
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
-        console.error('Response error details:', data); // 🔍 log full response error
+        console.error('Response error details:', data);
         throw new Error(data.message || 'Failed to add entry log');
       }
-  
+
+      console.log('✅ Successfully submitted:');
+      console.log('➡️ Data sent:', requestBody);
+      console.log('✅ Response received:', data);
+
       toast.success('Entry log added successfully!');
       setFormData({ club: '', membership_number: '', membership_name: '' });
+
+      if (onSuccess) {
+        onSuccess(); // ✅ call parent to close modal
+      }
+
     } catch (error) {
       console.error('Submit Entry Error:', error);
       toast.error(error.message);
     }
   };
-  
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto p-4 border rounded">
@@ -119,6 +131,7 @@ const EntryForm = () => {
 };
 
 export default EntryForm;
+
 
 
 
