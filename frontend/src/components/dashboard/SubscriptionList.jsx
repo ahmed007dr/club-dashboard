@@ -19,6 +19,7 @@ import { MoreVertical } from "lucide-react";
 
 
 
+
 const SubscriptionList = () => {
   const dispatch = useDispatch();
   const { subscriptions, status, error, updateStatus } = useSelector(
@@ -43,7 +44,7 @@ const SubscriptionList = () => {
     status: '',
     startDate: '',
     endDate: '',
-    clubName: '', 
+    clubName: '',
     attendanceDays: '',
   });
 
@@ -76,7 +77,7 @@ const SubscriptionList = () => {
       ? subscriptionEndDate.setHours(0, 0, 0, 0) ===
         filterEndDate.setHours(0, 0, 0, 0)
       : true;
-      const matchesClubName = filters.clubName
+    const matchesClubName = filters.clubName
       ? subscription.club_name
           .toLowerCase()
           .includes(filters.clubName.toLowerCase())
@@ -89,7 +90,7 @@ const SubscriptionList = () => {
       matchesStatus &&
       matchesStartDate &&
       matchesEndDate &&
-      matchesClubName&&
+      matchesClubName &&
       matchesAttendanceDays
     );
   });
@@ -126,7 +127,7 @@ const SubscriptionList = () => {
       status: '',
       startDate: '',
       endDate: '',
-      clubName: '',  
+      clubName: '',
       attendanceDays: '',
     });
     setCurrentPage(1);
@@ -292,20 +293,20 @@ const SubscriptionList = () => {
           />
         </div>
 
-    {/* Club Name Filter - Replaced Club ID Filter */}
-<div className="flex flex-col w-56">
-  <label className="text-sm font-medium text-gray-700 mb-1 text-right">
-    اسم النادي
-  </label>
-  <input
-    type="text"
-    name="clubName"
-    value={filters.clubName}
-    onChange={handleFilterChange}
-    placeholder="بحث باسم النادي"
-    className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
-  />
-</div>
+        {/* Club Name Filter */}
+        <div className="flex flex-col w-56">
+          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
+            اسم النادي
+          </label>
+          <input
+            type="text"
+            name="clubName"
+            value={filters.clubName}
+            onChange={handleFilterChange}
+            placeholder="بحث باسم النادي"
+            className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
+          />
+        </div>
 
         {/* Attendance Days Filter */}
         <div className="flex flex-col w-56">
