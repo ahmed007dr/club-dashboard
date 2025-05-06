@@ -129,10 +129,9 @@ const Attendance = () => {
       attendanceFilters.attendance_date
     );
   
-    const matchesMemberName =
-      attendance.member_details?.name
-        ?.toLowerCase()
-        .includes(attendanceFilters.member_name.toLowerCase()) ||
+    const matchesMemberName = attendance.member_name
+      ?.toLowerCase()
+      .includes(attendanceFilters.member_name.toLowerCase()) ||
       !attendanceFilters.member_name;
   
     return matchesSubscription && matchesDate && matchesMemberName;

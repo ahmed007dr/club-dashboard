@@ -97,8 +97,9 @@ const StaffProfile = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-700">
                           <p><strong>التاريخ:</strong> {new Date(shift.date).toLocaleDateString('ar-EG')}</p>
                           <p><strong>من:</strong> {formattedStart}</p>
-                          <p><strong>إلى:</strong> {formattedEnd}</p>
+                         
                           <p><strong>النادي:</strong> {shift.club_details?.name}</p>
+                          <p><strong>إلى:</strong> {formattedEnd}</p>
                           <p><strong>الموقع:</strong> {shift.club_details?.location}</p>
                           <p>
                             <strong>تمت الموافقة من:</strong>{' '}
