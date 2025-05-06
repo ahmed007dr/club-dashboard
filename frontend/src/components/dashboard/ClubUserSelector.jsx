@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import BASE_URL from '../../config/api';
 
 const ClubUserSelector = () => {
   const [clubs, setClubs] = useState([]);
@@ -15,7 +16,7 @@ const ClubUserSelector = () => {
           Authorization: `Bearer ${token}`,
         };
   
-        const response = await axios.get('http://127.0.0.1:8000/accounts/api/users/', { headers });
+        const response = await axios.get(`${BASE_URL}/accounts/api/users/`, { headers });
         const users = response.data;
   
         const clubsMap = {};
