@@ -4,6 +4,8 @@ from core.serializers import ClubSerializer
 from accounts.serializers import UserSerializer
 from members.serializers import MemberSerializer
 from members.models import Member
+from django.db import models
+
 
 class MemberByMembershipNumberField(serializers.PrimaryKeyRelatedField):
     def to_internal_value(self, data):
@@ -13,6 +15,12 @@ class MemberByMembershipNumberField(serializers.PrimaryKeyRelatedField):
             raise serializers.ValidationError("عضو غير موجود برقم العضوية المدخل.")
 
     def to_representation(self, value):
+        # Ensure we have a full Member instance, not just a PKOnlyObject
+        if not isinstance(value, Member):
+            try:
+                value = Member.objects.get(pk=value.pk)
+            except Member.DoesNotExist:
+                return None
         return value.membership_number
 
 
