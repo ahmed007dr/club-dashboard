@@ -42,6 +42,7 @@ import IncomeSourcesList from './IncomeSourcesList'; // Adjust the path as neede
 import IncomeSourceForm from './IncomeSourceForm';   // Adjust the path as needed
 
 
+
 const Income = () => {
   const dispatch = useDispatch();
   const [showModal, setShowModal] = useState(false);
@@ -56,6 +57,7 @@ const Income = () => {
   });
   const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
   const [userClub, setUserClub] = useState(null);
+  const [sortOrder, setSortOrder] = useState("desc"); // "desc" for newest first, "asc" for oldest first
 
   // Filter states
   const [incomeFilters, setIncomeFilters] = useState({
@@ -130,9 +132,9 @@ const Income = () => {
       .sort((a, b) => {
         const dateA = a.date ? new Date(a.date) : new Date(0);
         const dateB = b.date ? new Date(b.date) : new Date(0);
-        return dateB - dateA;
+        return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
       });
-  }, [incomes, incomeFilters, userClub]);
+  }, [incomes, incomeFilters, userClub, sortOrder]);
 
   // Pagination calculations
   const incomePageCount = Math.ceil(filteredIncomes.length / pageSize);
@@ -295,7 +297,7 @@ const Income = () => {
           <TabsTrigger value="incomes">الايرادات</TabsTrigger>
         </TabsList>
 
-        {/* Revenue Sources Tab (now first) */}
+        {/* Revenue Sources Tab */}
         <TabsContent value="sources" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -310,7 +312,7 @@ const Income = () => {
           </Card>
         </TabsContent>
 
-        {/* Incomes Tab (now second) */}
+        {/* Incomes Tab */}
         <TabsContent value="incomes" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -320,6 +322,16 @@ const Income = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Sort Toggle Button */}
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+                  className="mb-4 bg-primary text-white"
+                >
+                  {sortOrder === "desc" ? "فرز من الأقدم إلى الأحدث" : "فرز من الأحدث إلى الأقدم"}
+                </Button>
+              </div>
+
               {/* Filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 {["club", "source", "amountMin", "amountMax", "dateFrom", "dateTo", "received_by"].map(

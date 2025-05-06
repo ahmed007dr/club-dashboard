@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { addEntryLog } from "@/redux/slices/EntryLogsSlice";
-
 import toast from 'react-hot-toast';
 
 const EntryForm = () => {
@@ -11,7 +10,6 @@ const EntryForm = () => {
   const [formData, setFormData] = useState({
     club: '',
     membership_number: '',
-    membership_name: '',
   });
 
   const handleChange = (e) => {
@@ -28,7 +26,6 @@ const EntryForm = () => {
       const resultAction = await dispatch(addEntryLog({
         club: Number(formData.club),
         membership_number: Number(formData.membership_number),
-        membership_name: formData.membership_name,
       }));
 
       if (addEntryLog.fulfilled.match(resultAction)) {
@@ -61,15 +58,6 @@ const EntryForm = () => {
         required
         className="w-full border px-3 py-2 rounded"
       />
-      <input
-        type="text"
-        name="membership_name"
-        placeholder="Membership Name"
-        value={formData.membership_name}
-        onChange={handleChange}
-        required
-        className="w-full border px-3 py-2 rounded"
-      />
       <button
         type="submit"
         className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
@@ -82,3 +70,4 @@ const EntryForm = () => {
 };
 
 export default EntryForm;
+

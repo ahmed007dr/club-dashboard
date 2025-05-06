@@ -57,6 +57,9 @@ const customStyles = `
   }
 `;
 
+
+
+
 const Expense = () => {
   const dispatch = useDispatch();
   const [showModal, setShowModal] = useState(false);
@@ -81,10 +84,9 @@ const Expense = () => {
   const itemsPerPage = 5;
 
   const { expenses, loading, error } = useSelector((state) => state.finance);
-  const { expenseCategories } = useSelector(
-    (state) => state.finance
-  );
+  const { expenseCategories } = useSelector((state) => state.finance);
   console.log("Expense Categories:", expenseCategories);
+
   useEffect(() => {
     dispatch(fetchExpenseCategories());
   }, [dispatch]);
@@ -116,19 +118,7 @@ const Expense = () => {
     dispatch(fetchExpenses());
   }, [dispatch]);
 
-  // Extract unique categories
-  const uniqueCategories = useMemo(() => {
-    const categoriesMap = new Map();
-    expenses.forEach((expense) => {
-      if (expense.category_details && expense.club_details?.id === userClub?.id) {
-        categoriesMap.set(expense.category_details.id, {
-          id: expense.category_details.id,
-          name: expense.category_details.name,
-        });
-      }
-    });
-    return Array.from(categoriesMap.values());
-  }, [expenses, userClub]);
+
 
   // Handle text input changes
   const handleChange = (e) => {
@@ -217,9 +207,9 @@ const Expense = () => {
       });
   };
 
-  // Filter expenses
+  // Filter and sort expenses
   const filteredExpenses = useMemo(() => {
-    return expenses.filter((expense) => {
+    const filtered = expenses.filter((expense) => {
       const expenseDate = new Date(expense.date);
       const from = startDate ? new Date(startDate) : null;
       const to = endDate ? new Date(endDate) : null;
@@ -230,6 +220,23 @@ const Expense = () => {
         (!to || expenseDate <= to)
       );
     });
+
+    const sorted = filtered.sort((a, b) => {
+      // Sort by created_at if available, otherwise by id
+      if (a.created_at && b.created_at) {
+        return new Date(b.created_at) - new Date(a.created_at); // Newest first
+      }
+      return b.id - a.id; // Fallback to id, assuming higher IDs are newer
+    });
+
+    // Log sorted expenses for debugging
+    console.log("Sorted expenses:", sorted.map(exp => ({
+      id: exp.id,
+      created_at: exp.created_at,
+      date: exp.date,
+    })));
+
+    return sorted;
   }, [expenses, startDate, endDate, userClub]);
 
   const paginatedExpenses = useMemo(() => {
@@ -376,7 +383,6 @@ const Expense = () => {
                           <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
                             {expense.invoice_number || "غير متاح"}
                           </td>
-                         
                           <td className="px-2 sm:px-4 py-3 text-sm flex justify-end">
                             <DropdownMenu dir="rtl">
                               <DropdownMenuTrigger asChild>
@@ -505,37 +511,35 @@ const Expense = () => {
                 </div>
 
                 <div>
-  <label className="block text-sm font-medium mb-1 text-right">
-    الفئة
-  </label>
-  <select
-    name="category"
-    value={currentExpense ? currentExpense.category : newExpense.category}
-    onChange={handleChange}
-    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
-  >
-    <option value="">اختر الفئة</option>
-    {loading && <option disabled>جاري التحميل...</option>}
-    {error && <option disabled>خطأ في تحميل الفئات</option>}
-    {expenseCategories?.map((category) => (
-      <option key={category.id} value={category.id.toString()}>
-        {category.name}
-      </option>
-    ))}
-  </select>
-  {errors.category && (
-    <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
-      {errors.category}
-    </p>
-  )}
-</div>
-
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    الفئة
+                  </label>
+                  <select
+                    name="category"
+                    value={currentExpense ? currentExpense.category : newExpense.category}
+                    onChange={handleChange}
+                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+                  >
+                    <option value="">اختر الفئة</option>
+                    {loading && <option disabled>جاري التحميل...</option>}
+                    {error && <option disabled>خطأ في تحميل الفئات</option>}
+                    {expenseCategories?.map((category) => (
+                      <option key={category.id} value={category.id.toString()}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.category && (
+                    <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
+                      {errors.category}
+                    </p>
+                  )}
+                </div>
 
                 {[
                   { label: "المبلغ", name: "amount", type: "number", step: "0.01" },
                   { label: "الوصف", name: "description", type: "text" },
                   { label: "التاريخ", name: "date", type: "date" },
-                 
                 ].map(({ label, name, type, step }) => (
                   <div key={name}>
                     <label className="block text-sm font-medium mb-1 text-right">
@@ -547,7 +551,7 @@ const Expense = () => {
                       value={currentExpense ? currentExpense[name] || "" : newExpense[name] || ""}
                       onChange={handleChange}
                       step={step}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+                      className="w-full border px-3 py-2 rounded-md focus:outline-none piqu: focus:ring-green-200 text-right text-sm sm:text-base"
                     />
                     {errors[name] && (
                       <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
@@ -556,8 +560,6 @@ const Expense = () => {
                     )}
                   </div>
                 ))}
-
-          
               </div>
               <div className="mt-6 flex justify-end gap-2">
                 <button

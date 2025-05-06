@@ -30,6 +30,8 @@ import EntryForm from "./EntryForm";
 
 
 
+
+
 const Attendance = () => {
   const dispatch = useDispatch();
 
@@ -40,9 +42,9 @@ const Attendance = () => {
     error: attendanceError,
   } = useSelector((state) => state.attendance);
   
-    const { subscriptions, status, error, updateStatus } = useSelector(
-      (state) => state.subscriptions
-    );
+  const { subscriptions, status, error, updateStatus } = useSelector(
+    (state) => state.subscriptions
+  );
   const {
     entryLogs,
     loading: entryLogsLoading,
@@ -88,6 +90,7 @@ const Attendance = () => {
   useEffect(() => {
     dispatch(fetchAttendances());
     dispatch(fetchEntryLogs());
+    dispatch(fetchSubscriptions());
   }, [dispatch]);
 
   // Handle input changes
@@ -115,30 +118,32 @@ const Attendance = () => {
     setEntryLogPage(1); // Reset to first page on filter change
   };
 
-  // Filter and paginate Attendance data
-  const filteredAttendances = attendances.filter((attendance) => {
-    const subscriptionText =
-      typeof attendance.subscription === "string"
-        ? attendance.subscription
-        : attendance.subscription?.name || "";
+  // Filter and sort Attendance data
+  const filteredAttendances = attendances
+    .filter((attendance) => {
+      const subscriptionText =
+        typeof attendance.subscription === "string"
+          ? attendance.subscription
+          : attendance.subscription?.name || "";
   
-    const matchesSubscription = subscriptionText
-      .toLowerCase()
-      .includes(attendanceFilters.subscription.toLowerCase());
+      const matchesSubscription = subscriptionText
+        .toLowerCase()
+        .includes(attendanceFilters.subscription.toLowerCase());
   
-    const matchesDate = attendance.attendance_date.includes(
-      attendanceFilters.attendance_date
-    );
+      const matchesDate = attendance.attendance_date.includes(
+        attendanceFilters.attendance_date
+      );
   
-    const matchesMemberName =
-      attendance.member_details?.name
-        ?.toLowerCase()
-        .includes(attendanceFilters.member_name.toLowerCase()) ||
-      !attendanceFilters.member_name;
+      const matchesMemberName =
+        attendance.member_details?.name
+          ?.toLowerCase()
+          .includes(attendanceFilters.member_name.toLowerCase()) ||
+        !attendanceFilters.member_name;
   
-    return matchesSubscription && matchesDate && matchesMemberName;
-  });
-  
+      return matchesSubscription && matchesDate && matchesMemberName;
+    })
+    // Sort by attendance_date (newest to oldest)
+    .sort((a, b) => new Date(b.attendance_date) - new Date(a.attendance_date));
 
   const totalAttendancePages = Math.ceil(filteredAttendances.length / attendanceItemsPerPage);
   const paginatedAttendances = filteredAttendances.slice(
@@ -147,16 +152,19 @@ const Attendance = () => {
   );
 
   // Filter and paginate Entry Logs data
-  const filteredEntryLogs = entryLogs.filter((log) => {
-    const matchesClub = log.club_details?.name
-      ?.toLowerCase()
-      .includes(entryLogFilters.club.toLowerCase()) || !entryLogFilters.club;
-    const matchesMember = log.member_details?.name
-      ?.toLowerCase()
-      .includes(entryLogFilters.member.toLowerCase()) || !entryLogFilters.member;
-    const matchesTimestamp = log.timestamp.includes(entryLogFilters.timestamp);
-    return matchesClub && matchesMember && matchesTimestamp;
-  });
+  const filteredEntryLogs = entryLogs
+    .filter((log) => {
+      const matchesClub = log.club_details?.name
+        ?.toLowerCase()
+        .includes(entryLogFilters.club.toLowerCase()) || !entryLogFilters.club;
+      const matchesMember = log.member_details?.name
+        ?.toLowerCase()
+        .includes(entryLogFilters.member.toLowerCase()) || !entryLogFilters.member;
+      const matchesTimestamp = log.timestamp.includes(entryLogFilters.timestamp);
+      return matchesClub && matchesMember && matchesTimestamp;
+    })
+    // Sort by timestamp (newest to oldest, already assumed in Entry Logs)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
   const totalEntryLogPages = Math.ceil(filteredEntryLogs.length / entryLogItemsPerPage);
   const paginatedEntryLogs = filteredEntryLogs.slice(
@@ -167,12 +175,12 @@ const Attendance = () => {
   // Handle adding new attendance
   const handleAddAttendance = (e) => {
     e.preventDefault();
-    if (!newAttendance.subscription ) {
+    if (!newAttendance.subscription) {
       alert("الرجاء ملء جميع الحقول الخاصة بالحضور.");
       return;
     }
     dispatch(addAttendance(newAttendance));
-    setNewAttendance({ subscription: "", });
+    setNewAttendance({ subscription: "" });
     setIsAttendanceDialogOpen(false);
   };
 
@@ -203,22 +211,19 @@ const Attendance = () => {
   };
 
   // Function to parse and format the timestamp
-const formatDate = (dateStr) => {
-  const date = new Date(dateStr);  // Parse the timestamp string
-  return date.toLocaleString('en-GB', {  // Format the date to a specific format
-    weekday: 'short', // Optional: to include the weekday (Mon, Tue, etc.)
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  });
-};
-
-  useEffect(() => {
-    dispatch(fetchSubscriptions());
-  }, [dispatch]);
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr); // Parse the timestamp string
+    if (isNaN(date)) return "Invalid date"; // Handle invalid dates
+    return date.toLocaleString("en-GB", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -284,41 +289,40 @@ const formatDate = (dateStr) => {
 
               {/* Attendance Dialog */}
               {isAttendanceDialogOpen && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
-      <button
-        onClick={() => setIsAttendanceDialogOpen(false)}
-        className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
-      >
-        ×
-      </button>
-      <h3 className="text-lg font-semibold mb-4">إضافة حضور</h3>
-      <form onSubmit={handleAddAttendance} className="space-y-4">
-        <div>
-          <label className="block text-sm mb-1">اسم العضو</label>
-          <select
-            name="subscription"
-            value={newAttendance.subscription}
-            onChange={handleAttendanceInputChange}
-            className="border px-3 py-2 rounded w-full"
-            required
-          >
-            <option value="">اختر العضو</option>
-            {subscriptions.map((sub) => (
-              <option key={sub.id} value={sub.id}>
-                {sub.member_name} (النادي: {sub.club_name})
-              </option>
-            ))}
-          </select>
-        </div>
-   
-        <Button type="submit" className="w-full bg-blue-500">
-          إضافة الحضور
-        </Button>
-      </form>
-    </div>
-  </div>
-)}
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                  <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
+                    <button
+                      onClick={() => setIsAttendanceDialogOpen(false)}
+                      className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
+                    >
+                      ×
+                    </button>
+                    <h3 className="text-lg font-semibold mb-4">إضافة حضور</h3>
+                    <form onSubmit={handleAddAttendance} className="space-y-4">
+                      <div>
+                        <label className="block text-sm mb-1">اسم العضو</label>
+                        <select
+                          name="subscription"
+                          value={newAttendance.subscription}
+                          onChange={handleAttendanceInputChange}
+                          className="border px-3 py-2 rounded w-full"
+                          required
+                        >
+                          <option value="">اختر العضو</option>
+                          {subscriptions.map((sub) => (
+                            <option key={sub.id} value={sub.id}>
+                              {sub.member_name} (النادي: {sub.club_name})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <Button type="submit" className="w-full bg-blue-500">
+                        إضافة الحضور
+                      </Button>
+                    </form>
+                  </div>
+                </div>
+              )}
 
               {/* Attendance Table */}
               {attendanceLoading && <p>جاري تحميل بيانات الحضور...</p>}
@@ -331,7 +335,6 @@ const formatDate = (dateStr) => {
                     <table className="min-w-full divide-y divide-border">
                       <thead>
                         <tr className="bg-muted/50">
-                          
                           <th className="px-4 py-3 text-right text-sm font-medium">تاريخ الحضور</th>
                           <th className="px-4 py-3 text-right text-sm font-medium">اسم العضو</th>
                           <th className="px-4 py-3 text-right text-sm font-medium">الإجراءات</th>
@@ -343,8 +346,11 @@ const formatDate = (dateStr) => {
                             key={attendance.id}
                             className="hover:bg-gray-100 transition"
                           >
-                           
-                            <td className="px-4 py-3 text-sm">{attendance.attendance_date}</td>
+                            <td className="px-4 py-3 text-sm">
+                              {attendance.attendance_date
+                                ? formatDate(attendance.attendance_date)
+                                : "Invalid date"}
+                            </td>
                             <td className="px-4 py-3 text-sm">
                               {attendance.member_name || "غير متاح"}
                             </td>
@@ -448,20 +454,19 @@ const formatDate = (dateStr) => {
 
               {/* Entry Log Dialog */}
               {isEntryLogDialogOpen && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
-      <button
-        onClick={() => setIsEntryLogDialogOpen(false)}
-        className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
-      >
-        ×
-      </button>
-      <h3 className="text-lg font-semibold mb-4">إضافة سجل دخول</h3>
-      <EntryForm />
-    </div>
-  </div>
-)}
-
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                  <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
+                    <button
+                      onClick={() => setIsEntryLogDialogOpen(false)}
+                      className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
+                    >
+                      ×
+                    </button>
+                    <h3 className="text-lg font-semibold mb-4">إضافة سجل دخول</h3>
+                    <EntryForm />
+                  </div>
+                </div>
+              )}
 
               {/* Entry Logs Table */}
               {entryLogsLoading && <p>جاري تحميل سجلات الدخول...</p>}
@@ -494,8 +499,8 @@ const formatDate = (dateStr) => {
                               {log.member_name || "غير متاح"}
                             </td>
                             <td className="px-4 py-3 text-sm">
-        {log.timestamp ? formatDate(log.timestamp) : 'Invalid date'}
-      </td>
+                              {log.timestamp ? formatDate(log.timestamp) : "Invalid date"}
+                            </td>
                           </tr>
                         ))}
                       </tbody>

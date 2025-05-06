@@ -10,7 +10,6 @@ const EntryForm = ({ onSuccess }) => {
   const [formData, setFormData] = useState({
     club: '',
     membership_number: '',
-    membership_name: '',
   });
 
   const [clubs, setClubs] = useState([]);
@@ -45,7 +44,6 @@ const EntryForm = ({ onSuccess }) => {
       const requestBody = {
         club: Number(formData.club),
         membership_number: Number(formData.membership_number),
-        membership_name: formData.membership_name,
       };
 
       const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/add/`, {
@@ -69,7 +67,7 @@ const EntryForm = ({ onSuccess }) => {
       console.log('✅ Response received:', data);
 
       toast.success('Entry log added successfully!');
-      setFormData({ club: '', membership_number: '', membership_name: '' });
+      setFormData({ club: '', membership_number: '' });
 
       if (onSuccess) {
         onSuccess(); // ✅ call parent to close modal
@@ -111,15 +109,7 @@ const EntryForm = ({ onSuccess }) => {
         required
         className="w-full border px-3 py-2 rounded"
       />
-      <input
-        type="text"
-        name="membership_name"
-        placeholder="Membership Name"
-        value={formData.membership_name}
-        onChange={handleChange}
-        required
-        className="w-full border px-3 py-2 rounded"
-      />
+
       <button
         type="submit"
         className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
@@ -131,6 +121,7 @@ const EntryForm = ({ onSuccess }) => {
 };
 
 export default EntryForm;
+
 
 
 
