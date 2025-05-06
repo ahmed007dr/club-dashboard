@@ -17,7 +17,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attendance
         fields = [
-            # 'id',
+             'id',
             'subscription',
             'subscription_details',
             'attendance_date',

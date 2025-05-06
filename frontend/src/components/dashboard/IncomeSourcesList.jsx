@@ -128,15 +128,27 @@ const IncomeSourcesList = () => {
       ) : filteredSources.length === 0 ? (
         <p className="text-center text-gray-500">لا توجد مصادر دخل مسجلة.</p>
       ) : (
-        <ul className="space-y-4">
-          {filteredSources.map((source) => (
-            <li key={source.id} className="p-4 border rounded-md shadow-sm">
-              <p><span className="font-semibold">الاسم:</span> {source.name}</p>
-              <p><span className="font-semibold">الوصف:</span> {source.description}</p>
-              <p><span className="font-semibold">النادي:</span> {source.club_details?.name || "غير معروف"}</p>
-            </li>
-          ))}
-        </ul>
+        <div className="overflow-x-auto">
+        <table className="max-w-full table-auto border border-gray-300">
+          <thead>
+            <tr className=" text-right">
+              <th className="px-4 py-2 border">الاسم</th>
+              <th className="px-4 py-2 border">الوصف</th>
+              <th className="px-4 py-2 border">النادي</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredSources.map((source) => (
+              <tr key={source.id} className="text-right">
+                <td className="px-4 py-2 border">{source.name}</td>
+                <td className="px-4 py-2 border">{source.description}</td>
+                <td className="px-4 py-2 border">{source.club_details?.name || 'غير معروف'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      
       )}
 
       {/* Pagination */}

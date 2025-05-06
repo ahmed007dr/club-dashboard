@@ -18,7 +18,6 @@ import axios from 'axios';
 
 
 
-
 const Staff = () => {
   const dispatch = useDispatch();
   const staff = useSelector((state) => state.staff.items || []);
@@ -42,7 +41,7 @@ const Staff = () => {
   const [clubs, setClubs] = useState([]);
   const [selectedClubId, setSelectedClubId] = useState("");
   const [selectedClubUsers, setSelectedClubUsers] = useState([]);
-
+  const [profileUser, setProfileUser] = useState({ id: "", username: "" });
   // Fetch users grouped by club
   useEffect(() => {
     const fetchUsersGroupedByClub = async () => {
@@ -88,13 +87,18 @@ const Staff = () => {
     })
       .then((response) => response.json())
       .then((data) => {
+        console.log("Profile data:", data);
+  
         const club = { id: data.club.id, name: data.club.name };
         setUserClub(club);
         setFilters((prev) => ({ ...prev, club: club.id.toString() }));
         setFormData((prev) => ({ ...prev, club: club.id.toString() }));
         setSelectedClubId(club.id.toString());
+        setProfileUser({ id: data.id, username: data.username }); // Store id and username
+  
         const userClubData = clubs.find((c) => c.club_id === club.id);
         if (userClubData) setSelectedClubUsers(userClubData.users);
+  
         setLoadingProfile(false);
       })
       .catch((err) => {
@@ -242,7 +246,7 @@ const Staff = () => {
     return isNaN(parsedDate) ? new Date(0) : parsedDate; // Fallback for invalid dates
   };
 
-  // Filter and sort staff based on filters
+  // Filter and sort staff based on filters and id (newest to oldest)
   const filteredStaff = useMemo(() => {
     return staff
       .filter((shift) => {
@@ -258,9 +262,8 @@ const Staff = () => {
         return clubMatch && staffMatch;
       })
       .sort((a, b) => {
-        const dateA = parseTime(a.shift_start);
-        const dateB = parseTime(b.shift_start);
-        return dateB - dateA; // Sort newest to oldest
+        // Sort by id in descending order (highest id first = newest)
+        return (b.id || 0) - (a.id || 0);
       });
   }, [staff, filters, userClub]);
 
@@ -298,7 +301,7 @@ const Staff = () => {
 
   return (
     <div className="p-4 sm:p-6" dir="rtl">
-      {/* Header Chaucer and Add Button */}
+      {/* Header and Add Button */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
         <div className="flex items-center space-x-3 space-x-reverse">
           <RiUserLine className="text-blue-600 w-6 h-6 sm:w-8 sm:h-8" />
@@ -479,7 +482,7 @@ const Staff = () => {
                     {`${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`}
                   </p>
                   <p className="text-sm">
-                    <strong>تمت الموافقة بواسطة:</strong>{" "}
+                    <strong>تمت الماملة بواسطة:</strong>{" "}
                     {shift.approved_by_details
                       ? shift.approved_by_details.username
                       : "غير موافق عليه"}
@@ -624,24 +627,20 @@ const Staff = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  تمت الموافقة بواسطة
-                </label>
-                <select
-                  name="approved_by"
-                  value={formData.approved_by || ""}
-                  onChange={handleFormChange}
-                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-                  disabled={!formData.club}
-                >
-                  <option value="">اختر موافق</option>
-                  {selectedClubUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.first_name} {user.last_name} ({user.username})
-                    </option>
-                  ))}
-                </select>
-              </div>
+  <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
+  <select
+    name="approved_by"
+    value={formData.approved_by || ""}
+    onChange={handleFormChange}
+    className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+    disabled={!formData.club}
+  >
+    <option value="">اختر موافق</option>
+    {profileUser.id && (
+      <option value={profileUser.id}>{profileUser.username}</option>
+    )}
+  </select>
+</div>
 
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -734,23 +733,19 @@ const Staff = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  تمت الموافقة بواسطة
-                </label>
-                <select
-                  name="approved_by"
-                  value={formData.approved_by || ""}
-                  onChange={handleFormChange}
-                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-                >
-                  <option value="">اختر موافق</option>
-                  {selectedClubUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.first_name} {user.last_name} ({user.username})
-                    </option>
-                  ))}
-                </select>
-              </div>
+  <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
+  <select
+    name="approved_by"
+    value={formData.approved_by || ""}
+    onChange={handleFormChange}
+    className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+  >
+    <option value="">اختر موافق</option>
+    {profileUser.id && (
+      <option value={profileUser.id}>{profileUser.username}</option>
+    )}
+  </select>
+</div>
 
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -762,7 +757,7 @@ const Staff = () => {
                 </button>
                 <button
                   type="submit"
-                  className="btn"
+                  className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                 >
                   حفظ
                 </button>

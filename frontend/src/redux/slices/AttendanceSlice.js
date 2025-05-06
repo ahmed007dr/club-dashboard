@@ -12,14 +12,21 @@ export const fetchAttendances = createAsyncThunk(
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-        },
+        }
       });
-      return response.data; // Use response.data instead of response.json()
+
+      // Sort by attendance_date (newest first)
+      const sortedData = [...response.data].sort((a, b) => 
+        new Date(b.attendance_date) - new Date(a.attendance_date)
+      );
+      
+      return sortedData;
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch attendances.');
     }
   }
 );
+
 
 // Async thunk for adding attendance
 export const addAttendance = createAsyncThunk(
@@ -59,8 +66,11 @@ export const deleteAttendance = createAsyncThunk(
           'Content-Type': 'application/json',
         },
       });
+
+      console.log('Delete successful:', response.data); // Log successful response
       return id; // Return the ID for optimistic updates
     } catch (error) {
+      console.error('Delete failed:', error.response?.data || error.message); // Log error details
       return rejectWithValue(error.response?.data?.message || 'Failed to delete attendance.');
     }
   }
