@@ -12,6 +12,7 @@ import {
 } from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
 import BASE_URL from "@/config/api";
+import { Link } from 'react-router-dom';
 
 
 import axios from 'axios';
@@ -21,6 +22,7 @@ import axios from 'axios';
 const Staff = () => {
   const dispatch = useDispatch();
   const staff = useSelector((state) => state.staff.items || []);
+  console.log("Staff data:", staff);
   const [selectedShift, setSelectedShift] = useState(null);
   const [modalType, setModalType] = useState("");
   const [formData, setFormData] = useState({
@@ -393,9 +395,11 @@ const Staff = () => {
                         : "Invalid date"}
                     </td>
                     <td className="p-2 sm:p-3">{shift.club_details?.name}</td>
-                    <td className="p-2 sm:p-3">
-                      {`${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`}
-                    </td>
+                    <td className="p-2 sm:p-3 text-blue-600 hover:underline">
+  <Link to={`/staff/${shift.staff_details.id}`}>
+    {`${shift.staff_details.first_name} ${shift.staff_details.last_name}`}
+  </Link>
+</td>
                     <td className="p-2 sm:p-3">
                       {shift.approved_by_details
                         ? shift.approved_by_details.username

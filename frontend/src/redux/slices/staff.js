@@ -84,22 +84,39 @@ export const deleteStaff = createAsyncThunk('staff/deleteStaff', async (id) => {
 // Get staff by ID
 export const getStaffById = createAsyncThunk('staff/getStaffById', async (id) => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`${BASE_URL}/staff/api/staff/${id}/`, {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-    });
-    if (!res.ok) {
-        if (res.status === 404) {
-            throw new Error("Staff not found.");
+    
+    console.log("Fetching staff data for ID:", id); // Debugging line
+
+    try {
+        const res = await fetch(`${BASE_URL}/staff/api/shifts/staff/${id}/`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+        });
+
+        // Check if response is OK
+        if (!res.ok) {
+            if (res.status === 404) {
+                console.log("Staff not found (404).");
+                throw new Error("Staff not found.");
+            }
+            console.log("Failed to fetch staff by ID, status:", res.status);
+            throw new Error("Failed to fetch staff by ID.");
         }
-        throw new Error("Failed to fetch staff by ID.");
+
+        const data = await res.json();
+        console.log("Fetched staff data:", data);  // ✅ Console log added
+
+        return data; // Returning the staff data
+    } catch (error) {
+        console.log("Error occurred during staff data fetch:", error.message);
+        throw error; // Rethrow the error for Redux to handle
     }
-    const data = await res.json();
-    return data;
 });
+
+
 
 // Staff slice
 const staffSlice = createSlice({
@@ -147,10 +164,13 @@ const staffSlice = createSlice({
                 state.items = state.items.filter(staff => staff.id !== id);
             })
 
-            // getStaffById
             .addCase(getStaffById.fulfilled, (state, action) => {
+                console.log("Staff data fetched successfully:", action.payload); // Log the payload here
                 state.user = action.payload;
-            });
+              })
+              .addCase(getStaffById.rejected, (state, action) => {
+                console.log("Error fetching staff data:", action.error); // Log if there's an error
+              });
     },
 });
 
