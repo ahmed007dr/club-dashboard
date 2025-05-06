@@ -1,8 +1,6 @@
 from django.db import models
 from accounts.models import User
 from core.models import Club
-from core.models import Club
-from accounts.models import User
 
 
 # Create your models here.

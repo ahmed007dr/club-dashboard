@@ -6,15 +6,26 @@ from .models import Attendance, EntryLog
 from .serializers import AttendanceSerializer, EntryLogSerializer
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub  
+from django.db.models import Q
 
 # Attendance API Views
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_list_api(request):
+    search_term = request.GET.get('q', '')
+
     if request.user.role == 'owner':
-        attendances = Attendance.objects.select_related('subscription', 'subscription__member').order_by('-attendance_date')  
+        attendances = Attendance.objects.select_related('subscription', 'subscription__member')
     else:
-        attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(subscription__club=request.user.club).order_by('-attendance_date')  # باقي الموظفين يشوفوا بس السجلات في ناديهم
+        attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(subscription__club=request.user.club)
+
+    if search_term:
+        attendances = attendances.filter(
+            Q(subscription__member__name__icontains=search_term) |
+            Q(subscription__member__membership_number__icontains=search_term)
+        )
+
+    attendances = attendances.order_by('-attendance_date')
 
     serializer = AttendanceSerializer(attendances, many=True)
     return Response(serializer.data)
@@ -42,10 +53,20 @@ def delete_attendance_api(request, attendance_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def entry_log_list_api(request):
+    search_term = request.GET.get('q', '')
+
     if request.user.role == 'owner':
-        logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').order_by('-timestamp')  
+        logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription')
     else:
-        logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(club=request.user.club).order_by('-timestamp')  # باقي الموظفين يشوفوا بس السجلات في ناديهم
+        logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(club=request.user.club)
+
+    if search_term:
+        logs = logs.filter(
+            Q(member__name__icontains=search_term) |
+            Q(member__membership_number__icontains=search_term)
+        )
+
+    logs = logs.order_by('-timestamp')
 
     serializer = EntryLogSerializer(logs, many=True)
     return Response(serializer.data)

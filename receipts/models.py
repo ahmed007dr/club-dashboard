@@ -1,11 +1,4 @@
 from django.db import models
-
-# Create your models here.
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from finance.models import Income, IncomeSource
-from django.utils.timezone import now
-from accounts.models import User
 from members.models import Member
 from subscriptions.models import Subscription
 
@@ -33,26 +26,3 @@ class AutoCorrectionLog(models.Model):
 
     def __str__(self):
         return f"Correction for {self.member.name} on {self.created_at.strftime('%Y-%m-%d')}"
-
-
-
-# @receiver(post_save, sender=Receipt)
-# def create_income_for_receipt(sender, instance, created, **kwargs):
-#     if created:
-#         source_name = 'Subscription Payment' if instance.subscription else 'General Payment'
-#         source, _ = IncomeSource.objects.get_or_create(club=instance.club, name=source_name)
-
-#         Income.objects.create(
-#             club=instance.club,
-#             source=source,
-#             amount=instance.amount,
-#             date=instance.date.date(),
-#             received_by=instance.issued_by,
-#             related_receipt=instance
-#         )
-
-#         if not instance.invoice_number:
-#             today_str = now().strftime('%Y%m%d')
-#             invoice_id = f"INV{today_str}-{instance.id:04d}"
-#             Receipt.objects.filter(id=instance.id).update(invoice_number=invoice_id)
-
