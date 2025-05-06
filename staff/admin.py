@@ -3,26 +3,34 @@ from import_export.admin import ImportExportModelAdmin
 from import_export import resources, fields
 from .models import Shift, StaffAttendance
 
-
 # =======================
 # Shift Resource & Admin
 # =======================
 
 class ShiftResource(resources.ModelResource):
-    club_name = fields.Field(column_name='Club', attribute='club', readonly=True)
-    staff_username = fields.Field(column_name='Staff', attribute='staff', readonly=True)
-    approved_by_username = fields.Field(column_name='Approved By', attribute='approved_by', readonly=True)
+    club_name = fields.Field(column_name='Club')
+    staff_username = fields.Field(column_name='Staff')
+    approved_by_username = fields.Field(column_name='Approved By')
+
+    def dehydrate_club_name(self, obj):
+        return obj.club.name if obj.club else ''
+
+    def dehydrate_staff_username(self, obj):
+        return obj.staff.username if obj.staff else ''
+
+    def dehydrate_approved_by_username(self, obj):
+        return obj.approved_by.username if obj.approved_by else ''
 
     class Meta:
         model = Shift
         fields = (
             'id',
-            'club__name',
-            'staff__username',
             'date',
             'shift_start',
             'shift_end',
-            'approved_by__username',
+            'club_name',
+            'staff_username',
+            'approved_by_username',
         )
         export_order = fields
 
@@ -38,15 +46,24 @@ class ShiftAdmin(ImportExportModelAdmin):
     ordering = ['-date']
 
 
-# ===========================
+# =============================
 # Staff Attendance Resource
-# ===========================
+# =============================
 
 class StaffAttendanceResource(resources.ModelResource):
-    staff_username = fields.Field(column_name='Staff', attribute='staff', readonly=True)
-    club_name = fields.Field(column_name='Club', attribute='club', readonly=True)
-    shift_id = fields.Field(column_name='Shift ID', attribute='shift', readonly=True)
-    duration = fields.Field(column_name='Duration (hrs)', readonly=True)
+    club_name = fields.Field(column_name='Club')
+    staff_username = fields.Field(column_name='Staff')
+    shift_id_display = fields.Field(column_name='Shift ID')
+    duration = fields.Field(column_name='Duration (hrs)')
+
+    def dehydrate_club_name(self, obj):
+        return obj.club.name if obj.club else ''
+
+    def dehydrate_staff_username(self, obj):
+        return obj.staff.username if obj.staff else ''
+
+    def dehydrate_shift_id_display(self, obj):
+        return obj.shift.id if obj.shift else ''
 
     def dehydrate_duration(self, obj):
         return obj.duration_hours() or "N/A"
@@ -55,11 +72,12 @@ class StaffAttendanceResource(resources.ModelResource):
         model = StaffAttendance
         fields = (
             'id',
-            'staff__username',
-            'club__name',
             'check_in',
             'check_out',
-            'shift__id',
+            'club_name',
+            'staff_username',
+            'shift_id_display',
+            'duration',
         )
         export_order = fields
 
