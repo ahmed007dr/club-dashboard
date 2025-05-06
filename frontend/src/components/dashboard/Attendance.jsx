@@ -331,8 +331,7 @@ const formatDate = (dateStr) => {
                     <table className="min-w-full divide-y divide-border">
                       <thead>
                         <tr className="bg-muted/50">
-                          <th className="px-4 py-3 text-right text-sm font-medium">المعرف</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">الاشتراك</th>
+                          
                           <th className="px-4 py-3 text-right text-sm font-medium">تاريخ الحضور</th>
                           <th className="px-4 py-3 text-right text-sm font-medium">اسم العضو</th>
                           <th className="px-4 py-3 text-right text-sm font-medium">الإجراءات</th>
@@ -344,8 +343,7 @@ const formatDate = (dateStr) => {
                             key={attendance.id}
                             className="hover:bg-gray-100 transition"
                           >
-                            <td className="px-4 py-3 text-sm">{attendance.id}</td>
-                            <td className="px-4 py-3 text-sm">{attendance.subscription}</td>
+                           
                             <td className="px-4 py-3 text-sm">{attendance.attendance_date}</td>
                             <td className="px-4 py-3 text-sm">
                               {attendance.member_name || "غير متاح"}
