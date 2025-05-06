@@ -19,9 +19,11 @@ def member_list_api(request):
     paginator.page_size = 20
 
     if request.user.role == 'owner':
-        members = Member.objects.all() 
+        members = Member.objects.all()
     else:
-        members = Member.objects.filter(club=request.user.club)  
+        members = Member.objects.filter(club=request.user.club)
+
+    members = members.order_by('-id')  
 
     result_page = paginator.paginate_queryset(members, request)
     serializer = MemberSerializer(result_page, many=True)
@@ -74,6 +76,7 @@ def delete_member_api(request, member_id):
     member.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_search_api(request):
@@ -82,19 +85,22 @@ def member_search_api(request):
 
     search_term = request.GET.get('q', '')
 
+    search_filter = (
+        Q(name__icontains=search_term) |
+        Q(membership_number__icontains=search_term) |
+        Q(national_id__icontains=search_term) |
+        Q(phone__icontains=search_term)
+    )
+
     if request.user.role == 'owner':
-        members = Member.objects.filter(
-            Q(name__icontains=search_term) |
-            Q(membership_number__icontains=search_term)
-        )  
+        members = Member.objects.filter(search_filter)
     else:
-        members = Member.objects.filter(
-            Q(club=request.user.club) &
-            (Q(name__icontains=search_term) | Q(membership_number__icontains=search_term))
-        )  
+        members = Member.objects.filter(Q(club=request.user.club) & search_filter)
 
     serializer = MemberSerializer(members, many=True)
     return Response(serializer.data)
+
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
