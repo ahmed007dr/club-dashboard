@@ -3,8 +3,10 @@ import { useDispatch, useSelector } from "react-redux";
 import { postSubscription } from "../../redux/slices/subscriptionsSlice";
 import { fetchUsers } from "../../redux/slices/memberSlice";
 import { fetchSubscriptionTypes } from "../../redux/slices/subscriptionsSlice";
+import { toast } from "react-hot-toast";
 
-const CreateSubscription = () => {
+
+const CreateSubscription = ({ onClose })  => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error: subscriptionError } = useSelector(
     (state) => state.subscriptions
@@ -73,12 +75,12 @@ const CreateSubscription = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     const { club, member, type, start_date, paid_amount } = formData;
-
+  
     if (!club || !member || !type || !start_date || !paid_amount) {
-      alert("Please fill in all fields.");
+      toast.error("يرجى ملء جميع الحقول.");
       return;
     }
-
+  
     const payload = {
       club: parseInt(club),
       member: parseInt(member),
@@ -86,9 +88,26 @@ const CreateSubscription = () => {
       start_date,
       paid_amount: parseFloat(paid_amount),
     };
-
-    dispatch(postSubscription(payload));
+  
+    dispatch(postSubscription(payload))
+      .unwrap()
+      .then(() => {
+        toast.success("تم إنشاء الاشتراك بنجاح!");
+        // Optional: Reset form
+        setFormData({
+          club: "",
+          member: "",
+          type: "",
+          start_date: "",
+          paid_amount: "",
+        });
+        if (onClose) onClose();
+      })
+      .catch((err) => {
+        toast.error("فشل في إنشاء الاشتراك: " + (err.message || "خطأ غير معروف"));
+      });
   };
+  
 
   return (
     <div className="container mx-auto p-4" dir="rtl">

@@ -10,7 +10,7 @@ import {
 } from "../../redux/slices/invitesSlice";
 import { RiVipCrown2Line } from "react-icons/ri";
 import BASE_URL from '../../config/api';
-
+import { toast } from 'react-hot-toast';
 
 const InviteList = () => {
   const dispatch = useDispatch();
@@ -140,6 +140,7 @@ const InviteList = () => {
     return errors;
   };
 
+
   const handleAddInvite = async (e) => {
     e.preventDefault();
     const errors = validateForm();
@@ -147,15 +148,16 @@ const InviteList = () => {
       setFormErrors(errors);
       return;
     }
-
+  
     try {
       await dispatch(
         addInvite({
           ...formData,
           club: Number(formData.club),
-          invited_by: formData.invited_by || null, // Send membership_number as string or null
+          invited_by: formData.invited_by || null,
         })
       ).unwrap();
+      toast.success('تمت إضافة الدعوة بنجاح');
       setShowAddModal(false);
       setFormData({
         club: userClub?.id?.toString() || "",
@@ -168,12 +170,13 @@ const InviteList = () => {
       setFormErrors({});
     } catch (error) {
       console.error("Failed to add invite:", error);
+      toast.error('فشل في إضافة الدعوة');
       setFormErrors({
         general: "فشل في إضافة الدعوة: " + (error.message || "خطأ غير معروف"),
       });
     }
   };
-
+  
   const handleEditInvite = async (e) => {
     e.preventDefault();
     const errors = validateForm();
@@ -181,13 +184,13 @@ const InviteList = () => {
       setFormErrors(errors);
       return;
     }
-
+  
     const cleanedData = {
       ...formData,
       club: Number(formData.club),
-      invited_by: formData.invited_by || null, // Send membership_number as string or null
+      invited_by: formData.invited_by || null,
     };
-
+  
     try {
       await dispatch(
         editInviteById({
@@ -195,32 +198,36 @@ const InviteList = () => {
           inviteData: cleanedData,
         })
       ).unwrap();
+      toast.success('تم تعديل الدعوة بنجاح');
       setShowEditModal(false);
       setFormErrors({});
     } catch (error) {
       console.error("Failed to edit invite:", error);
+      toast.error('فشل في تعديل الدعوة');
       setFormErrors({
         general: "فشل في تعديل الدعوة: " + (error.message || "خطأ غير معروف"),
       });
     }
   };
-
+  
   const handleDeleteInvite = async () => {
     try {
       await dispatch(deleteInviteById(selectedInviteId)).unwrap();
+      toast.success('تم حذف الدعوة بنجاح');
       setShowDeleteModal(false);
     } catch (error) {
       console.error("Failed to delete invite:", error);
+      toast.error('فشل في حذف الدعوة');
     }
   };
-
+  
   const handleMarkAsUsed = async (e) => {
     e.preventDefault();
     if (!markUsedData.used_by) {
       setFormErrors({ used_by: "معرف العضو مطلوب" });
       return;
     }
-
+  
     try {
       await dispatch(
         markInviteAsUsed({
@@ -228,17 +235,20 @@ const InviteList = () => {
           used_by: Number(markUsedData.used_by),
         })
       ).unwrap();
+      toast.success('تم تحديد الدعوة كمستخدمة');
       setShowMarkUsedModal(false);
       setMarkUsedData({ used_by: "" });
       setFormErrors({});
     } catch (error) {
       console.error("Failed to mark invite as used:", error);
+      toast.error('فشل في تحديد الدعوة كمستخدمة');
       setFormErrors({
         general:
           "فشل في تحديد الدعوة كمستخدمة: " + (error.message || "خطأ غير معروف"),
       });
     }
   };
+  
 
   const openEditModal = async (inviteId) => {
     setSelectedInviteId(inviteId);

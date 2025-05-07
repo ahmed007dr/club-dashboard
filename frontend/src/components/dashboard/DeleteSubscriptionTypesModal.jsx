@@ -1,14 +1,27 @@
 import React from 'react';
 import { useDispatch } from 'react-redux';
 import { deleteSubscriptionType } from '../../redux/slices/subscriptionsSlice';
+import { toast } from 'react-hot-toast';
 
 const DeleteSubscriptionTypesModal = ({ isOpen, onClose, subscription }) => {
   const dispatch = useDispatch();
 
-  const handleDelete = () => {
-    dispatch(deleteSubscriptionType(subscription.id));
-    onClose(); // Close the modal after dispatch
+  const handleDelete = async () => {
+    try {
+      // Dispatch delete action
+      await dispatch(deleteSubscriptionType(subscription.id)).unwrap();
+      
+      // Show success notification
+      toast.success("تم حذف الاشتراك بنجاح!");
+
+      // Close the modal after successful deletion
+      onClose();
+    } catch (err) {
+      console.error("Deletion failed:", err);
+      toast.error("فشل في حذف الاشتراك");
+    }
   };
+
 
   if (!isOpen || !subscription) return null;
 

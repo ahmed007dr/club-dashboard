@@ -514,21 +514,22 @@ const SubscriptionList = () => {
 
       {/* Modals */}
       {createModalOpen && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full relative">
-            <button
-              onClick={() => setCreateModalOpen(false)}
-              className="absolute top-2 right-2 text-gray-600 hover:text-gray-800"
-            >
-              X
-            </button>
-            <h3 className="text-2xl font-semibold mb-4 text-center">
-              إضافة اشتراك
-            </h3>
-            <CreateSubscription />
-          </div>
-        </div>
-      )}
+  <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
+    <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full relative">
+      <button
+        onClick={() => setCreateModalOpen(false)}
+        className="absolute top-2 right-2 text-gray-600 hover:text-gray-800"
+      >
+        X
+      </button>
+      <h3 className="text-2xl font-semibold mb-4 text-center">
+        إضافة اشتراك
+      </h3>
+      <CreateSubscription onClose={() => setCreateModalOpen(false)} />
+    </div>
+  </div>
+)}
+
 
       {isModalOpen && (
         <UpdateSubscriptionModal

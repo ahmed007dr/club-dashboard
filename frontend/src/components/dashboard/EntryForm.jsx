@@ -40,12 +40,12 @@ const EntryForm = ({ onSuccess }) => {
   
     try {
       const token = localStorage.getItem('token');
-
+  
       const requestBody = {
         club: Number(formData.club),
         membership_number: Number(formData.membership_number),
       };
-
+  
       const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/add/`, {
         method: 'POST',
         headers: {
@@ -54,30 +54,34 @@ const EntryForm = ({ onSuccess }) => {
         },
         body: JSON.stringify(requestBody),
       });
-
+  
       const data = await response.json();
-
+  
       if (!response.ok) {
         console.error('Response error details:', data);
-        throw new Error(data.message || 'Failed to add entry log');
+        throw new Error(data.message || 'فشل في إضافة سجل الدخول');
       }
-
+  
       console.log('✅ Successfully submitted:');
       console.log('➡️ Data sent:', requestBody);
       console.log('✅ Response received:', data);
-
-      toast.success('Entry log added successfully!');
+  
+      // Arabic success message
+      toast.success('تم إضافة سجل الدخول بنجاح!');
       setFormData({ club: '', membership_number: '' });
-
+  
       if (onSuccess) {
-        onSuccess(); // ✅ call parent to close modal
+        onSuccess(); // Close modal on success
       }
-
+  
     } catch (error) {
       console.error('Submit Entry Error:', error);
-      toast.error(error.message);
+  
+      // Arabic error message
+      toast.error(error.message || 'حدث خطأ أثناء إضافة السجل');
     }
   };
+  
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto p-4 border rounded">

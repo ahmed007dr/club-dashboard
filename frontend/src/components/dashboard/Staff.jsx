@@ -13,7 +13,7 @@ import {
 import { MoreVertical } from "lucide-react";
 import BASE_URL from "@/config/api";
 import { Link } from 'react-router-dom';
-
+import { toast } from 'react-hot-toast';
 
 import axios from 'axios';
 
@@ -151,6 +151,35 @@ const Staff = () => {
     }
   };
 
+  const handleAddSubmit = (e) => {
+    e.preventDefault();
+  
+    if (!userClub) {
+      toast.error("النادي غير متاح. يرجى المحاولة لاحقًا.");
+      return;
+    }
+  
+    const staffData = {
+      shift_end: formData.shift_end,
+      club: Number(formData.club),
+      staff: Number(formData.staff) || null,
+      approved_by: Number(formData.approved_by) || null,
+    };
+  
+    dispatch(addStaff(staffData))
+      .unwrap()
+      .then(() => {
+        dispatch(fetchStaff());
+        toast.success("تم إضافة الوردية بنجاح!");
+        handleCloseModal(); // Close modal
+      })
+      .catch((err) => {
+        toast.error("فشل في إضافة الوردية: " + (err.message || "خطأ غير معروف"));
+      });
+  };
+  
+  
+
   const handleCloseModal = () => {
     setModalType("");
     setSelectedShift(null);
@@ -163,67 +192,44 @@ const Staff = () => {
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleAddSubmit = (e) => {
-    e.preventDefault();
-    if (!userClub) {
-      setFormError("النادي غير متاح. يرجى المحاولة لاحقًا.");
-      return;
-    }
-
-    const staffData = {
-      shift_end: formData.shift_end,
-      club: Number(formData.club),
-      staff: Number(formData.staff) || null,
-      approved_by: Number(formData.approved_by) || null,
-    };
-
-    dispatch(addStaff(staffData))
-      .unwrap()
-      .then(() => {
-        dispatch(fetchStaff());
-        handleCloseModal();
-      })
-      .catch((err) => {
-        setFormError(
-          "فشل في إضافة الوردية: " + (err.message || "خطأ غير معروف")
-        );
-      });
-  };
-
   const handleEditSubmit = (e) => {
     e.preventDefault();
+  
     if (!userClub) {
-      setFormError("النادي غير متاح. يرجى المحاولة لاحقًا.");
+      toast.error("النادي غير متاح. يرجى المحاولة لاحقًا.");
       return;
     }
-
+  
     const updatedStaff = {
       shift_end: formData.shift_end,
       club: Number(formData.club),
       staff: Number(formData.staff) || null,
       approved_by: Number(formData.approved_by) || null,
     };
-
+  
     dispatch(editStaff({ id: selectedShift.id, updatedStaff }))
       .unwrap()
       .then(() => {
         dispatch(fetchStaff());
+        toast.success("تم تعديل الوردية بنجاح!");
         handleCloseModal();
       })
       .catch((err) => {
-        setFormError(
-          "فشل في تعديل الوردية: " + (err.message || "خطأ غير معروف")
-        );
+        toast.error("فشل في تعديل الوردية: " + (err.message || "خطأ غير معروف"));
       });
   };
-
+  
   const confirmDelete = () => {
     dispatch(deleteStaff(selectedShift.id))
       .unwrap()
       .then(() => {
         dispatch(fetchStaff());
+        toast.success("تم حذف الوردية بنجاح!");
         handleCloseModal();
         setCurrentPage(1);
+      })
+      .catch((err) => {
+        toast.error("فشل في حذف الوردية: " + (err.message || "خطأ غير معروف"));
       });
   };
 

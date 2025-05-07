@@ -27,7 +27,7 @@ import {
   
 } from "../../redux/slices/subscriptionsSlice";
 import EntryForm from "./EntryForm";
-
+import { toast } from 'react-hot-toast';  // Import toast
 
 const Attendance = () => {
   const dispatch = useDispatch();
@@ -162,16 +162,26 @@ const Attendance = () => {
     entryLogPage * entryLogItemsPerPage
   );
 
-  // Handle adding new attendance
   const handleAddAttendance = (e) => {
     e.preventDefault();
-    if (!newAttendance.subscription ) {
-      alert("الرجاء ملء جميع الحقول الخاصة بالحضور.");
+  
+    // Check if all fields are filled
+    if (!newAttendance.subscription) {
+      toast.error("الرجاء ملء جميع الحقول الخاصة بالحضور.");
       return;
     }
-    dispatch(addAttendance(newAttendance));
-    setNewAttendance({ subscription: "", });
-    setIsAttendanceDialogOpen(false);
+  
+    dispatch(addAttendance(newAttendance))
+      .unwrap() // Ensure that if the action returns a promise, we handle it properly
+      .then(() => {
+        toast.success("تم إضافة الحضور بنجاح!");  // Show success toast
+        setNewAttendance({ subscription: "" });  // Reset form data
+        setIsAttendanceDialogOpen(false);  // Close the modal after success
+      })
+      .catch((err) => {
+        console.error("Failed to add attendance:", err);
+        toast.error("فشل في إضافة الحضور");  // Show error toast
+      });
   };
 
   // Handle adding new entry log
@@ -440,10 +450,11 @@ const Attendance = () => {
         ×
       </button>
       <h3 className="text-lg font-semibold mb-4">إضافة سجل دخول</h3>
-      <EntryForm />
+      <EntryForm onSuccess={() => setIsEntryLogDialogOpen(false)} />
     </div>
   </div>
 )}
+
 
 
               {/* Entry Logs Table */}
