@@ -4,7 +4,6 @@ import BASE_URL from '../../config/api';
 
 const API_BASE_URL = `${BASE_URL}/receipts/api`;
 
-// Helper function to get auth headers
 const getAuthHeaders = () => {
   const token = localStorage.getItem('token');
   if (!token) {
@@ -17,18 +16,17 @@ const getAuthHeaders = () => {
   };
 };
 
-// Async Thunks
 export const fetchReceipts = createAsyncThunk(
   'receipts/fetchAll',
-  async (_, { rejectWithValue }) => {
+  async ({ clubId }, { rejectWithValue }) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/receipts/`, {
         headers: getAuthHeaders(),
+        params: { club_id: clubId },
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching receipts:', error.response?.data || error.message);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -50,8 +48,7 @@ export const addReceipt = createAsyncThunk(
       }
       return response.data;
     } catch (error) {
-      console.error('Error adding receipt:', error.response?.data || error.message);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -74,11 +71,8 @@ export const fetchReceiptByInvoice = createAsyncThunk(
     } catch (error) {
       const status = error.response?.status;
       if (status === 404) {
-        // Gracefully handle not found
-        return null; // or return a specific object like { message: "Not found" }
+        return null;
       }
-
-      console.error('Error fetching receipt by invoice:', error.response?.data || error.message);
       return rejectWithValue('Something went wrong while fetching the receipt');
     }
   }
@@ -93,18 +87,22 @@ export const fetchReceiptById = createAsyncThunk(
       });
       return response.data;
     } catch (error) {
-      console.error('Error fetching receipt by ID:', error.response?.data || error.message);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
+
 export const deleteReceipt = createAsyncThunk(
   'receipts/delete',
-  async (receiptId) => {
-    await axios.delete(`${API_BASE_URL}/receipts/${receiptId}/delete/`, {
-      headers: getAuthHeaders()
-    });
-    return receiptId;
+  async (receiptId, { rejectWithValue }) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/receipts/${receiptId}/delete/`, {
+        headers: getAuthHeaders()
+      });
+      return receiptId;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
+    }
   }
 );
 
@@ -112,24 +110,18 @@ export const updateReceipt = createAsyncThunk(
   'receipts/update',
   async ({ receiptId, receiptData }, { rejectWithValue }) => {
     try {
-      console.log(`Attempting to update receipt with ID: ${receiptId}`, receiptData); // Log the receipt data being sent
-
+      console.log(`Attempting to update receipt with ID: ${receiptId}`, receiptData);
       const response = await axios.put(`${API_BASE_URL}/receipts/${receiptId}/edit/`, receiptData, {
         headers: getAuthHeaders()
       });
-
-      console.log('Receipt updated successfully:', response.data); // Log the successful response
+      console.log('Receipt updated successfully:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error updating receipt:', error.response?.data || error.message); // Log the error
-      return rejectWithValue(
-        error.response?.data || error.message
-      );
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
-// Receipts Slice
 const receiptsSlice = createSlice({
   name: 'receipts',
   initialState: {
@@ -145,7 +137,6 @@ const receiptsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      // Fetch all receipts
       .addCase(fetchReceipts.pending, (state) => {
         state.status = 'loading';
       })
@@ -155,10 +146,8 @@ const receiptsSlice = createSlice({
       })
       .addCase(fetchReceipts.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload;
       })
-      
-      // Add receipt
       .addCase(addReceipt.pending, (state) => {
         state.status = 'loading';
       })
@@ -168,34 +157,27 @@ const receiptsSlice = createSlice({
       })
       .addCase(addReceipt.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload;
       })
-      
       .addCase(fetchReceiptByInvoice.pending, (state) => {
         state.status = 'loading';
         state.error = null;
         state.message = null;
       })
-  
-      // Fulfilled state
       .addCase(fetchReceiptByInvoice.fulfilled, (state, action) => {
         state.status = 'succeeded';
         if (action.payload === null) {
           state.message = 'No receipt found for this invoice number.';
-          state.receipt = null;
+          state.currentReceipt = null;
         } else {
-          state.receipt = action.payload;
+          state.currentReceipt = action.payload;
           state.message = null;
         }
       })
-  
-      // Rejected state
       .addCase(fetchReceiptByInvoice.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.payload || action.error.message;
+        state.error = action.payload;
       })
-      
-      // Fetch by ID
       .addCase(fetchReceiptById.pending, (state) => {
         state.status = 'loading';
       })
@@ -205,10 +187,8 @@ const receiptsSlice = createSlice({
       })
       .addCase(fetchReceiptById.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload;
       })
-      
-      // Delete receipt
       .addCase(deleteReceipt.pending, (state) => {
         state.status = 'loading';
       })
@@ -218,10 +198,8 @@ const receiptsSlice = createSlice({
       })
       .addCase(deleteReceipt.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload;
       })
-      
-      // Update receipt
       .addCase(updateReceipt.pending, (state) => {
         state.status = 'loading';
       })
@@ -235,7 +213,7 @@ const receiptsSlice = createSlice({
       })
       .addCase(updateReceipt.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload;
       });
   }
 });

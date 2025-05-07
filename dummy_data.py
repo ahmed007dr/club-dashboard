@@ -1,10 +1,7 @@
 import os
 import django
-
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
 django.setup()
-
-import random
 from datetime import timedelta, datetime
 from django.utils import timezone
 from faker import Faker
@@ -15,9 +12,10 @@ from subscriptions.models import SubscriptionType, Subscription
 from tickets.models import Ticket
 from receipts.models import Receipt
 from attendance.models import EntryLog
-from staff.models import Shift
+from staff.models import Shift, StaffAttendance
 from invites.models import FreeInvite
 from finance.models import ExpenseCategory, Expense, IncomeSource, Income
+import random
 
 
 fake = Faker()
@@ -33,10 +31,10 @@ def create_dummy_data():
         )
         clubs.append(club)
 
-    # Create Users (with different roles including owner)
-    roles = ['owner', 'admin', 'reception', 'accountant', 'coach']
+    # Create Users (with different roles including owner and staff)
+    roles = ['owner', 'admin', 'reception', 'accountant', 'coach', 'staff']
     users = []
-    for _ in range(5):
+    for _ in range(6):  # Increased to ensure enough staff users
         username = fake.user_name()[:5]
         user = User.objects.create_user(
             username=username,
@@ -45,9 +43,27 @@ def create_dummy_data():
             club=random.choice(clubs),
             role=random.choice(roles),
             first_name=fake.first_name(),
-            last_name=fake.last_name()
+            last_name=fake.last_name(),
+            rfid_code=fake.unique.bothify(text='RFID-#####') if 'staff' in roles else None
         )
         users.append(user)
+
+    # Ensure at least 2 staff users
+    staff_users = [u for u in users if u.role == 'staff']
+    while len(staff_users) < 2:
+        username = fake.user_name()[:5]
+        user = User.objects.create_user(
+            username=username,
+            email=fake.email(),
+            password='123',
+            club=random.choice(clubs),
+            role='staff',
+            first_name=fake.first_name(),
+            last_name=fake.last_name(),
+            rfid_code=fake.unique.bothify(text='RFID-#####')
+        )
+        users.append(user)
+        staff_users.append(user)
 
     # Create Members
     members = []
@@ -142,19 +158,45 @@ def create_dummy_data():
         )
 
     # Create Shifts
-    for _ in range(5):
+    shifts = []
+    for _ in range(10):  # Increased number of shifts
         date = fake.date_this_month()
         start_time = fake.time_object()
         end_time = (datetime.combine(date, start_time) + 
                    timedelta(hours=random.randint(4, 8))).time()
+        shift_end_date = date if end_time >= start_time else date + timedelta(days=1)
         
-        Shift.objects.create(
+        shift = Shift.objects.create(
             club=random.choice(clubs),
-            staff=random.choice(users),
+            staff=random.choice(staff_users),
             date=date,
             shift_start=start_time,
             shift_end=end_time,
+            shift_end_date=shift_end_date if end_time < start_time else None,
             approved_by=random.choice(users) if fake.boolean() else None
+        )
+        shifts.append(shift)
+
+    # Create Staff Attendance
+    for _ in range(8):
+        shift = random.choice(shifts)
+        check_in = timezone.make_aware(
+            datetime.combine(shift.date, shift.shift_start) + 
+            timedelta(minutes=random.randint(-15, 15))
+        )
+        check_out = None
+        if fake.boolean():
+            check_out = timezone.make_aware(
+                datetime.combine(shift.shift_end_date or shift.date, shift.shift_end) + 
+                timedelta(minutes=random.randint(-15, 15))
+            )
+        
+        StaffAttendance.objects.create(
+            staff=shift.staff,
+            club=shift.club,
+            shift=shift,
+            check_in=check_in,
+            check_out=check_out
         )
 
     # Create Free Invites

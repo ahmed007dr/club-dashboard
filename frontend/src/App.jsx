@@ -20,6 +20,7 @@ import MemberSubscriptions from './components/dashboard/MemberSubscriptions';
 import Member from "./pages/member/Member"; 
 import AddMember from "./components/modals/AddMember"; 
 import StaffProfile from './components/dashboard/StaffProfile';
+import AttendanceReport from './components/dashboard/AttendanceReport';
 import { Toaster } from 'react-hot-toast';
 
 // Route protection component
@@ -39,7 +40,7 @@ function App() {
       <Toaster position="top-center" />
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+      
         
         {/* Protected Routes */}
         <Route path="/" element={<ProtectedRoute element={<Dashboard />} />}>
@@ -59,7 +60,7 @@ function App() {
           <Route path="finance" element={<Finance />} />
           <Route path="add-member" element={<AddMember />} />
           <Route path="/staff/:id" element={<StaffProfile />} />
-
+          <Route path="/attendance-report" element={<AttendanceReport />} />
         </Route>
         
       </Routes>

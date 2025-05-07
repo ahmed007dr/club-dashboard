@@ -1,28 +1,36 @@
-// src/redux/slices/invitesSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 
-// Fetch all invites
 export const fetchFreeInvites = createAsyncThunk(
-    'invites/fetchFreeInvites',
-    async () => {
-      const token = localStorage.getItem('token');  // Get token from localStorage
+  'invites/fetchFreeInvites',
+  async ({ clubId }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Access token not found');
+      }
       const response = await axios.get(`${BASE_URL}/invites/api/free-invites/`, {
         headers: {
-          Authorization: token ? `Bearer ${token}` : '', // Add token if it exists
+          Authorization: `Bearer ${token}`,
         },
+        params: { club_id: clubId },
       });
-      return response.data; // Assuming the API returns an array or object
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
-  );
+  }
+);
 
-// Add new invite
 export const addInvite = createAsyncThunk(
   'invites/addInvite',
   async (inviteData, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Access token not found');
+      }
       const response = await axios.post(
         `${BASE_URL}/invites/api/free-invites/add/`,
         inviteData,
@@ -33,20 +41,21 @@ export const addInvite = createAsyncThunk(
           },
         }
       );
-      console.log('Invite added successfully:', response.data); // Log success message
       return response.data;
     } catch (error) {
-      console.error('Error adding invite:', error.response?.data || error.message); // Log error details
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
-// Fetch single invite by ID
+
 export const fetchInviteById = createAsyncThunk(
   'invites/fetchInviteById',
   async (inviteId, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Access token not found');
+      }
       const response = await axios.get(
         `${BASE_URL}/invites/api/free-invites/${inviteId}/`,
         {
@@ -56,20 +65,21 @@ export const fetchInviteById = createAsyncThunk(
           },
         }
       );
-      console.log('Fetched invite:', response.data); // Log the fetched invite data
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
-// Delete invite
 export const deleteInviteById = createAsyncThunk(
   'invites/deleteInviteById',
   async (inviteId, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Access token not found');
+      }
       await axios.delete(
         `${BASE_URL}/invites/api/free-invites/${inviteId}/delete/`,
         {
@@ -79,21 +89,21 @@ export const deleteInviteById = createAsyncThunk(
           },
         }
       );
-      console.log(`Invite with ID ${inviteId} deleted successfully.`); // Log success message
       return inviteId;
     } catch (error) {
-      console.error(`Error deleting invite with ID ${inviteId}:`, error.response?.data || error.message); // Log error details
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
-// Edit invite
 export const editInviteById = createAsyncThunk(
   'invites/editInviteById',
   async ({ inviteId, inviteData }, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Access token not found');
+      }
       const response = await axios.put(
         `${BASE_URL}/invites/api/free-invites/${inviteId}/edit/`,
         inviteData,
@@ -104,21 +114,21 @@ export const editInviteById = createAsyncThunk(
           },
         }
       );
-      console.log(`Invite with ID ${inviteId} updated successfully:`, response.data); // Log success message
       return response.data;
     } catch (error) {
-      console.error(`Error updating invite with ID ${inviteId}:`, error.response?.data || error.message); // Log error details
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
-// Mark invite as used (similar to markTicketAsUsed)
 export const markInviteAsUsed = createAsyncThunk(
   'invites/markInviteAsUsed',
   async ({ inviteId, used_by }, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Access token not found');
+      }
       const response = await axios.post(
         `${BASE_URL}/invites/api/free-invites/${inviteId}/mark-used/`,
         { used_by },
@@ -131,7 +141,7 @@ export const markInviteAsUsed = createAsyncThunk(
       );
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -147,8 +157,9 @@ const invitesSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-    .addCase(fetchFreeInvites.pending, (state) => {
+      .addCase(fetchFreeInvites.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(fetchFreeInvites.fulfilled, (state, action) => {
         state.loading = false;
@@ -156,7 +167,7 @@ const invitesSlice = createSlice({
       })
       .addCase(fetchFreeInvites.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message;
+        state.error = action.payload;
       })
       .addCase(addInvite.pending, (state) => {
         state.loading = true;

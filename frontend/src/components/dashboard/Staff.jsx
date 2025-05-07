@@ -3,7 +3,16 @@ import { CiTrash, CiEdit } from "react-icons/ci";
 import { FaEye, FaPlus } from "react-icons/fa";
 import { RiUserLine } from "react-icons/ri";
 import { useDispatch, useSelector } from "react-redux";
-import { addStaff, deleteStaff, editStaff, fetchStaff } from "@/redux/slices/staff";
+import {
+  fetchShifts,
+  addShift,
+  editShift,
+  deleteShift,
+  checkInStaff,
+  checkOutStaff,
+  getStaffReport,
+  clearError,
+} from "@/redux/slices/staff";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,21 +21,19 @@ import {
 } from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
 import BASE_URL from "@/config/api";
-import { Link } from 'react-router-dom';
-
-
-import axios from 'axios';
-
-
+import { Link } from "react-router-dom";
+import axios from "axios";
 
 const Staff = () => {
   const dispatch = useDispatch();
-  const staff = useSelector((state) => state.staff.items || []);
-  console.log("Staff data:", staff);
+  const { shifts, loading, error } = useSelector((state) => state.staff);
   const [selectedShift, setSelectedShift] = useState(null);
   const [modalType, setModalType] = useState("");
   const [formData, setFormData] = useState({
+    date: "",
+    shift_start: "",
     shift_end: "",
+    shift_end_date: "",
     club: "",
     staff: "",
     approved_by: null,
@@ -44,6 +51,10 @@ const Staff = () => {
   const [selectedClubId, setSelectedClubId] = useState("");
   const [selectedClubUsers, setSelectedClubUsers] = useState([]);
   const [profileUser, setProfileUser] = useState({ id: "", username: "" });
+  const [rfidCode, setRfidCode] = useState("");
+  const [reportModal, setReportModal] = useState(false);
+  const [staffReport, setStaffReport] = useState(null);
+
   // Fetch users grouped by club
   useEffect(() => {
     const fetchUsersGroupedByClub = async () => {
@@ -89,18 +100,16 @@ const Staff = () => {
     })
       .then((response) => response.json())
       .then((data) => {
-        console.log("Profile data:", data);
-  
         const club = { id: data.club.id, name: data.club.name };
         setUserClub(club);
         setFilters((prev) => ({ ...prev, club: club.id.toString() }));
         setFormData((prev) => ({ ...prev, club: club.id.toString() }));
         setSelectedClubId(club.id.toString());
-        setProfileUser({ id: data.id, username: data.username }); // Store id and username
-  
+        setProfileUser({ id: data.id, username: data.username });
+
         const userClubData = clubs.find((c) => c.club_id === club.id);
         if (userClubData) setSelectedClubUsers(userClubData.users);
-  
+
         setLoadingProfile(false);
       })
       .catch((err) => {
@@ -109,9 +118,9 @@ const Staff = () => {
       });
   }, [clubs]);
 
-  // Fetch staff data
+  // Fetch shifts
   useEffect(() => {
-    dispatch(fetchStaff());
+    dispatch(fetchShifts());
   }, [dispatch]);
 
   const handleClubChange = (e) => {
@@ -128,7 +137,10 @@ const Staff = () => {
 
     if (type === "add") {
       setFormData({
+        date: "",
+        shift_start: "",
         shift_end: "",
+        shift_end_date: "",
         club: userClub?.id?.toString() || "",
         staff: "",
         approved_by: null,
@@ -136,7 +148,10 @@ const Staff = () => {
     } else if (type === "edit" && shift) {
       setFormData({
         id: shift.id,
+        date: shift.date,
+        shift_start: shift.shift_start,
         shift_end: shift.shift_end,
+        shift_end_date: shift.shift_end_date || "",
         club: userClub?.id?.toString() || shift.club_details.id.toString(),
         staff: `${shift.staff_details.id}`,
         approved_by: shift.approved_by_details
@@ -148,6 +163,18 @@ const Staff = () => {
       setSelectedClubId(clubId);
       const selected = clubs.find((c) => c.club_id.toString() === clubId);
       setSelectedClubUsers(selected ? selected.users : []);
+    } else if (type === "checkInOut") {
+      setRfidCode("");
+    } else if (type === "report" && shift) {
+      dispatch(getStaffReport(shift.staff_details.id))
+        .unwrap()
+        .then((report) => {
+          setStaffReport(report);
+          setReportModal(true);
+        })
+        .catch((err) => {
+          setFormError("فشل في جلب تقرير الحضور: " + (err || "خطأ غير معروف"));
+        });
     }
   };
 
@@ -156,6 +183,11 @@ const Staff = () => {
     setSelectedShift(null);
     setFormData({});
     setFormError(null);
+    setReportModal(false);
+    setStaffReport(null);
+    dispatch(clearError("shifts"));
+    dispatch(clearError("attendance"));
+    dispatch(clearError("report"));
   };
 
   const handleFormChange = (e) => {
@@ -170,22 +202,25 @@ const Staff = () => {
       return;
     }
 
-    const staffData = {
+    const shiftData = {
+      date: formData.date,
+      shift_start: formData.shift_start,
       shift_end: formData.shift_end,
+      shift_end_date: formData.shift_end_date || null,
       club: Number(formData.club),
       staff: Number(formData.staff) || null,
       approved_by: Number(formData.approved_by) || null,
     };
 
-    dispatch(addStaff(staffData))
+    dispatch(addShift(shiftData))
       .unwrap()
       .then(() => {
-        dispatch(fetchStaff());
+        dispatch(fetchShifts());
         handleCloseModal();
       })
       .catch((err) => {
         setFormError(
-          "فشل في إضافة الوردية: " + (err.message || "خطأ غير معروف")
+          "فشل في إضافة الوردية: " + (err.error || "خطأ غير معروف")
         );
       });
   };
@@ -197,45 +232,71 @@ const Staff = () => {
       return;
     }
 
-    const updatedStaff = {
+    const updatedShift = {
+      date: formData.date,
+      shift_start: formData.shift_start,
       shift_end: formData.shift_end,
+      shift_end_date: formData.shift_end_date || null,
       club: Number(formData.club),
       staff: Number(formData.staff) || null,
       approved_by: Number(formData.approved_by) || null,
     };
 
-    dispatch(editStaff({ id: selectedShift.id, updatedStaff }))
+    dispatch(editShift({ id: selectedShift.id, updatedShift }))
       .unwrap()
       .then(() => {
-        dispatch(fetchStaff());
+        dispatch(fetchShifts());
         handleCloseModal();
       })
       .catch((err) => {
         setFormError(
-          "فشل في تعديل الوردية: " + (err.message || "خطأ غير معروف")
+          "فشل في تعديل الوردية: " + (err.error || "خطأ غير معروف")
+        );
+      });
+  };
+
+  const handleCheckInOutSubmit = (e, action) => {
+    e.preventDefault();
+    if (!rfidCode) {
+      setFormError("برجاء إدخال كود RFID.");
+      return;
+    }
+
+    const thunk = action === "checkIn" ? checkInStaff : checkOutStaff;
+    dispatch(thunk(rfidCode))
+      .unwrap()
+      .then(() => {
+        dispatch(fetchShifts()); // Refresh shifts to reflect updated attendance
+        handleCloseModal();
+      })
+      .catch((err) => {
+        setFormError(
+          `فشل في تسجيل ${action === "checkIn" ? "الدخول" : "الخروج"}: ` +
+            (err.error || "خطأ غير معروف")
         );
       });
   };
 
   const confirmDelete = () => {
-    dispatch(deleteStaff(selectedShift.id))
+    dispatch(deleteShift(selectedShift.id))
       .unwrap()
       .then(() => {
-        dispatch(fetchStaff());
+        dispatch(fetchShifts());
         handleCloseModal();
         setCurrentPage(1);
+      })
+      .catch((err) => {
+        setFormError("فشل في حذف الوردية: " + (err || "خطأ غير معروف"));
       });
   };
 
   const parseTime = (timeStr) => {
-    if (!timeStr) return new Date(0); // Fallback for invalid/undefined dates
+    if (!timeStr) return new Date(0);
 
-    // Remove microseconds if present
     if (timeStr.includes(".")) {
       timeStr = timeStr.split(".")[0];
     }
 
-    // Handle time-only format (e.g., "12:00:00")
     if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) {
       const today = new Date();
       const [hours, minutes, seconds] = timeStr.split(":");
@@ -243,14 +304,13 @@ const Staff = () => {
       return today;
     }
 
-    // Handle full timestamp or other formats
     const parsedDate = new Date(timeStr);
-    return isNaN(parsedDate) ? new Date(0) : parsedDate; // Fallback for invalid dates
+    return isNaN(parsedDate) ? new Date(0) : parsedDate;
   };
 
-  // Filter and sort staff based on filters and id (newest to oldest)
-  const filteredStaff = useMemo(() => {
-    return staff
+  // Filter and sort shifts based on filters and id (newest to oldest)
+  const filteredShifts = useMemo(() => {
+    return shifts
       .filter((shift) => {
         const clubMatch =
           userClub &&
@@ -263,17 +323,14 @@ const Staff = () => {
 
         return clubMatch && staffMatch;
       })
-      .sort((a, b) => {
-        // Sort by id in descending order (highest id first = newest)
-        return (b.id || 0) - (a.id || 0);
-      });
-  }, [staff, filters, userClub]);
+      .sort((a, b) => (b.id || 0) - (a.id || 0));
+  }, [shifts, filters, userClub]);
 
   // Pagination logic
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredStaff.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredStaff.length / itemsPerPage);
+  const currentItems = filteredShifts.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredShifts.length / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
 
@@ -309,14 +366,23 @@ const Staff = () => {
           <RiUserLine className="text-blue-600 w-6 h-6 sm:w-8 sm:h-8" />
           <h2 className="text-xl sm:text-2xl font-semibold">الطاقم</h2>
         </div>
-        <button
-          onClick={() => handleOpenModal("add")}
-          className="flex items-center gap-2 btn"
-          disabled={loadingProfile || !userClub}
-        >
-          <FaPlus className="w-4 h-4" />
-          إضافة وردية جديدة
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => handleOpenModal("add")}
+            className="flex items-center gap-2 btn"
+            disabled={loadingProfile || !userClub}
+          >
+            <FaPlus className="w-4 h-4" />
+            إضافة وردية جديدة
+          </button>
+          <button
+            onClick={() => handleOpenModal("checkInOut")}
+            className="flex items-center gap-2 btn"
+            disabled={loadingProfile || !userClub}
+          >
+            تسجيل حضور/انصراف
+          </button>
+        </div>
       </div>
 
       {/* Filter Inputs */}
@@ -326,9 +392,7 @@ const Staff = () => {
           <select
             name="club"
             value={filters.club}
-            onChange={(e) =>
-              setFilters({ ...filters, club: e.target.value })
-            }
+            onChange={(e) => setFilters({ ...filters, club: e.target.value })}
             className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
             disabled
           >
@@ -345,16 +409,21 @@ const Staff = () => {
             type="text"
             name="staff"
             value={filters.staff}
-            onChange={(e) =>
-              setFilters({ ...filters, staff: e.target.value })
-            }
+            onChange={(e) => setFilters({ ...filters, staff: e.target.value })}
             placeholder="تصفية حسب اسم الموظف"
             className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
           />
         </div>
       </div>
 
-      {/* Staff Table */}
+      {/* Error Display */}
+      {(error.shifts || error.attendance || error.report) && (
+        <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
+          {error.shifts || error.attendance || error.report}
+        </div>
+      )}
+
+      {/* Shifts Table */}
       <div className="overflow-x-auto">
         {currentItems.length > 0 ? (
           <>
@@ -376,6 +445,10 @@ const Staff = () => {
                     <td className="p-2 sm:p-3">
                       {shift.date
                         ? new Date(shift.date).toLocaleDateString("en-GB")
+                        : shift.shift_end_date
+                        ? new Date(shift.shift_end_date).toLocaleDateString(
+                            "en-GB"
+                          )
                         : "N/A"}
                     </td>
                     <td className="p-2 sm:p-3">
@@ -384,7 +457,7 @@ const Staff = () => {
                             "en-GB",
                             { hour: "2-digit", minute: "2-digit" }
                           )
-                        : "Invalid date"}
+                        : "Invalid time"}
                     </td>
                     <td className="p-2 sm:p-3">
                       {shift.shift_end
@@ -392,14 +465,14 @@ const Staff = () => {
                             "en-GB",
                             { hour: "2-digit", minute: "2-digit" }
                           )
-                        : "Invalid date"}
+                        : "Invalid time"}
                     </td>
                     <td className="p-2 sm:p-3">{shift.club_details?.name}</td>
                     <td className="p-2 sm:p-3 text-blue-600 hover:underline">
-  <Link to={`/staff/${shift.staff_details.id}`}>
-    {`${shift.staff_details.first_name} ${shift.staff_details.last_name}`}
-  </Link>
-</td>
+                      <Link to={`/staff/${shift.staff_details.id}`}>
+                        {`${shift.staff_details.first_name} ${shift.staff_details.last_name}`}
+                      </Link>
+                    </td>
                     <td className="p-2 sm:p-3">
                       {shift.approved_by_details
                         ? shift.approved_by_details.username
@@ -431,6 +504,12 @@ const Staff = () => {
                           >
                             <CiTrash className="mr-2" /> حذف
                           </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleOpenModal("report", shift)}
+                            className="cursor-pointer text-blue-600 hover:bg-blue-50"
+                          >
+                            <FaEye className="mr-2" /> تقرير الحضور
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
@@ -448,7 +527,13 @@ const Staff = () => {
                 >
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-semibold">
-                      نهاية الوردية: {shift.shift_end}
+                      التاريخ: {shift.date
+                        ? new Date(shift.date).toLocaleDateString("en-GB")
+                        : shift.shift_end_date
+                        ? new Date(shift.shift_end_date).toLocaleDateString(
+                            "en-GB"
+                          )
+                        : "N/A"}
                     </span>
                     <DropdownMenu dir="rtl">
                       <DropdownMenuTrigger asChild>
@@ -475,6 +560,12 @@ const Staff = () => {
                         >
                           <CiTrash className="mr-2" /> حذف
                         </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleOpenModal("report", shift)}
+                          className="cursor-pointer text-blue-600 hover:bg-blue-50"
+                        >
+                          <FaEye className="mr-2" /> تقرير الحضور
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -486,7 +577,7 @@ const Staff = () => {
                     {`${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`}
                   </p>
                   <p className="text-sm">
-                    <strong>تمت الماملة بواسطة:</strong>{" "}
+                    <strong>تمت الموافقة بواسطة:</strong>{" "}
                     {shift.approved_by_details
                       ? shift.approved_by_details.username
                       : "غير موافق عليه"}
@@ -507,8 +598,8 @@ const Staff = () => {
         <div className="flex flex-col sm:flex-row justify-between items-center mt-4 space-y-2 sm:space-y-0">
           <div className="text-sm text-gray-700">
             عرض {indexOfFirstItem + 1} إلى{" "}
-            {Math.min(indexOfLastItem, filteredStaff.length)} من{" "}
-            {filteredStaff.length} وردية
+            {Math.min(indexOfLastItem, filteredShifts.length)} من{" "}
+            {filteredShifts.length} وردية
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -560,7 +651,7 @@ const Staff = () => {
         </div>
       )}
 
-      {/* Add Modal */}
+      {/* Add Shift Modal */}
       {modalType === "add" && (
         <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4">
           <div
@@ -574,6 +665,9 @@ const Staff = () => {
               <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
                 {formError}
               </div>
+            )}
+            {loading.shifts && (
+              <div className="text-center text-sm mb-4">جاري التحميل...</div>
             )}
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
@@ -617,9 +711,31 @@ const Staff = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  نهاية الوردية
-                </label>
+                <label className="block text-sm font-medium mb-1">تاريخ البداية</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">وقت البداية</label>
+                <input
+                  type="time"
+                  name="shift_start"
+                  value={formData.shift_start || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">وقت النهاية</label>
                 <input
                   type="time"
                   name="shift_end"
@@ -631,20 +747,31 @@ const Staff = () => {
               </div>
 
               <div>
-  <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
-  <select
-    name="approved_by"
-    value={formData.approved_by || ""}
-    onChange={handleFormChange}
-    className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-    disabled={!formData.club}
-  >
-    <option value="">اختر موافق</option>
-    {profileUser.id && (
-      <option value={profileUser.id}>{profileUser.username}</option>
-    )}
-  </select>
-</div>
+                <label className="block text-sm font-medium mb-1">تاريخ النهاية (اختياري)</label>
+                <input
+                  type="date"
+                  name="shift_end_date"
+                  value={formData.shift_end_date || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
+                <select
+                  name="approved_by"
+                  value={formData.approved_by || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  disabled={!formData.club}
+                >
+                  <option value="">اختر موافق</option>
+                  {profileUser.id && (
+                    <option value={profileUser.id}>{profileUser.username}</option>
+                  )}
+                </select>
+              </div>
 
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -658,7 +785,12 @@ const Staff = () => {
                   type="submit"
                   className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                   disabled={
-                    !formData.club || !formData.staff || !formData.shift_end
+                    !formData.club ||
+                    !formData.staff ||
+                    !formData.date ||
+                    !formData.shift_start ||
+                    !formData.shift_end ||
+                    loading.shifts
                   }
                 >
                   إضافة
@@ -669,7 +801,7 @@ const Staff = () => {
         </div>
       )}
 
-      {/* Edit Modal */}
+      {/* Edit Shift Modal */}
       {modalType === "edit" && selectedShift && (
         <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4">
           <div
@@ -681,6 +813,9 @@ const Staff = () => {
               <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
                 {formError}
               </div>
+            )}
+            {loading.shifts && (
+              <div className="text-center text-sm mb-4">جاري التحميل...</div>
             )}
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
@@ -723,9 +858,31 @@ const Staff = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  نهاية الوردية
-                </label>
+                <label className="block text-sm font-medium mb-1">تاريخ البداية</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">وقت البداية</label>
+                <input
+                  type="time"
+                  name="shift_start"
+                  value={formData.shift_start || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">وقت النهاية</label>
                 <input
                   type="time"
                   name="shift_end"
@@ -737,19 +894,30 @@ const Staff = () => {
               </div>
 
               <div>
-  <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
-  <select
-    name="approved_by"
-    value={formData.approved_by || ""}
-    onChange={handleFormChange}
-    className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-  >
-    <option value="">اختر موافق</option>
-    {profileUser.id && (
-      <option value={profileUser.id}>{profileUser.username}</option>
-    )}
-  </select>
-</div>
+                <label className="block text-sm font-medium mb-1">تاريخ النهاية (اختياري)</label>
+                <input
+                  type="date"
+                  name="shift_end_date"
+                  value={formData.shift_end_date || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
+                <select
+                  name="approved_by"
+                  value={formData.approved_by || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                >
+                  <option value="">اختر موافق</option>
+                  {profileUser.id && (
+                    <option value={profileUser.id}>{profileUser.username}</option>
+                  )}
+                </select>
+              </div>
 
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -762,6 +930,7 @@ const Staff = () => {
                 <button
                   type="submit"
                   className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+                  disabled={loading.shifts}
                 >
                   حفظ
                 </button>
@@ -771,7 +940,7 @@ const Staff = () => {
         </div>
       )}
 
-      {/* View Modal */}
+      {/* View Shift Modal */}
       {modalType === "view" && selectedShift && (
         <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4">
           <div
@@ -783,7 +952,36 @@ const Staff = () => {
             </h2>
             <ul className="text-sm space-y-2">
               <li>
-                <strong>نهاية الوردية:</strong> {selectedShift.shift_end}
+                <strong>تاريخ البداية:</strong>{" "}
+                {selectedShift.date
+                  ? new Date(selectedShift.date).toLocaleDateString("en-GB")
+                  : "N/A"}
+              </li>
+              <li>
+                <strong>وقت البداية:</strong>{" "}
+                {selectedShift.shift_start
+                  ? parseTime(selectedShift.shift_start).toLocaleTimeString(
+                      "en-GB",
+                      { hour: "2-digit", minute: "2-digit" }
+                    )
+                  : "Invalid time"}
+              </li>
+              <li>
+                <strong>وقت النهاية:</strong>{" "}
+                {selectedShift.shift_end
+                  ? parseTime(selectedShift.shift_end).toLocaleTimeString(
+                      "en-GB",
+                      { hour: "2-digit", minute: "2-digit" }
+                    )
+                  : "Invalid time"}
+              </li>
+              <li>
+                <strong>تاريخ النهاية:</strong>{" "}
+                {selectedShift.shift_end_date
+                  ? new Date(selectedShift.shift_end_date).toLocaleDateString(
+                      "en-GB"
+                    )
+                  : "N/A"}
               </li>
               <li>
                 <strong>النادي:</strong> {selectedShift.club_details?.name}
@@ -811,7 +1009,7 @@ const Staff = () => {
         </div>
       )}
 
-      {/* Delete Modal */}
+      {/* Delete Shift Modal */}
       {modalType === "delete" && selectedShift && (
         <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4">
           <div
@@ -821,6 +1019,11 @@ const Staff = () => {
             <h2 className="text-lg sm:text-xl font-semibold mb-4">
               هل أنت متأكد أنك تريد حذف هذه الوردية؟
             </h2>
+            {formError && (
+              <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
+                {formError}
+              </div>
+            )}
             <div className="flex justify-end gap-2">
               <button
                 onClick={handleCloseModal}
@@ -831,8 +1034,118 @@ const Staff = () => {
               <button
                 onClick={confirmDelete}
                 className="px-4 py-2 bg-red-500 text-white rounded text-sm hover:bg-red-600"
+                disabled={loading.shifts}
               >
                 حذف
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Check-In/Check-Out Modal */}
+      {modalType === "checkInOut" && (
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4">
+          <div
+            className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg sm:text-xl font-bold mb-4">
+              تسجيل حضور/انصراف
+            </h2>
+            {formError && (
+              <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
+                {formError}
+              </div>
+            )}
+            {loading.attendance && (
+              <div className="text-center text-sm mb-4">جاري التحميل...</div>
+            )}
+            <form className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  كود RFID
+                </label>
+                <input
+                  type="text"
+                  value={rfidCode}
+                  onChange={(e) => setRfidCode(e.target.value)}
+                  placeholder="أدخل كود RFID"
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400"
+                >
+                  إلغاء
+                </button>
+                <button
+                  type="submit"
+                  onClick={(e) => handleCheckInOutSubmit(e, "checkIn")}
+                  className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                  disabled={!rfidCode || loading.attendance}
+                >
+                  تسجيل دخول
+                </button>
+                <button
+                  type="submit"
+                  onClick={(e) => handleCheckInOutSubmit(e, "checkOut")}
+                  className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                  disabled={!rfidCode || loading.attendance}
+                >
+                  تسجيل خروج
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Attendance Report Modal */}
+      {reportModal && staffReport && (
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4">
+          <div
+            className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg sm:text-xl font-bold mb-4">
+              تقرير الحضور
+            </h2>
+            {loading.report && (
+              <div className="text-center text-sm mb-4">جاري التحميل...</div>
+            )}
+            {error.report && (
+              <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
+                {error.report}
+              </div>
+            )}
+            <ul className="text-sm space-y-2">
+              <li>
+                <strong>اسم الموظف:</strong>{" "}
+                {staffReport.staff_name || "N/A"}
+              </li>
+              <li>
+                <strong>كود RFID:</strong> {staffReport.rfid_code || "N/A"}
+              </li>
+              <li>
+                <strong>عدد أيام الحضور:</strong>{" "}
+                {staffReport.attendance_days || 0}
+              </li>
+              <li>
+                <strong>إجمالي الساعات:</strong>{" "}
+                {staffReport.total_hours || 0}
+              </li>
+            </ul>
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={handleCloseModal}
+                className="px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400"
+              >
+                إغلاق
               </button>
             </div>
           </div>
