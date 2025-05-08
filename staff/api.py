@@ -138,6 +138,7 @@ def staff_check_in_by_code_api(request):
     )
     return Response(StaffAttendanceSerializer(attendance).data, status=status.HTTP_201_CREATED)
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def staff_check_out_by_code_api(request):
@@ -151,14 +152,14 @@ def staff_check_out_by_code_api(request):
     except User.DoesNotExist:
         return Response({'error': 'Invalid RFID code or inactive user'}, status=status.HTTP_404_NOT_FOUND)
 
-    try:
-        attendance = StaffAttendance.objects.get(staff=user, check_out__isnull=True)
-    except StaffAttendance.DoesNotExist:
+    attendance = StaffAttendance.objects.filter(staff=user, check_out__isnull=True).order_by('-check_in').first()
+    if not attendance:
         return Response({'error': 'No active check-in found'}, status=status.HTTP_400_BAD_REQUEST)
 
     attendance.check_out = timezone.now()
     attendance.save()
     return Response(StaffAttendanceSerializer(attendance).data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

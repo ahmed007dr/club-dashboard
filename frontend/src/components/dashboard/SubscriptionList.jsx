@@ -379,7 +379,7 @@ const SubscriptionList = () => {
                 >
                   <td className="py-2 px-4">
                     <Link
-                      to={`/member-subscriptions/${subscription.member}`}
+                      to={`/member-subscriptions/${subscription.member_details.name}`}
                       className="text-blue-600 hover:underline"
                     >
                       {subscription.member_name}
