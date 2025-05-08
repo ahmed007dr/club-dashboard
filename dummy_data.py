@@ -254,7 +254,6 @@ def create_dummy_data():
             date=fake.date_this_month(),
             status=random.choice(['pending', 'used']),
             invited_by=random.choice(members) if fake.boolean() else None,
-            handled_by=random.choice(users) if fake.boolean() else None
         )
 
     # Create Expense Categories

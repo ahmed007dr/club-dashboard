@@ -82,23 +82,29 @@ export const deleteAttendance = createAsyncThunk(
 );
 
 // Thunk: Staff Check-In
-export const checkInStaff = createAsyncThunk('attendance/checkIn', async (rfid_code, { rejectWithValue }) => {
-  try {
-    const response = await axios.post(`${BASE_URL}/staff/check-in/`, { rfid_code }, {
-      headers: {
-        Authorization: getToken()
-      }
-    });
-    return response.data;
-  } catch (error) {
-    return rejectWithValue(error.response?.data || { error: 'Check-in failed' });
+export const checkInStaff = createAsyncThunk(
+  'attendance/checkIn',
+  async (rfid_code, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(`${BASE_URL}/staff/api/check-in/`, { rfid_code }, {
+        headers: {
+          Authorization: getToken()
+        }
+      });
+      console.log('✅ Check-in success:', response.data); // Log success
+      return response.data;
+    } catch (error) {
+      console.error('❌ Check-in error:', error.response?.data || 'Check-in failed'); // Log error
+      return rejectWithValue(error.response?.data || { error: 'Check-in failed' });
+    }
   }
-});
+);
+
 
 // Thunk: Staff Check-Out
 export const checkOutStaff = createAsyncThunk('attendance/checkOut', async (rfid_code, { rejectWithValue }) => {
   try {
-    const response = await axios.post(`${BASE_URL}/staff/check-out/`, { rfid_code }, {
+    const response = await axios.post(`${BASE_URL}/staff/api/check-out/`, { rfid_code }, {
       headers: {
         Authorization: getToken()
       }

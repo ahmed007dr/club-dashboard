@@ -71,7 +71,6 @@ def delete_free_invite_api(request, invite_id):
 def mark_invite_used_api(request, invite_id):
     invite = get_object_or_404(FreeInvite, id=invite_id)
     invite.status = 'used'
-    invite.handled_by = request.user
     invite.save()
     serializer = FreeInviteSerializer(invite)
     return Response(serializer.data)
