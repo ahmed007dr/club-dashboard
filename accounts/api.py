@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .serializers import UserSerializer, UserProfileSerializer, LoginSerializer
+from .serializers import UserSerializer, UserProfileSerializer, LoginSerializer ,RFIDLoginSerializer
 from utils.permissions import IsOwnerOrRelatedToClub  
 from .models import User
 
@@ -60,3 +60,19 @@ def api_user_list(request):
 
     serializer = UserProfileSerializer(users, many=True)
     return Response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_rfid_login(request):
+    serializer = RFIDLoginSerializer(data=request.data)
+    
+    if serializer.is_valid():
+        user = serializer.validated_data['user']
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'user': UserSerializer(user).data,
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+        }, status=status.HTTP_200_OK)
+
+    return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)

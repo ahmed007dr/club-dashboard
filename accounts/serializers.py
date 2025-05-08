@@ -12,7 +12,21 @@ class ClubMiniSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'first_name', 'last_name', 'email']
+        fields = [
+            'id',
+            'username',
+            'first_name',
+            'last_name',
+            'email',
+            'role',
+            'club',
+            'rfid_code',
+            'is_active'
+        ]
+        extra_kwargs = {
+            'rfid_code': {'required': False, 'allow_null': True},
+            'club': {'required': False, 'allow_null': True},
+        }
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -28,8 +42,13 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'last_name',
             'role',
             'club',
+            'rfid_code',
             'is_active'
         ]
+        extra_kwargs = {
+            'rfid_code': {'required': False, 'allow_null': True},
+        }
+
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()
@@ -42,3 +61,23 @@ class LoginSerializer(serializers.Serializer):
         if username and password:
             return data
         raise serializers.ValidationError("Username and password are required")
+
+class RFIDLoginSerializer(serializers.Serializer):
+    rfid_code = serializers.CharField()
+
+    def validate(self, data):
+        rfid_code = data.get('rfid_code')
+
+        if not rfid_code:
+            raise serializers.ValidationError("RFID code is required.")
+
+        try:
+            user = User.objects.get(rfid_code=rfid_code)
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Invalid RFID code.")
+
+        if not user.is_active:
+            raise serializers.ValidationError("User account is inactive.")
+
+        data['user'] = user
+        return data

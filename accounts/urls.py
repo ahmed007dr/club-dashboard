@@ -19,5 +19,6 @@ urlpatterns = [
     # API
     path('api/profile/', api.api_user_profile, name='api-user-profile'),
     path('api/users/', api.api_user_list, name='api_user_list'),
+    path('api/login/rfid/', api.api_rfid_login, name='api_rfid_login'),
 
 ]

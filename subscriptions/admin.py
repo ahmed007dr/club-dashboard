@@ -10,14 +10,19 @@ from django.utils.html import format_html
 class SubscriptionTypeResource(resources.ModelResource):
     class Meta:
         model = SubscriptionType
-        fields = ('id', 'name', 'duration_days', 'price', 'includes_gym', 'includes_pool', 'includes_classes', 'is_active')
+        fields = (
+            'id', 'club__name', 'name', 'duration_days', 'price',
+            'includes_gym', 'includes_pool', 'includes_classes',
+            'is_active', 'max_entries'
+        )
+
 
 class SubscriptionResource(resources.ModelResource):
     class Meta:
         model = Subscription
         fields = (
             'id', 'club__name', 'member__name', 'type__name', 'start_date', 'end_date',
-            'paid_amount', 'remaining_amount', 'attendance_days'
+            'paid_amount', 'remaining_amount', 'entry_count'
         )
 
 
@@ -25,9 +30,9 @@ class SubscriptionResource(resources.ModelResource):
 @admin.register(SubscriptionType)
 class SubscriptionTypeAdmin(ImportExportModelAdmin):
     resource_class = SubscriptionTypeResource
-    list_display = ('name', 'duration_days', 'price', 'is_active')
-    list_filter = ('is_active',)
-    search_fields = ('name',)
+    list_display = ('name', 'club', 'duration_days', 'price', 'max_entries', 'is_active')
+    list_filter = ('club', 'is_active')
+    search_fields = ('name', 'club__name')
 
 
 # ========== Admin for Subscription ==========
@@ -36,7 +41,7 @@ class SubscriptionAdmin(ImportExportModelAdmin):
     resource_class = SubscriptionResource
     list_display = (
         'colored_member', 'type', 'club', 'start_date', 'end_date',
-        'paid_amount', 'remaining_amount', 'attendance_days', 'days_remaining'
+        'paid_amount', 'remaining_amount', 'entry_count', 'remaining_entries', 'days_remaining'
     )
     list_filter = ('club', 'type', 'start_date', 'end_date')
     search_fields = ('member__name', 'type__name', 'club__name')
@@ -67,6 +72,12 @@ class SubscriptionAdmin(ImportExportModelAdmin):
         return "-"
     days_remaining.short_description = 'Days Remaining'
 
+    def remaining_entries(self, obj):
+        if obj.type.max_entries == 0:
+            return "Unlimited"
+        return max(0, obj.type.max_entries - obj.entry_count)
+    remaining_entries.short_description = 'Remaining Entries'
+
     # Action لتجديد الاشتراك
     def renew_subscription(self, request, queryset):
         renewed = 0
@@ -74,7 +85,7 @@ class SubscriptionAdmin(ImportExportModelAdmin):
             if sub.end_date:
                 sub.start_date = sub.end_date + timedelta(days=1)
                 sub.end_date = sub.start_date + timedelta(days=sub.type.duration_days)
-                sub.attendance_days = 0
+                sub.entry_count = 0
                 sub.save()
                 renewed += 1
         self.message_user(request, f"{renewed} subscription(s) renewed successfully.")

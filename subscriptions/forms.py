@@ -2,6 +2,8 @@ from django import forms
 from .models import Subscription
 
 class SubscriptionForm(forms.ModelForm):
+    attendance_days = forms.IntegerField(required=False)  
+
     class Meta:
         model = Subscription
         fields = [
