@@ -43,7 +43,7 @@ class EntryLogSerializer(serializers.ModelSerializer):
         model = EntryLog
         fields = [
             'timestamp',
-            'membership_number',  # incoming from POST
+            'membership_number', 
             'related_subscription',
             'club',
             'approved_by',

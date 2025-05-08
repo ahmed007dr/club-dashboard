@@ -5,10 +5,9 @@ from django.shortcuts import get_object_or_404
 from .models import Attendance, EntryLog
 from .serializers import AttendanceSerializer, EntryLogSerializer
 from rest_framework.permissions import IsAuthenticated
-from utils.permissions import IsOwnerOrRelatedToClub  
+from utils.permissions import IsOwnerOrRelatedToClub
 from django.db.models import Q
 
-# Attendance API Views
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_list_api(request):
@@ -35,10 +34,21 @@ def attendance_list_api(request):
 def add_attendance_api(request):
     serializer = AttendanceSerializer(data=request.data)
     if serializer.is_valid():
+        subscription = serializer.validated_data['subscription']
+        if not subscription.can_enter():
+            return Response(
+                {'error': 'Maximum entry limit reached for this subscription'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         attendance = serializer.save()
         if not IsOwnerOrRelatedToClub().has_object_permission(request, None, attendance):
-            attendance.delete() 
-            return Response({'error': 'You do not have permission to create an attendance record for this club'}, status=status.HTTP_403_FORBIDDEN)
+            attendance.delete()
+            return Response(
+                {'error': 'You do not have permission to create an attendance record for this club'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        subscription.entry_count += 1
+        subscription.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -46,10 +56,12 @@ def add_attendance_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_attendance_api(request, attendance_id):
     attendance = get_object_or_404(Attendance, id=attendance_id)
+    subscription = attendance.subscription
+    subscription.entry_count = max(0, subscription.entry_count - 1)  # Decrease entry count
+    subscription.save()
     attendance.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
-# EntryLog API Views
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def entry_log_list_api(request):
@@ -75,13 +87,16 @@ def entry_log_list_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def create_entry_log_api(request):
     data = request.data.copy()
-    data['approved_by'] = request.user.id  
+    data['approved_by'] = request.user.id
     
     serializer = EntryLogSerializer(data=data)
     if serializer.is_valid():
         entry_log = serializer.save()
         if not IsOwnerOrRelatedToClub().has_object_permission(request, None, entry_log):
-            entry_log.delete()  
-            return Response({'error': 'You do not have permission to create an entry log for this club'}, status=status.HTTP_403_FORBIDDEN)
+            entry_log.delete()
+            return Response(
+                {'error': 'You do not have permission to create an entry log for this club'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
