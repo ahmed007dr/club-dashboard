@@ -155,7 +155,24 @@ const Navbar = ({ hideMenuButton = false }) => {
                 </div>
               </Menu.Items>
             </Menu>
+
+            
           )}
+
+<>
+    <button
+      onClick={() => window.location.href = '/check-in'}
+      className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 transition"
+    >
+      تسجيل الدخول
+    </button>
+    <button
+      onClick={() => window.location.href = '/check-out'}
+      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition"
+    >
+      تسجيل الخروج
+    </button>
+  </>
 
           {/* Dark Mode Toggle */}
           <button onClick={handleToggleDarkMode} className="p-2 rounded-full text-gray-500 dark:text-gray-300">

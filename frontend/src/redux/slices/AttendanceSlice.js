@@ -2,6 +2,11 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import BASE_URL from '../../config/api';
 import axios from 'axios';
 
+const getToken = () => {
+  const token = localStorage.getItem('token');
+  return token ? `Bearer ${token}` : '';
+};
+
 // Async thunk for fetching attendances
 export const fetchAttendances = createAsyncThunk(
   'attendance/fetchAttendances',
@@ -76,11 +81,72 @@ export const deleteAttendance = createAsyncThunk(
   }
 );
 
+// Thunk: Staff Check-In
+export const checkInStaff = createAsyncThunk('attendance/checkIn', async (rfid_code, { rejectWithValue }) => {
+  try {
+    const response = await axios.post(`${BASE_URL}/staff/check-in/`, { rfid_code }, {
+      headers: {
+        Authorization: getToken()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data || { error: 'Check-in failed' });
+  }
+});
+
+// Thunk: Staff Check-Out
+export const checkOutStaff = createAsyncThunk('attendance/checkOut', async (rfid_code, { rejectWithValue }) => {
+  try {
+    const response = await axios.post(`${BASE_URL}/staff/check-out/`, { rfid_code }, {
+      headers: {
+        Authorization: getToken()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data || { error: 'Check-out failed' });
+  }
+});
+
+// Thunk: Analyze Attendance
+export const analyzeAttendance = createAsyncThunk('attendance/analyze', async (attendanceId, { rejectWithValue }) => {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/attendance/${attendanceId}/analysis/`, {
+      headers: {
+        Authorization: getToken()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data || { error: 'Analysis failed' });
+  }
+});
+
+// Thunk: Get Staff Attendance Report
+export const getStaffAttendanceReport = createAsyncThunk('attendance/report', async (staffId, { rejectWithValue }) => {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/staff/${staffId}/attendance/report/`, {
+      headers: {
+        Authorization: getToken()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data || { error: 'Report fetch failed' });
+  }
+});
+
+
 // Slice definition
 const attendanceSlice = createSlice({
   name: 'attendance',
   initialState: {
     attendances: [],
+    checkInData: null,
+    checkOutData: null,
+    analysisData: null,
+    reportData: null,
     loading: false,
     error: null,
   },
@@ -126,7 +192,23 @@ const attendanceSlice = createSlice({
       .addCase(deleteAttendance.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-      });
+      })
+      .addCase(checkInStaff.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(checkInStaff.fulfilled, (state, action) => { state.loading = false; state.checkInData = action.payload; })
+      .addCase(checkInStaff.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+
+      .addCase(checkOutStaff.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(checkOutStaff.fulfilled, (state, action) => { state.loading = false; state.checkOutData = action.payload; })
+      .addCase(checkOutStaff.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+
+      .addCase(analyzeAttendance.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(analyzeAttendance.fulfilled, (state, action) => { state.loading = false; state.analysisData = action.payload; })
+      .addCase(analyzeAttendance.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+
+      .addCase(getStaffAttendanceReport.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(getStaffAttendanceReport.fulfilled, (state, action) => { state.loading = false; state.reportData = action.payload; })
+      .addCase(getStaffAttendanceReport.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
+  
   },
 });
 

@@ -63,6 +63,7 @@ if __name__ == "__main__":
 
     print("⚙️ Applying new migrations...")
     run_cmd("python manage.py migrate")
-    #run_cmd("python dummy_data.py")
+    run_cmd("python dummy_data.py")
+    run_cmd("winpty python manage.py createsuperuser")
 
     print("\n🎉 Project is clean and ready!")
