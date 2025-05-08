@@ -1,6 +1,5 @@
 from django.urls import path
-from django.contrib.auth.decorators import login_required
-from . import views, api
+from . import api
 
 urlpatterns = [
     # Shift Management APIs
@@ -10,34 +9,11 @@ urlpatterns = [
     path('api/shifts/<int:shift_id>/edit/', api.edit_shift_api, name='edit_shift'),
     path('api/shifts/<int:shift_id>/delete/', api.delete_shift_api, name='delete_shift'),
     path('api/staff/<int:staff_id>/shifts/', api.staff_shifts_api, name='staff_shifts'),
-
     # Attendance Management APIs
     path('api/check-in/', api.staff_check_in_by_code_api, name='staff_check_in'),
     path('api/check-out/', api.staff_check_out_by_code_api, name='staff_check_out'),
     path('api/attendance/<int:attendance_id>/analysis/', api.staff_attendance_analysis_api, name='attendance_analysis'),
     path('api/staff/<int:staff_id>/attendance/report/', api.staff_attendance_report_api, name='attendance_report'),
+    path('api/missing-checkins/', api.missing_checkins_api, name='missing_checkins'),
+
 ]
-
-
-# urlpatterns = [
-#     # ===== Template Views =====
-#     path('shifts/', login_required(views.shift_list), name='shift-list'),
-#     path('shifts/add/', login_required(views.add_shift), name='add-shift'),
-#     path('shifts/<int:shift_id>/', login_required(views.shift_detail), name='shift-detail'),
-#     path('shifts/<int:shift_id>/edit/', login_required(views.edit_shift), name='edit-shift'),
-#     path('shifts/<int:shift_id>/delete/', login_required(views.delete_shift), name='delete-shift'),
-    
-#     # ===== API Endpoints =====
-#     path('api/shifts/', api.shift_list_api, name='api-shift-list'),
-#     path('api/shifts/add/', api.add_shift_api, name='api-add-shift'),
-#     path('api/shifts/<int:shift_id>/', api.shift_detail_api, name='api-shift-detail'),
-#     path('api/shifts/<int:shift_id>/edit/', api.edit_shift_api, name='api-edit-shift'),
-#     path('api/shifts/<int:shift_id>/delete/', api.delete_shift_api, name='api-delete-shift'),
-#     path('api/shifts/staff/<int:staff_id>/', api.staff_shifts_api, name='api-staff-shifts'),
-
-#     path('check-in/', api.staff_check_in_api),
-#     path('check-out/', api.staff_check_out_api),
-#     path('attendance/<int:attendance_id>/report/', api.staff_attendance_analysis_api),
-
-# ]
-

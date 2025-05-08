@@ -15,11 +15,12 @@ class Shift(models.Model):
         return f"{self.staff.username} - {self.date} {self.shift_start} to {self.shift_end}"
 
 class StaffAttendance(models.Model):
-    staff = models.ForeignKey(User, on_delete=models.CASCADE, limit_choices_to={'role': 'staff'})
+    staff = models.ForeignKey(User, on_delete=models.CASCADE)  
     club = models.ForeignKey(Club, on_delete=models.CASCADE)
     check_in = models.DateTimeField()
     check_out = models.DateTimeField(null=True, blank=True)
     shift = models.ForeignKey(Shift, on_delete=models.SET_NULL, null=True, blank=True)
+    auto_checked_out = models.BooleanField(default=False) 
 
     def duration_hours(self):
         if self.check_out:

@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub
 from accounts.models import User
 from rest_framework.exceptions import ValidationError
+from django.db.models.functions import TruncDate
 
 # Shift Management APIs
 @api_view(['GET'])
@@ -114,22 +115,33 @@ def find_current_shift(user):
     return None
 
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def staff_check_in_by_code_api(request):
-    """Record staff check-in using RFID code."""
+    """Record staff check-in using RFID code for any active user. Auto-checkout if needed."""
     rfid_code = request.data.get('rfid_code')
     if not rfid_code:
         return Response({'error': 'RFID code is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        user = User.objects.get(rfid_code=rfid_code, role='staff')
+        user = User.objects.get(rfid_code=rfid_code, is_active=True)
     except User.DoesNotExist:
-        return Response({'error': 'Invalid RFID code'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Invalid RFID code or inactive user'}, status=status.HTTP_404_NOT_FOUND)
 
-    if not user.is_active:
-        return Response({'error': 'User account is inactive'}, status=status.HTTP_403_FORBIDDEN)
+    open_attendances = StaffAttendance.objects.filter(staff=user, check_out__isnull=True)
+    for attendance in open_attendances:
+        if attendance.shift:
+            shift_end_date = attendance.shift.shift_end_date or attendance.shift.date
+            shift_end_dt = datetime.combine(shift_end_date, attendance.shift.shift_end)
+            shift_end_dt = timezone.make_aware(shift_end_dt)
 
-    if StaffAttendance.objects.filter(staff=user, check_out__isnull=True).exists():
-        return Response({'error': 'Already checked in'}, status=status.HTTP_400_BAD_REQUEST)
+            if shift_end_dt < timezone.now():
+                attendance.check_out = shift_end_dt
+            else:
+                attendance.check_out = timezone.now()
+        else:
+            attendance.check_out = timezone.now()
+
+        attendance.save()
 
     shift = find_current_shift(user)
     attendance = StaffAttendance.objects.create(
@@ -138,28 +150,33 @@ def staff_check_in_by_code_api(request):
         shift=shift,
         check_in=timezone.now()
     )
+
     return Response(StaffAttendanceSerializer(attendance).data, status=status.HTTP_201_CREATED)
 
+
+
 @api_view(['POST'])
+@permission_classes([IsAuthenticated])
 def staff_check_out_by_code_api(request):
-    """Record staff check-out using RFID code."""
+    """Record staff check-out using RFID code for any active user."""
     rfid_code = request.data.get('rfid_code')
     if not rfid_code:
         return Response({'error': 'RFID code is required'}, status=status.HTTP_400_BAD_REQUEST)
 
     try:
-        user = User.objects.get(rfid_code=rfid_code, role='staff')
+        user = User.objects.get(rfid_code=rfid_code, is_active=True)
     except User.DoesNotExist:
-        return Response({'error': 'Invalid RFID code'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'Invalid RFID code or inactive user'}, status=status.HTTP_404_NOT_FOUND)
 
-    try:
-        attendance = StaffAttendance.objects.get(staff=user, check_out__isnull=True)
-    except StaffAttendance.DoesNotExist:
+    attendance = StaffAttendance.objects.filter(staff=user, check_out__isnull=True).order_by('-check_in').first()
+    if not attendance:
         return Response({'error': 'No active check-in found'}, status=status.HTTP_400_BAD_REQUEST)
 
     attendance.check_out = timezone.now()
     attendance.save()
     return Response(StaffAttendanceSerializer(attendance).data)
+
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -212,7 +229,7 @@ def staff_attendance_analysis_api(request, attendance_id):
 def staff_attendance_report_api(request, staff_id):
     """Generate a report of attendance days and total hours for a staff member."""
     try:
-        staff = User.objects.get(id=staff_id, role='staff')
+        staff = User.objects.get(id=staff_id, is_active=True)  # تغيير إلى is_active فقط
     except User.DoesNotExist:
         return Response({'error': 'Staff not found'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -220,7 +237,11 @@ def staff_attendance_report_api(request, staff_id):
     if request.user.role != 'owner':
         attendances = attendances.filter(club=request.user.club)
 
-    attendance_days = attendances.distinct('check_in__date').count()
+    # Count distinct attendance days
+    attendance_days = attendances.annotate(date=TruncDate('check_in')) \
+                                 .values('date') \
+                                 .distinct() \
+                                 .count()
     total_hours = sum(
         attendance.duration_hours() or 0
         for attendance in attendances
@@ -234,3 +255,33 @@ def staff_attendance_report_api(request, staff_id):
         'attendance_days': attendance_days,
         'total_hours': round(total_hours, 2)
     })
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def missing_checkins_api(request):
+    """Retrieve staff who have shifts today but haven't checked in."""
+    today = timezone.now().date()
+    shifts = Shift.objects.filter(date=today).select_related('staff', 'club')
+    
+    if request.user.role != 'owner':
+        shifts = shifts.filter(club=request.user.club)
+    
+    missing_checkins = []
+    for shift in shifts:
+        if not StaffAttendance.objects.filter(
+            staff=shift.staff,
+            check_in__date=today,
+            shift=shift
+        ).exists():
+            missing_checkins.append({
+                "shift_id": shift.id,
+                "staff_id": shift.staff.id,
+                "staff_name": shift.staff.username,
+                "rfid_code": shift.staff.rfid_code,
+                "club_id": shift.club.id,
+                "club_name": shift.club.name,
+                "shift_start": shift.shift_start.strftime("%H:%M:%S"),
+                "shift_end": shift.shift_end.strftime("%H:%M:%S")
+            })
+    
+    return Response(missing_checkins)
