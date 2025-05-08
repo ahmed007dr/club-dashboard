@@ -1,23 +1,26 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
 import BASE_URL from '../../config/api';
+import axios from 'axios';
 
+const getToken = () => {
+  const token = localStorage.getItem('token');
+  return token ? `Bearer ${token}` : '';
+};
+
+// Async thunk for fetching attendances
 export const fetchAttendances = createAsyncThunk(
   'attendance/fetchAttendances',
-  async ({ clubId }, { rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Access token not found');
-      }
       const response = await axios.get(`${BASE_URL}/attendance/api/attendances/`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-        },
-        params: { club_id: clubId },
+        }
       });
 
+      // Sort by attendance_date (newest first)
       const sortedData = [...response.data].sort((a, b) => 
         new Date(b.attendance_date) - new Date(a.attendance_date)
       );
@@ -29,61 +32,128 @@ export const fetchAttendances = createAsyncThunk(
   }
 );
 
+
+// Async thunk for adding attendance
 export const addAttendance = createAsyncThunk(
   'attendance/addAttendance',
   async (newAttendance, { rejectWithValue }) => {
     try {
+      console.log('Sending attendance data:', newAttendance); // Log the data being sent
+
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Access token not found');
-      }
       const response = await axios.post(`${BASE_URL}/attendance/api/attendances/add/`, newAttendance, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      return response.data;
+
+      console.log('Attendance response data:', response.data); // Log the response data
+
+      return response.data; // Use response.data instead of newAttendance for consistency
     } catch (error) {
+      console.error('Error adding attendance:', error); // Log the error if it occurs
       return rejectWithValue(error.response?.data?.message || 'Failed to add attendance.');
     }
   }
 );
 
+
+// Async thunk for deleting attendance
 export const deleteAttendance = createAsyncThunk(
   'attendance/deleteAttendance',
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Access token not found');
-      }
       const response = await axios.delete(`${BASE_URL}/attendance/api/attendances/${id}/delete/`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
-      if (response.status !== 204) {
-        throw new Error('Failed to delete attendance.');
-      }
-      return id;
+
+      console.log('Delete successful:', response.data); // Log successful response
+      return id; // Return the ID for optimistic updates
     } catch (error) {
+      console.error('Delete failed:', error.response?.data || error.message); // Log error details
       return rejectWithValue(error.response?.data?.message || 'Failed to delete attendance.');
     }
   }
 );
 
+// Thunk: Staff Check-In
+export const checkInStaff = createAsyncThunk('attendance/checkIn', async (rfid_code, { rejectWithValue }) => {
+  try {
+    const response = await axios.post(`${BASE_URL}/staff/check-in/`, { rfid_code }, {
+      headers: {
+        Authorization: getToken()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data || { error: 'Check-in failed' });
+  }
+});
+
+// Thunk: Staff Check-Out
+export const checkOutStaff = createAsyncThunk('attendance/checkOut', async (rfid_code, { rejectWithValue }) => {
+  try {
+    const response = await axios.post(`${BASE_URL}/staff/check-out/`, { rfid_code }, {
+      headers: {
+        Authorization: getToken()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data || { error: 'Check-out failed' });
+  }
+});
+
+// Thunk: Analyze Attendance
+export const analyzeAttendance = createAsyncThunk('attendance/analyze', async (attendanceId, { rejectWithValue }) => {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/attendance/${attendanceId}/analysis/`, {
+      headers: {
+        Authorization: getToken()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data || { error: 'Analysis failed' });
+  }
+});
+
+// Thunk: Get Staff Attendance Report
+export const getStaffAttendanceReport = createAsyncThunk('attendance/report', async (staffId, { rejectWithValue }) => {
+  try {
+    const response = await axios.get(`${BASE_URL}/api/staff/${staffId}/attendance/report/`, {
+      headers: {
+        Authorization: getToken()
+      }
+    });
+    return response.data;
+  } catch (error) {
+    return rejectWithValue(error.response?.data || { error: 'Report fetch failed' });
+  }
+});
+
+
+// Slice definition
 const attendanceSlice = createSlice({
   name: 'attendance',
   initialState: {
     attendances: [],
+    checkInData: null,
+    checkOutData: null,
+    analysisData: null,
+    reportData: null,
     loading: false,
     error: null,
   },
   reducers: {},
   extraReducers: (builder) => {
     builder
+      // Fetch attendances
       .addCase(fetchAttendances.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -96,18 +166,20 @@ const attendanceSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+      // Add attendance
       .addCase(addAttendance.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(addAttendance.fulfilled, (state, action) => {
         state.loading = false;
-        state.attendances.push(action.payload);
+        state.attendances.push(action.payload); // Update with response.data
       })
       .addCase(addAttendance.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+      // Delete attendance
       .addCase(deleteAttendance.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -120,7 +192,23 @@ const attendanceSlice = createSlice({
       .addCase(deleteAttendance.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-      });
+      })
+      .addCase(checkInStaff.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(checkInStaff.fulfilled, (state, action) => { state.loading = false; state.checkInData = action.payload; })
+      .addCase(checkInStaff.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+
+      .addCase(checkOutStaff.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(checkOutStaff.fulfilled, (state, action) => { state.loading = false; state.checkOutData = action.payload; })
+      .addCase(checkOutStaff.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+
+      .addCase(analyzeAttendance.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(analyzeAttendance.fulfilled, (state, action) => { state.loading = false; state.analysisData = action.payload; })
+      .addCase(analyzeAttendance.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+
+      .addCase(getStaffAttendanceReport.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(getStaffAttendanceReport.fulfilled, (state, action) => { state.loading = false; state.reportData = action.payload; })
+      .addCase(getStaffAttendanceReport.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
+  
   },
 });
 

@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { addReceipt, fetchReceipts } from '../../redux/slices/receiptsSlice';
 import { fetchSubscriptions } from '../../redux/slices/subscriptionsSlice';
+import { toast } from 'react-hot-toast';
+
 
 function AddReceiptForm({ onClose }) {
   const dispatch = useDispatch();
@@ -64,15 +66,19 @@ function AddReceiptForm({ onClose }) {
       subscription: parseInt(formData.subscription),
       amount: parseFloat(formData.amount),
     };
-    
+  
     try {
       await dispatch(addReceipt(receiptData)).unwrap();
       await dispatch(fetchReceipts());
+  
+      toast.success('تمت إضافة الإيصال بنجاح!'); // Arabic success toast
       onClose();
     } catch (error) {
       console.error("Error adding receipt:", error);
+      toast.error('حدث خطأ أثناء إضافة الإيصال'); // Arabic error toast
     }
   };
+  
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-6 bg-white rounded-lg shadow-md">

@@ -39,17 +39,23 @@ const Members = () => {
     const fetchData = async () => {
       try {
         const fetchedData = await dispatch(fetchUsers()).unwrap();
+        console.log('Raw fetched data:', fetchedData); // Log original data
+  
         // Sort by id in descending order (newest to oldest)
         const sortedData = [...fetchedData.results].sort((a, b) => b.id - a.id);
+        console.log('Sorted data:', sortedData); // Log sorted data
+  
         setSearchResult(sortedData);
         setData(sortedData);
       } catch (error) {
+        console.error('Fetch error:', error);
         setError('Failed to fetch members. Please try again later: ' + error.message);
       }
     };
-
+  
     fetchData();
   }, [dispatch]);
+  
 
   const handleSearch = async (e) => {
     const query = e.target.value.toLowerCase();
@@ -254,18 +260,19 @@ const Members = () => {
 
       {/* Add Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0 был:2)] dark:bg-[rgba(255, 255, 255, 0.2)]">
-          <div className="bg-white p-6 rounded-lg w-1/3 relative">
-            <button
-              onClick={closeAddModal}
-              className="absolute top-2 right-3 text-xl"
-            >
-              ×
-            </button>
-            <AddMember />
-          </div>
-        </div>
-      )}
+  <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(255, 255, 255, 0.2)]">
+    <div className="bg-white p-6 rounded-lg w-1/3 relative">
+      <button
+        onClick={closeAddModal}
+        className="absolute top-2 right-3 text-xl"
+      >
+        ×
+      </button>
+      <AddMember closeAddModal={closeAddModal} />
+    </div>
+  </div>
+)}
+
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (

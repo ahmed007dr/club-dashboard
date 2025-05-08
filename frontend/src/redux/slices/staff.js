@@ -1,304 +1,177 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import axios from 'axios';
 import BASE_URL from '../../config/api';
 
-export const fetchShifts = createAsyncThunk(
-  'staff/fetchShifts',
-  async ({ clubId }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${BASE_URL}/api/attendance/shifts/`, {
+// Fetch staff
+export const fetchStaff = createAsyncThunk('staff/fetchStaff', async () => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${BASE_URL}/staff/api/shifts/`, {
+        method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
         },
-        params: { club_id: clubId },
-      });
-      return res.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to fetch shifts.");
-    }
-  }
-);
-
-export const addShift = createAsyncThunk(
-  'staff/addShift',
-  async (newShift, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.post(`${BASE_URL}/api/attendance/shifts/add/`, newShift, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      return res.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to add shift');
-    }
-  }
-);
-
-export const editShift = createAsyncThunk(
-  'staff/editShift',
-  async ({ id, updatedShift }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.put(`${BASE_URL}/api/attendance/shifts/${id}/edit/`, updatedShift, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      return { id, updatedShift: res.data };
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to edit shift');
-    }
-  }
-);
-
-export const deleteShift = createAsyncThunk(
-  'staff/deleteShift',
-  async (id, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.delete(`${BASE_URL}/api/attendance/shifts/${id}/delete/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (res.status !== 204) {
-        throw new Error("Failed to delete shift.");
-      }
-      return id;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to delete shift.");
-    }
-  }
-);
-
-export const getStaffShifts = createAsyncThunk(
-  'staff/getStaffShifts',
-  async (staffId, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${BASE_URL}/api/attendance/staff/${staffId}/shifts/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      return { staffId, shifts: res.data };
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to fetch staff shifts.");
-    }
-  }
-);
-
-export const checkInStaff = createAsyncThunk(
-  'staff/checkInStaff',
-  async (rfid_code, { rejectWithValue }) => {
-    try {
-      const res = await axios.post(`${BASE_URL}/api/attendance/check-in/`, { rfid_code }, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      return res.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to check-in');
-    }
-  }
-);
-
-export const checkOutStaff = createAsyncThunk(
-  'staff/checkOutStaff',
-  async (rfid_code, { rejectWithValue }) => {
-    try {
-      const res = await axios.post(`${BASE_URL}/api/attendance/check-out/`, { rfid_code }, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-      return res.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to check-out');
-    }
-  }
-);
-
-export const getStaffReport = createAsyncThunk(
-  'staff/getStaffReport',
-  async (staffId, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${BASE_URL}/api/attendance/staff/${staffId}/attendance/report/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      return res.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to fetch staff report.");
-    }
-  }
-);
-
-export const getAttendanceAnalysis = createAsyncThunk(
-  'staff/getAttendanceAnalysis',
-  async ({ clubId }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${BASE_URL}/api/attendance/analysis/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        params: { club_id: clubId },
-      });
-      return res.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data?.message || "Failed to fetch attendance analysis.");
-    }
-  }
-);
-
-const staffSlice = createSlice({
-  name: 'staff',
-  initialState: {
-    shifts: [],
-    staffShifts: {},
-    attendance: [],
-    report: null,
-    analysis: null,
-    staffProfile: null,
-    loading: {
-      shifts: false,
-      staffShifts: false,
-      attendance: false,
-      report: false,
-      analysis: false,
-    },
-    error: {
-      shifts: null,
-      staffShifts: null,
-      attendance: null,
-      report: null,
-      analysis: null,
-    },
-  },
-  reducers: {
-    clearError: (state, action) => {
-      state.error[action.payload] = null;
-    },
-  },
-  extraReducers: (builder) => {
-    builder
-      .addCase(fetchShifts.pending, (state) => {
-        state.loading.shifts = true;
-        state.error.shifts = null;
-      })
-      .addCase(fetchShifts.fulfilled, (state, action) => {
-        state.shifts = action.payload;
-        state.loading.shifts = false;
-      })
-      .addCase(fetchShifts.rejected, (state, action) => {
-        state.loading.shifts = false;
-        state.error.shifts = action.payload;
-      })
-      .addCase(addShift.fulfilled, (state, action) => {
-        state.shifts.push(action.payload);
-      })
-      .addCase(addShift.rejected, (state, action) => {
-        state.error.shifts = action.payload;
-      })
-      .addCase(editShift.fulfilled, (state, action) => {
-        const { id, updatedShift } = action.payload;
-        const index = state.shifts.findIndex((shift) => shift.id === id);
-        if (index !== -1) {
-          state.shifts[index] = { ...state.shifts[index], ...updatedShift };
+    });
+    if (!res.ok) {
+        if (res.status === 401) {
+            throw new Error("Unauthorized. Please log in again.");
+        } else if (res.status === 500) {
+            throw new Error("Internal Server Error. Please try again later.");
         }
-      })
-      .addCase(editShift.rejected, (state, action) => {
-        state.error.shifts = action.payload;
-      })
-      .addCase(deleteShift.fulfilled, (state, action) => {
-        state.shifts = state.shifts.filter((shift) => shift.id !== action.payload);
-      })
-      .addCase(deleteShift.rejected, (state, action) => {
-        state.error.shifts = action.payload;
-      })
-      .addCase(getStaffShifts.pending, (state) => {
-        state.loading.staffShifts = true;
-        state.error.staffShifts = null;
-      })
-      .addCase(getStaffShifts.fulfilled, (state, action) => {
-        const { staffId, shifts } = action.payload;
-        state.staffShifts[staffId] = shifts;
-        state.loading.staffShifts = false;
-      })
-      .addCase(getStaffShifts.rejected, (state, action) => {
-        state.loading.staffShifts = false;
-        state.error.staffShifts = action.payload;
-      })
-      .addCase(checkInStaff.pending, (state) => {
-        state.loading.attendance = true;
-        state.error.attendance = null;
-      })
-      .addCase(checkInStaff.fulfilled, (state, action) => {
-        state.attendance.push(action.payload);
-        state.loading.attendance = false;
-      })
-      .addCase(checkInStaff.rejected, (state, action) => {
-        state.loading.attendance = false;
-        state.error.attendance = action.payload;
-      })
-      .addCase(checkOutStaff.pending, (state) => {
-        state.loading.attendance = true;
-        state.error.attendance = null;
-      })
-      .addCase(checkOutStaff.fulfilled, (state, action) => {
-        const updatedAttendance = action.payload;
-        const index = state.attendance.findIndex((att) => att.id === updatedAttendance.id);
-        if (index !== -1) {
-          state.attendance[index] = updatedAttendance;
-        } else {
-          state.attendance.push(updatedAttendance);
-        }
-        state.loading.attendance = false;
-      })
-      .addCase(checkOutStaff.rejected, (state, action) => {
-        state.loading.attendance = false;
-        state.error.attendance = action.payload;
-      })
-      .addCase(getStaffReport.pending, (state) => {
-        state.loading.report = true;
-        state.error.report = null;
-      })
-      .addCase(getStaffReport.fulfilled, (state, action) => {
-        state.report = action.payload;
-        state.loading.report = false;
-      })
-      .addCase(getStaffReport.rejected, (state, action) => {
-        state.loading.report = false;
-        state.error.report = action.payload;
-      })
-      .addCase(getAttendanceAnalysis.pending, (state) => {
-        state.loading.analysis = true;
-        state.error.analysis = null;
-      })
-      .addCase(getAttendanceAnalysis.fulfilled, (state, action) => {
-        state.analysis = action.payload;
-        state.loading.analysis = false;
-      })
-      .addCase(getAttendanceAnalysis.rejected, (state, action) => {
-        state.loading.analysis = false;
-        state.error.analysis = action.payload;
-      });
-  },
+        throw new Error("Failed to fetch staff.");
+    }
+    const data = await res.json();
+    return data;
 });
 
-export const { clearError } = staffSlice.actions;
-export default staffSlice.reducer;
+// Add staff
+export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff, { rejectWithValue }) => {
+    try {
+        const token = localStorage.getItem('token');
+        console.log('Attempting to add staff shift with data:', newStaff);
+        
+        const res = await fetch(`${BASE_URL}/staff/api/shifts/add/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(newStaff),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            console.error('Failed to add staff shift. Server responded with:', data);
+            return rejectWithValue(data);
+        }
+
+        console.log('Successfully added staff shift:', data);
+        return data;
+    } catch (error) {
+        console.error('Error while adding staff shift:', error);
+        return rejectWithValue(error.response ? error.response.data : error.message);
+    }
+});
+
+// Edit staff
+export const editStaff = createAsyncThunk('staff/editStaff', async ({ id, updatedStaff }) => {
+    const token = localStorage.getItem('token');
+    const res = await fetch(`${BASE_URL}/staff/api/shifts/${id}/edit/`, {
+        method: 'PUT',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updatedStaff),
+    });
+    const data = await res.json();
+    return { id, updatedStaff: data };
+});
+
+// Delete staff
+export const deleteStaff = createAsyncThunk('staff/deleteStaff', async (id) => {
+    const token = localStorage.getItem('token');
+    await fetch(`${BASE_URL}/staff/api/shifts/${id}/delete/`, {
+        method: 'DELETE',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        }
+    });
+    return id;
+});
+
+// Get staff by ID
+export const getStaffById = createAsyncThunk('staff/getStaffById', async (id) => {
+    const token = localStorage.getItem('token');
+    
+    console.log("Fetching staff data for ID:", id); // Debugging line
+
+    try {
+        const res = await fetch(`${BASE_URL}/staff/api/shifts/staff/${id}/`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+        });
+
+        // Check if response is OK
+        if (!res.ok) {
+            if (res.status === 404) {
+                console.log("Staff not found (404).");
+                throw new Error("Staff not found.");
+            }
+            console.log("Failed to fetch staff by ID, status:", res.status);
+            throw new Error("Failed to fetch staff by ID.");
+        }
+
+        const data = await res.json();
+        console.log("Fetched staff data:", data);  // ✅ Console log added
+
+        return data; // Returning the staff data
+    } catch (error) {
+        console.log("Error occurred during staff data fetch:", error.message);
+        throw error; // Rethrow the error for Redux to handle
+    }
+});
+
+
+
+// Staff slice
+const staffSlice = createSlice({
+    name: 'staffslice',
+    initialState: {
+        items: [],
+        user: null,
+        isloading: false,
+        error: null,
+    },
+    reducers: {},
+    extraReducers: (builder) => {
+        builder
+            // fetchStaff
+            .addCase(fetchStaff.pending, (state) => {
+                state.isloading = true;
+                state.error = null;
+            })
+            .addCase(fetchStaff.fulfilled, (state, action) => {
+                state.items = action.payload;
+                state.isloading = false;
+            })
+            .addCase(fetchStaff.rejected, (state, action) => {
+                state.isloading = false;
+                state.error = action.error.message;
+            })
+
+            // addStaff
+            .addCase(addStaff.fulfilled, (state, action) => {
+                state.items.push(action.payload);
+            })
+
+            // editStaff
+            .addCase(editStaff.fulfilled, (state, action) => {
+                const { id, updatedStaff } = action.payload;
+                const index = state.items.findIndex(staff => staff.id === id);
+                if (index !== -1) {
+                    state.items[index] = { ...state.items[index], ...updatedStaff };
+                }
+            })
+
+            // deleteStaff
+            .addCase(deleteStaff.fulfilled, (state, action) => {
+                const id = action.payload;
+                state.items = state.items.filter(staff => staff.id !== id);
+            })
+
+            .addCase(getStaffById.fulfilled, (state, action) => {
+                console.log("Staff data fetched successfully:", action.payload); // Log the payload here
+                state.user = action.payload;
+              })
+              .addCase(getStaffById.rejected, (state, action) => {
+                console.log("Error fetching staff data:", action.error); // Log if there's an error
+              });
+    },
+});
+
+export default staffSlice;

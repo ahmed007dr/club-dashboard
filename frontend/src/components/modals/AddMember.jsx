@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch } from "react-redux";
 import { addMember } from '../../redux/slices/memberSlice';
 import { fetchClubs } from '../../redux/slices/clubSlice';
+import { toast } from 'react-hot-toast';
 
-const AddMember = () => {
+const AddMember = ({ closeAddModal }) => {
   const dispatch = useDispatch();
   const [clubs, setClubs] = useState([]);
 
@@ -31,18 +32,24 @@ const AddMember = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Form data:", formData);
-    dispatch(addMember(formData));
-    
-    setFormData({
-      name: '',
-      national_id: '',
-      birth_date: '',
-      phone: '',
-      club: '',
-      referred_by: '',
-    });
+    try {
+      await dispatch(addMember(formData)).unwrap();
+      toast.success("تم إضافة العضو بنجاح!");
+      closeAddModal(); // Close modal after success
+      setFormData({
+        name: '',
+        national_id: '',
+        birth_date: '',
+        phone: '',
+        club: '',
+        referred_by: '',
+      });
+    } catch (error) {
+      toast.error("فشل في إضافة العضو");
+      console.error("Add member error:", error);
+    }
   };
+  
 
   useEffect(() => {
     const fetchData = async () => {

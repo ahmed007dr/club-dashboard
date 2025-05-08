@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import { putSubscriptionType } from '../../redux/slices/subscriptionsSlice';
+import { toast } from 'react-hot-toast';
 
-const UpdateSubscriptionTypes = ({ subscriptionId, subscriptionData }) => {
+
+const UpdateSubscriptionTypes = ({ subscriptionId, subscriptionData, closeModal })  => {
   const dispatch = useDispatch();
   const [formData, setFormData] = useState({
     name: '',
@@ -25,9 +27,19 @@ const UpdateSubscriptionTypes = ({ subscriptionId, subscriptionData }) => {
     setFormData((prevData) => ({ ...prevData, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    dispatch(putSubscriptionType({ id: subscriptionId, subscriptionData: formData }));
+
+    try {
+      await dispatch(putSubscriptionType({ id: subscriptionId, subscriptionData: formData })).unwrap();
+      toast.success("تم تحديث نوع الاشتراك بنجاح!");
+
+      // Close the modal after successful update
+      closeModal();
+    } catch (err) {
+      console.error("Update failed:", err);
+      toast.error(err.message || "فشل في تحديث نوع الاشتراك");
+    }
   };
 
   return (
@@ -68,7 +80,7 @@ const UpdateSubscriptionTypes = ({ subscriptionId, subscriptionData }) => {
           required
         />
       </div>
-      <button type="submit" className="w-full py-2 bg-blue-500 text-white rounded-lg">Update Subscription</button>
+      <button type="submit" className="w-full btn">تحديث نوع الاشتراك</button>
     </form>
   );
 };

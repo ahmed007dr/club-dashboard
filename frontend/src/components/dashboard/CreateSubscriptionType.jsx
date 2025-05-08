@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { addSubscriptionType } from '../../redux/slices/subscriptionsSlice';
+import { toast } from "react-hot-toast";
 
-const CreateSubscriptionTypes = () => {
+const CreateSubscriptionTypes = ({ onClose }) => {
   const dispatch = useDispatch();
   const [formData, setFormData] = useState({
     name: '',
@@ -26,7 +27,7 @@ const CreateSubscriptionTypes = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-
+  
     // Basic validation
     if (!formData.name.trim()) {
       setError('Name is required');
@@ -40,18 +41,19 @@ const CreateSubscriptionTypes = () => {
       setError('Price cannot be negative');
       return;
     }
-
+  
     const submissionData = {
       ...formData,
       name: formData.name.trim(),
       price: parseFloat(formData.price),
       duration_days: parseInt(formData.duration_days, 10),
     };
-
+  
     try {
       await dispatch(addSubscriptionType(submissionData)).unwrap();
-
-      // Reset form on success
+  
+      toast.success("تم إنشاء نوع الاشتراك بنجاح!");
+  
       setFormData({
         name: '',
         price: '',
@@ -60,11 +62,15 @@ const CreateSubscriptionTypes = () => {
         includes_pool: false,
         includes_classes: false,
       });
+  
+      if (onClose) onClose();  // Close modal if passed via props
+  
     } catch (err) {
       console.error('Failed to create subscription:', err);
-      setError(err.message || 'Failed to create subscription');
+      toast.error(err.message || 'فشل في إنشاء نوع الاشتراك');
     }
   };
+  
 
   return (
     <form onSubmit={handleSubmit} className="max-w-md mx-auto bg-white p-6 rounded shadow"  dir="rtl">

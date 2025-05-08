@@ -1,65 +1,80 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
-import axios from 'axios';
 import BASE_URL from '../../config/api';
 
-export const fetchClubs = createAsyncThunk('club/fetchClubs', async (_, { rejectWithValue }) => {
+const token = localStorage.getItem('token');
+
+export const fetchClubs = createAsyncThunk('clubs/fetchClubs', async (_, { rejectWithValue }) => {
   try {
-    const token = localStorage.getItem('token');
-    const response = await axios.get(`${BASE_URL}/core/api/club/`, {
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    const response = await fetch(`${BASE_URL}/core/api/club/`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`, // Make sure token is included
+        'Content-Type': 'application/json',
+      },
     });
-    return Array.isArray(response.data) ? response.data : [response.data];
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return rejectWithValue(errorData.message || "Failed to fetch clubs.");
+    }
+
+    const data = await response.json();
+
+    // Normalize the response to always be an array
+    return Array.isArray(data) ? data : [data];
   } catch (error) {
     console.error("Error fetching clubs:", error);
-    return rejectWithValue(error.response?.data?.message || 'Failed to fetch clubs');
+    return rejectWithValue(error.message || "An unexpected error occurred.");
   }
 });
 
-export const editClub = createAsyncThunk('club/editClub', async ({ id, updatedClub }, { rejectWithValue }) => {
+
+// Edit club
+export const editClub = createAsyncThunk('clubs/editClub', async ({ id, updatedClub }, { rejectWithValue }) => {
   try {
-    const token = localStorage.getItem('token');
-    const response = await axios.post(`${BASE_URL}/core/api/club/edit/`, updatedClub, {
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    const response = await fetch(`${BASE_URL}/core/api/club/edit/`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatedClub),
     });
-    return { id, updatedClub: response.data };
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return rejectWithValue(errorData.message || "Failed to edit club.");
+    }
+
+    const data = await response.json();
+    return { id, updatedClub: data };
   } catch (error) {
     console.error("Error editing club:", error);
-    return rejectWithValue(error.response?.data?.message || 'Failed to edit club');
+    return rejectWithValue(error.message || "An unexpected error occurred.");
   }
 });
 
 const clubSlice = createSlice({
-  name: 'club',
+  name: 'clubSlice',
   initialState: {
-    items: [],
-    selectedClub: null,
-    loading: false,
-    error: null,
+    items: [], // List of clubs
+    isLoading: true,
+    selectedClub: null, // To store the selected club
+    error: null, // To store errors
   },
-  reducers: {
-    setSelectedClub: (state, action) => {
-      state.selectedClub = action.payload;
-    },
-    clearError: (state) => {
-      state.error = null;
-    },
-  },
+  reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(fetchClubs.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
       .addCase(fetchClubs.fulfilled, (state, action) => {
-        state.loading = false;
         state.items = action.payload;
-        if (!state.selectedClub && action.payload.length > 0) {
-          state.selectedClub = action.payload[0];
-        }
+        state.isLoading = false;
+      })
+      .addCase(fetchClubs.pending, (state) => {
+        state.isLoading = true;
       })
       .addCase(fetchClubs.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
+        state.isLoading = false;
+        state.error = action.payload || action.error.message;
       })
       .addCase(editClub.fulfilled, (state, action) => {
         const { id, updatedClub } = action.payload;
@@ -69,10 +84,9 @@ const clubSlice = createSlice({
         }
       })
       .addCase(editClub.rejected, (state, action) => {
-        state.error = action.payload;
+        state.error = action.payload || action.error.message;
       });
   },
 });
 
-export const { setSelectedClub, clearError } = clubSlice.actions;
-export default clubSlice.reducer;
+export default clubSlice;
