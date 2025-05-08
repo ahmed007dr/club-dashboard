@@ -20,7 +20,6 @@ class StaffAttendance(models.Model):
     check_in = models.DateTimeField()
     check_out = models.DateTimeField(null=True, blank=True)
     shift = models.ForeignKey(Shift, on_delete=models.SET_NULL, null=True, blank=True)
-    auto_checked_out = models.BooleanField(default=False) 
 
     def duration_hours(self):
         if self.check_out:
