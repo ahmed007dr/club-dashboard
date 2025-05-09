@@ -789,53 +789,7 @@ const subscriptionsSlice = createSlice({
       // Always add to attendances array
       state.attendances.push(action.payload);
     
-      // If subscriptions aren't loaded, skip the subscription update
-      if (!state.memberSubscriptions?.length) {
-        console.warn("Subscriptions not loaded - attendance recorded but not linked to subscription");
-        return;
-      }
-    
-      const { attendance_date, subscription, subscription_details } = action.payload;
       
-      // Get member ID from subscription_details instead of member_details
-      const memberId = subscription_details?.member;
-      
-      if (!memberId) {
-        console.error("Member ID not found in subscription details");
-        return;
-      }
-    
-      // Find the specific subscription (using both member ID and subscription ID for accuracy)
-      const subscriptionIndex = state.memberSubscriptions.findIndex(
-        sub => sub.id === subscription && sub.member === memberId
-      );
-    
-      if (subscriptionIndex === -1) {
-        console.error("Matching subscription not found");
-        return;
-      }
-    
-      // Initialize attendance_dates array if it doesn't exist
-      if (!state.memberSubscriptions[subscriptionIndex].attendance_dates) {
-        state.memberSubscriptions[subscriptionIndex].attendance_dates = [];
-      }
-    
-      // Check for duplicate dates before adding
-      const existingDates = state.memberSubscriptions[subscriptionIndex].attendance_dates;
-      const isDuplicate = existingDates.some(date => date === attendance_date);
-      
-      if (!isDuplicate) {
-        // Add new attendance date and update count
-        state.memberSubscriptions[subscriptionIndex].attendance_dates = [
-          ...existingDates,
-          attendance_date
-        ];
-        
-        state.memberSubscriptions[subscriptionIndex].attendance_days = 
-          state.memberSubscriptions[subscriptionIndex].attendance_dates.length;
-      } else {
-        console.warn(`Attendance already recorded for date: ${attendance_date}`);
-      }
     })
     
     
