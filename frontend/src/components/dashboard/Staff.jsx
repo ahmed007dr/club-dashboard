@@ -18,7 +18,6 @@ import { toast } from 'react-hot-toast';
 import axios from 'axios';
 
 
-
 const Staff = () => {
   const dispatch = useDispatch();
   const staff = useSelector((state) => state.staff.items || []);
@@ -26,6 +25,8 @@ const Staff = () => {
   const [selectedShift, setSelectedShift] = useState(null);
   const [modalType, setModalType] = useState("");
   const [formData, setFormData] = useState({
+    date: "",
+    shift_start: "",
     shift_end: "",
     club: "",
     staff: "",
@@ -44,6 +45,7 @@ const Staff = () => {
   const [selectedClubId, setSelectedClubId] = useState("");
   const [selectedClubUsers, setSelectedClubUsers] = useState([]);
   const [profileUser, setProfileUser] = useState({ id: "", username: "" });
+
   // Fetch users grouped by club
   useEffect(() => {
     const fetchUsersGroupedByClub = async () => {
@@ -90,17 +92,16 @@ const Staff = () => {
       .then((response) => response.json())
       .then((data) => {
         console.log("Profile data:", data);
-  
         const club = { id: data.club.id, name: data.club.name };
         setUserClub(club);
         setFilters((prev) => ({ ...prev, club: club.id.toString() }));
         setFormData((prev) => ({ ...prev, club: club.id.toString() }));
         setSelectedClubId(club.id.toString());
-        setProfileUser({ id: data.id, username: data.username }); // Store id and username
-  
+        setProfileUser({ id: data.id, username: data.username });
+
         const userClubData = clubs.find((c) => c.club_id === club.id);
         if (userClubData) setSelectedClubUsers(userClubData.users);
-  
+
         setLoadingProfile(false);
       })
       .catch((err) => {
@@ -128,6 +129,8 @@ const Staff = () => {
 
     if (type === "add") {
       setFormData({
+        date: "",
+        shift_start: "",
         shift_end: "",
         club: userClub?.id?.toString() || "",
         staff: "",
@@ -136,7 +139,9 @@ const Staff = () => {
     } else if (type === "edit" && shift) {
       setFormData({
         id: shift.id,
-        shift_end: shift.shift_end,
+        date: shift.date || "",
+        shift_start: shift.shift_start || "",
+        shift_end: shift.shift_end || "",
         club: userClub?.id?.toString() || shift.club_details.id.toString(),
         staff: `${shift.staff_details.id}`,
         approved_by: shift.approved_by_details
@@ -153,37 +158,44 @@ const Staff = () => {
 
   const handleAddSubmit = (e) => {
     e.preventDefault();
-  
+
     if (!userClub) {
       toast.error("النادي غير متاح. يرجى المحاولة لاحقًا.");
       return;
     }
-  
+
     const staffData = {
+      date: formData.date,
+      shift_start: formData.shift_start,
       shift_end: formData.shift_end,
       club: Number(formData.club),
       staff: Number(formData.staff) || null,
       approved_by: Number(formData.approved_by) || null,
     };
-  
+
     dispatch(addStaff(staffData))
       .unwrap()
       .then(() => {
         dispatch(fetchStaff());
         toast.success("تم إضافة الوردية بنجاح!");
-        handleCloseModal(); // Close modal
+        handleCloseModal();
       })
       .catch((err) => {
         toast.error("فشل في إضافة الوردية: " + (err.message || "خطأ غير معروف"));
       });
   };
-  
-  
 
   const handleCloseModal = () => {
     setModalType("");
     setSelectedShift(null);
-    setFormData({});
+    setFormData({
+      date: "",
+      shift_start: "",
+      shift_end: "",
+      club: "",
+      staff: "",
+      approved_by: null,
+    });
     setFormError(null);
   };
 
@@ -194,19 +206,21 @@ const Staff = () => {
 
   const handleEditSubmit = (e) => {
     e.preventDefault();
-  
+
     if (!userClub) {
       toast.error("النادي غير متاح. يرجى المحاولة لاحقًا.");
       return;
     }
-  
+
     const updatedStaff = {
+      date: formData.date,
+      shift_start: formData.shift_start,
       shift_end: formData.shift_end,
       club: Number(formData.club),
       staff: Number(formData.staff) || null,
       approved_by: Number(formData.approved_by) || null,
     };
-  
+
     dispatch(editStaff({ id: selectedShift.id, updatedStaff }))
       .unwrap()
       .then(() => {
@@ -218,7 +232,7 @@ const Staff = () => {
         toast.error("فشل في تعديل الوردية: " + (err.message || "خطأ غير معروف"));
       });
   };
-  
+
   const confirmDelete = () => {
     dispatch(deleteStaff(selectedShift.id))
       .unwrap()
@@ -234,14 +248,12 @@ const Staff = () => {
   };
 
   const parseTime = (timeStr) => {
-    if (!timeStr) return new Date(0); // Fallback for invalid/undefined dates
+    if (!timeStr) return new Date(0);
 
-    // Remove microseconds if present
     if (timeStr.includes(".")) {
       timeStr = timeStr.split(".")[0];
     }
 
-    // Handle time-only format (e.g., "12:00:00")
     if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) {
       const today = new Date();
       const [hours, minutes, seconds] = timeStr.split(":");
@@ -249,12 +261,11 @@ const Staff = () => {
       return today;
     }
 
-    // Handle full timestamp or other formats
     const parsedDate = new Date(timeStr);
-    return isNaN(parsedDate) ? new Date(0) : parsedDate; // Fallback for invalid dates
+    return isNaN(parsedDate) ? new Date(0) : parsedDate;
   };
 
-  // Filter and sort staff based on filters and id (newest to oldest)
+  // Filter and sort staff based on filters and id
   const filteredStaff = useMemo(() => {
     return staff
       .filter((shift) => {
@@ -270,7 +281,6 @@ const Staff = () => {
         return clubMatch && staffMatch;
       })
       .sort((a, b) => {
-        // Sort by id in descending order (highest id first = newest)
         return (b.id || 0) - (a.id || 0);
       });
   }, [staff, filters, userClub]);
@@ -332,9 +342,7 @@ const Staff = () => {
           <select
             name="club"
             value={filters.club}
-            onChange={(e) =>
-              setFilters({ ...filters, club: e.target.value })
-            }
+            onChange={(e) => setFilters({ ...filters, club: e.target.value })}
             className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
             disabled
           >
@@ -351,9 +359,7 @@ const Staff = () => {
             type="text"
             name="staff"
             value={filters.staff}
-            onChange={(e) =>
-              setFilters({ ...filters, staff: e.target.value })
-            }
+            onChange={(e) => setFilters({ ...filters, staff: e.target.value })}
             placeholder="تصفية حسب اسم الموظف"
             className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
           />
@@ -402,10 +408,10 @@ const Staff = () => {
                     </td>
                     <td className="p-2 sm:p-3">{shift.club_details?.name}</td>
                     <td className="p-2 sm:p-3 text-blue-600 hover:underline">
-  <Link to={`/staff/${shift.staff_details.id}`}>
-    {`${shift.staff_details.first_name} ${shift.staff_details.last_name}`}
-  </Link>
-</td>
+                      <Link to={`/staff/${shift.staff_details.id}`}>
+                        {`${shift.staff_details.first_name} ${shift.staff_details.last_name}`}
+                      </Link>
+                    </td>
                     <td className="p-2 sm:p-3">
                       {shift.approved_by_details
                         ? shift.approved_by_details.username
@@ -454,7 +460,9 @@ const Staff = () => {
                 >
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-semibold">
-                      نهاية الوردية: {shift.shift_end}
+                      التاريخ: {shift.date
+                        ? new Date(shift.date).toLocaleDateString("en-GB")
+                        : "N/A"}
                     </span>
                     <DropdownMenu dir="rtl">
                       <DropdownMenuTrigger asChild>
@@ -485,6 +493,24 @@ const Staff = () => {
                     </DropdownMenu>
                   </div>
                   <p className="text-sm">
+                    <strong>بداية الوردية:</strong>{" "}
+                    {shift.shift_start
+                      ? parseTime(shift.shift_start).toLocaleTimeString(
+                          "en-GB",
+                          { hour: "2-digit", minute: "2-digit" }
+                        )
+                      : "Invalid date"}
+                  </p>
+                  <p className="text-sm">
+                    <strong>نهاية الوردية:</strong>{" "}
+                    {shift.shift_end
+                      ? parseTime(shift.shift_end).toLocaleTimeString(
+                          "en-GB",
+                          { hour: "2-digit", minute: "2-digit" }
+                        )
+                      : "Invalid date"}
+                  </p>
+                  <p className="text-sm">
                     <strong>النادي:</strong> {shift.club_details?.name}
                   </p>
                   <p className="text-sm">
@@ -492,7 +518,7 @@ const Staff = () => {
                     {`${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`}
                   </p>
                   <p className="text-sm">
-                    <strong>تمت الماملة بواسطة:</strong>{" "}
+                    <strong>تمت الموافقة بواسطة:</strong>{" "}
                     {shift.approved_by_details
                       ? shift.approved_by_details.username
                       : "غير موافق عليه"}
@@ -583,6 +609,39 @@ const Staff = () => {
             )}
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
+                <label className="block text-sm font-medium mb-1">التاريخ</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">بداية الوردية</label>
+                <input
+                  type="time"
+                  name="shift_start"
+                  value={formData.shift_start || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">نهاية الوردية</label>
+                <input
+                  type="time"
+                  name="shift_end"
+                  value={formData.shift_end || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium mb-1">النادي</label>
                 <select
                   name="club"
@@ -602,7 +661,6 @@ const Staff = () => {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1">الموظف</label>
                 <select
@@ -621,37 +679,21 @@ const Staff = () => {
                   ))}
                 </select>
               </div>
-
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  نهاية الوردية
-                </label>
-                <input
-                  type="time"
-                  name="shift_end"
-                  value={formData.shift_end || ""}
+                <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
+                <select
+                  name="approved_by"
+                  value={formData.approved_by || ""}
                   onChange={handleFormChange}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-                  required
-                />
+                  disabled={!formData.club}
+                >
+                  <option value="">اختر موافق</option>
+                  {profileUser.id && (
+                    <option value={profileUser.id}>{profileUser.username}</option>
+                  )}
+                </select>
               </div>
-
-              <div>
-  <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
-  <select
-    name="approved_by"
-    value={formData.approved_by || ""}
-    onChange={handleFormChange}
-    className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-    disabled={!formData.club}
-  >
-    <option value="">اختر موافق</option>
-    {profileUser.id && (
-      <option value={profileUser.id}>{profileUser.username}</option>
-    )}
-  </select>
-</div>
-
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
@@ -664,7 +706,11 @@ const Staff = () => {
                   type="submit"
                   className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                   disabled={
-                    !formData.club || !formData.staff || !formData.shift_end
+                    !formData.club ||
+                    !formData.staff ||
+                    !formData.date ||
+                    !formData.shift_start ||
+                    !formData.shift_end
                   }
                 >
                   إضافة
@@ -684,11 +730,45 @@ const Staff = () => {
           >
             <h2 className="text-lg sm:text-xl font-bold mb-4">تعديل الوردية</h2>
             {formError && (
-              <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
+              <div className="bg-red-100 text-red-7
+              00 p-2 rounded mb-4 text-right text-sm">
                 {formError}
               </div>
             )}
             <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">التاريخ</label>
+                <input
+                  type="date"
+                  name="date"
+                  value={formData.date || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">بداية الوردية</label>
+                <input
+                  type="time"
+                  name="shift_start"
+                  value={formData.shift_start || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">نهاية الوردية</label>
+                <input
+                  type="time"
+                  name="shift_end"
+                  value={formData.shift_end || ""}
+                  onChange={handleFormChange}
+                  className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+                  required
+                />
+              </div>
               <div>
                 <label className="block text-sm font-medium mb-1">النادي</label>
                 <select
@@ -709,7 +789,6 @@ const Staff = () => {
                   ))}
                 </select>
               </div>
-
               <div>
                 <label className="block text-sm font-medium mb-1">الموظف</label>
                 <select
@@ -727,36 +806,20 @@ const Staff = () => {
                   ))}
                 </select>
               </div>
-
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  نهاية الوردية
-                </label>
-                <input
-                  type="time"
-                  name="shift_end"
-                  value={formData.shift_end || ""}
+                <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
+                <select
+                  name="approved_by"
+                  value={formData.approved_by || ""}
                   onChange={handleFormChange}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-                  required
-                />
+                >
+                  <option value="">اختر موافق</option>
+                  {profileUser.id && (
+                    <option value={profileUser.id}>{profileUser.username}</option>
+                  )}
+                </select>
               </div>
-
-              <div>
-  <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
-  <select
-    name="approved_by"
-    value={formData.approved_by || ""}
-    onChange={handleFormChange}
-    className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-  >
-    <option value="">اختر موافق</option>
-    {profileUser.id && (
-      <option value={profileUser.id}>{profileUser.username}</option>
-    )}
-  </select>
-</div>
-
               <div className="mt-4 flex justify-end gap-2">
                 <button
                   type="button"
@@ -789,7 +852,28 @@ const Staff = () => {
             </h2>
             <ul className="text-sm space-y-2">
               <li>
-                <strong>نهاية الوردية:</strong> {selectedShift.shift_end}
+                <strong>التاريخ:</strong>{" "}
+                {selectedShift.date
+                  ? new Date(selectedShift.date).toLocaleDateString("en-GB")
+                  : "N/A"}
+              </li>
+              <li>
+                <strong>بداية الوردية:</strong>{" "}
+                {selectedShift.shift_start
+                  ? parseTime(selectedShift.shift_start).toLocaleTimeString(
+                      "en-GB",
+                      { hour: "2-digit", minute: "2-digit" }
+                    )
+                  : "Invalid date"}
+              </li>
+              <li>
+                <strong>نهاية الوردية:</strong>{" "}
+                {selectedShift.shift_end
+                  ? parseTime(selectedShift.shift_end).toLocaleTimeString(
+                      "en-GB",
+                      { hour: "2-digit", minute: "2-digit" }
+                    )
+                  : "Invalid date"}
               </li>
               <li>
                 <strong>النادي:</strong> {selectedShift.club_details?.name}

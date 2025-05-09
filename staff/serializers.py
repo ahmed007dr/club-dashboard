@@ -70,6 +70,7 @@ class StaffAttendanceSerializer(serializers.ModelSerializer):
     duration_hours = serializers.SerializerMethodField()
     shift_details = ShiftSerializer(source='shift', read_only=True)
     staff_details = UserSerializer(source='staff', read_only=True)
+    club_details = ClubSerializer(source='club', read_only=True)
 
     class Meta:
         model = StaffAttendance
@@ -78,6 +79,7 @@ class StaffAttendanceSerializer(serializers.ModelSerializer):
             'staff',
             'staff_details',
             'club',
+            'club_details',
             'check_in',
             'check_out',
             'shift',

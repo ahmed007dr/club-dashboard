@@ -357,115 +357,123 @@ const SubscriptionList = () => {
             لا توجد اشتراكات متاحة.
           </p>
         ) : (
-          <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="py-2 px-4 text-right">العضو</th>
-                <th className="py-2 px-4 text-right">اسم النادي</th>
-                <th className="py-2 px-4 text-right">تاريخ البدء</th>
-                <th className="py-2 px-4 text-right">تاريخ الانتهاء</th>
-                <th className="py-2 px-4 text-right">المبلغ المدفوع</th>
-                <th className="py-2 px-4 text-right">المبلغ المتبقي</th>
-                <th className="py-2 px-4 text-right">الحالة</th>
-                <th className="py-2 px-4 text-center">الدفع</th>
-                <th className="py-2 px-4 text-right">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {currentSubscriptions.map((subscription) => (
-                <tr
-                  key={subscription.id}
-                  className="border-b hover:bg-gray-50 transition"
+       <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
+  <thead className="bg-gray-100">
+    <tr>
+      <th className="py-1 px-2 text-right text-sm">العضو</th>
+      <th className="py-1 px-2 text-right text-sm">اسم النادي</th>
+      <th className="py-1 px-2 text-right text-sm">تاريخ البدء</th>
+      <th className="py-1 px-2 text-right text-sm">تاريخ الانتهاء</th>
+      <th className="py-1 px-2 text-right text-sm">عدد الإدخالات</th>
+      <th className="py-1 px-2 text-right text-sm">الحد الأقصى للإدخالات</th>
+      <th className="py-1 px-2 text-right text-sm">الإدخالات المتبقية</th>
+      <th className="py-1 px-2 text-right text-sm">المبلغ المدفوع</th>
+      <th className="py-1 px-2 text-right text-sm">المبلغ المتبقي</th>
+      <th className="py-1 px-2 text-right text-sm">الحالة</th>
+      <th className="py-1 px-2 text-center text-sm">الدفع</th>
+      <th className="py-1 px-2 text-right text-sm">الإجراءات</th>
+    </tr>
+  </thead>
+  <tbody>
+    {currentSubscriptions.map((subscription) => (
+      <tr
+        key={subscription.id}
+        className="border-b hover:bg-gray-50 transition"
+      >
+        <td className="py-1 px-2 text-sm">
+          <Link
+            to={`/member-subscriptions/${subscription.member_details.name}`}
+            className="text-blue-600 hover:underline"
+          >
+            {subscription.member_details.name}
+          </Link>
+        </td>
+        <td className="py-1 px-2 text-sm">{subscription.club_details.name}</td>
+        <td className="py-1 px-2 text-sm">{subscription.start_date}</td>
+        <td className="py-1 px-2 text-sm">{subscription.end_date}</td>
+        <td className="py-1 px-2 text-sm">{subscription.entry_count}</td>
+        <td className="py-1 px-2 text-sm">{subscription.type_details.max_entries}</td>
+        <td className="py-1 px-2 text-sm">
+          {subscription.type_details.max_entries - subscription.entry_count}
+        </td>
+        <td className="py-1 px-2 text-sm">${subscription.paid_amount}</td>
+        <td className="py-1 px-2 text-sm">${subscription.remaining_amount}</td>
+        <td className="py-1 px-2 text-sm">
+          <span
+            className={`px-1 py-0.5 rounded text-xs font-medium
+              ${
+                subscription.status === 'Active'
+                  ? 'bg-green-100 text-green-600'
+                  : subscription.status === 'Expired'
+                  ? 'bg-red-100 text-red-600'
+                  : subscription.status === 'Upcoming'
+                  ? 'bg-blue-100 text-blue-600'
+                  : ''
+              }`}
+          >
+            {subscription.status}
+          </span>
+        </td>
+        <td className="py-1 px-2 flex items-center">
+          <input
+            type="text"
+            inputMode="decimal"
+            pattern="[0-9]*\.?[0-9]*"
+            placeholder="0.00"
+            value={paymentAmounts[subscription.id] || ''}
+            onChange={(e) => handleInputChange(e, subscription.id)}
+            className="border p-0.5 rounded w-12 text-sm"
+          />
+          <button
+            onClick={() => handlePayment(subscription)}
+            className="btn text-sm px-2 py-0.5 ml-1"
+          >
+            دفع
+          </button>
+        </td>
+        <td className="py-1 px-2">
+          <div className="flex items-center gap-1">
+            <DropdownMenu dir="rtl">
+              <DropdownMenuTrigger asChild>
+                <button className="bg-gray-200 text-gray-700 px-0.5 py-0.5 rounded-md hover:bg-gray-300 transition-colors">
+                  <MoreVertical className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-32 text-sm">
+                <DropdownMenuItem
+                  onClick={() => openModal(subscription)}
+                  className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
                 >
-                  <td className="py-2 px-4">
-                    <Link
-                      to={`/member-subscriptions/${subscription.member_details.name}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {subscription.member_name}
-                    </Link>
-                  </td>
-                  <td className="py-2 px-4">{subscription.club_name}</td>
-                  <td className="py-2 px-4">{subscription.start_date}</td>
-                  <td className="py-2 px-4">{subscription.end_date}</td>
-                  <td className="py-2 px-4">${subscription.paid_amount}</td>
-                  <td className="py-2 px-4">${subscription.remaining_amount}</td>
-                  <td className="py-2 px-4">
-                    <span
-                      className={`px-2 py-1 rounded text-sm font-medium
-                        ${
-                          subscription.status === 'Active'
-                            ? 'bg-green-100 text-green-600'
-                            : subscription.status === 'Expired'
-                            ? 'bg-red-100 text-red-600'
-                            : subscription.status === 'Upcoming'
-                            ? 'bg-blue-100 text-blue-600'
-                            : ''
-                        }`}
-                    >
-                      {subscription.status}
-                    </span>
-                  </td>
-                  <td className="py-2 px-8 flex ">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      pattern="[0-9]*\.?[0-9]*"
-                      placeholder="0.00"
-                      value={paymentAmounts[subscription.id] || ''}
-                      onChange={(e) => handleInputChange(e, subscription.id)}
-                      className="border p-1 rounded w-15"
-                    />
-                    <button
-                      onClick={() => handlePayment(subscription)}
-                      className="btn"
-                    >
-                      دفع
-                    </button>
-                  </td>
-                  <td className="py-2 px-4">
-                    <div className="flex items-center gap-2">
-                      <DropdownMenu dir="rtl">
-                        <DropdownMenuTrigger asChild>
-                          <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                            <MoreVertical className="h-5 w-5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem
-                            onClick={() => openModal(subscription)}
-                            className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                          >
-                            تعديل
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => openDetailModal(subscription.id)}
-                            className="cursor-pointer text-green-600 hover:bg-yellow-50"
-                          >
-                            عرض
-                          </DropdownMenuItem>
-                          {subscription.status === 'Expired' && (
-                            <DropdownMenuItem
-                              onClick={() => handleRenew(subscription.id)}
-                              className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                            >
-                              تجديد
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => openDeleteModal(subscription)}
-                            className="cursor-pointer text-red-600 hover:bg-red-50"
-                          >
-                            حذف
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  تعديل
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => openDetailModal(subscription.id)}
+                  className="cursor-pointer text-green-600 hover:bg-yellow-50"
+                >
+                  عرض
+                </DropdownMenuItem>
+                {subscription.status === 'Expired' && (
+                  <DropdownMenuItem
+                    onClick={() => handleRenew(subscription.id)}
+                    className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                  >
+                    تجديد
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onClick={() => openDeleteModal(subscription)}
+                  className="cursor-pointer text-red-600 hover:bg-red-50"
+                >
+                  حذف
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
         )}
       </div>
 

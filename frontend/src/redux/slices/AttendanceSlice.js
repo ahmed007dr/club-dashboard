@@ -116,23 +116,32 @@ export const checkOutStaff = createAsyncThunk('attendance/checkOut', async (rfid
 });
 
 // Thunk: Analyze Attendance
-export const analyzeAttendance = createAsyncThunk('attendance/analyze', async (attendanceId, { rejectWithValue }) => {
-  try {
-    const response = await axios.get(`${BASE_URL}/api/attendance/${attendanceId}/analysis/`, {
-      headers: {
-        Authorization: getToken()
-      }
-    });
-    return response.data;
-  } catch (error) {
-    return rejectWithValue(error.response?.data || { error: 'Analysis failed' });
+// Thunk: Analyze Attendance by Staff ID
+export const analyzeAttendance = createAsyncThunk(
+  'attendance/analyze',
+  async (staffId, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${BASE_URL}/staff/api/attendance/${staffId}/analysis/`, {
+        headers: {
+          Authorization: getToken(),
+          'Content-Type': 'application/json',
+        }
+      });
+
+      console.log('Attendance analysis response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('Analysis error:', error.response?.data || 'Analysis failed');
+      return rejectWithValue(error.response?.data || { error: 'Analysis failed' });
+    }
   }
-});
+);
+
 
 // Thunk: Get Staff Attendance Report
 export const getStaffAttendanceReport = createAsyncThunk('attendance/report', async (staffId, { rejectWithValue }) => {
   try {
-    const response = await axios.get(`${BASE_URL}/api/staff/${staffId}/attendance/report/`, {
+    const response = await axios.get(`${BASE_URL}/staff/api/staff/${staffId}/attendance/report/`, {
       headers: {
         Authorization: getToken()
       }
@@ -143,12 +152,37 @@ export const getStaffAttendanceReport = createAsyncThunk('attendance/report', as
   }
 });
 
+// Async thunk to fetch shift attendances
+export const fetchShiftAttendances = createAsyncThunk(
+  'shiftAttendance/fetchShiftAttendances',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await axios.get(`${BASE_URL}/staff/attendance/`, {
+        headers: {
+          Authorization: getToken(),
+          'Content-Type': 'application/json',
+        },
+      });
+
+      // Sort by check_in (newest first)
+      const sortedData = [...response.data].sort((a, b) => 
+        new Date(b.check_in) - new Date(a.check_in)
+      );
+
+      return sortedData;
+    } catch (error) {
+      console.error('Fetch shift attendances error:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.error || 'Failed to fetch shift attendances.');
+    }
+  }
+);
 
 // Slice definition
 const attendanceSlice = createSlice({
   name: 'attendance',
   initialState: {
     attendances: [],
+    shiftAttendances: [],
     checkInData: null,
     checkOutData: null,
     analysisData: null,
@@ -213,8 +247,20 @@ const attendanceSlice = createSlice({
 
       .addCase(getStaffAttendanceReport.pending, (state) => { state.loading = true; state.error = null; })
       .addCase(getStaffAttendanceReport.fulfilled, (state, action) => { state.loading = false; state.reportData = action.payload; })
-      .addCase(getStaffAttendanceReport.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
-  
+      .addCase(getStaffAttendanceReport.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+     .addCase(fetchShiftAttendances.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchShiftAttendances.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.shiftAttendances = action.payload;
+        state.lastFetched = new Date().toISOString();
+      })
+      .addCase(fetchShiftAttendances.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
   },
 });
 

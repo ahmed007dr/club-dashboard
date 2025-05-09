@@ -177,7 +177,7 @@ const CreateSubscriptionTypes = ({ onClose }) => {
       </div>
 
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">أقصى عدد للمشاركين</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">أقصى عدد للحضور</label>
         <input
           type="number"
           name="max_entries"

@@ -10,6 +10,7 @@ from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub
 from accounts.models import User
 from rest_framework.exceptions import ValidationError
+from django.db.models.functions import TruncDate
 
 # Shift Management APIs
 @api_view(['GET'])
@@ -116,7 +117,7 @@ def find_current_shift(user):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def staff_check_in_by_code_api(request):
-    """Record staff check-in using RFID code for any active user."""
+    """Record staff check-in using RFID code for any active user. Auto-checkout if needed."""
     rfid_code = request.data.get('rfid_code')
     if not rfid_code:
         return Response({'error': 'RFID code is required'}, status=status.HTTP_400_BAD_REQUEST)
@@ -126,8 +127,21 @@ def staff_check_in_by_code_api(request):
     except User.DoesNotExist:
         return Response({'error': 'Invalid RFID code or inactive user'}, status=status.HTTP_404_NOT_FOUND)
 
-    if StaffAttendance.objects.filter(staff=user, check_out__isnull=True).exists():
-        return Response({'error': 'Already checked in'}, status=status.HTTP_400_BAD_REQUEST)
+    open_attendances = StaffAttendance.objects.filter(staff=user, check_out__isnull=True)
+    for attendance in open_attendances:
+        if attendance.shift:
+            shift_end_date = attendance.shift.shift_end_date or attendance.shift.date
+            shift_end_dt = datetime.combine(shift_end_date, attendance.shift.shift_end)
+            shift_end_dt = timezone.make_aware(shift_end_dt)
+
+            if shift_end_dt < timezone.now():
+                attendance.check_out = shift_end_dt
+            else:
+                attendance.check_out = timezone.now()
+        else:
+            attendance.check_out = timezone.now()
+
+        attendance.save()
 
     shift = find_current_shift(user)
     attendance = StaffAttendance.objects.create(
@@ -136,7 +150,9 @@ def staff_check_in_by_code_api(request):
         shift=shift,
         check_in=timezone.now()
     )
+
     return Response(StaffAttendanceSerializer(attendance).data, status=status.HTTP_201_CREATED)
+
 
 
 @api_view(['POST'])
@@ -159,6 +175,7 @@ def staff_check_out_by_code_api(request):
     attendance.check_out = timezone.now()
     attendance.save()
     return Response(StaffAttendanceSerializer(attendance).data)
+
 
 
 @api_view(['GET'])
@@ -220,7 +237,11 @@ def staff_attendance_report_api(request, staff_id):
     if request.user.role != 'owner':
         attendances = attendances.filter(club=request.user.club)
 
-    attendance_days = attendances.distinct('check_in__date').count()
+    # Count distinct attendance days
+    attendance_days = attendances.annotate(date=TruncDate('check_in')) \
+                                 .values('date') \
+                                 .distinct() \
+                                 .count()
     total_hours = sum(
         attendance.duration_hours() or 0
         for attendance in attendances
@@ -264,3 +285,15 @@ def missing_checkins_api(request):
             })
     
     return Response(missing_checkins)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def attendance_list_api(request):
+    """Retrieve a list of all staff attendance records with staff name, check-in, check-out, club, and duration."""
+    attendances = StaffAttendance.objects.select_related('staff', 'club', 'shift')
+    if request.user.role != 'owner':
+        attendances = attendances.filter(club=request.user.club)
+    
+    serializer = StaffAttendanceSerializer(attendances, many=True)
+    return Response(serializer.data)

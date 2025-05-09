@@ -412,10 +412,10 @@ const handleCreateSubmit = (e) => {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">اسم المشتري</label>
+          <label className="block text-sm font-medium mb-1"> رقم التذكرة </label>
           <input
             type="text"
-            placeholder="بحث عن اسم المشتري"
+            placeholder="بحث عن رقم التذكرة    "
             className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
             value={filterBuyerName}
             onChange={(e) => setFilterBuyerName(e.target.value)}
@@ -459,8 +459,7 @@ const handleCreateSubmit = (e) => {
                     اسم النادي
                   </th>
                   <th className="py-2 px-4 border-b text-center text-sm font-medium text-gray-700">
-                    المشتري
-                  </th>
+                    رقم التذكرة                 </th>
                   <th className="py-2 px-4 border-b text-center text-sm font-medium text-gray-700">
                     نوع التذكرة
                   </th>
@@ -725,14 +724,14 @@ const handleCreateSubmit = (e) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-right">اسم المشتري</label>
+                  <label className="block text-sm font-medium mb-1 text-right">رقم التذكر</label>
                   <input
                     type="text"
                     name="buyer_name"
                     value={formData.buyer_name}
                     onChange={handleFormChange}
                     className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    placeholder="أدخل اسم المشتري"
+                    placeholder="رقم التذكره"
                     required
                   />
                 </div>
@@ -746,8 +745,8 @@ const handleCreateSubmit = (e) => {
                     required
                   >
                     <option value="">اختر نوع التذكرة</option>
-                    <option value="session">جلسة</option>
-                    <option value="day_pass">تصريح يومي</option>
+                    <option value="session">حصه فرديه</option>
+                    <option value="day_pass">برايفت</option>
                   </select>
                 </div>
                 <div>

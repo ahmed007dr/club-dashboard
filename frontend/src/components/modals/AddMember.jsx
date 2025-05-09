@@ -15,6 +15,11 @@ const AddMember = ({ closeAddModal }) => {
     phone: '',
     club: '',
     referred_by: '',
+    rfid_code: '',
+    job: '',
+    address: '',
+    note: '',
+    photo: null,
   });
 
   const handleChange = (e) => {
@@ -43,13 +48,17 @@ const AddMember = ({ closeAddModal }) => {
         phone: '',
         club: '',
         referred_by: '',
+        rfid_code: '',
+        job: '',
+        address: '',
+        note: '',
+        photo: null,
       });
     } catch (error) {
       toast.error("فشل في إضافة العضو");
       console.error("Add member error:", error);
     }
   };
-  
 
   useEffect(() => {
     const fetchData = async () => {
@@ -66,11 +75,12 @@ const AddMember = ({ closeAddModal }) => {
 
   return (
     <div className="max-h-[80vh] overflow-auto">
-      <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">Add Member</h2>
+      <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">إضافة عضو</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Full Name and National ID */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="name">Full Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="name">الاسم الكامل</label>
             <input
               id="name"
               name="name"
@@ -78,13 +88,13 @@ const AddMember = ({ closeAddModal }) => {
               value={formData.name}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
-              placeholder="Enter full name"
+              placeholder="أدخل الاسم الكامل"
               required
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="national_id">National ID</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="national_id">رقم الهوية</label>
             <input
               id="national_id"
               name="national_id"
@@ -92,15 +102,16 @@ const AddMember = ({ closeAddModal }) => {
               value={formData.national_id}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
-              placeholder="Enter national ID"
+              placeholder="أدخل رقم الهوية"
               required
             />
           </div>
         </div>
 
+        {/* Date of Birth and Phone Number */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="birth_date">Date of Birth</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="birth_date">تاريخ الميلاد</label>
             <input
               id="birth_date"
               name="birth_date"
@@ -113,7 +124,7 @@ const AddMember = ({ closeAddModal }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="phone">Phone Number</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="phone">رقم الهاتف</label>
             <input
               id="phone"
               name="phone"
@@ -121,15 +132,16 @@ const AddMember = ({ closeAddModal }) => {
               value={formData.phone}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
-              placeholder="Enter phone number"
+              placeholder="أدخل رقم الهاتف"
               required
             />
           </div>
         </div>
 
+        {/* Club, Referred By, RFID Code, Job, Address */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="club">Club</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="club">النادي</label>
             <select
               id="club"
               name="club"
@@ -138,7 +150,7 @@ const AddMember = ({ closeAddModal }) => {
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
               required
             >
-              <option value="">Select a club</option>
+              <option value="">اختر النادي</option>
               {clubs.map((club) => (
                 <option key={club.id} value={club.id}>
                   {club.name}
@@ -148,7 +160,7 @@ const AddMember = ({ closeAddModal }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="referred_by">Referred By (Member ID)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="referred_by">أُحيل بواسطة (رقم العضوية)</label>
             <input
               id="referred_by"
               name="referred_by"
@@ -156,9 +168,78 @@ const AddMember = ({ closeAddModal }) => {
               value={formData.referred_by}
               onChange={handleChange}
               className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
-              placeholder="Enter referring member ID"
+              placeholder="أدخل رقم العضو المحيل"
             />
           </div>
+        </div>
+
+        {/* RFID Code, Job, Address, Note */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="rfid_code">رمز RFID</label>
+            <input
+              id="rfid_code"
+              name="rfid_code"
+              type="text"
+              value={formData.rfid_code}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+              placeholder="أدخل رمز RFID"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="job">الوظيفة</label>
+            <input
+              id="job"
+              name="job"
+              type="text"
+              value={formData.job}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+              placeholder="أدخل الوظيفة"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="address">العنوان</label>
+            <input
+              id="address"
+              name="address"
+              type="text"
+              value={formData.address}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+              placeholder="أدخل العنوان"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="note">ملاحظة</label>
+            <input
+              id="note"
+              name="note"
+              type="text"
+              value={formData.note}
+              onChange={handleChange}
+              className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+              placeholder="أدخل ملاحظة"
+            />
+          </div>
+        </div>
+
+        {/* Photo Upload */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="photo">صورة</label>
+          <input
+            id="photo"
+            name="photo"
+            type="file"
+            onChange={handleChange}
+            className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
+          />
         </div>
 
         <div>
@@ -166,7 +247,7 @@ const AddMember = ({ closeAddModal }) => {
             type="submit"
             className="btn"
           >
-            Add Member
+            إضافة عضو
           </button>
         </div>
       </form>
@@ -175,3 +256,4 @@ const AddMember = ({ closeAddModal }) => {
 };
 
 export default AddMember;
+

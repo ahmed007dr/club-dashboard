@@ -169,6 +169,7 @@ const Members = () => {
             <th className="p-3 border-b">#</th>
             <th className="p-3 border-b">الصورة</th>
             <th className="p-3 border-b">الاسم</th>
+            <th className="p-3 border-b">rfid code</th>
             <th className="p-3 border-b">رقم العضوية</th>
             <th className="p-3 border-b">الرقم القومي</th>
             <th className="p-3 border-b">الهاتف</th>
@@ -195,6 +196,7 @@ const Members = () => {
                   </Link>
                 </td>
                 <td className="p-3 border-b">{member.name}</td>
+                <td className="p-3 border-b">{member.rfid_code}</td>
                 <td className="p-3 border-b">{member.membership_number}</td>
                 <td className="p-3 border-b">{member.national_id}</td>
                 <td className="p-3 border-b">{member.phone}</td>
