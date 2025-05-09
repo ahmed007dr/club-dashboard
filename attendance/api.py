@@ -7,6 +7,8 @@ from .serializers import AttendanceSerializer, EntryLogSerializer
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub
 from django.db.models import Q
+from django.utils import timezone
+from members.models import Member
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -21,36 +23,14 @@ def attendance_list_api(request):
     if search_term:
         attendances = attendances.filter(
             Q(subscription__member__name__icontains=search_term) |
-            Q(subscription__member__membership_number__icontains=search_term)
+            Q(subscription__member__phone__icontains=search_term) |
+            Q(subscription__member__rfid_code__icontains=search_term)
         )
 
     attendances = attendances.order_by('-attendance_date')
 
     serializer = AttendanceSerializer(attendances, many=True)
     return Response(serializer.data)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def add_attendance_api(request):
-    serializer = AttendanceSerializer(data=request.data)
-    if serializer.is_valid():
-        subscription = serializer.validated_data['subscription']
-        if not subscription.can_enter():
-            return Response(
-                {'error': 'Maximum entry limit reached for this subscription'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        attendance = serializer.save()
-        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, attendance):
-            attendance.delete()
-            return Response(
-                {'error': 'You do not have permission to create an attendance record for this club'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        subscription.entry_count += 1
-        subscription.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -75,7 +55,8 @@ def entry_log_list_api(request):
     if search_term:
         logs = logs.filter(
             Q(member__name__icontains=search_term) |
-            Q(member__membership_number__icontains=search_term)
+            Q(member__phone__icontains=search_term) |
+            Q(member__rfid_code__icontains=search_term)
         )
 
     logs = logs.order_by('-timestamp')
@@ -83,20 +64,62 @@ def entry_log_list_api(request):
     serializer = EntryLogSerializer(logs, many=True)
     return Response(serializer.data)
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def add_attendance_api(request):
+    serializer = AttendanceSerializer(data=request.data)
+    if serializer.is_valid():
+        attendance = serializer.save()
+
+        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, attendance):
+            attendance.delete()
+            return Response(
+                {'error': 'ليس لديك الصلاحية لتسجيل حضور لهذا النادي'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        subscription = attendance.subscription
+        if not subscription.can_enter():
+            attendance.delete()
+            return Response(
+                {'error': 'لا يمكن تسجيل الحضور: تم الوصول للحد الأقصى لعدد الدخول'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        subscription.entry_count += 1
+        subscription.save()
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def create_entry_log_api(request):
     data = request.data.copy()
     data['approved_by'] = request.user.id
-    
+
     serializer = EntryLogSerializer(data=data)
     if serializer.is_valid():
         entry_log = serializer.save()
+
         if not IsOwnerOrRelatedToClub().has_object_permission(request, None, entry_log):
             entry_log.delete()
             return Response(
-                {'error': 'You do not have permission to create an entry log for this club'},
+                {'error': 'ليس لديك الصلاحية لتسجيل دخول لهذا النادي'},
                 status=status.HTTP_403_FORBIDDEN
             )
+
+        subscription = entry_log.related_subscription
+        if subscription and not subscription.can_enter():
+            entry_log.delete()
+            return Response(
+                {'error': 'لا يمكن تسجيل الدخول: تم الوصول للحد الأقصى لعدد الدخول'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
