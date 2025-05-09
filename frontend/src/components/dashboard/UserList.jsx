@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import BASE_URL from '../../config/api';
+
 function UserList() {
   const [clubs, setClubs] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -14,7 +16,7 @@ function UserList() {
           Authorization: `Bearer ${token}`,
         };
   
-        const response = await axios.get('http://127.0.0.1:8000/accounts/api/users/', { headers });
+        const response = await axios.get(`${BASE_URL}/accounts/api/users/`, { headers });
         const users = response.data;
         
         // RAW DATA DUMP
