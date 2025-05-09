@@ -26,6 +26,7 @@ SECRET_KEY = 'django-insecure-k#i%183_hpx5%@pfnvytqg9ssh&(ke-%!a+8(mjgr&k=qv5tux
 DEBUG = True
 
 ALLOWED_HOSTS = []
+# ALLOWED_HOSTS = ['club-ft.com','www.club-ft.com'] # setting c panel
 
 
 # Application definition
@@ -83,12 +84,12 @@ CORS_ORIGIN_ALLOW_ALL = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    # Add other allowed origins for production
+    #"https://club-ft.com", # setting c panel
 ]
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    # Add other trusted origins for production
+    # "https://club-ft.com", # setting c panel
 ]
 
 
@@ -113,7 +114,7 @@ REST_FRAMEWORK = {
 
 # JWT Settings
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=3000),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,
@@ -125,6 +126,7 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        # 'DIRS': [os.path.join(BASE_DIR, 'templates'),os.path.join(BASE_DIR, 'frontend', 'dist')], # setting c panel
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -201,12 +203,11 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
-STATIC_URL = 'static/'
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
+STATIC_URL = 'static/' 
+STATICFILES_DIRS = [BASE_DIR / "static",] # setting c panel
+# STATICFILES_DIRS = [os.path.join(BASE_DIR, 'frontend', 'dist', 'assets')] # setting c panel
+# STATIC_ROOT = os.path.join(BASE_DIR, 'static') # setting c panel
 #add   path for url static & media
-
 MEDIA_URL='media/'
 MEDIA_ROOT=BASE_DIR / "media"
 
