@@ -16,7 +16,7 @@ import { MdOutlineSubscriptions } from 'react-icons/md';
 import { IoMdAnalytics } from 'react-icons/io';
 import { HiOutlineDocumentReport } from 'react-icons/hi';
 import { GiTeamIdea, GiMoneyStack, GiTicket } from 'react-icons/gi';
-
+import { BiLogIn, BiLogOut } from 'react-icons/bi';
 const Dashboard = () => {
   const dispatch = useDispatch();
   const sidebarOpen = useSelector((state) => state.ui.sidebarOpen);
@@ -45,6 +45,8 @@ const Dashboard = () => {
       icon: <FaRegBuilding />,
       children: [
         { path: 'staff', name: 'الموظفون', icon: <RiUserLine /> },
+        { path: 'check-in', name: 'تسجيل الدخول', icon: <BiLogIn /> },
+        { path: 'check-out', name: 'تسجيل الخروج', icon: <BiLogOut /> },
         { path: 'club', name: 'النادي', icon: <HiOutlineDocumentReport /> },
         { path: 'tickets', name: 'التذاكر', icon: <GiTicket /> },
       ],

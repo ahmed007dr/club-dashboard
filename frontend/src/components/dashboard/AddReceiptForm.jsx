@@ -78,13 +78,16 @@ function AddReceiptForm({ onClose }) {
       toast.error('حدث خطأ أثناء إضافة الإيصال'); // Arabic error toast
     }
   };
-  
+  console.log("uniqueClubs", uniqueClubs);
+console.log("uniqueMembers", uniqueMembers);
+console.log("filteredSubscriptions", filteredSubscriptions);
+
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 p-6 bg-white rounded-lg shadow-md">
       {/* Club Dropdown */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Select Club</label>
+        <label className="block mb-1 font-medium ">Select Club</label>
         <select
           name="club"
           value={formData.club}
@@ -102,7 +105,7 @@ function AddReceiptForm({ onClose }) {
           className="w-full border px-3 py-2 rounded-md"
           required
         >
-          <option value="">-- Select Club --</option>
+          <option value="">-- النادي --</option>
           {uniqueClubs.map(club => (
             <option key={club.id} value={club.id}>
               {club.name}
@@ -113,7 +116,7 @@ function AddReceiptForm({ onClose }) {
 
       {/* Member Dropdown */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Select Member</label>
+        <label className="block mb-1 font-medium ">العضو</label>
         <select
           name="member"
           value={formData.member}
@@ -121,11 +124,11 @@ function AddReceiptForm({ onClose }) {
             handleChange(e);
             setFormData(prev => ({ ...prev, subscription: '' }));
           }}
-          className="w-full border px-3 py-2 rounded-md"
+          className="w-full border px-3 py-2 rounded-md text-black"
           required
           disabled={!formData.club}
         >
-          <option value="">-- Select Member --</option>
+          <option value="text-black">-- Select Member --</option>
           {uniqueMembers.map(member => (
             <option key={member.id} value={member.id}>
               {member.name}
@@ -136,7 +139,7 @@ function AddReceiptForm({ onClose }) {
 
       {/* Subscription Dropdown */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Select Subscription</label>
+        <label className="block mb-1 font-medium ">Select Subscription</label>
         <select
           name="subscription"
           value={formData.subscription}
@@ -156,7 +159,7 @@ function AddReceiptForm({ onClose }) {
 
       {/* Amount Input */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Amount</label>
+        <label className="block mb-1 font-medium ">Amount</label>
         <input
           type="number"
           name="amount"
@@ -171,7 +174,7 @@ function AddReceiptForm({ onClose }) {
 
       {/* Payment Method */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Payment Method</label>
+        <label className="block mb-1 font-medium ">Payment Method</label>
         <select
           name="payment_method"
           value={formData.payment_method}
@@ -186,7 +189,7 @@ function AddReceiptForm({ onClose }) {
 
       {/* Note */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Note</label>
+        <label className="block mb-1 font-medium ">Note</label>
         <textarea
           name="note"
           value={formData.note}
@@ -201,7 +204,7 @@ function AddReceiptForm({ onClose }) {
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+          className="px-4 py-2 border border-gray-300 rounded-md  hover:bg-gray-100"
         >
           Cancel
         </button>

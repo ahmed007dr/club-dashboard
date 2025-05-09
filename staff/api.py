@@ -154,7 +154,6 @@ def staff_check_in_by_code_api(request):
     return Response(StaffAttendanceSerializer(attendance).data, status=status.HTTP_201_CREATED)
 
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def staff_check_out_by_code_api(request):
@@ -175,7 +174,6 @@ def staff_check_out_by_code_api(request):
     attendance.check_out = timezone.now()
     attendance.save()
     return Response(StaffAttendanceSerializer(attendance).data)
-
 
 
 @api_view(['GET'])
