@@ -1,11 +1,20 @@
 from django.contrib import admin
 from import_export.admin import ImportExportModelAdmin
-from import_export import resources
+from import_export import resources, fields
+from import_export.widgets import ForeignKeyWidget
 from .models import Member
+from core.models import Club
 from subscriptions.models import Subscription
+from .resources import MemberResource
 
 # Resource for import/export
 class MemberResource(resources.ModelResource):
+    club__name = fields.Field(
+        column_name='club__name',
+        attribute='club',
+        widget=ForeignKeyWidget(Club, 'name')
+    )
+
     class Meta:
         model = Member
         fields = (
@@ -14,7 +23,6 @@ class MemberResource(resources.ModelResource):
             'club__name', 'created_at'
         )
         export_order = fields
-
 # Inline subscription display
 class SubscriptionInline(admin.TabularInline):
     model = Subscription
