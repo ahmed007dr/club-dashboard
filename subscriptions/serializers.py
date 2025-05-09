@@ -4,6 +4,7 @@ from core.serializers import ClubSerializer
 from utils.permissions import IsOwnerOrRelatedToClub
 from members.serializers import MemberSerializer
 from django.utils import timezone
+from django.db import models
 
 class SubscriptionTypeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
@@ -40,13 +41,14 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'remaining_amount': {'read_only': True},
-            'end_date': {'read_only': True},  # Controlled by model save
+            'end_date': {'read_only': True},  
         }
 
     def validate(self, data):
         club = data.get('club')
         subscription_type = data.get('type')
         start_date = data.get('start_date')
+        member = data.get('member')
 
         # Validate club and subscription type consistency
         if club and subscription_type and subscription_type.club != club:
@@ -60,5 +62,36 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         # Validate start_date
         if start_date and start_date < timezone.now().date():
             raise serializers.ValidationError("Start date cannot be in the past.")
+
+        # Check for active subscriptions for the same member
+        if member:
+            today = timezone.now().date()
+            active_subscriptions = Subscription.objects.filter(
+                member=member,
+                club=club,
+                start_date__lte=today,
+                end_date__gte=today
+            ).exclude(
+                entry_count__gte=models.F('type__max_entries')  # Exclude fully used subscriptions
+            ).exclude(
+                type__max_entries=0  # Include unlimited entries subscriptions
+            )
+
+            if active_subscriptions.exists() and not self.instance:
+                raise serializers.ValidationError(
+                    "This member already has an active subscription. Please wait until it expires or entries are exhausted."
+                )
+
+            # Check for subscriptions with remaining_amount > 0
+            unpaid_subscriptions = Subscription.objects.filter(
+                member=member,
+                club=club,
+                remaining_amount__gt=0
+            )
+
+            if unpaid_subscriptions.exists() and not self.instance:
+                raise serializers.ValidationError(
+                    "This member has unpaid amounts for previous subscriptions. Please settle all outstanding payments before creating a new subscription."
+                )
 
         return data
