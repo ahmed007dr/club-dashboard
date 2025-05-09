@@ -11,23 +11,17 @@ from .models import Member
 from utils.generate_membership_number import generate_membership_number
 from django.db import IntegrityError
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_list_api(request):
-    paginator = PageNumberPagination()
-    paginator.page_size = 20
-
     if request.user.role == 'owner':
         members = Member.objects.all()
     else:
         members = Member.objects.filter(club=request.user.club)
-
-    members = members.order_by('-id')  
-
-    result_page = paginator.paginate_queryset(members, request)
-    serializer = MemberSerializer(result_page, many=True)
-    return paginator.get_paginated_response(serializer.data)
+    
+    members = members.order_by('-id')
+    serializer = MemberSerializer(members, many=True)
+    return Response(serializer.data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -80,15 +74,13 @@ def delete_member_api(request, member_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_search_api(request):
-    paginator = PageNumberPagination()
-    paginator.page_size = 20
-
     search_term = request.GET.get('q', '')
 
     search_filter = (
         Q(name__icontains=search_term) |
         Q(membership_number__icontains=search_term) |
         Q(national_id__icontains=search_term) |
+        Q(rfid_code__icontains=search_term) |
         Q(phone__icontains=search_term)
     )
 

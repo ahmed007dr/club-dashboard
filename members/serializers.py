@@ -34,4 +34,5 @@ class MemberSerializer(serializers.ModelSerializer):
             'job': {'required': False, 'allow_null': True},
             'address': {'required': False, 'allow_null': True},
             'note': {'required': False, 'allow_null': True},
+            'national_id': {'required': False, 'allow_null': True},
         }

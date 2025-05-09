@@ -15,7 +15,7 @@ import { IoTicketOutline } from "react-icons/io5";
 import { Link } from "react-router-dom";
 import SubscriptionStats from "./SubscriptionStats";
 import SubscriptionChart from "./SubscriptionChart";
-import ShiftsPerClubChart from "./ShiftsPerClubChart ";
+import ShiftsPerClubChart from "./ShiftsPerClubChart";
 
 const isToday = (dateStr) => {
   const today = new Date();
@@ -28,6 +28,7 @@ const isToday = (dateStr) => {
 };
 
 const filterByDate = (data, isTodayView) => {
+  if (!Array.isArray(data)) return [];
   if (!isTodayView) return data;
   return data.filter((item) => isToday(item.created_at));
 };
@@ -48,31 +49,80 @@ const Main = () => {
   const fetchAll = () => {
     dispatch(fetchUsers())
       .unwrap()
-      .then((res) => setTotalMembers(filterByDate(res.results, isTodayView).length));
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalMembers(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching users:", err);
+        setTotalMembers(0);
+      });
 
     dispatch(fetchSubscriptions())
       .unwrap()
-      .then((res) => setTotalSubscriptions(filterByDate(res, isTodayView).length));
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalSubscriptions(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching subscriptions:", err);
+        setTotalSubscriptions(0);
+      });
 
     dispatch(fetchTickets())
       .unwrap()
-      .then((res) => setTotalTickets(filterByDate(res, isTodayView).length));
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalTickets(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching tickets:", err);
+        setTotalTickets(0);
+      });
 
     dispatch(fetchAttendances())
       .unwrap()
-      .then((res) => setTotalAttendances(filterByDate(res, isTodayView).length));
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalAttendances(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching attendances:", err);
+        setTotalAttendances(0);
+      });
 
     dispatch(fetchStaff())
       .unwrap()
-      .then((res) => setTotalStaff(filterByDate(res, isTodayView).length));
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalStaff(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching staff:", err);
+        setTotalStaff(0);
+      });
 
     dispatch(fetchFreeInvites())
       .unwrap()
-      .then((res) => setTotalInvites(filterByDate(res, isTodayView).length));
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalInvites(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching free invites:", err);
+        setTotalInvites(0);
+      });
 
     dispatch(fetchReceipts())
       .unwrap()
-      .then((res) => setTotalReceipts(filterByDate(res, isTodayView).length));
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalReceipts(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching receipts:", err);
+        setTotalReceipts(0);
+      });
   };
 
   useEffect(() => {

@@ -23,7 +23,7 @@ function Receipts() {
     (state) => state.receipts
   );
   const { subscriptions } = useSelector((state) => state.subscriptions);
-
+ console.log("subscriptions", subscriptions);
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchError, setSearchError] = useState("");
@@ -58,34 +58,40 @@ function Receipts() {
   }, [dispatch]);
 
   // Data filtering helpers
-  const uniqueClubs = useMemo(() => {
-    return Array.from(
-      new Map(
-        subscriptions.map((sub) => [
-          sub.club,
-          { id: sub.club, name: sub.club_name },
-        ])
-      ).values()
-    );
-  }, [subscriptions]);
+   const uniqueClubs = Array.from(
+    new Map(
+      subscriptions.map(sub => [
+        sub.club, 
+        { 
+          id: sub.club, 
+          name: sub.club_details?.name || 'Unknown Club' 
+        }
+      ])
+    ).values()
+  );
 
-  const getFilteredMembers = (clubId) => {
-    return clubId
-      ? subscriptions.filter((sub) => sub.club === parseInt(clubId))
-      : subscriptions;
-  };
+ const getFilteredMembers = (clubId) => {
+  return clubId
+    ? subscriptions.filter((sub) => sub.club === parseInt(clubId))
+    : subscriptions;
+};
 
-  const getUniqueMembers = (clubId) => {
-    const filtered = getFilteredMembers(clubId);
-    return Array.from(
-      new Map(
-        filtered.map((sub) => [
-          sub.member,
-          { id: sub.member, name: sub.member_name },
-        ])
-      ).values()
-    );
-  };
+const getUniqueMembers = (clubId) => {
+  const filtered = getFilteredMembers(clubId);
+  return Array.from(
+    new Map(
+      filtered.map((sub) => [
+        sub.member,
+        { 
+          id: sub.member, 
+          name: sub.member_details?.name || sub.member_name || 'Unknown Member' 
+        }
+      ])
+    ).values()
+  );
+};
+
+  
 
   const getFilteredSubscriptions = (memberId) => {
     return memberId
@@ -615,7 +621,7 @@ function Receipts() {
 
       {/* Add Receipt Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6">
               <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
@@ -633,7 +639,7 @@ function Receipts() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-4 sm:p-6">
               <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
@@ -660,7 +666,7 @@ function Receipts() {
 
       {/* Edit Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6">
               <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
@@ -739,7 +745,7 @@ function Receipts() {
                       getFilteredSubscriptions(editData.member).map((sub) => (
                         <option key={sub.id} value={sub.id}>
                           {sub?.type_details?.name || "نوع غير معروف"} -{" "}
-                          {sub.price} جنيه
+                          
                         </option>
                       ))}
                   </select>
@@ -820,7 +826,7 @@ function Receipts() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm sm:text-base"
+                    className="btn sm:text-base"
                     disabled={
                       isUpdating ||
                       !editData.club ||

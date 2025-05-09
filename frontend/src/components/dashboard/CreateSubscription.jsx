@@ -5,8 +5,7 @@ import { fetchUsers } from "../../redux/slices/memberSlice";
 import { fetchSubscriptionTypes } from "../../redux/slices/subscriptionsSlice";
 import { toast } from "react-hot-toast";
 
-
-const CreateSubscription = ({ onClose })  => {
+const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error: subscriptionError } = useSelector(
     (state) => state.subscriptions
@@ -30,7 +29,11 @@ const CreateSubscription = ({ onClose })  => {
     const fetchData = async () => {
       try {
         const fetchedData = await dispatch(fetchUsers()).unwrap();
-        const memberList = fetchedData.results;
+        console.log('Raw fetched data:', fetchedData);
+
+        // fetchedData is an array
+        const memberList = Array.isArray(fetchedData) ? fetchedData : [];
+        console.log('Member list:', memberList);
 
         setMembers(memberList);
 
@@ -75,12 +78,12 @@ const CreateSubscription = ({ onClose })  => {
   const handleSubmit = (e) => {
     e.preventDefault();
     const { club, member, type, start_date, paid_amount } = formData;
-  
+
     if (!club || !member || !type || !start_date || !paid_amount) {
       toast.error("يرجى ملء جميع الحقول.");
       return;
     }
-  
+
     const payload = {
       club: parseInt(club),
       member: parseInt(member),
@@ -88,7 +91,7 @@ const CreateSubscription = ({ onClose })  => {
       start_date,
       paid_amount: parseFloat(paid_amount),
     };
-  
+
     dispatch(postSubscription(payload))
       .unwrap()
       .then(() => {
@@ -107,7 +110,6 @@ const CreateSubscription = ({ onClose })  => {
         toast.error("فشل في إنشاء الاشتراك: " + (err.message || "خطأ غير معروف"));
       });
   };
-  
 
   return (
     <div className="container mx-auto p-4" dir="rtl">
@@ -203,10 +205,7 @@ const CreateSubscription = ({ onClose })  => {
         </div>
 
         {/* Submit Button */}
-        <button
-          type="submit"
-          className="btn"
-        >
+        <button type="submit" className="btn">
           إنشاء اشتراك
         </button>
       </form>

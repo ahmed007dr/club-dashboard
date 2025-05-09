@@ -9,12 +9,12 @@ urlpatterns = [
     path('api/shifts/<int:shift_id>/edit/', api.edit_shift_api, name='edit_shift'),
     path('api/shifts/<int:shift_id>/delete/', api.delete_shift_api, name='delete_shift'),
     path('api/staff/<int:staff_id>/shifts/', api.staff_shifts_api, name='staff_shifts'),
-
     # Attendance Management APIs
     path('api/check-in/', api.staff_check_in_by_code_api, name='staff_check_in'),
     path('api/check-out/', api.staff_check_out_by_code_api, name='staff_check_out'),
     path('api/attendance/<int:attendance_id>/analysis/', api.staff_attendance_analysis_api, name='attendance_analysis'),
     path('api/staff/<int:staff_id>/attendance/report/', api.staff_attendance_report_api, name='attendance_report'),
     path('attendance/', api.attendance_list_api, name='attendance_list'),
+    path('api/missing-checkins/', api.missing_checkins_api, name='missing_checkins'),
 
 ]

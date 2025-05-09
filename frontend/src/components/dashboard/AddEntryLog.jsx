@@ -60,7 +60,7 @@ const EntryForm = () => {
       />
       <button
         type="submit"
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+        className="w-full btn"
         disabled={loading}
       >
         {loading ? 'Submitting...' : 'Submit Entry'}

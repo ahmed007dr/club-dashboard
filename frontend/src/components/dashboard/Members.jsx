@@ -32,29 +32,29 @@ const Members = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(5); // Configurable items per page
 
-  const members = useSelector((state) => state.member.items).results;
+ const members = useSelector((state) => state.member.items); // Remove .results
   const dispatch = useDispatch();
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const fetchedData = await dispatch(fetchUsers()).unwrap();
-        console.log('Raw fetched data:', fetchedData); // Log original data
-  
-        // Sort by id in descending order (newest to oldest)
-        const sortedData = [...fetchedData.results].sort((a, b) => b.id - a.id);
-        console.log('Sorted data:', sortedData); // Log sorted data
-  
-        setSearchResult(sortedData);
-        setData(sortedData);
-      } catch (error) {
-        console.error('Fetch error:', error);
-        setError('Failed to fetch members. Please try again later: ' + error.message);
-      }
-    };
-  
-    fetchData();
-  }, [dispatch]);
+  const fetchData = async () => {
+    try {
+      const fetchedData = await dispatch(fetchUsers()).unwrap();
+      console.log('Raw fetched data:', fetchedData); // Log original data
+
+      // Sort by id in descending order (newest to oldest)
+      const sortedData = [...fetchedData].sort((a, b) => b.id - a.id); // Remove .results
+      console.log('Sorted data:', sortedData); // Log sorted data
+
+      setSearchResult(sortedData);
+      setData(sortedData);
+    } catch (error) {
+      console.error('Fetch error:', error);
+      setError('Failed to fetch members. Please try again later: ' + error.message);
+    }
+  };
+
+  fetchData();
+}, [dispatch]); 
   
 
   const handleSearch = async (e) => {
