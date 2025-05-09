@@ -230,9 +230,15 @@ def make_payment(request, pk):
     if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
         return Response({'error': 'You do not have permission to make a payment for this subscription'}, status=status.HTTP_403_FORBIDDEN)
 
+    if subscription.remaining_amount <= 0:
+        return Response({"error": "No remaining amount to pay for this subscription"}, status=status.HTTP_400_BAD_REQUEST)
+
     amount = Decimal(request.data.get('amount', 0))
     if amount <= 0:
         return Response({"error": "Payment amount must be positive"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if amount > subscription.remaining_amount:
+        return Response({"error": f"Payment amount cannot exceed the remaining amount of {subscription.remaining_amount}"}, status=status.HTTP_400_BAD_REQUEST)
     
     subscription.paid_amount += amount
     subscription.remaining_amount = max(Decimal('0'), subscription.type.price - subscription.paid_amount)
