@@ -80,15 +80,13 @@ def delete_member_api(request, member_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_search_api(request):
-    paginator = PageNumberPagination()
-    paginator.page_size = 20
-
     search_term = request.GET.get('q', '')
 
     search_filter = (
         Q(name__icontains=search_term) |
         Q(membership_number__icontains=search_term) |
         Q(national_id__icontains=search_term) |
+        Q(rfid_code__icontains=search_term) |
         Q(phone__icontains=search_term)
     )
 
