@@ -58,29 +58,66 @@ const Navbar = ({ hideMenuButton = false }) => {
     setIsDarkMode((prev) => !prev);
   };
 
-  const handleLogout = async () => {
-    try {
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (!refreshToken) return;
-
-      await axios.post(
-        `${BASE_URL}/accounts/api/logout/`,
-        { refresh: refreshToken },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-          },
-        }
-      );
-
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      setIsLoggedIn(false);
-      window.location.href = '/login';
-    } catch (error) {
-      console.error('Logout failed:', error.response?.data || error.message);
+ const handleLogout = async () => {
+  try {
+    const refreshToken = localStorage.getItem('refreshToken');
+    const accessToken = localStorage.getItem('token');
+    
+    if (!refreshToken) {
+      console.warn('No refresh token found, proceeding with client-side cleanup');
+      cleanupAndRedirect();
+      return;
     }
-  };
+
+    console.log('Attempting logout with:', { 
+      refreshToken: refreshToken ? 'exists' : 'missing',
+      accessToken: accessToken ? 'exists' : 'missing'
+    });
+
+    const response = await axios.post(
+      `${BASE_URL}/accounts/api/logout/`,
+      { refresh: refreshToken },
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        validateStatus: (status) => status < 500 // Don't throw for 4xx errors
+      }
+    );
+
+    console.log('Logout successful, server response:', response.data);
+    cleanupAndRedirect();
+    
+  } catch (error) {
+    const errorDetails = {
+      message: error.message,
+      response: error.response ? {
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers
+      } : null,
+      config: error.config
+    };
+    
+    console.error('Detailed logout error:', errorDetails);
+    
+    // If the server is unreachable or returns 401/403, still clean up locally
+    if (!error.response || [401, 403].includes(error.response?.status)) {
+      console.warn('Proceeding with client-side cleanup despite server error');
+      cleanupAndRedirect();
+    } else {
+      toast.error(`Logout failed: ${error.response?.data?.detail || error.message}`);
+    }
+  }
+};
+
+// Helper function to avoid code duplication
+const cleanupAndRedirect = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+  setIsLoggedIn(false);
+  window.location.href = '/login';
+};
 
   if (location.pathname === '/login') {
     return null;

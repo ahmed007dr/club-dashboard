@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
 import { analyzeAttendance, getStaffAttendanceReport } from "@/redux/slices/AttendanceSlice";
+import { FiUser, FiBarChart2 } from 'react-icons/fi';
 
 const AttendanceAnalysis = () => {
   const { staffId } = useParams();
@@ -20,29 +21,71 @@ const AttendanceAnalysis = () => {
   if (error) return <div className="text-center py-8 text-red-600 font-semibold">حدث خطأ أثناء تحميل البيانات.</div>;
 
   return (
-    <div className="max-w-3xl mx-auto p-6 bg-white shadow rounded space-y-8" dir="rtl">
+    <div className="max-w-4xl mx-auto p-6 bg-white shadow rounded space-y-8" dir="rtl">
       
-      {/* بيانات التقرير */}
+      {/* جدول تقرير الموظف */}
       {reportData && (
-        <div className="space-y-2">
-          <h2 className="text-xl font-bold text-gray-800 border-b pb-2">تقرير الموظف</h2>
-          <p><span className="font-medium">الاسم:</span> {reportData.staff_name}</p>
-          <p><span className="font-medium">رقم الموظف:</span> {reportData.staff_id}</p>
-          <p><span className="font-medium">رمز RFID:</span> {reportData.rfid_code}</p>
-          <p><span className="font-medium">عدد أيام الحضور:</span> {reportData.attendance_days}</p>
-          <p><span className="font-medium">إجمالي الساعات:</span> {reportData.total_hours} ساعة</p>
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4 flex items-center gap-2">
+            <FiUser className="text-blue-600 border-2 border-blue-600 p-1 rounded-full" /> تقرير الموظف
+          </h2>
+          <table className="w-full border border-gray-300 rounded text-right">
+            <tbody className="divide-y divide-gray-200">
+              <tr>
+                <th className="p-3 font-medium bg-gray-100">الاسم</th>
+                <td className="p-3">{reportData.staff_name}</td>
+              </tr>
+              <tr>
+                <th className="p-3 font-medium bg-gray-100">رقم الموظف</th>
+                <td className="p-3">{reportData.staff_id}</td>
+              </tr>
+              <tr>
+                <th className="p-3 font-medium bg-gray-100">رمز RFID</th>
+                <td className="p-3">{reportData.rfid_code}</td>
+              </tr>
+              <tr>
+                <th className="p-3 font-medium bg-gray-100">عدد أيام الحضور</th>
+                <td className="p-3">{reportData.attendance_days}</td>
+              </tr>
+              <tr>
+                <th className="p-3 font-medium bg-gray-100">إجمالي الساعات</th>
+                <td className="p-3">{reportData.total_hours} ساعة</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* بيانات التحليل */}
+      {/* جدول تحليل الحضور */}
       {analysisData && (
-        <div className="space-y-2">
-          <h2 className="text-xl font-bold text-gray-800 border-b pb-2">تحليل الحضور</h2>
-          <p><span className="font-medium">الحالة:</span> {analysisData.status.replace(/_/g, ' ')}</p>
-          <p><span className="font-medium">التأخير بالدقائق:</span> {analysisData.late_by_minutes}</p>
-          <p><span className="font-medium">المغادرة المبكرة بالدقائق:</span> {analysisData.left_early_by_minutes}</p>
-          <p><span className="font-medium">الساعات الفعلية:</span> {analysisData.actual_hours} ساعة</p>
-          <p><span className="font-medium">الساعات المتوقعة:</span> {analysisData.expected_hours} ساعة</p>
+        <div>
+          <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4 flex items-center gap-2">
+            <FiBarChart2 className="text-blue-600 border-2 border-blue-600 p-1 rounded-full" /> تحليل الحضور
+          </h2>
+          <table className="w-full border border-gray-300 rounded text-right">
+            <tbody className="divide-y divide-gray-200">
+              <tr>
+                <th className="p-3 font-medium bg-gray-100">الحالة</th>
+                <td className="p-3">{analysisData.status.replace(/_/g, ' ')}</td>
+              </tr>
+              <tr>
+                <th className="p-3 font-medium bg-gray-100">التأخير بالدقائق</th>
+                <td className="p-3">{analysisData.late_by_minutes}</td>
+              </tr>
+              <tr>
+                <th className="p-3 font-medium bg-gray-100">المغادرة المبكرة بالدقائق</th>
+                <td className="p-3">{analysisData.left_early_by_minutes}</td>
+              </tr>
+              <tr>
+                <th className="p-3 font-medium bg-gray-100">الساعات الفعلية</th>
+                <td className="p-3">{analysisData.actual_hours} ساعة</td>
+              </tr>
+              <tr>
+                <th className="p-3 font-medium bg-gray-100">الساعات المتوقعة</th>
+                <td className="p-3">{analysisData.expected_hours} ساعة</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -51,4 +94,6 @@ const AttendanceAnalysis = () => {
 };
 
 export default AttendanceAnalysis;
+
+
 
