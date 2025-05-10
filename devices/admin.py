@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib import messages
-from .models import AllowedDevice, ExtendedUserVisit, DeviceSettings
+from .models import AllowedDevice, ExtendedUserVisit, DeviceSettings ,AllowedIP
 import logging
 
 logger = logging.getLogger(__name__)
@@ -65,3 +65,9 @@ class ExtendedUserVisitAdmin(admin.ModelAdmin):
     list_display = ('user_visit', 'session_duration')
     search_fields = ('user_visit__user__username',)
     readonly_fields = ('user_visit', 'session_duration')
+
+
+@admin.register(AllowedIP)
+class AllowedIPAdmin(admin.ModelAdmin):
+    list_display = ['ip_address', 'description']
+    search_fields = ['ip_address', 'description']
