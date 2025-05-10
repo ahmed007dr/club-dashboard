@@ -67,13 +67,13 @@ def subscription_list(request):
                 source, created = IncomeSource.objects.get_or_create(
                     club=subscription.club,
                     name='Subscription',
-                    defaults={'description': 'Income from subscription payments'}
+                    defaults={'description': 'ايراد عن اشتراك'}
                 )
                 income = Income(
                     club=subscription.club,
                     source=source,
                     amount=subscription.paid_amount,
-                    description=f"Subscription payment for {subscription.member.name}",
+                    description=f"ايراد اشتراك عن اللاعب  {subscription.member.name}",
                     date=timezone.now().date(),
                     received_by=request.user
                 )
@@ -207,13 +207,13 @@ def renew_subscription(request, pk):
     source, created = IncomeSource.objects.get_or_create(
         club=subscription.club,
         name='Renewal',
-        defaults={'description': 'Income from renewal payments'}
+        defaults={'description': 'ايراد عن تجديد اشتراك'}
     )
     income = Income(
         club=subscription.club,
         source=source,
         amount=subscription.type.price,
-        description=f"Renewal payment for {subscription.member.name}",
+        description=f"تجديد اشتراك عن المشترك  {subscription.member.name}",
         date=timezone.now().date(),
         received_by=request.user
     )
@@ -247,13 +247,13 @@ def make_payment(request, pk):
     source, created = IncomeSource.objects.get_or_create(
         club=subscription.club,
         name='Subscription',
-        defaults={'description': 'Income from subscription payments'}
+        defaults={'description': 'ايراد عن اشتراك'}
     )
     income = Income(
         club=subscription.club,
         source=source,
         amount=amount,
-        description=f"Subscription payment for {subscription.member.name}",
+        description=f"ايراد عن اشتراك باسم {subscription.member.name}",
         date=timezone.now().date(),
         received_by=request.user
     )
