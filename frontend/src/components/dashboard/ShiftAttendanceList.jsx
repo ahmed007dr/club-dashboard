@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchShiftAttendances } from '../../redux/slices/AttendanceSlice';
+import { Link } from 'react-router-dom';
 
 const ShiftAttendanceList = () => {
   const dispatch = useDispatch();
   const { shiftAttendances, isLoading, error, lastFetched } = useSelector((state) => state.attendance);
-  
+  console.log(shiftAttendances);
   // State management
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
@@ -181,9 +182,13 @@ const ShiftAttendanceList = () => {
               {currentItems.map((attendance) => (
                 <tr key={attendance.id} className="hover:bg-gray-50">
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <Link
+                      to={`/attendance/${attendance.staff_details.id}`}  className=" hover:underline">
                     {attendance.staff_details.username}
+                     </Link>
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                    
                     {attendance.club_details.name}
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">

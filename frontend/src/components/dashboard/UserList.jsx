@@ -18,7 +18,7 @@ function UserList() {
   
         const response = await axios.get(`${BASE_URL}/accounts/api/users/`, { headers });
         const users = response.data;
-        
+        console.log(users); // Dump the raw data
         // RAW DATA DUMP
         console.log(users);
         
@@ -69,7 +69,7 @@ function UserList() {
               <div key={user.id}>
                 <Link
                   to={`/attendance/${user.id}`}
-                  className="text-blue-600 hover:underline"
+                  className=" hover:underline"
                 >
                   {user.name || user.username || `User ${user.id}`}
                 </Link>

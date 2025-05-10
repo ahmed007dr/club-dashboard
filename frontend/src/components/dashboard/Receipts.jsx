@@ -17,18 +17,21 @@ import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
 
 
 
+
 function Receipts() {
   const dispatch = useDispatch();
   const { receipts, status, error, message, currentReceipt } = useSelector(
     (state) => state.receipts
   );
   const { subscriptions } = useSelector((state) => state.subscriptions);
- console.log("subscriptions", subscriptions);
+  console.log("subscriptions", subscriptions);
+
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchField, setSearchField] = useState("invoice_number");
   const [searchError, setSearchError] = useState("");
-  const [isUpdating, setIsUpdating] = useState(false);
   const [inputError, setInputError] = useState("");
+  const [isUpdating, setIsUpdating] = useState(false);
   const [editData, setEditData] = useState({
     id: "",
     club: "",
@@ -51,6 +54,16 @@ function Receipts() {
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const itemsPerPageOptions = [5, 10, 20];
 
+  // Search fields configuration
+  const searchFields = [
+    { value: "invoice_number", label: "رقم الفاتورة" },
+    { value: "amount", label: "المبلغ" },
+    { value: "payment_method", label: "طريقة الدفع" },
+    { value: "note", label: "ملاحظة" },
+    { value: "club_name", label: "اسم النادي" },
+    { value: "member_name", label: "اسم العضو" },
+  ];
+
   // Fetch data on mount
   useEffect(() => {
     dispatch(fetchReceipts());
@@ -58,40 +71,39 @@ function Receipts() {
   }, [dispatch]);
 
   // Data filtering helpers
-   const uniqueClubs = Array.from(
+  const uniqueClubs = Array.from(
     new Map(
-      subscriptions.map(sub => [
-        sub.club, 
-        { 
-          id: sub.club, 
-          name: sub.club_details?.name || 'Unknown Club' 
-        }
+      subscriptions.map((sub) => [
+        sub.club,
+        {
+          id: sub.club,
+          name: sub.club_details?.name || "Unknown Club",
+        },
       ])
     ).values()
   );
 
- const getFilteredMembers = (clubId) => {
-  return clubId
-    ? subscriptions.filter((sub) => sub.club === parseInt(clubId))
-    : subscriptions;
-};
+  const getFilteredMembers = (clubId) => {
+    return clubId
+      ? subscriptions.filter((sub) => sub.club === parseInt(clubId))
+      : subscriptions;
+  };
 
-const getUniqueMembers = (clubId) => {
-  const filtered = getFilteredMembers(clubId);
-  return Array.from(
-    new Map(
-      filtered.map((sub) => [
-        sub.member,
-        { 
-          id: sub.member, 
-          name: sub.member_details?.name || sub.member_name || 'Unknown Member' 
-        }
-      ])
-    ).values()
-  );
-};
-
-  
+  const getUniqueMembers = (clubId) => {
+    const filtered = getFilteredMembers(clubId);
+    return Array.from(
+      new Map(
+        filtered.map((sub) => [
+          sub.member,
+          {
+            id: sub.member,
+            name:
+              sub.member_details?.name || sub.member_name || "Unknown Member",
+          },
+        ])
+      ).values()
+    );
+  };
 
   const getFilteredSubscriptions = (memberId) => {
     return memberId
@@ -102,7 +114,11 @@ const getUniqueMembers = (clubId) => {
   // Format and validate invoice number
   const formatInvoiceNumber = (value) => {
     let cleaned = value.toUpperCase().replace(/[^A-Z0-9-]/g, "");
-    if (cleaned.startsWith("INV") && cleaned.length > 11 && !cleaned.includes("-")) {
+    if (
+      cleaned.startsWith("INV") &&
+      cleaned.length > 11 &&
+      !cleaned.includes("-")
+    ) {
       cleaned = `${cleaned.slice(0, 11)}-${cleaned.slice(11)}`;
     }
     return cleaned.slice(0, 16);
@@ -114,13 +130,22 @@ const getUniqueMembers = (clubId) => {
   };
 
   const handleSearchInputChange = (e) => {
-    const value = formatInvoiceNumber(e.target.value);
+    const value = e.target.value;
     setSearchTerm(value);
     setSearchError("");
-    if (value && !validateInvoiceNumber(value) && value.length >= 16) {
-      setInputError(
-        "صيغة غير صحيحة. المتوقع: INVYYYYMMDD-NNNN (مثال: INV20250429-0003)"
-      );
+
+    // Special formatting for invoice number if that's the selected field
+    if (searchField === "invoice_number") {
+      const formattedValue = formatInvoiceNumber(value);
+      setSearchTerm(formattedValue);
+
+      if (value && !validateInvoiceNumber(formattedValue)) {
+        setInputError(
+          "صيغة غير صحيحة. المتوقع: INVYYYYMMDD-NNNN (مثال: INV20250429-0003)"
+        );
+      } else {
+        setInputError("");
+      }
     } else {
       setInputError("");
     }
@@ -140,6 +165,7 @@ const getUniqueMembers = (clubId) => {
     e.preventDefault();
     setSearchError("");
     setInputError("");
+
     if (!searchTerm.trim()) {
       // Reset to sorted receipts
       const sortedReceipts = [...receipts].sort((a, b) =>
@@ -149,17 +175,39 @@ const getUniqueMembers = (clubId) => {
       setCurrentPage(1);
       return;
     }
-    if (!validateInvoiceNumber(searchTerm.trim())) {
-      setSearchError(
-        "صيغة رقم الفاتورة غير صحيحة. المتوقع: INVYYYYMMDD-NNNN (مثال: INV20250506-0008)"
-      );
-      return;
-    }
+
+    const searchTermLower = searchTerm.trim().toLowerCase();
+
     const filtered = receipts
-      .filter((receipt) =>
-        receipt.invoice_number.includes(searchTerm.trim().toUpperCase())
-      )
+      .filter((receipt) => {
+        // Handle different search fields
+        switch (searchField) {
+          case "invoice_number":
+            return receipt.invoice_number?.toLowerCase().includes(searchTermLower);
+          case "amount":
+            return receipt.amount?.toString().includes(searchTermLower);
+          case "payment_method":
+            return (
+              (receipt.payment_method === "cash" &&
+                "نقدي".includes(searchTermLower)) ||
+              (receipt.payment_method === "bank" &&
+                "تحويل بنكي".includes(searchTermLower)) ||
+              (receipt.payment_method === "visa" &&
+                "فيزا".includes(searchTermLower)) ||
+              receipt.payment_method?.toLowerCase().includes(searchTermLower)
+            );
+          case "note":
+            return receipt.note?.toLowerCase().includes(searchTermLower);
+          case "club_name":
+            return receipt.club_details?.name?.toLowerCase().includes(searchTermLower);
+          case "member_name":
+            return receipt.member_details?.name?.toLowerCase().includes(searchTermLower);
+          default:
+            return true;
+        }
+      })
       .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort search results
+
     setFilteredReceipts(filtered);
     setCurrentPage(1);
   };
@@ -350,20 +398,37 @@ const getUniqueMembers = (clubId) => {
         onSubmit={handleSearch}
         className="flex flex-col sm:flex-row gap-2 mb-6 w-full"
       >
-        <div className="relative w-full">
-          <input
-            type="text"
-            placeholder="أدخل رقم الفاتورة"
-            value={searchTerm}
-            onChange={handleSearchInputChange}
-            className={`w-full px-3 py-2 border text-sm sm:text-base ${
-              inputError ? "border-red-500" : "border-gray-300"
-            } rounded-md focus:outline-none focus:ring focus:ring-blue-200`}
-          />
-          {inputError && (
-            <p className="absolute text-red-500 text-xs mt-1">{inputError}</p>
-          )}
+        <div className="flex flex-col sm:flex-row gap-2 w-full">
+          <select
+            value={searchField}
+            onChange={(e) => setSearchField(e.target.value)}
+            className="w-full sm:w-1/4 px-3 py-2 border border-gray-300 rounded-md text-sm sm:text-base"
+          >
+            {searchFields.map((field) => (
+              <option key={field.value} value={field.value}>
+                {field.label}
+              </option>
+            ))}
+          </select>
+
+          <div className="relative w-full">
+            <input
+              type={searchField === "amount" ? "number" : "text"}
+              placeholder={`ابحث بـ ${
+                searchFields.find((f) => f.value === searchField)?.label || ""
+              }`}
+              value={searchTerm}
+              onChange={handleSearchInputChange}
+              className={`w-full px-3 py-2 border text-sm sm:text-base ${
+                inputError ? "border-red-500" : "border-gray-300"
+              } rounded-md focus:outline-none focus:ring focus:ring-blue-200`}
+            />
+            {inputError && (
+              <p className="absolute text-red-500 text-xs mt-1">{inputError}</p>
+            )}
+          </div>
         </div>
+
         <Button
           type="submit"
           className="w-full sm:w-auto bg-blue-500 hover:bg-blue-600 text-white text-sm sm:text-base py-2 px-4"
@@ -371,6 +436,7 @@ const getUniqueMembers = (clubId) => {
         >
           {status === "loading" ? "جاري البحث..." : "بحث"}
         </Button>
+
         {searchTerm && (
           <Button
             type="button"
@@ -408,6 +474,12 @@ const getUniqueMembers = (clubId) => {
                   <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
                     رقم الفاتورة
                   </th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+                    النادي
+                  </th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+                    العضو
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -444,6 +516,12 @@ const getUniqueMembers = (clubId) => {
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm">
                       {receipt.invoice_number}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm">
+                      {receipt.club_details?.name || "غير معروف"}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm">
+                      {receipt.member_details?.name || "غير معروف"}
                     </td>
                   </tr>
                 ))}
@@ -492,6 +570,12 @@ const getUniqueMembers = (clubId) => {
                       : receipt.payment_method}
                   </p>
                   <p className="text-sm">
+                    <strong>النادي:</strong> {receipt.club_details?.name || "غير معروف"}
+                  </p>
+                  <p className="text-sm">
+                    <strong>العضو:</strong> {receipt.member_details?.name || "غير معروف"}
+                  </p>
+                  <p className="text-sm">
                     <strong>ملاحظة:</strong> {receipt.note || "لا يوجد"}
                   </p>
                 </div>
@@ -501,7 +585,7 @@ const getUniqueMembers = (clubId) => {
         ) : (
           <p className="p-4 text-gray-500 text-sm sm:text-base">
             {searchTerm
-              ? "لم يتم العثور على إيصال بهذا الرقم"
+              ? "لم يتم العثور على إيصال بهذه المعايير"
               : "لم يتم العثور على إيصالات"}
           </p>
         )}
@@ -745,7 +829,7 @@ const getUniqueMembers = (clubId) => {
                       getFilteredSubscriptions(editData.member).map((sub) => (
                         <option key={sub.id} value={sub.id}>
                           {sub?.type_details?.name || "نوع غير معروف"} -{" "}
-                          
+                          {sub?.type_details?.price || "0"} جنيه
                         </option>
                       ))}
                   </select>

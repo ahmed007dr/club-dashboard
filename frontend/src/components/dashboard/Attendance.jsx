@@ -49,9 +49,9 @@ const Attendance = () => {
   } = useSelector((state) => state.entryLogs);
 
   // Form states
-  const [newAttendance, setNewAttendance] = useState({
-    subscription: "",
-  });
+ const [newAttendance, setNewAttendance] = useState({
+  identifier: "",
+});
   const [newEntryLog, setNewEntryLog] = useState({
     club: "",
     member: "",
@@ -90,10 +90,10 @@ const Attendance = () => {
   }, [dispatch]);
 
   // Handle input changes
-  const handleAttendanceInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewAttendance({ ...newAttendance, [name]: value });
-  };
+ const handleAttendanceInputChange = (e) => {
+  setNewAttendance({ ...newAttendance, [e.target.name]: e.target.value });
+};
+
 
   const handleEntryLogInputChange = (e) => {
     const { name, value } = e.target;
@@ -162,27 +162,26 @@ const Attendance = () => {
     entryLogPage * entryLogItemsPerPage
   );
 
-  const handleAddAttendance = (e) => {
-    e.preventDefault();
-  
-    // Check if all fields are filled
-    if (!newAttendance.subscription) {
-      toast.error("الرجاء ملء جميع الحقول الخاصة بالحضور.");
-      return;
-    }
-  
-    dispatch(addAttendance(newAttendance))
-      .unwrap() // Ensure that if the action returns a promise, we handle it properly
-      .then(() => {
-        toast.success("تم إضافة الحضور بنجاح!");  // Show success toast
-        setNewAttendance({ subscription: "" });  // Reset form data
-        setIsAttendanceDialogOpen(false);  // Close the modal after success
-      })
-      .catch((err) => {
-        console.error("Failed to add attendance:", err);
-        toast.error("فشل في إضافة الحضور");  // Show error toast
-      });
-  };
+ const handleAddAttendance = (e) => {
+  e.preventDefault();
+
+  if (!newAttendance.identifier) {
+    toast.error("الرجاء إدخال معرّف العضو.");
+    return;
+  }
+
+  dispatch(addAttendance(newAttendance))
+    .unwrap()
+    .then(() => {
+      toast.success("تم إضافة الحضور بنجاح!");
+      setNewAttendance({ identifier: "" });
+      setIsAttendanceDialogOpen(false);
+    })
+    .catch((err) => {
+      console.error("فشل في إضافة الحضور:", err);
+      toast.error("فشل في إضافة الحضور");
+    });
+};
 
   // Handle adding new entry log
   const handleAddEntryLog = (e) => {
@@ -277,7 +276,8 @@ const Attendance = () => {
               </Button>
 
               {/* Attendance Dialog */}
-              {isAttendanceDialogOpen && (
+    {/* نموذج الحضور */}
+{isAttendanceDialogOpen && (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
     <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
       <button
@@ -289,30 +289,27 @@ const Attendance = () => {
       <h3 className="text-lg font-semibold mb-4">إضافة حضور</h3>
       <form onSubmit={handleAddAttendance} className="space-y-4">
         <div>
-          <label className="block text-sm mb-1">اسم العضو</label>
-          <select
-            name="subscription"
-            value={newAttendance.subscription}
+          <label className="block text-sm mb-1">معرّف العضو</label>
+          <input
+            type="text"
+            name="identifier"
+            value={newAttendance.identifier}
             onChange={handleAttendanceInputChange}
             className="border px-3 py-2 rounded w-full"
+            placeholder="أدخل المعرّف"
             required
-          >
-            <option value="">اختر العضو</option>
-            {subscriptions.map((sub) => (
-              <option key={sub.id} value={sub.id}>
-                {sub.member_name} (النادي: {sub.club_name})
-              </option>
-            ))}
-          </select>
+          />
         </div>
-   
-        <Button type="submit" className="w-full bg-blue-500">
+
+        <button type="submit" className="w-full btn">
           إضافة الحضور
-        </Button>
+        </button>
       </form>
     </div>
   </div>
 )}
+
+
 
               {/* Attendance Table */}
               {attendanceLoading && <p>جاري تحميل بيانات الحضور...</p>}
