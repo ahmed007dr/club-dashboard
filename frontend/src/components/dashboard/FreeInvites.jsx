@@ -12,9 +12,12 @@ import { RiVipCrown2Line } from "react-icons/ri";
 import BASE_URL from '../../config/api';
 import { toast } from 'react-hot-toast';
 
+
+
 const InviteList = () => {
   const dispatch = useDispatch();
   const { invites, loading, error } = useSelector((state) => state.invites);
+  console.log(invites);
   const [userClub, setUserClub] = useState(null); // Logged-in user's club
   const [loadingProfile, setLoadingProfile] = useState(true); // Profile loading state
 
@@ -78,6 +81,7 @@ const InviteList = () => {
   useEffect(() => {
     dispatch(fetchFreeInvites());
   }, [dispatch]);
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -100,25 +104,27 @@ const InviteList = () => {
     }));
   };
 
-  // Filter invites
-  const filteredInvites = invites.filter((invite) => {
-    const matchesGuest =
-      filters.guestName === "" ||
-      invite.guest_name.toLowerCase().includes(filters.guestName.toLowerCase());
-    const matchesStatus = filters.status === "" || invite.status === filters.status;
-    const matchesClub =
-      userClub && invite.club_details?.id.toString() === userClub.id.toString();
-    let matchesDate = true;
-    if (filters.date) {
-      const inviteDate = new Date(invite.date);
-      inviteDate.setHours(0, 0, 0, 0);
-      const selectedDate = new Date(filters.date);
-      selectedDate.setHours(0, 0, 0, 0);
-      matchesDate = inviteDate.getTime() === selectedDate.getTime();
-    }
+  // Sort invites by id in descending order (newest first) and then apply filters
+  const filteredInvites = [...invites]
+    .sort((a, b) => b.id - a.id) // Sort by id descending
+    .filter((invite) => {
+      const matchesGuest =
+        filters.guestName === "" ||
+        invite.guest_name.toLowerCase().includes(filters.guestName.toLowerCase());
+      const matchesStatus = filters.status === "" || invite.status === filters.status;
+      const matchesClub =
+        userClub && invite.club_details?.id.toString() === userClub.id.toString();
+      let matchesDate = true;
+      if (filters.date) {
+        const inviteDate = new Date(invite.date);
+        inviteDate.setHours(0, 0, 0, 0);
+        const selectedDate = new Date(filters.date);
+        selectedDate.setHours(0, 0, 0, 0);
+        matchesDate = inviteDate.getTime() === selectedDate.getTime();
+      }
 
-    return matchesGuest && matchesStatus && matchesClub && matchesDate;
-  });
+      return matchesGuest && matchesStatus && matchesClub && matchesDate;
+    });
 
   const validateForm = () => {
     const errors = {};
@@ -126,20 +132,8 @@ const InviteList = () => {
     if (!formData.guest_name) errors.guest_name = "اسم الضيف مطلوب";
     if (!formData.phone) errors.phone = "رقم الهاتف مطلوب";
     if (!formData.date) errors.date = "التاريخ مطلوب";
-    // Optional: Validate membership_number against members (uncomment if members are fetched)
-    /*
-    if (formData.invited_by && members.length > 0) {
-      const validMembership = members.some(
-        (member) => member.membership_number === formData.invited_by
-      );
-      if (!validMembership) {
-        errors.invited_by = "رقم العضوية غير صالح لهذا النادي";
-      }
-    }
-    */
     return errors;
   };
-
 
   const handleAddInvite = async (e) => {
     e.preventDefault();
@@ -148,7 +142,7 @@ const InviteList = () => {
       setFormErrors(errors);
       return;
     }
-  
+
     try {
       await dispatch(
         addInvite({
@@ -157,7 +151,7 @@ const InviteList = () => {
           invited_by: formData.invited_by || null,
         })
       ).unwrap();
-      toast.success('تمت إضافة الدعوة بنجاح');
+      toast.success("تمت إضافة الدعوة بنجاح");
       setShowAddModal(false);
       setFormData({
         club: userClub?.id?.toString() || "",
@@ -170,13 +164,13 @@ const InviteList = () => {
       setFormErrors({});
     } catch (error) {
       console.error("Failed to add invite:", error);
-      toast.error('فشل في إضافة الدعوة');
+      toast.error("فشل في إضافة الدعوة");
       setFormErrors({
         general: "فشل في إضافة الدعوة: " + (error.message || "خطأ غير معروف"),
       });
     }
   };
-  
+
   const handleEditInvite = async (e) => {
     e.preventDefault();
     const errors = validateForm();
@@ -184,13 +178,13 @@ const InviteList = () => {
       setFormErrors(errors);
       return;
     }
-  
+
     const cleanedData = {
       ...formData,
       club: Number(formData.club),
       invited_by: formData.invited_by || null,
     };
-  
+
     try {
       await dispatch(
         editInviteById({
@@ -198,36 +192,36 @@ const InviteList = () => {
           inviteData: cleanedData,
         })
       ).unwrap();
-      toast.success('تم تعديل الدعوة بنجاح');
+      toast.success("تم تعديل الدعوة بنجاح");
       setShowEditModal(false);
       setFormErrors({});
     } catch (error) {
       console.error("Failed to edit invite:", error);
-      toast.error('فشل في تعديل الدعوة');
+      toast.error("فشل في تعديل الدعوة");
       setFormErrors({
         general: "فشل في تعديل الدعوة: " + (error.message || "خطأ غير معروف"),
       });
     }
   };
-  
+
   const handleDeleteInvite = async () => {
     try {
       await dispatch(deleteInviteById(selectedInviteId)).unwrap();
-      toast.success('تم حذف الدعوة بنجاح');
+      toast.success("تم حذف الدعوة بنجاح");
       setShowDeleteModal(false);
     } catch (error) {
       console.error("Failed to delete invite:", error);
-      toast.error('فشل في حذف الدعوة');
+      toast.error("فشل في حذف الدعوة");
     }
   };
-  
+
   const handleMarkAsUsed = async (e) => {
     e.preventDefault();
     if (!markUsedData.used_by) {
       setFormErrors({ used_by: "معرف العضو مطلوب" });
       return;
     }
-  
+
     try {
       await dispatch(
         markInviteAsUsed({
@@ -235,20 +229,19 @@ const InviteList = () => {
           used_by: Number(markUsedData.used_by),
         })
       ).unwrap();
-      toast.success('تم تحديد الدعوة كمستخدمة');
+      toast.success("تم تحديد الدعوة كمستخدمة");
       setShowMarkUsedModal(false);
       setMarkUsedData({ used_by: "" });
       setFormErrors({});
     } catch (error) {
       console.error("Failed to mark invite as used:", error);
-      toast.error('فشل في تحديد الدعوة كمستخدمة');
+      toast.error("فشل في تحديد الدعوة كمستخدمة");
       setFormErrors({
         general:
           "فشل في تحديد الدعوة كمستخدمة: " + (error.message || "خطأ غير معروف"),
       });
     }
   };
-  
 
   const openEditModal = async (inviteId) => {
     setSelectedInviteId(inviteId);
@@ -948,7 +941,7 @@ const InviteList = () => {
                 <button
                   type="button"
                   onClick={() => setShowMarkUsedModal(false)}
-                  className="px-4 py-2 border border-gray-_TRIGGERED300 rounded-md text-gray-700 hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
                   إلغاء
                 </button>
