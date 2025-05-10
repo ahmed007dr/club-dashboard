@@ -57,3 +57,11 @@ class ExtendedUserVisit(models.Model):
 
     def __str__(self):
         return f"{self.user_visit.user.username} - {self.session_duration or 'Ongoing'}"
+    
+
+class AllowedIP(models.Model):
+    ip_address = models.GenericIPAddressField(unique=True)
+    description = models.CharField(max_length=255, blank=True)
+
+    def __str__(self):
+        return f"{self.ip_address} ({self.description})"
