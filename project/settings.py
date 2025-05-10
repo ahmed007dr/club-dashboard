@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # 'drf_spectacular',  
+
     'drf_yasg',  
     'rest_framework',
     'rest_framework_simplejwt',
@@ -46,6 +46,10 @@ INSTALLED_APPS = [
     'django_filters',
     "corsheaders",    
     'import_export',
+
+    'django_user_agents',
+    'simple_history',
+    'user_visit',
 
     #apps
     "core",
@@ -58,6 +62,7 @@ INSTALLED_APPS = [
     "tickets",
     "staff",
     "invites",
+    'devices',
 
 ]
 
@@ -70,6 +75,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_user_agents.middleware.UserAgentMiddleware',
+    # 'devices.middleware.DeviceAccessMiddleware',
+
 ]
 
 ROOT_URLCONF = 'project.urls'
@@ -199,7 +207,37 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 
-
+# Logging Configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'devices.log',
+            'formatter': 'verbose',
+        },
+        'console': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'devices': {
+            'handlers': ['file', 'console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 

@@ -32,7 +32,7 @@ def create_dummy_data():
         clubs.append(club)
 
     # Create Users (with different roles including owner and staff)
-    roles = ['owner', 'admin', 'reception', 'accountant', 'coach', 'staff']
+    roles = ['owner', 'admin', 'reception', 'accountant', 'coach']
     users = []
     for _ in range(6):  # Increased to ensure enough staff users
         username = fake.user_name()[:8]
@@ -49,7 +49,7 @@ def create_dummy_data():
         users.append(user)
 
     # Ensure at least 2 staff users
-    staff_users = [u for u in users if u.role == 'staff']
+    staff_users = [u for u in users if u.role == 'admin']
     while len(staff_users) < 2:
         username = fake.user_name()[:8]
         user = User.objects.create_user(
@@ -57,7 +57,7 @@ def create_dummy_data():
             email=fake.email(),
             password='123',
             club=random.choice(clubs),
-            role='staff',
+            role='admin',
             first_name=fake.first_name(),
             last_name=fake.last_name(),
             rfid_code=fake.unique.bothify(text='########')
@@ -71,12 +71,15 @@ def create_dummy_data():
         member = Member.objects.create(
             club=random.choice(clubs),
             name=fake.name(),
-            membership_number=fake.unique.bothify(text='#######'),
             national_id=fake.unique.numerify(text='##############'),
             birth_date=fake.date_of_birth(minimum_age=18, maximum_age=70),
             phone=fake.phone_number()[:20],
-            created_at=timezone.now(),
-            referred_by=None
+            phone2=fake.phone_number()[:20],
+            job=fake.job(),
+            address=fake.address()[:100],
+            note=fake.sentence(nb_words=6)[:100],
+            rfid_code=fake.unique.bothify(text='RFID-####-####'),
+            referred_by=None  # Set later
         )
         members.append(member)
 

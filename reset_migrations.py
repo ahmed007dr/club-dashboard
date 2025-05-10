@@ -11,7 +11,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 APPS = [
     "core", "accounts", "attendance", "members", "staff",
-    "subscriptions", "tickets", "invites", "receipts", "finance"
+    "subscriptions", "tickets", "invites", "receipts", "finance","devices"
 ]
 
 def create_static_dir():
