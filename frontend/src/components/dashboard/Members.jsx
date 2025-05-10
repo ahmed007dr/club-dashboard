@@ -7,21 +7,26 @@ import { RiGroupLine } from "react-icons/ri";
 import { useSelector, useDispatch } from "react-redux";
 import { deleteMember, editMember, fetchUsers, searchMember } from "../../redux/slices/memberSlice";
 import { IoAddOutline } from "react-icons/io5";
-
+import toast from 'react-hot-toast';
 
 
 const Members = () => {
-  const [data, setData] = useState([
-    {
-      id: '4',
-      photo: 'https://i.pravatar.cc/100?img=11',
-      name: 'ahmed El-Zahrani',
-      membership_number: '1008',
-      national_id: '102030405066',
-      phone: '0101234566',
-      club_name: 'Sports Club',
-    },
-  ]);
+const [data, setData] = useState([
+  {
+    id: '4',
+    photo: 'https://i.pravatar.cc/100?img=11',
+    name: 'ahmed El-Zahrani',
+    membership_number: '1008',
+    national_id: '102030405066',
+    phone: '0101234566',
+    phone2: '', // Add this
+    address: '', // Add this
+    rfid_code: '', // Add this
+    job: '', // Add this
+    note: '', // Add this
+    club_name: 'Sports Club',
+  },
+]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -116,17 +121,34 @@ const Members = () => {
     setSelectedMember({ ...selectedMember, [e.target.name]: e.target.value });
   };
 
-  const handleEditSubmit = () => {
+const handleEditSubmit = async () => {
+  try {
+    const toastId = toast.loading('جاري حفظ التعديلات...', {
+      position: 'top-center',
+    });
+
+    // Dispatch the edit action
+    await dispatch(
+      editMember({ id: selectedMember.id, updatedUser: selectedMember })
+    ).unwrap();
+
+    // Update local state
     const updatedData = data.map((m) =>
       m.id === selectedMember.id ? selectedMember : m
     );
-    dispatch(editMember({ id: selectedMember.id, updatedUser: selectedMember }));
-    // Sort updated data by id in descending order
     const sortedUpdatedData = [...updatedData].sort((a, b) => b.id - a.id);
+    
     setData(sortedUpdatedData);
     setSearchResult(sortedUpdatedData);
     setIsEditModalOpen(false);
-  };
+
+    toast.success('تم تحديث بيانات العضو بنجاح', {
+      id: toastId,
+    });
+  } catch (error) {
+    toast.error(`فشل في التحديث: ${error.message}`);
+  }
+};
 
   const openAddModal = () => setIsAddModalOpen(true);
   const closeAddModal = () => setIsAddModalOpen(false);
@@ -304,69 +326,145 @@ const Members = () => {
       )}
 
       {/* Edit Modal */}
-      {isEditModalOpen && selectedMember && (
-        <div
-          className="fixed inset-0 flex justify-center items-center z-40"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
-        >
-          <div className="modal relative">
-            <h3 className="text-lg font-semibold mb-4">Edit Member</h3>
-            <div className="flex flex-col gap-3">
-              <input
-                type="text"
-                name="name"
-                value={selectedMember.name}
-                onChange={handleEditChange}
-                placeholder="Name"
-                className="border px-3 py-2 rounded"
-              />
-              <input
-                type="text"
-                name="membership_number"
-                value={selectedMember.membership_number}
-                onChange={handleEditChange}
-                placeholder="Membership Number"
-                className="border px-3 py-2 rounded"
-              />
-              <input
-                type="text"
-                name="national_id"
-                value={selectedMember.national_id}
-                onChange={handleEditChange}
-                placeholder="National ID"
-                className="border px-3 py-2 rounded"
-              />
-              <input
-                type="text"
-                name="phone"
-                value={selectedMember.phone}
-                onChange={handleEditChange}
-                placeholder="Phone"
-                className="border px-3 py-2 rounded"
-              />
-              <input
-                type="text"
-                name="club_name"
-                value={selectedMember.club_name}
-                onChange={handleEditChange}
-                placeholder="Club Name"
-                className="border px-3 py-2 rounded"
-              />
-              <div className="flex justify-end gap-2 mt-4">
-                <button
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="bg-gray-300 px-4 py-2 rounded"
-                >
-                  Cancel
-                </button>
-                <button onClick={handleEditSubmit} className="btn">
-                  Save
-                </button>
-              </div>
-            </div>
+  {isEditModalOpen && selectedMember && (
+  <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]">
+    <div className="modal relative bg-white p-6 rounded-lg w-1/2">
+      <h3 className="text-lg font-semibold mb-4 text-right">تعديل العضو</h3>
+      <div className="grid grid-cols-2 gap-4">
+        {/* Column 1 */}
+        <div className="space-y-3">
+          <div className="flex flex-col">
+            <label className="text-right mb-1">الاسم الكامل</label>
+            <input
+              type="text"
+              name="name"
+              value={selectedMember.name}
+              onChange={handleEditChange}
+              className="border px-3 py-2 rounded text-right"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-right mb-1">رقم العضوية</label>
+            <input
+              type="text"
+              name="membership_number"
+              value={selectedMember.membership_number}
+              onChange={handleEditChange}
+              className="border px-3 py-2 rounded text-right"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-right mb-1">الرقم القومي</label>
+            <input
+              type="text"
+              name="national_id"
+              value={selectedMember.national_id}
+              onChange={handleEditChange}
+              className="border px-3 py-2 rounded text-right"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-right mb-1">رقم الهاتف الأساسي</label>
+            <input
+              type="text"
+              name="phone"
+              value={selectedMember.phone}
+              onChange={handleEditChange}
+              className="border px-3 py-2 rounded text-right"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-right mb-1">رقم الهاتف الثانوي</label>
+            <input
+              type="text"
+              name="phone2"
+              value={selectedMember.phone2 || ''}
+              onChange={handleEditChange}
+              className="border px-3 py-2 rounded text-right"
+            />
           </div>
         </div>
-      )}
+
+        {/* Column 2 */}
+        <div className="space-y-3">
+          <div className="flex flex-col">
+            <label className="text-right mb-1">كود البطاقة (RFID)</label>
+            <input
+              type="text"
+              name="rfid_code"
+              value={selectedMember.rfid_code || ''}
+              onChange={handleEditChange}
+              className="border px-3 py-2 rounded text-right"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-right mb-1">الوظيفة</label>
+            <input
+              type="text"
+              name="job"
+              value={selectedMember.job || ''}
+              onChange={handleEditChange}
+              className="border px-3 py-2 rounded text-right"
+            />
+          </div>
+
+      <div className="flex flex-col">
+  <label className="text-right mb-1">اسم النادي</label>
+  <input
+    type="text"
+    name="club_name"
+    value={selectedMember.club_name}
+    disabled
+    className="border px-3 py-2 rounded text-right bg-gray-100 cursor-not-allowed"
+  />
+</div>
+
+          <div className="flex flex-col">
+            <label className="text-right mb-1">العنوان</label>
+            <input
+              type="text"
+              name="address"
+              value={selectedMember.address || ''}
+              onChange={handleEditChange}
+              className="border px-3 py-2 rounded text-right"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-right mb-1">ملاحظات</label>
+            <textarea
+              name="note"
+              value={selectedMember.note || ''}
+              onChange={handleEditChange}
+              className="border px-3 py-2 rounded text-right"
+              rows={2}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 mt-6">
+        <button
+          onClick={() => setIsEditModalOpen(false)}
+          className="bg-gray-300 px-4 py-2 rounded"
+        >
+          إلغاء
+        </button>
+        <button 
+          onClick={handleEditSubmit} 
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          حفظ التعديلات
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

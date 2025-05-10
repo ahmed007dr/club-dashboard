@@ -19,6 +19,8 @@ import { MoreVertical } from "lucide-react";
 import BASE_URL from '../../config/api';
 import { toast } from 'react-hot-toast';
 
+
+
 const Tickets = () => {
   const dispatch = useDispatch();
   const { tickets, status, error } = useSelector((state) => state.tickets);
@@ -83,22 +85,24 @@ const Tickets = () => {
     dispatch(fetchTickets());
   }, [dispatch]);
 
-  // Filter tickets
-  const filteredTickets = tickets.filter((ticket) => {
-    const matchesClub =
-      userClub && ticket.club.toString() === userClub.id.toString();
-    const matchesBuyer =
-      filterBuyerName === "" ||
-      ticket.buyer_name?.toLowerCase().includes(filterBuyerName.toLowerCase());
-    const matchesType =
-      filterTicketType === "" || ticket.ticket_type === filterTicketType;
-    const matchesStatus =
-      filterUsedStatus === "" ||
-      (filterUsedStatus === "used" && ticket.used) ||
-      (filterUsedStatus === "unused" && !ticket.used);
+  // Filter and sort tickets
+  const filteredTickets = tickets
+    .filter((ticket) => {
+      const matchesClub =
+        userClub && ticket.club.toString() === userClub.id.toString();
+      const matchesBuyer =
+        filterBuyerName === "" ||
+        ticket.buyer_name?.toLowerCase().includes(filterBuyerName.toLowerCase());
+      const matchesType =
+        filterTicketType === "" || ticket.ticket_type === filterTicketType;
+      const matchesStatus =
+        filterUsedStatus === "" ||
+        (filterUsedStatus === "used" && ticket.used) ||
+        (filterUsedStatus === "unused" && !ticket.used);
 
-    return matchesClub && matchesBuyer && matchesType && matchesStatus;
-  });
+      return matchesClub && matchesBuyer && matchesType && matchesStatus;
+    })
+    .sort((a, b) => b.id - a.id); // Sort by id in descending order (newest first)
 
   // Pagination logic
   const totalItems = filteredTickets.length;
@@ -235,36 +239,36 @@ const Tickets = () => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-// Handle save changes for edit modal
-const handleEditSave = () => {
-  if (selectedTicket && userClub) {
-    const updatedTicketData = {
-      club: Number(userClub.id),
-      buyer_name: selectedTicket.buyer_name,
-      ticket_type: selectedTicket.ticket_type,
-      price: Number(selectedTicket.price),
-      used: selectedTicket.used,
-      used_by: selectedTicket.used ? Number(selectedTicket.used_by) || null : null,
-    };
+  // Handle save changes for edit modal
+  const handleEditSave = () => {
+    if (selectedTicket && userClub) {
+      const updatedTicketData = {
+        club: Number(userClub.id),
+        buyer_name: selectedTicket.buyer_name,
+        ticket_type: selectedTicket.ticket_type,
+        price: Number(selectedTicket.price),
+        used: selectedTicket.used,
+        used_by: selectedTicket.used ? Number(selectedTicket.used_by) || null : null,
+      };
 
-    dispatch(
-      editTicketById({
-        ticketId: selectedTicket.id,
-        ticketData: updatedTicketData,
-      })
-    )
-      .unwrap()
-      .then(() => {
-        dispatch(fetchTickets());
-        toast.success("تم تعديل التذكرة بنجاح!");
-        closeAllModals(); // Close the modal after success
-      })
-      .catch((err) => {
-        console.error("Failed to edit ticket:", err);
-        setFormError("فشل في تعديل التذكرة: " + (err.message || "خطأ غير معروف"));
-      });
-  }
-};
+      dispatch(
+        editTicketById({
+          ticketId: selectedTicket.id,
+          ticketData: updatedTicketData,
+        })
+      )
+        .unwrap()
+        .then(() => {
+          dispatch(fetchTickets());
+          toast.success("تم تعديل التذكرة بنجاح!");
+          closeAllModals();
+        })
+        .catch((err) => {
+          console.error("Failed to edit ticket:", err);
+          setFormError("فشل في تعديل التذكرة: " + (err.message || "خطأ غير معروف"));
+        });
+    }
+  };
 
   const handleDelete = () => {
     if (selectedTicket) {
@@ -273,7 +277,7 @@ const handleEditSave = () => {
         .then(() => {
           dispatch(fetchTickets());
           toast.success("تم حذف التذكرة بنجاح!");
-          closeAllModals(); // Close the modal after success
+          closeAllModals();
         })
         .catch((err) => {
           console.error("Failed to delete ticket:", err);
@@ -283,26 +287,26 @@ const handleEditSave = () => {
   };
 
   // Handle mark as used action
-const handleMarkAsUsed = () => {
-  if (selectedTicket) {
-    dispatch(
-      markTicketAsUsed({
-        ticketId: selectedTicket.id,
-        used_by: Number(selectedTicket.used_by) || null,
-      })
-    )
-      .unwrap()
-      .then(() => {
-        dispatch(fetchTickets());
-        toast.success("تم تحديد التذكرة كمستخدمة بنجاح!");
-        closeAllModals(); // Close the modal after success
-      })
-      .catch((err) => {
-        console.error("Failed to mark ticket as used:", err);
-        toast.error("فشل في تحديد التذكرة كمستخدمة");
-      });
-  }
-};
+  const handleMarkAsUsed = () => {
+    if (selectedTicket) {
+      dispatch(
+        markTicketAsUsed({
+          ticketId: selectedTicket.id,
+          used_by: Number(selectedTicket.used_by) || null,
+        })
+      )
+        .unwrap()
+        .then(() => {
+          dispatch(fetchTickets());
+          toast.success("تم تحديد التذكرة كمستخدمة بنجاح!");
+          closeAllModals();
+        })
+        .catch((err) => {
+          console.error("Failed to mark ticket as used:", err);
+          toast.error("فشل في تحديد التذكرة كمستخدمة");
+        });
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -330,38 +334,36 @@ const handleMarkAsUsed = () => {
     }));
   };
 
+  const handleCreateSubmit = (e) => {
+    e.preventDefault();
 
-const handleCreateSubmit = (e) => {
-  e.preventDefault();
-  
-  if (!userClub) {
-    setFormError("النادي غير متاح. يرجى المحاولة لاحقًا.");
-    return;
-  }
+    if (!userClub) {
+      setFormError("النادي غير متاح. يرجى المحاولة لاحقًا.");
+      return;
+    }
 
-  const ticketData = {
-    club: Number(formData.club),
-    buyer_name: formData.buyer_name,
-    ticket_type: formData.ticket_type,
-    price: Number(formData.price),
-    used: formData.used,
-    used_by: formData.used ? Number(formData.used_by) || null : null,
+    const ticketData = {
+      club: Number(formData.club),
+      buyer_name: formData.buyer_name,
+      ticket_type: formData.ticket_type,
+      price: Number(formData.price),
+      used: formData.used,
+      used_by: formData.used ? Number(formData.used_by) || null : null,
+    };
+
+    dispatch(addTicket(ticketData))
+      .unwrap()
+      .then(() => {
+        dispatch(fetchTickets());
+        toast.success("تم إضافة التذكرة بنجاح!");
+        closeAllModals();
+      })
+      .catch((err) => {
+        console.error("Failed to create ticket:", err);
+        setFormError("فشل في إضافة التذكرة: " + (err.message || "خطأ غير معروف"));
+        toast.error("فشل في إضافة التذكرة");
+      });
   };
-
-  dispatch(addTicket(ticketData))
-    .unwrap()
-    .then(() => {
-      dispatch(fetchTickets());
-      toast.success("تم إضافة التذكرة بنجاح!");
-      closeAllModals();  // Close the modal after success
-    })
-    .catch((err) => {
-      console.error("Failed to create ticket:", err);
-      setFormError("فشل في إضافة التذكرة: " + (err.message || "خطأ غير معروف"));
-      toast.error("فشل في إضافة التذكرة");
-    });
-};
-
 
   if (status === "loading" || loadingProfile)
     return (
@@ -415,7 +417,7 @@ const handleCreateSubmit = (e) => {
           <label className="block text-sm font-medium mb-1"> رقم التذكرة </label>
           <input
             type="text"
-            placeholder="بحث عن رقم التذكرة    "
+            placeholder="بحث عن رقم التذكرة"
             className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
             value={filterBuyerName}
             onChange={(e) => setFilterBuyerName(e.target.value)}
@@ -459,7 +461,8 @@ const handleCreateSubmit = (e) => {
                     اسم النادي
                   </th>
                   <th className="py-2 px-4 border-b text-center text-sm font-medium text-gray-700">
-                    رقم التذكرة                 </th>
+                    رقم التذكرة
+                  </th>
                   <th className="py-2 px-4 border-b text-center text-sm font-medium text-gray-700">
                     نوع التذكرة
                   </th>
@@ -968,11 +971,13 @@ const handleCreateSubmit = (e) => {
               </div>
             </div>
           </div>
+ί
+
         </div>
       )}
 
       {/* Mark as Used Modal */}
-      {showMarkAsUsedModal  && selectedTicket && (
+      {showMarkAsUsedModal && selectedTicket && (
         <div
           className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4"
           onClick={closeAllModals}

@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 const ShiftAttendanceList = () => {
   const dispatch = useDispatch();
   const { shiftAttendances, isLoading, error, lastFetched } = useSelector((state) => state.attendance);
+  console.log(shiftAttendances); // Dump the raw data
   console.log(shiftAttendances);
   // State management
   const [currentPage, setCurrentPage] = useState(1);
