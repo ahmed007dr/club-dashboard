@@ -76,7 +76,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_user_agents.middleware.UserAgentMiddleware',
-    # 'devices.middleware.DeviceAccessMiddleware',
+    'devices.middleware.DeviceAccessMiddleware',
+    'devices.middleware.RestrictAdminByIPMiddleware',
 
 ]
 
@@ -100,6 +101,7 @@ CSRF_TRUSTED_ORIGINS = [
     # "https://club-ft.com", # setting c panel
 ]
 
+DEFAULT_ALLOWED_IPS = ['127.0.0.1', '197.38.235.139','197.38.113.240']
 
 from datetime import timedelta
 
