@@ -28,7 +28,7 @@ import {
 } from "../../redux/slices/subscriptionsSlice";
 import EntryForm from "./EntryForm";
 import { toast } from 'react-hot-toast';  // Import toast
-
+import { FaUser } from "react-icons/fa";
 const Attendance = () => {
   const dispatch = useDispatch();
 
@@ -47,6 +47,9 @@ const Attendance = () => {
     loading: entryLogsLoading,
     error: entryLogsError,
   } = useSelector((state) => state.entryLogs);
+
+  const [foundSubscription, setFoundSubscription] = useState(null);
+const [searchLoading, setSearchLoading] = useState(false);
 
   // Form states
  const [newAttendance, setNewAttendance] = useState({
@@ -90,8 +93,23 @@ const Attendance = () => {
   }, [dispatch]);
 
   // Handle input changes
- const handleAttendanceInputChange = (e) => {
-  setNewAttendance({ ...newAttendance, [e.target.name]: e.target.value });
+const handleAttendanceInputChange = (e) => {
+  const { name, value } = e.target;
+  setNewAttendance({ ...newAttendance, [name]: value });
+  setFoundSubscription(null);
+
+  if (value.trim() === '') return;
+
+  setSearchLoading(true);
+  
+  // Search subscriptions by member phone or RFID code
+  const subscription = subscriptions.find(sub => 
+    sub.member_details?.phone === value || 
+    sub.member_details?.rfid_code === value
+  );
+
+  setFoundSubscription(subscription || null);
+  setSearchLoading(false);
 };
 
 
@@ -162,24 +180,48 @@ const Attendance = () => {
     entryLogPage * entryLogItemsPerPage
   );
 
- const handleAddAttendance = (e) => {
+const handleAddAttendance = (e) => {
   e.preventDefault();
 
-  if (!newAttendance.identifier) {
-    toast.error("الرجاء إدخال معرّف العضو.");
+  if (!foundSubscription) {
+    toast.error("الرجاء إدخال رقم هاتف أو كود RFID صحيح");
     return;
   }
 
-  dispatch(addAttendance(newAttendance))
+  // Check if subscription is active
+  if (foundSubscription.status !== 'Active') {
+    toast.error("لا يمكن تسجيل الحضور لاشتراك غير نشط");
+    return;
+  }
+
+  // Check if there are remaining entries
+  if (foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0) {
+    toast.error("لا توجد إدخالات متبقية في هذا الاشتراك");
+    return;
+  }
+
+  const attendanceData = {
+    identifier: newAttendance.identifier,
+    subscription_id: foundSubscription.id,
+    member_id: foundSubscription.member_details.id,
+    member_name: foundSubscription.member_details.name,
+    club_id: foundSubscription.club_details.id,
+    // Add any other required fields
+  };
+
+  dispatch(addAttendance(attendanceData))
     .unwrap()
     .then(() => {
       toast.success("تم إضافة الحضور بنجاح!");
       setNewAttendance({ identifier: "" });
+      setFoundSubscription(null);
       setIsAttendanceDialogOpen(false);
+      dispatch(fetchAttendances()); // Refresh attendance list
+      dispatch(fetchSubscriptions()); // Refresh subscriptions list
     })
     .catch((err) => {
       console.error("فشل في إضافة الحضور:", err);
-      toast.error("فشل في إضافة الحضور");
+      toast.error("فشل في إضافة الحضور: " + (err.message || "حدث خطأ"));
     });
 };
 
@@ -278,36 +320,143 @@ const Attendance = () => {
               {/* Attendance Dialog */}
     {/* نموذج الحضور */}
 {isAttendanceDialogOpen && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-    <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full relative" dir="rtl">
       <button
-        onClick={() => setIsAttendanceDialogOpen(false)}
-        className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
+        onClick={() => {
+          setIsAttendanceDialogOpen(false);
+          setFoundSubscription(null);
+          setNewAttendance({ identifier: "" });
+        }}
+        className="absolute top-3 left-3 text-gray-400 hover:text-gray-600 text-2xl"
       >
-        ×
+        &times;
       </button>
-      <h3 className="text-lg font-semibold mb-4">إضافة حضور</h3>
-      <form onSubmit={handleAddAttendance} className="space-y-4">
+      <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">إضافة حضور</h3>
+      <form onSubmit={handleAddAttendance} className="space-y-5">
         <div>
-          <label className="block text-sm mb-1">معرّف العضو</label>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            رقم الهاتف أو كود RFID
+          </label>
           <input
             type="text"
             name="identifier"
             value={newAttendance.identifier}
             onChange={handleAttendanceInputChange}
-            className="border px-3 py-2 rounded w-full"
-            placeholder="أدخل المعرّف"
+            className="border border-gray-300 focus:border-blue-500 focus:ring-blue-500 px-4 py-2 rounded-md w-full transition duration-150"
+            placeholder="أدخل رقم الهاتف أو كود RFID"
             required
+            autoFocus
           />
         </div>
 
-        <button type="submit" className="w-full btn">
-          إضافة الحضور
+        {searchLoading && (
+          <div className="text-center text-sm text-gray-600">جاري البحث...</div>
+        )}
+
+        {foundSubscription && (
+          <div className="border-t pt-5 mt-5 space-y-4">
+            <h4 className="font-semibold text-gray-700">بيانات الاشتراك:</h4>
+            <div className="flex items-start gap-4">
+              {foundSubscription.member_details?.photo ? (
+                <img
+                  src={foundSubscription.member_details.photo}
+                  alt="Member"
+                  className="w-12 h-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xl">
+                  <FaUser />
+                </div>
+              )}
+              <div className="flex-1 space-y-1">
+                <p className="font-medium text-gray-800">
+                  {foundSubscription.member_details?.name}
+                </p>
+                <p className="text-sm text-gray-500">
+                  #{foundSubscription.member_details?.membership_number}
+                </p>
+                <p className="text-sm text-red-500">
+                  <span className="font-medium text-gray-700">المبلغ المتبقي: </span>
+                  {foundSubscription.remaining_amount}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
+              <p>
+                <span className="font-medium">النادي: </span>
+                {foundSubscription.club_details?.name}
+              </p>
+              <p>
+                <span className="font-medium">الحالة: </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    foundSubscription.status === "Active"
+                      ? "bg-green-100 text-green-600"
+                      : foundSubscription.status === "Expired"
+                      ? "bg-red-100 text-red-600"
+                      : "bg-blue-100 text-blue-600"
+                  }`}
+                >
+                  {foundSubscription.status}
+                </span>
+              </p>
+              <p>
+                <span className="font-medium">الهاتف: </span>
+                {foundSubscription.member_details?.phone}
+              </p>
+              <p>
+                <span className="font-medium">RFID: </span>
+                {foundSubscription.member_details?.rfid_code || "غير مسجل"}
+              </p>
+              <p>
+                <span className="font-medium">تاريخ البدء: </span>
+                {new Date(foundSubscription.start_date).toLocaleDateString("ar-EG")}
+              </p>
+              <p>
+                <span className="font-medium">تاريخ الانتهاء: </span>
+                {new Date(foundSubscription.end_date).toLocaleDateString("ar-EG")}
+              </p>
+              <p className="col-span-2">
+                <span className="font-medium">الإدخالات المتبقية: </span>
+                <span
+                  className={`font-bold ${
+                    foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0
+                      ? "text-red-600"
+                      : "text-green-600"
+                  }`}
+                >
+                  {foundSubscription.type_details.max_entries - foundSubscription.entry_count}
+                </span>
+                <span className="text-xs text-gray-500">
+                  / {foundSubscription.type_details.max_entries}
+                </span>
+              </p>
+            </div>
+          </div>
+        )}
+
+        {newAttendance.identifier && !foundSubscription && !searchLoading && (
+          <p className="text-red-500 text-sm">لا يوجد اشتراك بهذا الرقم أو كود RFID</p>
+        )}
+
+        <button
+          type="submit"
+          className={`w-full py-2 rounded-md text-white font-semibold transition duration-150 ${
+            foundSubscription
+              ? "bg-green-600 hover:bg-green-700"
+              : "bg-gray-400 cursor-not-allowed"
+          }`}
+          disabled={!foundSubscription}
+        >
+          تأكيد الحضور
         </button>
       </form>
     </div>
   </div>
 )}
+
 
 
 
