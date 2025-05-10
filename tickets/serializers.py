@@ -24,9 +24,8 @@ class TicketSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             'issue_date': {'read_only': True},
+            'used_by': {'required': False, 'allow_null': True}, 
         }
 
     def validate(self, data):
-        if data.get('used') and not data.get('used_by'):
-            raise serializers.ValidationError("You must specify who used the ticket when marking it as used.")
         return data

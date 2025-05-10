@@ -35,14 +35,14 @@ def add_ticket_api(request):
         source, _ = IncomeSource.objects.get_or_create(
             club=ticket.club,
             name='Ticket',
-            defaults={'description': 'Income from Ticket payments'}
+            defaults={'description': 'ارباح بيع تذاكر'}
         )
 
         income = Income.objects.create(
             club=ticket.club,
             source=source,
             amount=ticket.price,
-            description=f"Ticket sale for {ticket.ticket_type}",
+            description=f"بيع تذكره بنوع  {ticket.ticket_type}",
             date=timezone.now().date(),
             received_by=request.user
         )
@@ -94,16 +94,19 @@ def delete_ticket_api(request, ticket_id):
 def mark_ticket_used_api(request, ticket_id):
     ticket = get_object_or_404(Ticket, id=ticket_id)
     
-    used_by_id = request.data.get('used_by')
-    if not used_by_id:
-        return Response(
-            {"error": "used_by field is required"},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+    used_by_id = request.data.get('used_by') 
+    
+    if used_by_id:
+        from members.models import Member
+        if not Member.objects.filter(id=used_by_id).exists():
+            return Response(
+                {"error": "Invalid used_by ID"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     
     ticket.used = True
-    ticket.used_by_id = used_by_id
+    ticket.used_by_id = used_by_id if used_by_id else None
     ticket.save()
     
     serializer = TicketSerializer(ticket)
-    return Response(serializer.data)
+    return Response(serializer.data, status=status.HTTP_200_OK)
