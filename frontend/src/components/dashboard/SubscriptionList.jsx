@@ -387,7 +387,6 @@ const SubscriptionList = () => {
                 <th className="py-1 px-2 text-right text-sm">تاريخ البدء</th>
                 <th className="py-1 px-2 text-right text-sm">تاريخ الانتهاء</th>
                 <th className="py-1 px-2 text-right text-sm">عدد الإدخالات</th>
-                <th className="py-1 px-2 text-right text-sm">الحد الأقصى للإدخالات</th>
                 <th className="py-1 px-2 text-right text-sm">الإدخالات المتبقية</th>
                 <th className="py-1 px-2 text-right text-sm">المبلغ المدفوع</th>
                 <th className="py-1 px-2 text-right text-sm">المبلغ المتبقي</th>
@@ -404,7 +403,7 @@ const SubscriptionList = () => {
                 >
                   <td className="py-1 px-2 text-sm">
                     <Link
-                      to={`/member-subscriptions/${subscription.member_details.name}`}
+                      to={`/member-subscriptions/${subscription.member_details.id}`}
                       className="text-blue-600 hover:underline"
                     >
                       {subscription.member_details.name}
@@ -414,7 +413,6 @@ const SubscriptionList = () => {
                   <td className="py-1 px-2 text-sm">{subscription.start_date}</td>
                   <td className="py-1 px-2 text-sm">{subscription.end_date}</td>
                   <td className="py-1 px-2 text-sm">{subscription.entry_count}</td>
-                  <td className="py-1 px-2 text-sm">{subscription.type_details.max_entries}</td>
                   <td className="py-1 px-2 text-sm">
                     {subscription.type_details.max_entries - subscription.entry_count}
                   </td>
