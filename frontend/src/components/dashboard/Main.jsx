@@ -2,57 +2,132 @@ import { fetchStaff } from "@/redux/slices/staff";
 import { fetchFreeInvites } from "../../redux/slices/invitesSlice";
 import { fetchReceipts } from "../../redux/slices/receiptsSlice";
 import { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import { fetchUsers } from "../../redux/slices/memberSlice";
 import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
 import { fetchTickets } from "../../redux/slices/ticketsSlice";
 import { fetchAttendances } from "@/redux/slices/AttendanceSlice";
-import { RiGroupLine } from "react-icons/ri";
+import { RiGroupLine, RiVipCrown2Line } from "react-icons/ri";
 import { MdSubscriptions } from "react-icons/md";
 import { FaRegCalendarCheck, FaReceipt } from "react-icons/fa";
 import { BsPeopleFill } from "react-icons/bs";
-import { Link } from "react-router-dom";
-import { RiVipCrown2Line } from "react-icons/ri";
 import { IoTicketOutline } from "react-icons/io5";
-import EntryForm from "./EntryForm";
+import { Link } from "react-router-dom";
+import SubscriptionStats from "./SubscriptionStats";
 import SubscriptionChart from "./SubscriptionChart";
-import ShiftsPerClubChart from "./ShiftsPerClubChart ";
-import ExpenseCategories from "./ExpenseCategories"
+import ShiftsPerClubChart from "./ShiftsPerClubChart";
+
+const isToday = (dateStr) => {
+  const today = new Date();
+  const date = new Date(dateStr);
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
+};
+
+const filterByDate = (data, isTodayView) => {
+  if (!Array.isArray(data)) return [];
+  if (!isTodayView) return data;
+  return data.filter((item) => isToday(item.created_at));
+};
+
 const Main = () => {
   const dispatch = useDispatch();
-  const { invites } = useSelector((state) => state.invites);
-  const { receipts } = useSelector((state) => state.receipts);
+
+  const [isTodayView, setIsTodayView] = useState(true);
 
   const [totalMembers, setTotalMembers] = useState(0);
   const [totalSubscriptions, setTotalSubscriptions] = useState(0);
   const [totalTickets, setTotalTickets] = useState(0);
   const [totalAttendances, setTotalAttendances] = useState(0);
   const [totalStaff, setTotalStaff] = useState(0);
+  const [totalInvites, setTotalInvites] = useState(0);
+  const [totalReceipts, setTotalReceipts] = useState(0);
 
-  useEffect(() => {
+  const fetchAll = () => {
     dispatch(fetchUsers())
       .unwrap()
-      .then((res) => setTotalMembers(res.results.length))
-      .catch(console.error);
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalMembers(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching users:", err);
+        setTotalMembers(0);
+      });
+
     dispatch(fetchSubscriptions())
       .unwrap()
-      .then((res) => setTotalSubscriptions(res.length))
-      .catch(console.error);
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalSubscriptions(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching subscriptions:", err);
+        setTotalSubscriptions(0);
+      });
+
     dispatch(fetchTickets())
       .unwrap()
-      .then((res) => setTotalTickets(res.length))
-      .catch(console.error);
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalTickets(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching tickets:", err);
+        setTotalTickets(0);
+      });
+
     dispatch(fetchAttendances())
       .unwrap()
-      .then((res) => setTotalAttendances(res.length))
-      .catch(console.error);
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalAttendances(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching attendances:", err);
+        setTotalAttendances(0);
+      });
+
     dispatch(fetchStaff())
       .unwrap()
-      .then((res) => setTotalStaff(res.length))
-      .catch(console.error);
-    dispatch(fetchFreeInvites());
-    dispatch(fetchReceipts());
-  }, [dispatch]);
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalStaff(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching staff:", err);
+        setTotalStaff(0);
+      });
+
+    dispatch(fetchFreeInvites())
+      .unwrap()
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalInvites(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching free invites:", err);
+        setTotalInvites(0);
+      });
+
+    dispatch(fetchReceipts())
+      .unwrap()
+      .then((res) => {
+        const data = Array.isArray(res?.results) ? res.results : [];
+        setTotalReceipts(filterByDate(data, isTodayView).length);
+      })
+      .catch((err) => {
+        console.error("Error fetching receipts:", err);
+        setTotalReceipts(0);
+      });
+  };
+
+  useEffect(() => {
+    fetchAll();
+  }, [dispatch, isTodayView]);
 
   const cardClasses =
     "bg-white rounded-2xl p-4 sm:p-6 shadow transition hover:shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4";
@@ -63,168 +138,53 @@ const Main = () => {
 
   return (
     <div className="min-h-screen p-4 sm:p-6" dir="rtl">
-      <h2 className="text-xl sm:text-2xl font-bold text-gray-700 dark:text-white mb-4 sm:mb-6">
-        لوحة التحكم
-      </h2>
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-700 dark:text-white">
+          لوحة التحكم - {isTodayView ? "بيانات اليوم" : "الإجمالي الكلي"}
+        </h2>
+        <button
+          onClick={() => setIsTodayView((prev) => !prev)}
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-full text-sm shadow"
+        >
+          {isTodayView ? "عرض الإجمالي الكلي" : "عرض بيانات اليوم"}
+        </button>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-        {/* التذاكر */}
-        <div className={cardClasses}>
-          <div className="text-center sm:text-right">
-            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
-              إجمالي التذاكر
-            </h3>
-            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
-              {totalTickets}
-            </p>
-            <Link
-              to="/tickets"
-              className={textLinkClasses}
-              aria-label="عرض جميع التذاكر"
-            >
-              عرض الكل
-            </Link>
-          </div>
-          <IoTicketOutline className={iconClasses} />
-        </div>
-
-        {/* الأعضاء */}
-        <div className={cardClasses}>
-          <div className="text-center sm:text-right">
-            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
-              إجمالي الأعضاء
-            </h3>
-            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
-              {totalMembers}
-            </p>
-            <Link
-              to="/members"
-              className={textLinkClasses}
-              aria-label="عرض جميع الأعضاء"
-            >
-              عرض الكل
-            </Link>
-          </div>
-          <RiGroupLine className={iconClasses} />
-        </div>
-
-        {/* الاشتراكات */}
-        <div className={cardClasses}>
-          <div className="text-center sm:text-right">
-            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
-              إجمالي الاشتراكات
-            </h3>
-            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
-              {totalSubscriptions}
-            </p>
-            <Link
-              to="/subscriptions"
-              className={textLinkClasses}
-              aria-label="إدارة الاشتراكات"
-            >
-              إدارة
-            </Link>
-          </div>
-          <MdSubscriptions className={iconClasses} />
-        </div>
-
-        {/* الحضور */}
-        <div className={cardClasses}>
-          <div className="text-center sm:text-right">
-            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
-              إجمالي الحضور
-            </h3>
-            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
-              {totalAttendances}
-            </p>
-            <Link
-              to="/attendance"
-              className={textLinkClasses}
-              aria-label="تتبع الحضور"
-            >
-              تتبع
-            </Link>
-          </div>
-          <FaRegCalendarCheck className={iconClasses} />
-        </div>
-
-        {/* الموظفين */}
-        <div className={cardClasses}>
-          <div className="text-center sm:text-right">
-            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
-              إجمالي الموظفين
-            </h3>
-            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
-              {totalStaff}
-            </p>
-            <Link
-              to="/staff"
-              className={textLinkClasses}
-              aria-label="إدارة الموظفين"
-            >
-              إدارة
-            </Link>
-          </div>
-          <BsPeopleFill className={iconClasses} />
-        </div>
-
-        {/* الدعوات */}
-        <div className={cardClasses}>
-          <div className="text-center sm:text-right">
-            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
-              الدعوات
-            </h3>
-            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
-              {invites?.length || 0}
-            </p>
-            <Link
-              to="/free-invites"
-              className={textLinkClasses}
-              aria-label="عرض جميع الدعوات"
-            >
-              عرض الكل
-            </Link>
-          </div>
-          <RiVipCrown2Line className={iconClasses} />
-        </div>
-
-        {/* الإيصالات */}
-        <div className={cardClasses}>
-          <div className="text-center sm:text-right">
-            <h3 className="text-gray-600 text-sm sm:text-base font-semibold">
-              الإيصالات
-            </h3>
-            <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
-              {receipts?.length || 0}
-            </p>
-            <Link
-              to="/receipts"
-              className={textLinkClasses}
-              aria-label="عرض جميع الإيصالات"
-            >
-              عرض الكل
-            </Link>
-          </div>
-          <FaReceipt className={iconClasses} />
-        </div>
+        <DataCard label="إجمالي التذاكر" value={totalTickets} icon={<IoTicketOutline className={iconClasses} />} link="/tickets" />
+        <DataCard label="إجمالي الأعضاء" value={totalMembers} icon={<RiGroupLine className={iconClasses} />} link="/members" />
+        <DataCard label="إجمالي الاشتراكات" value={totalSubscriptions} icon={<MdSubscriptions className={iconClasses} />} link="/subscriptions" />
+        <DataCard label="إجمالي الحضور" value={totalAttendances} icon={<FaRegCalendarCheck className={iconClasses} />} link="/attendance" />
+        <DataCard label="إجمالي الموظفين" value={totalStaff} icon={<BsPeopleFill className={iconClasses} />} link="/staff" />
+        <DataCard label="الدعوات" value={totalInvites} icon={<RiVipCrown2Line className={iconClasses} />} link="/free-invites" />
+        <DataCard label="الإيصالات" value={totalReceipts} icon={<FaReceipt className={iconClasses} />} link="/receipts" />
       </div>
 
-      {/* Subscription Stats and Chart Section */}
+      {/* Charts Section */}
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4 sm:gap-6 mt-6">
-        <div className="w-full sm:w-1/2">
-          <EntryForm />
-        </div>
-        <div className="w-full sm:w-1/2">
-          <SubscriptionChart />
-        </div>
+        <div className="w-full sm:w-1/2"><SubscriptionStats /></div>
+        <div className="w-full sm:w-1/2"><SubscriptionChart /></div>
       </div>
 
-      {/* Shifts Per Club Chart Section */}
-      <div className="mt-6">
-        <div className="w-full">
-          <ShiftsPerClubChart />
-        </div>
+      <div className="mt-6"><ShiftsPerClubChart /></div>
+    </div>
+  );
+};
+
+const DataCard = ({ label, value, icon, link }) => {
+  const cardClasses =
+    "bg-white rounded-2xl p-4 sm:p-6 shadow transition hover:shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4";
+  const textLinkClasses =
+    "text-xs sm:text-sm text-blue-500 hover:underline mt-2 sm:mt-0 inline-block";
+
+  return (
+    <div className={cardClasses}>
+      <div className="text-center sm:text-right">
+        <h3 className="text-gray-600 text-sm sm:text-base font-semibold">{label}</h3>
+        <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">{value}</p>
+        <Link to={link} className={textLinkClasses}>عرض الكل</Link>
       </div>
+      {icon}
     </div>
   );
 };

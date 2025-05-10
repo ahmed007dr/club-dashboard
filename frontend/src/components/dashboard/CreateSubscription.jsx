@@ -3,8 +3,9 @@ import { useDispatch, useSelector } from "react-redux";
 import { postSubscription } from "../../redux/slices/subscriptionsSlice";
 import { fetchUsers } from "../../redux/slices/memberSlice";
 import { fetchSubscriptionTypes } from "../../redux/slices/subscriptionsSlice";
+import { toast } from "react-hot-toast";
 
-const CreateSubscription = () => {
+const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error: subscriptionError } = useSelector(
     (state) => state.subscriptions
@@ -28,7 +29,11 @@ const CreateSubscription = () => {
     const fetchData = async () => {
       try {
         const fetchedData = await dispatch(fetchUsers()).unwrap();
-        const memberList = fetchedData.results;
+        console.log('Raw fetched data:', fetchedData);
+
+        // fetchedData is an array
+        const memberList = Array.isArray(fetchedData) ? fetchedData : [];
+        console.log('Member list:', memberList);
 
         setMembers(memberList);
 
@@ -75,7 +80,7 @@ const CreateSubscription = () => {
     const { club, member, type, start_date, paid_amount } = formData;
 
     if (!club || !member || !type || !start_date || !paid_amount) {
-      alert("Please fill in all fields.");
+      toast.error("يرجى ملء جميع الحقول.");
       return;
     }
 
@@ -87,7 +92,23 @@ const CreateSubscription = () => {
       paid_amount: parseFloat(paid_amount),
     };
 
-    dispatch(postSubscription(payload));
+    dispatch(postSubscription(payload))
+      .unwrap()
+      .then(() => {
+        toast.success("تم إنشاء الاشتراك بنجاح!");
+        // Optional: Reset form
+        setFormData({
+          club: "",
+          member: "",
+          type: "",
+          start_date: "",
+          paid_amount: "",
+        });
+        if (onClose) onClose();
+      })
+      .catch((err) => {
+        toast.error("فشل في إنشاء الاشتراك: " + (err.message || "خطأ غير معروف"));
+      });
   };
 
   return (
@@ -184,10 +205,7 @@ const CreateSubscription = () => {
         </div>
 
         {/* Submit Button */}
-        <button
-          type="submit"
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-        >
+        <button type="submit" className="btn">
           إنشاء اشتراك
         </button>
       </form>

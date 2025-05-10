@@ -155,7 +155,11 @@ const Navbar = ({ hideMenuButton = false }) => {
                 </div>
               </Menu.Items>
             </Menu>
+
+            
           )}
+
+
 
           {/* Dark Mode Toggle */}
           <button onClick={handleToggleDarkMode} className="p-2 rounded-full text-gray-500 dark:text-gray-300">

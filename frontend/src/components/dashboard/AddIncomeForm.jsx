@@ -3,6 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { addIncome } from '../../redux/slices/financeSlice';
 import BASE_URL from '../../config/api';
 import { toast } from 'react-hot-toast';
+import axios from 'axios';
 
 const AddIncomeForm = () => {
   const dispatch = useDispatch();
@@ -18,13 +19,10 @@ const AddIncomeForm = () => {
 
   const [userClub, setUserClub] = useState(null);
   const [userId, setUserId] = useState(null);
-
-  const incomeSources = [
-    { id: 1, name: 'اشتراك' },         // Subscription
-    { id: 2, name: 'تسديد اشتراك' },   // Subscription Payment
-  ];
+  const [incomeSources, setIncomeSources] = useState([]);
 
   useEffect(() => {
+    // Fetch user profile
     fetch(`${BASE_URL}/accounts/api/profile/`, {
       method: 'GET',
       headers: {
@@ -47,6 +45,26 @@ const AddIncomeForm = () => {
       });
   }, []);
 
+  useEffect(() => {
+    // Fetch income sources
+    const fetchSources = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${BASE_URL}/finance/api/income-sources/`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setIncomeSources(response.data);
+      } catch (err) {
+        console.error('فشل في جلب مصادر الدخل:', err);
+        toast.error('فشل في تحميل مصادر الدخل');
+      }
+    };
+
+    fetchSources();
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -58,13 +76,7 @@ const AddIncomeForm = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const allowedSources = [1, 2];
     const sourceId = parseInt(formData.source);
-
-    if (!allowedSources.includes(sourceId)) {
-      toast.error('يُسمح فقط بمصدر "اشتراك" أو "تسديد اشتراك"');
-      return;
-    }
 
     if (!formData.source || !formData.club || !userId) {
       toast.error('الرجاء تعبئة جميع الحقول المطلوبة');
@@ -97,33 +109,34 @@ const AddIncomeForm = () => {
 
   return (
     <form
-      onSubmit={handleSubmit}
-      className="max-w-xl mx-auto p-6 bg-white shadow-lg rounded-lg space-y-6"
-    >
-      <h2 className="text-2xl font-semibold text-gray-800">إضافة الدخل</h2>
-
-      <div>
+    onSubmit={handleSubmit}
+    className="max-w-2xl mx-auto p-6  space-y-6"
+  >
+    <h2 className="text-2xl font-bold text-gray-800 text-center">إضافة الدخل</h2>
+  
+    <div className="flex flex-col md:flex-row gap-4">
+      <div className="w-full">
         <label className="block text-sm font-medium text-gray-700">النادي</label>
         <select
           name="club"
           value={formData.club}
           onChange={handleChange}
           disabled={!!userClub}
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 bg-gray-100 disabled:cursor-not-allowed"
+          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 bg-gray-100 disabled:cursor-not-allowed"
         >
           <option value="">اختر النادي</option>
           {userClub && <option value={userClub.id}>{userClub.name}</option>}
         </select>
       </div>
-
-      <div>
+  
+      <div className="w-full">
         <label className="block text-sm font-medium text-gray-700">المصدر</label>
         <select
           name="source"
           value={formData.source}
           onChange={handleChange}
           required
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2"
+          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
         >
           <option value="">اختر المصدر</option>
           {incomeSources.map((source) => (
@@ -133,8 +146,10 @@ const AddIncomeForm = () => {
           ))}
         </select>
       </div>
-
-      <div>
+    </div>
+  
+    <div className="flex flex-col md:flex-row gap-4">
+      <div className="w-full">
         <label className="block text-sm font-medium text-gray-700">المبلغ</label>
         <input
           type="number"
@@ -142,21 +157,11 @@ const AddIncomeForm = () => {
           value={formData.amount}
           onChange={handleChange}
           required
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2"
+          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
         />
       </div>
-
-      <div>
-        <label className="block text-sm font-medium text-gray-700">الوصف</label>
-        <textarea
-          name="description"
-          value={formData.description}
-          onChange={handleChange}
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2"
-        />
-      </div>
-
-      <div>
+  
+      <div className="w-full">
         <label className="block text-sm font-medium text-gray-700">التاريخ</label>
         <input
           type="date"
@@ -164,22 +169,40 @@ const AddIncomeForm = () => {
           value={formData.date}
           onChange={handleChange}
           required
-          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm px-3 py-2"
+          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
         />
       </div>
-
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-md shadow-sm transition duration-150"
-      >
-        {isLoading ? 'جاري الإرسال...' : 'إرسال'}
-      </button>
-    </form>
+    </div>
+  
+    <div>
+      <label className="block text-sm font-medium text-gray-700">الوصف</label>
+      <textarea
+        name="description"
+        value={formData.description}
+        onChange={handleChange}
+        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+        rows={3}
+      />
+    </div>
+  
+    <button
+      type="submit"
+      disabled={isLoading}
+      className="w-full btn"
+    >
+      {isLoading ? 'جاري الإرسال...' : 'إرسال'}
+    </button>
+  </form>
+  
   );
 };
 
 export default AddIncomeForm;
+
+ 
+
+
+
 
  
 

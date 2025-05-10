@@ -19,6 +19,14 @@ import Finance from './components/dashboard/Finance';
 import MemberSubscriptions from './components/dashboard/MemberSubscriptions';
 import Member from "./pages/member/Member"; 
 import AddMember from "./components/modals/AddMember"; 
+import StaffProfile from './components/dashboard/StaffProfile';
+import CheckInForm from './components/dashboard/CheckInForm';
+import OutForm from './components/dashboard/OutForm';
+import AttendanceAnalysis from './components/dashboard/AttendanceAnalysis';
+import UserList from './components/dashboard/UserList';
+import AttendanceForm from './components/dashboard/AttendanceForm';
+import ShiftAttendanceList from "./components/dashboard/ShiftAttendanceList";
+
 import { Toaster } from 'react-hot-toast';
 
 // Route protection component
@@ -57,6 +65,12 @@ function App() {
           <Route path="staff" element={<Staff />} />
           <Route path="finance" element={<Finance />} />
           <Route path="add-member" element={<AddMember />} />
+          <Route path="/staff/:id" element={<StaffProfile />} />
+          <Route path="attendance-form" element={<AttendanceForm />} />
+          <Route path="check-out" element={<OutForm />} />
+          <Route path="attendance/:staffId" element={<AttendanceAnalysis />} />
+          <Route path="staff-reports" element={<UserList/>} />
+          <Route path="/shift-attendance" element={<ShiftAttendanceList />} />
         </Route>
         
       </Routes>

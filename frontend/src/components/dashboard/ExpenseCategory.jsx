@@ -34,6 +34,8 @@ const customStyles = `
   }
 `;
 
+
+
 const ExpenseCategory = () => {
   const dispatch = useDispatch();
   const [showModal, setShowModal] = useState(false);
@@ -55,7 +57,6 @@ const ExpenseCategory = () => {
   const { expenseCategories, loading, error } = useSelector(
     (state) => state.finance
   );
-
 
   // Fetch user profile
   useEffect(() => {
@@ -88,7 +89,6 @@ const ExpenseCategory = () => {
   useEffect(() => {
     console.log("Expense Categories:", expenseCategories);
   }, [expenseCategories]);
-
 
   // Handle form input changes
   const handleChange = (e) => {
@@ -133,21 +133,29 @@ const ExpenseCategory = () => {
     }
   };
 
-  // Filter and paginate categories
+  // Filter and sort categories
   const filteredCategories = useMemo(() => {
-    return expenseCategories.filter((category) => {
-      const safeToString = (value) => (value ?? "").toString().toLowerCase();
-      const club = category.club_details?.name ? safeToString(category.club_details.name) : "";
-      const name = safeToString(category.name);
-      const description = safeToString(category.description);
+    return expenseCategories
+      .filter((category) => {
+        const safeToString = (value) => (value ?? "").toString().toLowerCase();
+        const club = category.club_details?.name ? safeToString(category.club_details.name) : "";
+        const name = safeToString(category.name);
+        const description = safeToString(category.description);
 
-      return (
-        category.club_details?.id === userClub?.id &&
-        club.includes(filters.club.toLowerCase()) &&
-        name.includes(filters.name.toLowerCase()) &&
-        description.includes(filters.description.toLowerCase())
-      );
-    });
+        return (
+          category.club_details?.id === userClub?.id &&
+          club.includes(filters.club.toLowerCase()) &&
+          name.includes(filters.name.toLowerCase()) &&
+          description.includes(filters.description.toLowerCase())
+        );
+      })
+      .sort((a, b) => {
+        // Sort by created_at if available, otherwise by id
+        if (a.created_at && b.created_at) {
+          return new Date(b.created_at) - new Date(a.created_at); // Newest first
+        }
+        return b.id - a.id; // Fallback to id, assuming higher IDs are newer
+      });
   }, [expenseCategories, filters, userClub]);
 
   const totalPages = Math.ceil(filteredCategories.length / itemsPerPage);

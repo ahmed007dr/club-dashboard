@@ -27,6 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
+import axios from 'axios';
 
 const labelMapping = {
   name: "الاسم",
@@ -37,6 +38,11 @@ const labelMapping = {
   date: "التاريخ",
   received_by: "المستلم",
 };
+
+import IncomeSourcesList from './IncomeSourcesList'; // Adjust the path as needed
+import IncomeSourceForm from './IncomeSourceForm';   // Adjust the path as needed
+
+
 
 const Income = () => {
   const dispatch = useDispatch();
@@ -52,6 +58,7 @@ const Income = () => {
   });
   const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
   const [userClub, setUserClub] = useState(null);
+  const [sortOrder, setSortOrder] = useState("desc"); // "desc" for newest first, "asc" for oldest first
 
   // Filter states
   const [incomeFilters, setIncomeFilters] = useState({
@@ -64,18 +71,13 @@ const Income = () => {
     club: "",
   });
 
-
   // Pagination states
   const [incomePage, setIncomePage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
-  const { incomes, loading, error } = useSelector(
-    (state) => state.finance
-  );
+  const { incomes, loading, error } = useSelector((state) => state.finance);
 
-  // Fetch user profile to get club details
-   // Fetch user profile to get club details
-   useEffect(() => {
+  useEffect(() => {
     fetch(`${BASE_URL}/accounts/api/profile/`, {
       method: "GET",
       headers: {
@@ -85,7 +87,7 @@ const Income = () => {
     })
       .then((response) => response.json())
       .then((data) => {
-        console.log("Fetched user club data:", data.club);
+        console.log("Fetched full user profile data:", data); // <-- Log all fetched data
         setUserClub({
           id: data.club.id,
           name: data.club.name,
@@ -98,37 +100,42 @@ const Income = () => {
   }, []);
   
 
-
   // Fetch data on component mount
   useEffect(() => {
     dispatch(fetchIncomes());
   }, [dispatch]);
 
   const filteredIncomes = useMemo(() => {
-    return incomes.filter((income) => {
-      return (
-        income.club_details?.id === userClub?.id &&
-        (!incomeFilters.club ||
-          income.club_details?.id.toString() === incomeFilters.club) &&
-        (!incomeFilters.source ||
-          income.source_details?.name
-            ?.toLowerCase()
-            .includes(incomeFilters.source.toLowerCase())) &&
-        (!incomeFilters.amountMin ||
-          income.amount >= parseFloat(incomeFilters.amountMin)) &&
-        (!incomeFilters.amountMax ||
-          income.amount <= parseFloat(incomeFilters.amountMax)) &&
-        (!incomeFilters.dateFrom ||
-          new Date(income.date) >= new Date(incomeFilters.dateFrom)) &&
-        (!incomeFilters.dateTo ||
-          new Date(income.date) <= new Date(incomeFilters.dateTo)) &&
-        (!incomeFilters.received_by ||
-          income.received_by_details?.username
-            ?.toLowerCase()
-            .includes(incomeFilters.received_by.toLowerCase()))
-      );
-    });
-  }, [incomes, incomeFilters, userClub]);
+    return incomes
+      .filter((income) => {
+        return (
+          income.club_details?.id === userClub?.id &&
+          (!incomeFilters.club ||
+            income.club_details?.id.toString() === incomeFilters.club) &&
+          (!incomeFilters.source ||
+            income.source_details?.name
+              ?.toLowerCase()
+              .includes(incomeFilters.source.toLowerCase())) &&
+          (!incomeFilters.amountMin ||
+            income.amount >= parseFloat(incomeFilters.amountMin)) &&
+          (!incomeFilters.amountMax ||
+            income.amount <= parseFloat(incomeFilters.amountMax)) &&
+          (!incomeFilters.dateFrom ||
+            new Date(income.date) >= new Date(incomeFilters.dateFrom)) &&
+          (!incomeFilters.dateTo ||
+            new Date(income.date) <= new Date(incomeFilters.dateTo)) &&
+          (!incomeFilters.received_by ||
+            income.received_by_details?.username
+              ?.toLowerCase()
+              .includes(incomeFilters.received_by.toLowerCase()))
+        );
+      })
+      .sort((a, b) => {
+        const dateA = a.date ? new Date(a.date) : new Date(0);
+        const dateB = b.date ? new Date(b.date) : new Date(0);
+        return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
+      });
+  }, [incomes, incomeFilters, userClub, sortOrder]);
 
   // Pagination calculations
   const incomePageCount = Math.ceil(filteredIncomes.length / pageSize);
@@ -212,7 +219,26 @@ const Income = () => {
     setCurrentItem(null);
     setShowModal(true);
   };
+  const [incomeSources, setIncomeSources] = useState([]);
+  useEffect(() => {
+    // Fetch income sources
+    const fetchSources = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await axios.get(`${BASE_URL}/finance/api/income-sources/`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        setIncomeSources(response.data);
+      } catch (err) {
+        console.error('فشل في جلب مصادر الدخل:', err);
+        toast.error('فشل في تحميل مصادر الدخل');
+      }
+    };
 
+    fetchSources();
+  }, []);
   const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
 
@@ -285,11 +311,28 @@ const Income = () => {
         إدارة الدخل
       </h1>
 
-      <Tabs defaultValue="incomes" dir="rtl">
+      <Tabs defaultValue="sources" dir="rtl">
         <TabsList dir="rtl">
+          <TabsTrigger value="sources">مصادر الايرادات</TabsTrigger>
           <TabsTrigger value="incomes">الايرادات</TabsTrigger>
         </TabsList>
 
+        {/* Revenue Sources Tab */}
+        <TabsContent value="sources" className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-right">مصادر الايرادات</CardTitle>
+              <CardDescription className="text-right">
+                إدارة مصادر الايرادات لنادي {userClub?.name || "جاري التحميل..."}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <IncomeSourcesList />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Incomes Tab */}
         <TabsContent value="incomes" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -299,6 +342,16 @@ const Income = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Sort Toggle Button */}
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
+                  className="mb-4 bg-primary text-white"
+                >
+                  {sortOrder === "desc" ? "فرز من الأقدم إلى الأحدث" : "فرز من الأحدث إلى الأقدم"}
+                </Button>
+              </div>
+
               {/* Filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 {["club", "source", "amountMin", "amountMax", "dateFrom", "dateTo", "received_by"].map(
@@ -473,85 +526,139 @@ const Income = () => {
 
       {/* Modal for adding/editing income */}
       {showModal && (
-        <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
-          onClick={() => setShowModal(false)}
-        >
-          <div
-            className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
-            onClick={(e) => e.stopPropagation()}
+  <div
+    className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
+    onClick={() => setShowModal(false)}
+  >
+    <div
+      className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h3 className="text-xl font-semibold mb-4 text-right">
+        {currentItem ? "تعديل دخل" : "إضافة دخل"}
+      </h3>
+      <div className="grid grid-cols-1 gap-4">
+        {/* Club Field */}
+        <div>
+          <label className="block text-sm font-medium mb-1 text-right">
+            النادي
+          </label>
+          <select
+            name="club"
+            value={currentItem ? currentItem.club : newItem.club}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+            disabled // Disabled since it's the user's club
           >
-            <h3 className="text-xl font-semibold mb-4 text-right">
-              {currentItem ? "تعديل دخل" : "إضافة دخل"}
-            </h3>
-            <div className="grid grid-cols-1 gap-4">
-              {["club", "source", "amount", "description", "date", "received_by"].map((field) => (
-                <div key={field}>
-                  <label className="block text-sm font-medium capitalize mb-1 text-right">
-                    {labelMapping[field] || field}
-                  </label>
-                  {field === "club" ? (
-                    <select
-                      name="club"
-                      value={currentItem ? currentItem.club : newItem.club}
-                      onChange={handleChange}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    >
-                      {userClub ? (
-                        <option value={userClub.id}>{userClub.name}</option>
-                      ) : (
-                        <option value="">جاري التحميل...</option>
-                      )}
-                    </select>
-                  ) : field === "source" ? (
-                    <select name="source" onChange={handleChange} value={newItem.source}>
-                <option value=""> مصدر الدخل</option>
-                {incomes.map((src) => (
-                  <option key={src.id} value={src.source_details?.name}>
-                    {src.source_details?.name}
-                  </option>
-                ))}
-              </select>
-                            
-                  ) : (
-                    <input
-                      type={
-                        field === "amount"
-                          ? "number"
-                          : field === "date"
-                          ? "date"
-                          : "text"
-                      }
-                      name={field}
-                      value={
-                        currentItem
-                          ? currentItem[field] || ""
-                          : newItem[field] || ""
-                      }
-                      onChange={handleChange}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-              >
-                إلغاء
-              </button>
-              <button
-                onClick={handleSave}
-                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-              >
-                حفظ
-              </button>
-            </div>
-          </div>
+            {userClub ? (
+              <option value={userClub.id}>{userClub.name}</option>
+            ) : (
+              <option value="">جاري التحميل...</option>
+            )}
+          </select>
         </div>
-      )}
+
+        {/* Source Field */}
+        <div>
+          <label className="block text-sm font-medium mb-1 text-right">
+            مصدر الدخل
+          </label>
+          <select
+            name="source"
+            value={currentItem ? currentItem.source : newItem.source}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+            required
+          >
+            <option value="">اختر مصدر الدخل</option>
+            {incomeSources.map((source) => (
+              <option key={source.id} value={source.id}>
+                {source.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Amount Field */}
+        <div>
+          <label className="block text-sm font-medium mb-1 text-right">
+            المبلغ
+          </label>
+          <input
+            type="number"
+            name="amount"
+            value={currentItem ? currentItem.amount || "" : newItem.amount || ""}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+            min="0"
+            step="0.01"
+          />
+        </div>
+
+        {/* Description Field */}
+        <div>
+          <label className="block text-sm font-medium mb-1 text-right">
+            الوصف
+          </label>
+          <textarea
+            name="description"
+            value={currentItem ? currentItem.description || "" : newItem.description || ""}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+            rows={3}
+          />
+        </div>
+
+        {/* Date Field */}
+        <div>
+          <label className="block text-sm font-medium mb-1 text-right">
+            التاريخ
+          </label>
+          <input
+            type="date"
+            name="date"
+            value={currentItem 
+              ? currentItem.date 
+                ? new Date(currentItem.date).toISOString().split('T')[0] 
+                : ""
+              : newItem.date || ""}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+          />
+        </div>
+
+        {/* Received By Field */}
+        <div>
+          <label className="block text-sm font-medium mb-1 text-right">
+            المستلم
+          </label>
+          <input
+            type="text"
+            name="received_by"
+            value={currentItem ? currentItem.received_by || "" : newItem.received_by || ""}
+            onChange={handleChange}
+            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+            placeholder="اسم المستلم"
+          />
+        </div>
+      </div>
+      <div className="mt-6 flex justify-end gap-2">
+        <button
+          onClick={() => setShowModal(false)}
+          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+        >
+          إلغاء
+        </button>
+        <button
+          onClick={handleSave}
+          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+        >
+          حفظ
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Delete confirmation modal */}
       {confirmDeleteModal && (

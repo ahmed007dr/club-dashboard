@@ -9,7 +9,7 @@ class FreeInviteAdmin(admin.ModelAdmin):
     list_filter = ('club', 'status', 'date')
     search_fields = ('guest_name', 'phone')
     date_hierarchy = 'date'
-    raw_id_fields = ('invited_by', 'handled_by')
+    raw_id_fields = ['invited_by']  
     actions = ['mark_as_used']
     
     def mark_as_used(self, request, queryset):

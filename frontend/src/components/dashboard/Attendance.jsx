@@ -27,6 +27,7 @@ import {
   
 } from "../../redux/slices/subscriptionsSlice";
 import EntryForm from "./EntryForm";
+import { toast } from 'react-hot-toast';  // Import toast
 
 const Attendance = () => {
   const dispatch = useDispatch();
@@ -50,7 +51,6 @@ const Attendance = () => {
   // Form states
   const [newAttendance, setNewAttendance] = useState({
     subscription: "",
-    attendance_date: "",
   });
   const [newEntryLog, setNewEntryLog] = useState({
     club: "",
@@ -129,10 +129,9 @@ const Attendance = () => {
       attendanceFilters.attendance_date
     );
   
-    const matchesMemberName =
-      attendance.member_details?.name
-        ?.toLowerCase()
-        .includes(attendanceFilters.member_name.toLowerCase()) ||
+    const matchesMemberName = attendance.member_name
+      ?.toLowerCase()
+      .includes(attendanceFilters.member_name.toLowerCase()) ||
       !attendanceFilters.member_name;
   
     return matchesSubscription && matchesDate && matchesMemberName;
@@ -163,16 +162,26 @@ const Attendance = () => {
     entryLogPage * entryLogItemsPerPage
   );
 
-  // Handle adding new attendance
   const handleAddAttendance = (e) => {
     e.preventDefault();
-    if (!newAttendance.subscription || !newAttendance.attendance_date) {
-      alert("الرجاء ملء جميع الحقول الخاصة بالحضور.");
+  
+    // Check if all fields are filled
+    if (!newAttendance.subscription) {
+      toast.error("الرجاء ملء جميع الحقول الخاصة بالحضور.");
       return;
     }
-    dispatch(addAttendance(newAttendance));
-    setNewAttendance({ subscription: "", attendance_date: "" });
-    setIsAttendanceDialogOpen(false);
+  
+    dispatch(addAttendance(newAttendance))
+      .unwrap() // Ensure that if the action returns a promise, we handle it properly
+      .then(() => {
+        toast.success("تم إضافة الحضور بنجاح!");  // Show success toast
+        setNewAttendance({ subscription: "" });  // Reset form data
+        setIsAttendanceDialogOpen(false);  // Close the modal after success
+      })
+      .catch((err) => {
+        console.error("Failed to add attendance:", err);
+        toast.error("فشل في إضافة الحضور");  // Show error toast
+      });
   };
 
   // Handle adding new entry log
@@ -296,17 +305,7 @@ const Attendance = () => {
             ))}
           </select>
         </div>
-        <div>
-          <label className="block text-sm mb-1">تاريخ الحضور</label>
-          <input
-            type="date"
-            name="attendance_date"
-            value={newAttendance.attendance_date}
-            onChange={handleAttendanceInputChange}
-            className="border px-3 py-2 rounded w-full"
-            required
-          />
-        </div>
+   
         <Button type="submit" className="w-full bg-blue-500">
           إضافة الحضور
         </Button>
@@ -326,8 +325,7 @@ const Attendance = () => {
                     <table className="min-w-full divide-y divide-border">
                       <thead>
                         <tr className="bg-muted/50">
-                          <th className="px-4 py-3 text-right text-sm font-medium">المعرف</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">الاشتراك</th>
+                         
                           <th className="px-4 py-3 text-right text-sm font-medium">تاريخ الحضور</th>
                           <th className="px-4 py-3 text-right text-sm font-medium">اسم العضو</th>
                           <th className="px-4 py-3 text-right text-sm font-medium">الإجراءات</th>
@@ -339,8 +337,6 @@ const Attendance = () => {
                             key={attendance.id}
                             className="hover:bg-gray-100 transition"
                           >
-                            <td className="px-4 py-3 text-sm">{attendance.id}</td>
-                            <td className="px-4 py-3 text-sm">{attendance.subscription}</td>
                             <td className="px-4 py-3 text-sm">{attendance.attendance_date}</td>
                             <td className="px-4 py-3 text-sm">
                               {attendance.member_name || "غير متاح"}
@@ -454,10 +450,11 @@ const Attendance = () => {
         ×
       </button>
       <h3 className="text-lg font-semibold mb-4">إضافة سجل دخول</h3>
-      <EntryForm />
+      <EntryForm onSuccess={() => setIsEntryLogDialogOpen(false)} />
     </div>
   </div>
 )}
+
 
 
               {/* Entry Logs Table */}

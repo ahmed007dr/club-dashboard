@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { CiTrash, CiEdit } from "react-icons/ci";
 import { FaEye, FaPlus } from "react-icons/fa";
 import { RiUserLine } from "react-icons/ri";
@@ -12,90 +12,78 @@ import {
 } from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
 import BASE_URL from "@/config/api";
-
+import { Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 
 import axios from 'axios';
-
 
 
 const Staff = () => {
   const dispatch = useDispatch();
   const staff = useSelector((state) => state.staff.items || []);
-  console.log(staff)
+  console.log("Staff data:", staff);
   const [selectedShift, setSelectedShift] = useState(null);
-  const [modalType, setModalType] = useState(""); // 'view' | 'edit' | 'delete' | 'add'
-  const [formData, setFormData] = useState({}); // Form inputs for add/edit
-  const [formError, setFormError] = useState(null); // Form error state
-  const [userClub, setUserClub] = useState(null); // Logged-in user's club
-  const [loadingProfile, setLoadingProfile] = useState(true); // Profile loading state
+  const [modalType, setModalType] = useState("");
+  const [formData, setFormData] = useState({
+    date: "",
+    shift_start: "",
+    shift_end: "",
+    club: "",
+    staff: "",
+    approved_by: null,
+  });
+  const [formError, setFormError] = useState(null);
+  const [userClub, setUserClub] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
   const [filters, setFilters] = useState({
     club: "",
     staff: "",
-    date: "",
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [clubs, setClubs] = useState([]);
-  const [selectedClubId, setSelectedClubId] = useState('');
+  const [selectedClubId, setSelectedClubId] = useState("");
   const [selectedClubUsers, setSelectedClubUsers] = useState([]);
+  const [profileUser, setProfileUser] = useState({ id: "", username: "" });
 
   // Fetch users grouped by club
   useEffect(() => {
     const fetchUsersGroupedByClub = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const headers = {
-          Authorization: `Bearer ${token}`,
-        };
-  
-        const response = await axios.get(`${BASE_URL}/accounts/api/users/`, { headers });
-        const users = response.data;
-  
+        const token = localStorage.getItem("token");
+        const response = await axios.get(`${BASE_URL}/accounts/api/users/`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
         const clubsMap = {};
-  
-        users.forEach(user => {
-          const { club } = user;
-          if (!club) return;
-  
-          if (!clubsMap[club.id]) {
-            clubsMap[club.id] = {
-              club_id: club.id,
-              club_name: club.name,
-              club_logo: club.logo,
-              users: []
+        response.data.forEach((user) => {
+          if (!user.club) return;
+          if (!clubsMap[user.club.id]) {
+            clubsMap[user.club.id] = {
+              club_id: user.club.id,
+              club_name: user.club.name,
+              users: [],
             };
           }
-  
-          clubsMap[club.id].users.push({
+          clubsMap[user.club.id].users.push({
             id: user.id,
             username: user.username,
             first_name: user.first_name,
-            last_name: user.last_name
+            last_name: user.last_name,
           });
         });
-  
-        const clubArray = Object.values(clubsMap);
-        setClubs(clubArray);
+        setClubs(Object.values(clubsMap));
       } catch (error) {
-        console.error('Failed to fetch users:', error);
+        console.error("Failed to fetch users:", error);
       }
     };
-  
     fetchUsersGroupedByClub();
   }, []);
 
-  const handleClubChange = (e) => {
-    const clubId = e.target.value;
-    setSelectedClubId(clubId);
-    const selected = clubs.find(c => c.club_id.toString() === clubId);
-    setSelectedClubUsers(selected ? selected.users : []);
-  };
-
-  // Fetch user profile to get club details
+  // Fetch user profile
   useEffect(() => {
     setLoadingProfile(true);
     fetch(`${BASE_URL}/accounts/api/profile/`, {
-      method: "GET",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
@@ -103,89 +91,43 @@ const Staff = () => {
     })
       .then((response) => response.json())
       .then((data) => {
+        console.log("Profile data:", data);
         const club = { id: data.club.id, name: data.club.name };
         setUserClub(club);
         setFilters((prev) => ({ ...prev, club: club.id.toString() }));
         setFormData((prev) => ({ ...prev, club: club.id.toString() }));
         setSelectedClubId(club.id.toString());
-        // Find and set users for the user's club
-        const userClubData = clubs.find(c => c.club_id === club.id);
-        if (userClubData) {
-          setSelectedClubUsers(userClubData.users);
-        }
+        setProfileUser({ id: data.id, username: data.username });
+
+        const userClubData = clubs.find((c) => c.club_id === club.id);
+        if (userClubData) setSelectedClubUsers(userClubData.users);
+
         setLoadingProfile(false);
       })
       .catch((err) => {
-        console.error("Failed to fetch user profile:", err);
+        console.error("Failed to fetch profile:", err);
         setLoadingProfile(false);
       });
   }, [clubs]);
 
   // Fetch staff data
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        await dispatch(fetchStaff()).unwrap();
-      } catch (error) {
-        console.error("Error fetching staff:", error);
-      }
-    };
-    fetchData();
+    dispatch(fetchStaff());
   }, [dispatch]);
 
-  // Filter staff based on filters
-  const filteredStaff = staff.filter((shift) => {
-    const clubMatch =
-      userClub && shift.club_details?.id.toString() === userClub.id.toString();
-    const staffMatch = filters.staff
-      ? `${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`
-          .toLowerCase()
-          .includes(filters.staff.toLowerCase())
-      : true;
-    const dateMatch = filters.date ? shift.date === filters.date : true;
-
-    return clubMatch && staffMatch && dateMatch;
-  });
-
-  // Pagination logic
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredStaff.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredStaff.length / itemsPerPage);
-
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
-  // Handle filter input changes
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters({ ...filters, [name]: value });
-    setCurrentPage(1);
+  const handleClubChange = (e) => {
+    const clubId = e.target.value;
+    setSelectedClubId(clubId);
+    const selected = clubs.find((c) => c.club_id.toString() === clubId);
+    setSelectedClubUsers(selected ? selected.users : []);
   };
 
-  // Open modal and populate formData
   const handleOpenModal = (type, shift = null) => {
     setModalType(type);
     setSelectedShift(shift);
     setFormError(null);
 
-    if (type === "edit" && shift) {
-      setFormData({
-        id: shift.id,
-        date: shift.date,
-        shift_start: shift.shift_start,
-        shift_end: shift.shift_end,
-        club: userClub?.id?.toString() || shift.club_details.id.toString(),
-        staff: `${shift.staff_details.id}`,
-        approved_by: shift.approved_by_details
-          ? `${shift.approved_by_details.id}`
-          : null,
-      });
-      // Set the selected club and users for edit modal
-      const clubId = userClub?.id?.toString() || shift.club_details.id.toString();
-      setSelectedClubId(clubId);
-      const selected = clubs.find(c => c.club_id.toString() === clubId);
-      setSelectedClubUsers(selected ? selected.users : []);
-    } else if (type === "add") {
+    if (type === "add") {
       setFormData({
         date: "",
         shift_start: "",
@@ -194,27 +136,31 @@ const Staff = () => {
         staff: "",
         approved_by: null,
       });
+    } else if (type === "edit" && shift) {
+      setFormData({
+        id: shift.id,
+        date: shift.date || "",
+        shift_start: shift.shift_start || "",
+        shift_end: shift.shift_end || "",
+        club: userClub?.id?.toString() || shift.club_details.id.toString(),
+        staff: `${shift.staff_details.id}`,
+        approved_by: shift.approved_by_details
+          ? `${shift.approved_by_details.id}`
+          : null,
+      });
+      const clubId =
+        userClub?.id?.toString() || shift.club_details.id.toString();
+      setSelectedClubId(clubId);
+      const selected = clubs.find((c) => c.club_id.toString() === clubId);
+      setSelectedClubUsers(selected ? selected.users : []);
     }
   };
 
-  const handleCloseModal = () => {
-    setModalType("");
-    setSelectedShift(null);
-    setFormData({});
-    setFormError(null);
-  };
-
-  // Handle form input changes
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
-  // Submit new staff shift
   const handleAddSubmit = (e) => {
     e.preventDefault();
+
     if (!userClub) {
-      setFormError("النادي غير متاح. يرجى المحاولة لاحقًا.");
+      toast.error("النادي غير متاح. يرجى المحاولة لاحقًا.");
       return;
     }
 
@@ -231,19 +177,38 @@ const Staff = () => {
       .unwrap()
       .then(() => {
         dispatch(fetchStaff());
+        toast.success("تم إضافة الوردية بنجاح!");
         handleCloseModal();
       })
       .catch((err) => {
-        console.error("Failed to add staff:", err);
-        setFormError("فشل في إضافة الوردية: " + (err.message || "خطأ غير معروف"));
+        toast.error("فشل في إضافة الوردية: " + (err.message || "خطأ غير معروف"));
       });
   };
 
-  // Submit edited staff shift
+  const handleCloseModal = () => {
+    setModalType("");
+    setSelectedShift(null);
+    setFormData({
+      date: "",
+      shift_start: "",
+      shift_end: "",
+      club: "",
+      staff: "",
+      approved_by: null,
+    });
+    setFormError(null);
+  };
+
+  const handleFormChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
   const handleEditSubmit = (e) => {
     e.preventDefault();
+
     if (!userClub) {
-      setFormError("النادي غير متاح. يرجى المحاولة لاحقًا.");
+      toast.error("النادي غير متاح. يرجى المحاولة لاحقًا.");
       return;
     }
 
@@ -260,11 +225,11 @@ const Staff = () => {
       .unwrap()
       .then(() => {
         dispatch(fetchStaff());
+        toast.success("تم تعديل الوردية بنجاح!");
         handleCloseModal();
       })
       .catch((err) => {
-        console.error("Failed to edit staff:", err);
-        setFormError("فشل في تعديل الوردية: " + (err.message || "خطأ غير معروف"));
+        toast.error("فشل في تعديل الوردية: " + (err.message || "خطأ غير معروف"));
       });
   };
 
@@ -273,12 +238,61 @@ const Staff = () => {
       .unwrap()
       .then(() => {
         dispatch(fetchStaff());
+        toast.success("تم حذف الوردية بنجاح!");
         handleCloseModal();
         setCurrentPage(1);
+      })
+      .catch((err) => {
+        toast.error("فشل في حذف الوردية: " + (err.message || "خطأ غير معروف"));
       });
   };
 
-  // Generate page numbers for pagination
+  const parseTime = (timeStr) => {
+    if (!timeStr) return new Date(0);
+
+    if (timeStr.includes(".")) {
+      timeStr = timeStr.split(".")[0];
+    }
+
+    if (/^\d{2}:\d{2}:\d{2}$/.test(timeStr)) {
+      const today = new Date();
+      const [hours, minutes, seconds] = timeStr.split(":");
+      today.setHours(hours, minutes, seconds, 0);
+      return today;
+    }
+
+    const parsedDate = new Date(timeStr);
+    return isNaN(parsedDate) ? new Date(0) : parsedDate;
+  };
+
+  // Filter and sort staff based on filters and id
+  const filteredStaff = useMemo(() => {
+    return staff
+      .filter((shift) => {
+        const clubMatch =
+          userClub &&
+          shift.club_details?.id.toString() === userClub.id.toString();
+        const staffMatch = filters.staff
+          ? `${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`
+              .toLowerCase()
+              .includes(filters.staff.toLowerCase())
+          : true;
+
+        return clubMatch && staffMatch;
+      })
+      .sort((a, b) => {
+        return (b.id || 0) - (a.id || 0);
+      });
+  }, [staff, filters, userClub]);
+
+  // Pagination logic
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredStaff.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredStaff.length / itemsPerPage);
+
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
   const getPageNumbers = () => {
     const maxPagesToShow = 5;
     const halfPages = Math.floor(maxPagesToShow / 2);
@@ -313,7 +327,7 @@ const Staff = () => {
         </div>
         <button
           onClick={() => handleOpenModal("add")}
-          className="flex items-center gap-2 w-full sm:w-auto bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm sm:text-base"
+          className="flex items-center gap-2 btn"
           disabled={loadingProfile || !userClub}
         >
           <FaPlus className="w-4 h-4" />
@@ -322,13 +336,13 @@ const Staff = () => {
       </div>
 
       {/* Filter Inputs */}
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1">النادي</label>
           <select
             name="club"
             value={filters.club}
-            onChange={handleFilterChange}
+            onChange={(e) => setFilters({ ...filters, club: e.target.value })}
             className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
             disabled
           >
@@ -345,18 +359,8 @@ const Staff = () => {
             type="text"
             name="staff"
             value={filters.staff}
-            onChange={handleFilterChange}
+            onChange={(e) => setFilters({ ...filters, staff: e.target.value })}
             placeholder="تصفية حسب اسم الموظف"
-            className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">التاريخ</label>
-          <input
-            type="date"
-            name="date"
-            value={filters.date}
-            onChange={handleFilterChange}
             className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
           />
         </div>
@@ -366,7 +370,6 @@ const Staff = () => {
       <div className="overflow-x-auto">
         {currentItems.length > 0 ? (
           <>
-            {/* Table for Small Screens and Above */}
             <table className="w-full border text-sm hidden sm:table">
               <thead>
                 <tr className="bg-gray-50">
@@ -382,16 +385,38 @@ const Staff = () => {
               <tbody className="divide-y divide-gray-200">
                 {currentItems.map((shift) => (
                   <tr key={shift.id} className="hover:bg-gray-50">
-                    <td className="p-2 sm:p-3">{shift.date}</td>
-                    <td className="p-2 sm:p-3">{shift.shift_start}</td>
-                    <td className="p-2 sm:p-3">{shift.shift_end}</td>
-                    <td className="p-2 sm:p-3">{shift.club_details?.name}</td>
                     <td className="p-2 sm:p-3">
-                      {`${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`}
+                      {shift.date
+                        ? new Date(shift.date).toLocaleDateString("en-GB")
+                        : "N/A"}
                     </td>
                     <td className="p-2 sm:p-3">
-  {shift.approved_by_details ? shift.approved_by_details.username : "غير موافق عليه"}
-</td>
+                      {shift.shift_start
+                        ? parseTime(shift.shift_start).toLocaleTimeString(
+                            "en-GB",
+                            { hour: "2-digit", minute: "2-digit" }
+                          )
+                        : "Invalid date"}
+                    </td>
+                    <td className="p-2 sm:p-3">
+                      {shift.shift_end
+                        ? parseTime(shift.shift_end).toLocaleTimeString(
+                            "en-GB",
+                            { hour: "2-digit", minute: "2-digit" }
+                          )
+                        : "Invalid date"}
+                    </td>
+                    <td className="p-2 sm:p-3">{shift.club_details?.name}</td>
+                    <td className="p-2 sm:p-3 text-blue-600 hover:underline">
+                      <Link to={`/staff/${shift.staff_details.id}`}>
+                        {`${shift.staff_details.first_name} ${shift.staff_details.last_name}`}
+                      </Link>
+                    </td>
+                    <td className="p-2 sm:p-3">
+                      {shift.approved_by_details
+                        ? shift.approved_by_details.username
+                        : "غير موافق عليه"}
+                    </td>
                     <td className="p-2 sm:p-3 flex gap-2 justify-center">
                       <DropdownMenu dir="rtl">
                         <DropdownMenuTrigger asChild>
@@ -426,7 +451,7 @@ const Staff = () => {
               </tbody>
             </table>
 
-            {/* Card Layout for Mobile */}
+            {/* Mobile View */}
             <div className="sm:hidden space-y-4">
               {currentItems.map((shift) => (
                 <div
@@ -435,7 +460,9 @@ const Staff = () => {
                 >
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-semibold">
-                      التاريخ: {shift.date}
+                      التاريخ: {shift.date
+                        ? new Date(shift.date).toLocaleDateString("en-GB")
+                        : "N/A"}
                     </span>
                     <DropdownMenu dir="rtl">
                       <DropdownMenuTrigger asChild>
@@ -466,10 +493,22 @@ const Staff = () => {
                     </DropdownMenu>
                   </div>
                   <p className="text-sm">
-                    <strong>بداية الوردية:</strong> {shift.shift_start}
+                    <strong>بداية الوردية:</strong>{" "}
+                    {shift.shift_start
+                      ? parseTime(shift.shift_start).toLocaleTimeString(
+                          "en-GB",
+                          { hour: "2-digit", minute: "2-digit" }
+                        )
+                      : "Invalid date"}
                   </p>
                   <p className="text-sm">
-                    <strong>نهاية الوردية:</strong> {shift.shift_end}
+                    <strong>نهاية الوردية:</strong>{" "}
+                    {shift.shift_end
+                      ? parseTime(shift.shift_end).toLocaleTimeString(
+                          "en-GB",
+                          { hour: "2-digit", minute: "2-digit" }
+                        )
+                      : "Invalid date"}
                   </p>
                   <p className="text-sm">
                     <strong>النادي:</strong> {shift.club_details?.name}
@@ -481,7 +520,7 @@ const Staff = () => {
                   <p className="text-sm">
                     <strong>تمت الموافقة بواسطة:</strong>{" "}
                     {shift.approved_by_details
-                      ? `${shift.approved_by_details.first_name} ${shift.approved_by_details.last_name}`
+                      ? shift.approved_by_details.username
                       : "غير موافق عليه"}
                   </p>
                 </div>
@@ -495,7 +534,7 @@ const Staff = () => {
         )}
       </div>
 
-      {/* Pagination Controls */}
+      {/* Pagination */}
       {totalPages > 0 && (
         <div className="flex flex-col sm:flex-row justify-between items-center mt-4 space-y-2 sm:space-y-0">
           <div className="text-sm text-gray-700">
@@ -507,7 +546,7 @@ const Staff = () => {
             <select
               value={itemsPerPage}
               onChange={(e) => {
-                setItemsPerPage(parseInt(e.target.value));
+                setItemsPerPage(Number(e.target.value));
                 setCurrentPage(1);
               }}
               className="border rounded px-2 py-1 text-sm"
@@ -530,7 +569,9 @@ const Staff = () => {
                 key={page}
                 onClick={() => paginate(page)}
                 className={`px-3 py-1 rounded text-sm ${
-                  currentPage === page ? "bg-blue-500 text-white" : "bg-gray-200"
+                  currentPage === page
+                    ? "bg-blue-500 text-white"
+                    : "bg-gray-200"
                 }`}
               >
                 {page}
@@ -553,15 +594,14 @@ const Staff = () => {
 
       {/* Add Modal */}
       {modalType === "add" && (
-        <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4"
-          onClick={handleCloseModal}
-        >
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4">
           <div
             className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md max-h-[80vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg sm:text-xl font-bold mb-4">إضافة وردية جديدة</h2>
+            <h2 className="text-lg sm:text-xl font-bold mb-4">
+              إضافة وردية جديدة
+            </h2>
             {formError && (
               <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
                 {formError}
@@ -614,7 +654,7 @@ const Staff = () => {
                   required
                 >
                   <option value="">اختر نادي</option>
-                  {clubs.map(club => (
+                  {clubs.map((club) => (
                     <option key={club.club_id} value={club.club_id}>
                       {club.club_name}
                     </option>
@@ -632,15 +672,11 @@ const Staff = () => {
                   disabled={!formData.club}
                 >
                   <option value="">اختر موظف</option>
-                  {selectedClubUsers.length > 0 ? (
-                    selectedClubUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.first_name} {user.last_name} ({user.username})
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">لا يوجد موظفين متاحين</option>
-                  )}
+                  {selectedClubUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.first_name} {user.last_name} ({user.username})
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -653,21 +689,15 @@ const Staff = () => {
                   disabled={!formData.club}
                 >
                   <option value="">اختر موافق</option>
-                  {selectedClubUsers.length > 0 ? (
-                    selectedClubUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.first_name} {user.last_name} ({user.username})
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">لا يوجد موظفين متاحين</option>
+                  {profileUser.id && (
+                    <option value={profileUser.id}>{profileUser.username}</option>
                   )}
                 </select>
               </div>
               <div className="mt-4 flex justify-end gap-2">
                 <button
-                  onClick={handleCloseModal}
                   type="button"
+                  onClick={handleCloseModal}
                   className="px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400"
                 >
                   إلغاء
@@ -675,7 +705,13 @@ const Staff = () => {
                 <button
                   type="submit"
                   className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
-                  disabled={!formData.club || !formData.staff || !formData.date || !formData.shift_start || !formData.shift_end}
+                  disabled={
+                    !formData.club ||
+                    !formData.staff ||
+                    !formData.date ||
+                    !formData.shift_start ||
+                    !formData.shift_end
+                  }
                 >
                   إضافة
                 </button>
@@ -687,17 +723,15 @@ const Staff = () => {
 
       {/* Edit Modal */}
       {modalType === "edit" && selectedShift && (
-        <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4"
-          onClick={handleCloseModal}
-        >
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4">
           <div
             className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md max-h-[80vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-lg sm:text-xl font-bold mb-4">تعديل الوردية</h2>
             {formError && (
-              <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
+              <div className="bg-red-100 text-red-7
+              00 p-2 rounded mb-4 text-right text-sm">
                 {formError}
               </div>
             )}
@@ -748,7 +782,7 @@ const Staff = () => {
                   required
                   disabled
                 >
-                  {clubs.map(club => (
+                  {clubs.map((club) => (
                     <option key={club.club_id} value={club.club_id}>
                       {club.club_name}
                     </option>
@@ -765,15 +799,11 @@ const Staff = () => {
                   required
                 >
                   <option value="">اختر موظف</option>
-                  {selectedClubUsers.length > 0 ? (
-                    selectedClubUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.first_name} {user.last_name} ({user.username})
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">لا يوجد موظفين متاحين</option>
-                  )}
+                  {selectedClubUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.first_name} {user.last_name} ({user.username})
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -785,28 +815,22 @@ const Staff = () => {
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
                 >
                   <option value="">اختر موافق</option>
-                  {selectedClubUsers.length > 0 ? (
-                    selectedClubUsers.map(user => (
-                      <option key={user.id} value={user.id}>
-                        {user.first_name} {user.last_name} ({user.username})
-                      </option>
-                    ))
-                  ) : (
-                    <option value="">لا يوجد موظفين متاحين</option>
+                  {profileUser.id && (
+                    <option value={profileUser.id}>{profileUser.username}</option>
                   )}
                 </select>
               </div>
               <div className="mt-4 flex justify-end gap-2">
                 <button
-                  onClick={handleCloseModal}
                   type="button"
+                  onClick={handleCloseModal}
                   className="px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400"
                 >
                   إلغاء
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600"
+                  className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
                 >
                   حفظ
                 </button>
@@ -818,27 +842,38 @@ const Staff = () => {
 
       {/* View Modal */}
       {modalType === "view" && selectedShift && (
-        <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4"
-          onClick={handleCloseModal}
-        >
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4">
           <div
             className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-lg sm:text-xl font-bold mb-4">تفاصيل الوردية</h2>
+            <h2 className="text-lg sm:text-xl font-bold mb-4">
+              تفاصيل الوردية
+            </h2>
             <ul className="text-sm space-y-2">
               <li>
-                <strong>معرف الوردية:</strong> {selectedShift.id}
+                <strong>التاريخ:</strong>{" "}
+                {selectedShift.date
+                  ? new Date(selectedShift.date).toLocaleDateString("en-GB")
+                  : "N/A"}
               </li>
               <li>
-                <strong>التاريخ:</strong> {selectedShift.date}
+                <strong>بداية الوردية:</strong>{" "}
+                {selectedShift.shift_start
+                  ? parseTime(selectedShift.shift_start).toLocaleTimeString(
+                      "en-GB",
+                      { hour: "2-digit", minute: "2-digit" }
+                    )
+                  : "Invalid date"}
               </li>
               <li>
-                <strong>بداية الوردية:</strong> {selectedShift.shift_start}
-              </li>
-              <li>
-                <strong>نهاية الوردية:</strong> {selectedShift.shift_end}
+                <strong>نهاية الوردية:</strong>{" "}
+                {selectedShift.shift_end
+                  ? parseTime(selectedShift.shift_end).toLocaleTimeString(
+                      "en-GB",
+                      { hour: "2-digit", minute: "2-digit" }
+                    )
+                  : "Invalid date"}
               </li>
               <li>
                 <strong>النادي:</strong> {selectedShift.club_details?.name}
@@ -850,7 +885,7 @@ const Staff = () => {
               <li>
                 <strong>تمت الموافقة بواسطة:</strong>{" "}
                 {selectedShift.approved_by_details
-                  ? `${selectedShift.approved_by_details.first_name} ${selectedShift.approved_by_details.last_name}`
+                  ? selectedShift.approved_by_details.username
                   : "غير موافق عليه"}
               </li>
             </ul>
@@ -868,10 +903,7 @@ const Staff = () => {
 
       {/* Delete Modal */}
       {modalType === "delete" && selectedShift && (
-        <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4"
-          onClick={handleCloseModal}
-        >
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4">
           <div
             className="bg-white p-4 sm:p-6 rounded-lg shadow-lg w-full max-w-md"
             onClick={(e) => e.stopPropagation()}

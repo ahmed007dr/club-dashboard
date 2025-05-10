@@ -11,9 +11,9 @@ from utils.permissions import IsOwnerOrRelatedToClub
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def free_invite_list_api(request):
     if request.user.role == 'owner':
-        invites = FreeInvite.objects.select_related('club', 'invited_by', 'handled_by').all()  
+        invites = FreeInvite.objects.select_related('club', 'invited_by').all()  
     else:
-        invites = FreeInvite.objects.select_related('club', 'invited_by', 'handled_by').filter(club=request.user.club)  
+        invites = FreeInvite.objects.select_related('club', 'invited_by').filter(club=request.user.club)  
 
     serializer = FreeInviteSerializer(invites, many=True)
     return Response(serializer.data)
@@ -26,9 +26,6 @@ from django.db import transaction
 @transaction.atomic
 def add_free_invite_api(request):
     data = request.data.copy()
-
-    if 'handled_by' not in data and request.user.is_staff:
-        data['handled_by'] = request.user.id
 
     serializer = FreeInviteSerializer(data=data)
     if serializer.is_valid():
@@ -74,7 +71,6 @@ def delete_free_invite_api(request, invite_id):
 def mark_invite_used_api(request, invite_id):
     invite = get_object_or_404(FreeInvite, id=invite_id)
     invite.status = 'used'
-    invite.handled_by = request.user
     invite.save()
     serializer = FreeInviteSerializer(invite)
     return Response(serializer.data)

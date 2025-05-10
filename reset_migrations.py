@@ -11,7 +11,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 APPS = [
     "core", "accounts", "attendance", "members", "staff",
-    "subscriptions", "tickets", "invites", "receipts", "finance"
+    "subscriptions", "tickets", "invites", "receipts", "finance","devices"
 ]
 
 def create_static_dir():
@@ -64,5 +64,6 @@ if __name__ == "__main__":
     print("⚙️ Applying new migrations...")
     run_cmd("python manage.py migrate")
     #run_cmd("python dummy_data.py")
+    #run_cmd("winpty python manage.py createsuperuser")
 
     print("\n🎉 Project is clean and ready!")

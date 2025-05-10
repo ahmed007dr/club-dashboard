@@ -11,9 +11,11 @@ import { CiTrash, CiEdit } from "react-icons/ci";
 import { HiOutlineDocumentReport } from "react-icons/hi";
 import AddReceiptForm from "./AddReceiptForm";
 import { Button } from "../ui/button";
-
+import { toast } from 'react-hot-toast';
 
 import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
+
+
 
 function Receipts() {
   const dispatch = useDispatch();
@@ -21,7 +23,7 @@ function Receipts() {
     (state) => state.receipts
   );
   const { subscriptions } = useSelector((state) => state.subscriptions);
-
+ console.log("subscriptions", subscriptions);
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchError, setSearchError] = useState("");
@@ -56,32 +58,44 @@ function Receipts() {
   }, [dispatch]);
 
   // Data filtering helpers
-  const uniqueClubs = useMemo(() => {
-    return Array.from(
-      new Map(
-        subscriptions.map(sub => [sub.club, { id: sub.club, name: sub.club_name }])
-      ).values()
-    );
-  }, [subscriptions]);
+   const uniqueClubs = Array.from(
+    new Map(
+      subscriptions.map(sub => [
+        sub.club, 
+        { 
+          id: sub.club, 
+          name: sub.club_details?.name || 'Unknown Club' 
+        }
+      ])
+    ).values()
+  );
 
-  const getFilteredMembers = (clubId) => {
-    return clubId 
-      ? subscriptions.filter(sub => sub.club === parseInt(clubId))
-      : subscriptions;
-  };
+ const getFilteredMembers = (clubId) => {
+  return clubId
+    ? subscriptions.filter((sub) => sub.club === parseInt(clubId))
+    : subscriptions;
+};
 
-  const getUniqueMembers = (clubId) => {
-    const filtered = getFilteredMembers(clubId);
-    return Array.from(
-      new Map(
-        filtered.map(sub => [sub.member, { id: sub.member, name: sub.member_name }])
-      ).values()
-    );
-  };
+const getUniqueMembers = (clubId) => {
+  const filtered = getFilteredMembers(clubId);
+  return Array.from(
+    new Map(
+      filtered.map((sub) => [
+        sub.member,
+        { 
+          id: sub.member, 
+          name: sub.member_details?.name || sub.member_name || 'Unknown Member' 
+        }
+      ])
+    ).values()
+  );
+};
+
+  
 
   const getFilteredSubscriptions = (memberId) => {
     return memberId
-      ? subscriptions.filter(sub => sub.member === parseInt(memberId))
+      ? subscriptions.filter((sub) => sub.member === parseInt(memberId))
       : [];
   };
 
@@ -116,7 +130,9 @@ function Receipts() {
     setSearchTerm("");
     setSearchError("");
     setInputError("");
-    setFilteredReceipts(receipts);
+    setFilteredReceipts(
+      [...receipts].sort((a, b) => new Date(b.date) - new Date(a.date))
+    );
     setCurrentPage(1);
   };
 
@@ -125,32 +141,38 @@ function Receipts() {
     setSearchError("");
     setInputError("");
     if (!searchTerm.trim()) {
-      setFilteredReceipts(receipts);
+      // Reset to sorted receipts
+      const sortedReceipts = [...receipts].sort((a, b) =>
+        new Date(b.date) - new Date(a.date)
+      );
+      setFilteredReceipts(sortedReceipts);
       setCurrentPage(1);
       return;
     }
     if (!validateInvoiceNumber(searchTerm.trim())) {
       setSearchError(
-        "صيغة رقم الفاتورة غير صحيحة. المتوقع: INVYYYYMMDD-NNNN (مثال: INV20250429-0003)"
+        "صيغة رقم الفاتورة غير صحيحة. المتوقع: INVYYYYMMDD-NNNN (مثال: INV20250506-0008)"
       );
       return;
     }
-    const filtered = receipts.filter((receipt) =>
-      receipt.invoice_number.includes(searchTerm.trim().toUpperCase())
-    );
+    const filtered = receipts
+      .filter((receipt) =>
+        receipt.invoice_number.includes(searchTerm.trim().toUpperCase())
+      )
+      .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort search results
     setFilteredReceipts(filtered);
     setCurrentPage(1);
   };
 
   const handleEditInputChange = (e) => {
     const { name, value } = e.target;
-    setEditData(prev => ({
+    setEditData((prev) => ({
       ...prev,
       [name]: value,
     }));
   };
 
-  const handleEditSubmit = (e) => {
+  const handleEditSubmit = async (e) => {
     e.preventDefault();
     setIsUpdating(true);
 
@@ -160,22 +182,23 @@ function Receipts() {
     receiptData.subscription = parseInt(receiptData.subscription) || null;
     receiptData.amount = parseFloat(receiptData.amount) || 0;
 
-    dispatch(
-      updateReceipt({
-        receiptId: id,
-        receiptData,
-      })
-    )
-      .then(() => {
-        dispatch(fetchReceipts());
-      })
-      .catch((error) => {
-        console.error("Update error:", error);
-      })
-      .finally(() => {
-        setIsUpdating(false);
-        setShowEditModal(false);
-      });
+    try {
+      await dispatch(
+        updateReceipt({
+          receiptId: id,
+          receiptData,
+        })
+      ).unwrap();
+
+      await dispatch(fetchReceipts());
+      toast.success("تم تحديث الإيصال بنجاح");
+    } catch (error) {
+      console.error("Update error:", error);
+      toast.error("حدث خطأ أثناء تحديث الإيصال");
+    } finally {
+      setIsUpdating(false);
+      setShowEditModal(false);
+    }
   };
 
   const handleDelete = (receiptId) => {
@@ -183,12 +206,18 @@ function Receipts() {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
-    dispatch(deleteReceipt(receiptToDelete)).then(() => {
-      dispatch(fetchReceipts());
-    });
-    setShowDeleteConfirm(false);
-    setReceiptToDelete(null);
+  const confirmDelete = async () => {
+    try {
+      await dispatch(deleteReceipt(receiptToDelete)).unwrap();
+      await dispatch(fetchReceipts());
+      toast.success("تم حذف الإيصال بنجاح");
+    } catch (error) {
+      console.error("Error deleting receipt:", error);
+      toast.error("حدث خطأ أثناء حذف الإيصال");
+    } finally {
+      setShowDeleteConfirm(false);
+      setReceiptToDelete(null);
+    }
   };
 
   const cancelDelete = () => {
@@ -217,7 +246,11 @@ function Receipts() {
   }, [currentReceipt]);
 
   useEffect(() => {
-    setFilteredReceipts(receipts);
+    // Sort receipts by date in descending order (newest first)
+    const sortedReceipts = [...receipts].sort((a, b) =>
+      new Date(b.date) - new Date(a.date)
+    );
+    setFilteredReceipts(sortedReceipts);
     setCurrentPage(1);
   }, [receipts]);
 
@@ -293,7 +326,7 @@ function Receipts() {
         </div>
         <Button
           onClick={() => setShowForm(true)}
-          className="flex items-center w-full sm:w-auto bg-blue-500 text-white px-4 py-2 text-sm sm:text-base"
+          className="flex items-center w-full sm:w-auto btn"
         >
           إضافة إيصال
           <svg
@@ -398,12 +431,20 @@ function Receipts() {
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm">{receipt.amount}</td>
                     <td className="px-4 sm:px-6 py-4 text-sm capitalize">
-                      {receipt.payment_method === "cash" ? "نقدي" : 
-                       receipt.payment_method === "bank" ? "تحويل بنكي" : 
-                       receipt.payment_method === "visa" ? "فيزا" : receipt.payment_method}
+                      {receipt.payment_method === "cash"
+                        ? "نقدي"
+                        : receipt.payment_method === "bank"
+                        ? "تحويل بنكي"
+                        : receipt.payment_method === "visa"
+                        ? "فيزا"
+                        : receipt.payment_method}
                     </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm">{receipt.note || "لا يوجد"}</td>
-                    <td className="px-4 sm:px-6 py-4 text-sm">{receipt.invoice_number}</td>
+                    <td className="px-4 sm:px-6 py-4 text-sm">
+                      {receipt.note || "لا يوجد"}
+                    </td>
+                    <td className="px-4 sm:px-6 py-4 text-sm">
+                      {receipt.invoice_number}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -442,9 +483,13 @@ function Receipts() {
                   </p>
                   <p className="text-sm">
                     <strong>طريقة الدفع:</strong>{" "}
-                    {receipt.payment_method === "cash" ? "نقدي" : 
-                     receipt.payment_method === "bank" ? "تحويل بنكي" : 
-                     receipt.payment_method === "visa" ? "فيزا" : receipt.payment_method}
+                    {receipt.payment_method === "cash"
+                      ? "نقدي"
+                      : receipt.payment_method === "bank"
+                      ? "تحويل بنكي"
+                      : receipt.payment_method === "visa"
+                      ? "فيزا"
+                      : receipt.payment_method}
                   </p>
                   <p className="text-sm">
                     <strong>ملاحظة:</strong> {receipt.note || "لا يوجد"}
@@ -455,7 +500,9 @@ function Receipts() {
           </>
         ) : (
           <p className="p-4 text-gray-500 text-sm sm:text-base">
-            {searchTerm ? "لم يتم العثور على إيصال بهذا الرقم" : "لم يتم العثور على إيصالات"}
+            {searchTerm
+              ? "لم يتم العثور على إيصال بهذا الرقم"
+              : "لم يتم العثور على إيصالات"}
           </p>
         )}
       </div>
@@ -518,7 +565,10 @@ function Receipts() {
 
           {/* Page Navigation */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center space-x-2 space-x-reverse" dir="ltr">
+            <div
+              className="flex justify-center items-center space-x-2 space-x-reverse"
+              dir="ltr"
+            >
               <Button
                 onClick={handlePrevious}
                 disabled={currentPage === 1}
@@ -571,7 +621,7 @@ function Receipts() {
 
       {/* Add Receipt Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6">
               <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
@@ -589,7 +639,7 @@ function Receipts() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-4 sm:p-6">
               <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
@@ -616,7 +666,7 @@ function Receipts() {
 
       {/* Edit Modal */}
       {showEditModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6">
               <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
@@ -625,23 +675,25 @@ function Receipts() {
               <form onSubmit={handleEditSubmit} className="space-y-4">
                 {/* Club Dropdown */}
                 <div>
-                  <label className="block mb-1 font-medium text-gray-700">اختر النادي</label>
+                  <label className="block mb-1 font-medium text-gray-700">
+                    اختر النادي
+                  </label>
                   <select
                     name="club"
                     value={editData.club}
                     onChange={(e) => {
                       handleEditInputChange(e);
-                      setEditData(prev => ({ 
-                        ...prev, 
-                        member: '', 
-                        subscription: '' 
+                      setEditData((prev) => ({
+                        ...prev,
+                        member: "",
+                        subscription: "",
                       }));
                     }}
                     className="w-full border px-3 py-2 rounded-md text-sm sm:text-base"
                     required
                   >
                     <option value="">-- اختر النادي --</option>
-                    {uniqueClubs.map(club => (
+                    {uniqueClubs.map((club) => (
                       <option key={club.id} value={club.id}>
                         {club.name}
                       </option>
@@ -651,32 +703,35 @@ function Receipts() {
 
                 {/* Member Dropdown */}
                 <div>
-                  <label className="block mb-1 font-medium text-gray-700">اختر العضو</label>
+                  <label className="block mb-1 font-medium text-gray-700">
+                    اختر العضو
+                  </label>
                   <select
                     name="member"
                     value={editData.member}
                     onChange={(e) => {
                       handleEditInputChange(e);
-                      setEditData(prev => ({ ...prev, subscription: '' }));
+                      setEditData((prev) => ({ ...prev, subscription: "" }));
                     }}
                     className="w-full border px-3 py-2 rounded-md text-sm sm:text-base"
                     required
                     disabled={!editData.club}
                   >
                     <option value="">-- اختر العضو --</option>
-                    {editData.club && 
-                      getUniqueMembers(editData.club).map(member => (
+                    {editData.club &&
+                      getUniqueMembers(editData.club).map((member) => (
                         <option key={member.id} value={member.id}>
                           {member.name}
                         </option>
-                      ))
-                    }
+                      ))}
                   </select>
                 </div>
 
                 {/* Subscription Dropdown */}
                 <div>
-                  <label className="block mb-1 font-medium text-gray-700">اختر الاشتراك</label>
+                  <label className="block mb-1 font-medium text-gray-700">
+                    اختر الاشتراك
+                  </label>
                   <select
                     name="subscription"
                     value={editData.subscription}
@@ -686,19 +741,21 @@ function Receipts() {
                     disabled={!editData.member}
                   >
                     <option value="">-- اختر الاشتراك --</option>
-                    {editData.member && 
-                      getFilteredSubscriptions(editData.member).map(sub => (
+                    {editData.member &&
+                      getFilteredSubscriptions(editData.member).map((sub) => (
                         <option key={sub.id} value={sub.id}>
-                          {sub?.type_details?.name || 'نوع غير معروف'} - {sub.price} جنيه
+                          {sub?.type_details?.name || "نوع غير معروف"} -{" "}
+                          
                         </option>
-                      ))
-                    }
+                      ))}
                   </select>
                 </div>
 
                 {/* Amount Input */}
                 <div>
-                  <label className="block mb-1 font-medium text-gray-700">المبلغ</label>
+                  <label className="block mb-1 font-medium text-gray-700">
+                    المبلغ
+                  </label>
                   <input
                     type="number"
                     name="amount"
@@ -713,7 +770,9 @@ function Receipts() {
 
                 {/* Payment Method */}
                 <div>
-                  <label className="block mb-1 font-medium text-gray-700">طريقة الدفع</label>
+                  <label className="block mb-1 font-medium text-gray-700">
+                    طريقة الدفع
+                  </label>
                   <select
                     name="payment_method"
                     value={editData.payment_method}
@@ -728,7 +787,9 @@ function Receipts() {
 
                 {/* Invoice Number */}
                 <div>
-                  <label className="block mb-1 font-medium text-gray-700">رقم الفاتورة</label>
+                  <label className="block mb-1 font-medium text-gray-700">
+                    رقم الفاتورة
+                  </label>
                   <input
                     type="text"
                     value={editData.invoice_number}
@@ -742,7 +803,9 @@ function Receipts() {
 
                 {/* Note */}
                 <div>
-                  <label className="block mb-1 font-medium text-gray-700">ملاحظات</label>
+                  <label className="block mb-1 font-medium text-gray-700">
+                    ملاحظات
+                  </label>
                   <textarea
                     name="note"
                     value={editData.note}
@@ -763,8 +826,14 @@ function Receipts() {
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm sm:text-base"
-                    disabled={isUpdating || !editData.club || !editData.member || !editData.subscription || !editData.amount}
+                    className="btn sm:text-base"
+                    disabled={
+                      isUpdating ||
+                      !editData.club ||
+                      !editData.member ||
+                      !editData.subscription ||
+                      !editData.amount
+                    }
                   >
                     {isUpdating ? "جاري الحفظ..." : "حفظ التغييرات"}
                   </button>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { addReceipt, fetchReceipts } from '../../redux/slices/receiptsSlice';
 import { fetchSubscriptions } from '../../redux/slices/subscriptionsSlice';
+import { toast } from 'react-hot-toast';
 
 function AddReceiptForm({ onClose }) {
   const dispatch = useDispatch();
@@ -22,10 +23,16 @@ function AddReceiptForm({ onClose }) {
     dispatch(fetchSubscriptions());
   }, [dispatch]);
 
-  // Get unique clubs with their IDs and names
+  // Get unique clubs with their IDs and names from club_details
   const uniqueClubs = Array.from(
     new Map(
-      subscriptions.map(sub => [sub.club, { id: sub.club, name: sub.club_name }])
+      subscriptions.map(sub => [
+        sub.club, 
+        { 
+          id: sub.club, 
+          name: sub.club_details?.name || 'Unknown Club' 
+        }
+      ])
     ).values()
   );
 
@@ -34,10 +41,16 @@ function AddReceiptForm({ onClose }) {
     ? subscriptions.filter(sub => sub.club === parseInt(formData.club))
     : subscriptions;
 
-  // Get unique members with their IDs and names
+  // Get unique members with their IDs and names from member_details
   const uniqueMembers = Array.from(
     new Map(
-      filteredMembers.map(sub => [sub.member, { id: sub.member, name: sub.member_name }])
+      filteredMembers.map(sub => [
+        sub.member, 
+        { 
+          id: sub.member, 
+          name: sub.member_details?.name || 'Unknown Member' 
+        }
+      ])
     ).values()
   );
 
@@ -64,13 +77,16 @@ function AddReceiptForm({ onClose }) {
       subscription: parseInt(formData.subscription),
       amount: parseFloat(formData.amount),
     };
-    
+  
     try {
       await dispatch(addReceipt(receiptData)).unwrap();
       await dispatch(fetchReceipts());
+  
+      toast.success('تمت إضافة الإيصال بنجاح!'); // Arabic success toast
       onClose();
     } catch (error) {
       console.error("Error adding receipt:", error);
+      toast.error('حدث خطأ أثناء إضافة الإيصال'); // Arabic error toast
     }
   };
 
@@ -78,7 +94,7 @@ function AddReceiptForm({ onClose }) {
     <form onSubmit={handleSubmit} className="space-y-4 p-6 bg-white rounded-lg shadow-md">
       {/* Club Dropdown */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Select Club</label>
+        <label className="block mb-1 font-medium">النادي</label>
         <select
           name="club"
           value={formData.club}
@@ -96,7 +112,7 @@ function AddReceiptForm({ onClose }) {
           className="w-full border px-3 py-2 rounded-md"
           required
         >
-          <option value="">-- Select Club --</option>
+          <option value="">-- اختر النادي --</option>
           {uniqueClubs.map(club => (
             <option key={club.id} value={club.id}>
               {club.name}
@@ -107,7 +123,7 @@ function AddReceiptForm({ onClose }) {
 
       {/* Member Dropdown */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Select Member</label>
+        <label className="block mb-1 font-medium">العضو</label>
         <select
           name="member"
           value={formData.member}
@@ -119,7 +135,7 @@ function AddReceiptForm({ onClose }) {
           required
           disabled={!formData.club}
         >
-          <option value="">-- Select Member --</option>
+          <option value="">-- اختر العضو --</option>
           {uniqueMembers.map(member => (
             <option key={member.id} value={member.id}>
               {member.name}
@@ -130,7 +146,7 @@ function AddReceiptForm({ onClose }) {
 
       {/* Subscription Dropdown */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Select Subscription</label>
+        <label className="block mb-1 font-medium">الاشتراك</label>
         <select
           name="subscription"
           value={formData.subscription}
@@ -139,10 +155,10 @@ function AddReceiptForm({ onClose }) {
           required
           disabled={!formData.member}
         >
-          <option value="">-- Select Subscription --</option>
+          <option value="">-- اختر الاشتراك --</option>
           {filteredSubscriptions.map(sub => (
             <option key={sub.id} value={sub.id}>
-              {sub?.type_details?.name || 'Unknown Type'} - ${sub.price}
+              {sub.type_details?.name || 'نوع غير معروف'} 
             </option>
           ))}
         </select>
@@ -150,7 +166,7 @@ function AddReceiptForm({ onClose }) {
 
       {/* Amount Input */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Amount</label>
+        <label className="block mb-1 font-medium">المبلغ</label>
         <input
           type="number"
           name="amount"
@@ -165,22 +181,22 @@ function AddReceiptForm({ onClose }) {
 
       {/* Payment Method */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Payment Method</label>
+        <label className="block mb-1 font-medium">طريقة الدفع</label>
         <select
           name="payment_method"
           value={formData.payment_method}
           onChange={handleChange}
           className="w-full border px-3 py-2 rounded-md"
         >
-          <option value="cash">Cash</option>
-          <option value="bank">Bank Transfer</option>
-          <option value="visa">Visa</option>
+          <option value="cash">نقدي</option>
+          <option value="bank">تحويل بنكي</option>
+          <option value="visa">فيزا</option>
         </select>
       </div>
 
       {/* Note */}
       <div>
-        <label className="block mb-1 font-medium text-gray-700">Note</label>
+        <label className="block mb-1 font-medium">ملاحظات</label>
         <textarea
           name="note"
           value={formData.note}
@@ -191,20 +207,20 @@ function AddReceiptForm({ onClose }) {
       </div>
 
       {/* Buttons */}
-      <div className="flex justify-end space-x-3">
+      <div className="flex justify-end space-x-3 space-x-reverse">
         <button
           type="button"
           onClick={onClose}
-          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100"
+          className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100"
         >
-          Cancel
+          إلغاء
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          className="btn"
           disabled={!formData.club || !formData.member || !formData.subscription || !formData.amount}
         >
-          Add Receipt
+          إضافة إيصال
         </button>
       </div>
     </form>
