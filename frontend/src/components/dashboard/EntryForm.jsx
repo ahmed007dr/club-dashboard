@@ -9,7 +9,7 @@ const EntryForm = ({ onSuccess }) => {
 
   const [formData, setFormData] = useState({
     club: '',
-    membership_number: '',
+    identifier: '',
   });
 
   const [clubs, setClubs] = useState([]);
@@ -20,8 +20,8 @@ const EntryForm = ({ onSuccess }) => {
         const res = await dispatch(fetchClubs()).unwrap();
         setClubs(res);
       } catch (error) {
-        console.error('Error fetching clubs:', error);
-        toast.error('Failed to fetch clubs');
+        console.error('خطأ في جلب الأندية:', error);
+        toast.error('فشل في جلب قائمة الأندية');
       }
     };
 
@@ -43,7 +43,7 @@ const EntryForm = ({ onSuccess }) => {
   
       const requestBody = {
         club: Number(formData.club),
-        membership_number: Number(formData.membership_number),
+        identifier: Number(formData.identifier),
       };
   
       const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/add/`, {
@@ -58,35 +58,27 @@ const EntryForm = ({ onSuccess }) => {
       const data = await response.json();
   
       if (!response.ok) {
-        console.error('Response error details:', data);
+        console.error('تفاصيل الخطأ من السيرفر:', data);
         throw new Error(data.message || 'فشل في إضافة سجل الدخول');
       }
   
-      console.log('✅ Successfully submitted:');
-      console.log('➡️ Data sent:', requestBody);
-      console.log('✅ Response received:', data);
-  
-      // Arabic success message
       toast.success('تم إضافة سجل الدخول بنجاح!');
-      setFormData({ club: '', membership_number: '' });
+      setFormData({ club: '', identifier: '' });
   
       if (onSuccess) {
-        onSuccess(); // Close modal on success
+        onSuccess();
       }
   
     } catch (error) {
-      console.error('Submit Entry Error:', error);
-  
-      // Arabic error message
+      console.error('خطأ أثناء إرسال السجل:', error);
       toast.error(error.message || 'حدث خطأ أثناء إضافة السجل');
     }
   };
-  
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto p-4 border rounded">
+    <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto p-4 border rounded text-right">
       <div>
-        <label htmlFor="club" className="block text-sm font-medium text-gray-700 mb-2">Club</label>
+        <label htmlFor="club" className="block text-sm font-medium text-gray-700 mb-2">النادي</label>
         <select
           id="club"
           name="club"
@@ -95,7 +87,7 @@ const EntryForm = ({ onSuccess }) => {
           className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
           required
         >
-          <option value="">Select a club</option>
+          <option value="">اختر ناديًا</option>
           {clubs.map((club) => (
             <option key={club.id || club._id} value={club.id || club._id}>
               {club.name}
@@ -106,9 +98,9 @@ const EntryForm = ({ onSuccess }) => {
 
       <input
         type="number"
-        name="membership_number"
-        placeholder="Membership Number"
-        value={formData.membership_number}
+        name="identifier"
+        placeholder="المعرّف"
+        value={formData.identifier}
         onChange={handleChange}
         required
         className="w-full border px-3 py-2 rounded"
@@ -116,15 +108,16 @@ const EntryForm = ({ onSuccess }) => {
 
       <button
         type="submit"
-        className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition"
+        className="w-full btn"
       >
-        Submit Entry
+        إرسال الدخول
       </button>
     </form>
   );
 };
 
 export default EntryForm;
+
 
 
 
