@@ -55,7 +55,7 @@ const SubscriptionList = () => {
   // Apply filters to the sorted array
   const filteredSubscriptions = sortedSubscriptions.filter((subscription) => {
     const matchesMember = filters.memberName
-      ? subscription.member_name
+      ? subscription.member_details.name
           .toLowerCase()
           .includes(filters.memberName.toLowerCase())
       : true;
