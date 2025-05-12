@@ -5,57 +5,59 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from rest_framework.pagination import PageNumberPagination
-from utils.permissions import IsOwnerOrRelatedToClub  #
+from utils.permissions import IsOwnerOrRelatedToClub
 from .serializers import MemberSerializer
 from .models import Member
-from utils.generate_membership_number import generate_membership_number
 from django.db import IntegrityError
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
+
+class MemberPagination(PageNumberPagination):
+    page_size = 20
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@method_decorator(cache_page(60*15)) 
 def member_list_api(request):
     if request.user.role == 'owner':
-        members = Member.objects.all()
+        members = Member.objects.select_related('club').prefetch_related('referred_by')
     else:
-        members = Member.objects.filter(club=request.user.club)
+        members = Member.objects.filter(club=request.user.club).select_related('club').prefetch_related('referred_by')
     
     members = members.order_by('-id')
-    serializer = MemberSerializer(members, many=True)
-    return Response(serializer.data)
+    paginator = MemberPagination()
+    result_page = paginator.paginate_queryset(members, request)
+    serializer = MemberSerializer(result_page, many=True, context={'request': request})
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def create_member_api(request):
-    membership_number = generate_membership_number()
-
-    data = request.data.copy()
-    data['membership_number'] = membership_number  
-
-    serializer = MemberSerializer(data=data)
-
+    serializer = MemberSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():
         try:
             member = serializer.save()
             if not IsOwnerOrRelatedToClub().has_object_permission(request, None, member):
-                member.delete() 
+                member.delete()
                 return Response({'error': 'You do not have permission to create a member for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except IntegrityError:
-            return Response({'error': 'Membership number already exists'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Membership number or RFID code already exists'}, status=status.HTTP_400_BAD_REQUEST)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@method_decorator(cache_page(60*5))  # Cache for 5 minutes
 def member_detail_api(request, member_id):
-    member = get_object_or_404(Member, id=member_id)
-    serializer = MemberSerializer(member)
+    member = get_object_or_404(Member.objects.select_related('club').prefetch_related('referred_by'), id=member_id)
+    serializer = MemberSerializer(member, context={'request': request})
     return Response(serializer.data)
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def update_member_api(request, member_id):
-    member = get_object_or_404(Member, id=member_id)
-    serializer = MemberSerializer(member, data=request.data)
+    member = get_object_or_404(Member.objects.select_related('club'), id=member_id)
+    serializer = MemberSerializer(member, data=request.data, partial=True, context={'request': request})
     if serializer.is_valid():
         updated_member = serializer.save()
         if not IsOwnerOrRelatedToClub().has_object_permission(request, None, updated_member):
@@ -70,12 +72,11 @@ def delete_member_api(request, member_id):
     member.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@method_decorator(cache_page(60*5))  # Cache for 5 minutes
 def member_search_api(request):
     search_term = request.GET.get('q', '')
-
     search_filter = (
         Q(name__icontains=search_term) |
         Q(membership_number__icontains=search_term) |
@@ -85,12 +86,14 @@ def member_search_api(request):
     )
 
     if request.user.role == 'owner':
-        members = Member.objects.filter(search_filter)
+        members = Member.objects.filter(search_filter).select_related('club').prefetch_related('referred_by')
     else:
-        members = Member.objects.filter(Q(club=request.user.club) & search_filter)
+        members = Member.objects.filter(Q(club=request.user.club) & search_filter).select_related('club').prefetch_related('referred_by')
 
-    serializer = MemberSerializer(members, many=True)
-    return Response(serializer.data)
+    paginator = MemberPagination()
+    result_page = paginator.paginate_queryset(members, request)
+    serializer = MemberSerializer(result_page, many=True, context={'request': request})
+    return paginator.get_paginated_response(serializer.data)
 
 
 

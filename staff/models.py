@@ -1,6 +1,8 @@
 from django.db import models
 from accounts.models import User
 from core.models import Club
+from django.contrib.auth import get_user_model
+User = get_user_model()
 
 class Shift(models.Model):
     club = models.ForeignKey(Club, on_delete=models.CASCADE)

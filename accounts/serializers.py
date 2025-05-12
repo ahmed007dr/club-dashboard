@@ -1,15 +1,14 @@
 from rest_framework import serializers
 from core.models import Club
+from audit_trail.serializers import TimeStampedSerializer
 from .models import User
 
-
-class ClubMiniSerializer(serializers.ModelSerializer):
+class ClubMiniSerializer(TimeStampedSerializer):
     class Meta:
         model = Club
-        fields = ['id', 'name', 'logo']
+        fields = ['id', 'name', 'logo', 'created_by', 'created_at', 'updated_by', 'updated_at']
 
-
-class UserSerializer(serializers.ModelSerializer):
+class UserSerializer(TimeStampedSerializer):
     class Meta:
         model = User
         fields = [
@@ -21,15 +20,18 @@ class UserSerializer(serializers.ModelSerializer):
             'role',
             'club',
             'rfid_code',
-            'is_active'
+            'is_active',
+            'created_by',
+            'created_at',
+            'updated_by',
+            'updated_at'
         ]
         extra_kwargs = {
             'rfid_code': {'required': False, 'allow_null': True},
             'club': {'required': False, 'allow_null': True},
         }
 
-
-class UserProfileSerializer(serializers.ModelSerializer):
+class UserProfileSerializer(TimeStampedSerializer):
     club = ClubMiniSerializer(read_only=True)
 
     class Meta:
@@ -43,12 +45,15 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'role',
             'club',
             'rfid_code',
-            'is_active'
+            'is_active',
+            'created_by',
+            'created_at',
+            'updated_by',
+            'updated_at'
         ]
         extra_kwargs = {
             'rfid_code': {'required': False, 'allow_null': True},
         }
-
 
 class LoginSerializer(serializers.Serializer):
     username = serializers.CharField()

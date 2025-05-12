@@ -1,9 +1,9 @@
 from django.db import models
 from datetime import timedelta
-from core.models import Club
+from audit_trail.models import TimeStampedModel
 
-class SubscriptionType(models.Model):
-    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='subscription_types')
+class SubscriptionType(TimeStampedModel):
+    club = models.ForeignKey('core.Club', on_delete=models.CASCADE, related_name='subscription_types')
     name = models.CharField(max_length=100)
     duration_days = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -11,18 +11,22 @@ class SubscriptionType(models.Model):
     includes_pool = models.BooleanField(default=False)
     includes_classes = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-    max_entries = models.PositiveIntegerField(default=0, help_text="Maximum allowed entries during subscription period (0 means unlimited)")
+    max_entries = models.PositiveIntegerField(default=0, help_text="Maximum allowed entries (0 means unlimited)")
 
     def __str__(self):
         return f"{self.name} ({self.club.name})"
 
     class Meta:
         unique_together = ['club', 'name']
+        indexes = [
+            models.Index(fields=['club', 'is_active']),
+            models.Index(fields=['name']),
+        ]
 
-class Subscription(models.Model):
-    club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
-    member = models.ForeignKey('members.Member', on_delete=models.CASCADE)
-    type = models.ForeignKey(SubscriptionType, on_delete=models.CASCADE)
+class Subscription(TimeStampedModel):
+    club = models.ForeignKey('core.Club', on_delete=models.CASCADE, related_name='subscriptions')
+    member = models.ForeignKey('members.Member', on_delete=models.CASCADE, related_name='subscriptions')
+    type = models.ForeignKey(SubscriptionType, on_delete=models.CASCADE, related_name='subscriptions')
     start_date = models.DateField()
     end_date = models.DateField(blank=True, null=True)
     paid_amount = models.DecimalField(max_digits=10, decimal_places=2)
@@ -38,7 +42,13 @@ class Subscription(models.Model):
         return f"{self.member.name} - {self.type.name}"
 
     def can_enter(self):
-        """Check if the subscription allows more entries."""
-        if self.type.max_entries == 0:  # Unlimited entries
+        if self.type.max_entries == 0:
             return True
         return self.entry_count < self.type.max_entries
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['club', 'member']),
+            models.Index(fields=['start_date', 'end_date']),
+            models.Index(fields=['member', 'remaining_amount']),
+        ]

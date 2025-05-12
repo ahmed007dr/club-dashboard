@@ -3,20 +3,19 @@ from django.utils import timezone
 from subscriptions.models import Subscription
 from members.models import Member
 from core.models import Club
+from audit_trail.models import TimeStampedModel
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
-class Attendance(models.Model):
+class Attendance(TimeStampedModel):
     subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='attendances')
     attendance_date = models.DateField(auto_now_add=True)
-    # attendance_date =models.DateField(default=timezone.now)
 
     def __str__(self):
         return f"{self.subscription.member.name} - {self.attendance_date}"
 
-
-class EntryLog(models.Model):
+class EntryLog(TimeStampedModel):
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='entry_logs')
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='entry_logs')
     timestamp = models.DateTimeField(auto_now_add=True)

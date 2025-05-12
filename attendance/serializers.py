@@ -6,11 +6,11 @@ from subscriptions.models import Subscription
 from subscriptions.serializers import SubscriptionSerializer
 from core.serializers import ClubSerializer
 from accounts.serializers import UserSerializer
+from audit_trail.serializers import TimeStampedSerializer
 from django.db.models import Q
 from django.utils import timezone
 
-
-class AttendanceSerializer(serializers.ModelSerializer):
+class AttendanceSerializer(TimeStampedSerializer):
     identifier = serializers.CharField(write_only=True)
     membership_number = serializers.SerializerMethodField()
     member_name = serializers.SerializerMethodField()
@@ -26,8 +26,12 @@ class AttendanceSerializer(serializers.ModelSerializer):
             'attendance_date',
             'membership_number',
             'member_name',
+            'created_by',
+            'created_at',
+            'updated_by',
+            'updated_at'
         ]
-        read_only_fields = ['attendance_date', 'membership_number', 'member_name', 'subscription']
+        read_only_fields = ['attendance_date', 'membership_number', 'member_name', 'subscription', 'created_by', 'created_at', 'updated_by', 'updated_at']
 
     def get_membership_number(self, obj):
         return obj.subscription.member.membership_number
@@ -59,7 +63,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
         validated_data['subscription'] = active_subscription
         return super().create(validated_data)
 
-class EntryLogSerializer(serializers.ModelSerializer):
+class EntryLogSerializer(TimeStampedSerializer):
     identifier = serializers.CharField(write_only=True)
     member_name = serializers.SerializerMethodField()
     club_details = ClubSerializer(source='club', read_only=True)
@@ -78,8 +82,12 @@ class EntryLogSerializer(serializers.ModelSerializer):
             'club_details',
             'approved_by_details',
             'subscription_details',
+            'created_by',
+            'created_at',
+            'updated_by',
+            'updated_at'
         ]
-        read_only_fields = ['timestamp', 'member_name', 'related_subscription']
+        read_only_fields = ['timestamp', 'member_name', 'related_subscription', 'created_by', 'created_at', 'updated_by', 'updated_at']
 
     def get_member_name(self, obj):
         return obj.member.name

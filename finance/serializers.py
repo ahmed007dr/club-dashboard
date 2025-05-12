@@ -1,17 +1,18 @@
 from rest_framework import serializers
+from audit_trail.serializers import TimeStampedSerializer
 from .models import Expense, Income, ExpenseCategory, IncomeSource
 from core.serializers import ClubSerializer
 from accounts.serializers import UserSerializer
 from receipts.serializers import ReceiptSerializer
 
-class ExpenseCategorySerializer(serializers.ModelSerializer):
+class ExpenseCategorySerializer(TimeStampedSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
-    
+
     class Meta:
         model = ExpenseCategory
-        fields = ['id', 'club', 'club_details', 'name', 'description']
+        fields = ['id', 'club', 'club_details', 'name', 'description', 'created_by', 'created_at', 'updated_by', 'updated_at']
 
-class ExpenseSerializer(serializers.ModelSerializer):
+class ExpenseSerializer(TimeStampedSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     category_details = ExpenseCategorySerializer(source='category', read_only=True)
     paid_by_details = UserSerializer(source='paid_by', read_only=True)
@@ -22,7 +23,8 @@ class ExpenseSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'club', 'club_details', 'category', 'category_details',
             'amount', 'description', 'date', 'paid_by', 'paid_by_details',
-            'invoice_number', 'attachment', 'attachment_url'
+            'invoice_number', 'attachment', 'attachment_url',
+            'created_by', 'created_at', 'updated_by', 'updated_at'
         ]
         extra_kwargs = {
             'attachment': {'required': False}
@@ -33,14 +35,14 @@ class ExpenseSerializer(serializers.ModelSerializer):
             return self.context['request'].build_absolute_uri(obj.attachment.url)
         return None
 
-class IncomeSourceSerializer(serializers.ModelSerializer):
+class IncomeSourceSerializer(TimeStampedSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
-    
+
     class Meta:
         model = IncomeSource
-        fields = '__all__'
+        fields = ['id', 'club', 'club_details', 'name', 'description', 'created_by', 'created_at', 'updated_by', 'updated_at']
 
-class IncomeSerializer(serializers.ModelSerializer):
+class IncomeSerializer(TimeStampedSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     source_details = IncomeSourceSerializer(source='source', read_only=True)
     received_by_details = UserSerializer(source='received_by', read_only=True)
@@ -51,10 +53,11 @@ class IncomeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'club', 'club_details', 'source', 'source_details',
             'amount', 'description', 'date', 'received_by', 'received_by_details',
-            'related_receipt', 'receipt_details'
+            'related_receipt', 'receipt_details',
+            'created_by', 'created_at', 'updated_by', 'updated_at'
         ]
-        
-class IncomeSummarySerializer(serializers.ModelSerializer):
+
+class IncomeSummarySerializer(TimeStampedSerializer):
     class Meta:
         model = Income
-        fields = ['id', 'amount', 'date', 'source', 'received_by']
+        fields = ['id', 'amount', 'date', 'source', 'received_by', 'created_by', 'created_at', 'updated_by', 'updated_at']

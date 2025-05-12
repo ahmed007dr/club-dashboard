@@ -4,8 +4,8 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .serializers import UserSerializer, UserProfileSerializer, LoginSerializer ,RFIDLoginSerializer
-from utils.permissions import IsOwnerOrRelatedToClub  
+from .serializers import UserSerializer, UserProfileSerializer, LoginSerializer, RFIDLoginSerializer
+from utils.permissions import IsOwnerOrRelatedToClub
 from .models import User
 
 @api_view(['POST'])
@@ -21,7 +21,7 @@ def api_login(request):
         if user:
             refresh = RefreshToken.for_user(user)
             return Response({
-                'user': UserSerializer(user).data,
+                'user': UserSerializer(user, context={'request': request}).data,
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }, status=status.HTTP_200_OK)
@@ -47,7 +47,7 @@ def api_logout(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_profile(request):
-    serializer = UserProfileSerializer(request.user)
+    serializer = UserProfileSerializer(request.user, context={'request': request})
     return Response(serializer.data)
 
 @api_view(['GET'])
@@ -58,7 +58,7 @@ def api_user_list(request):
     else:
         users = User.objects.filter(club=request.user.club)
 
-    serializer = UserProfileSerializer(users, many=True)
+    serializer = UserProfileSerializer(users, many=True, context={'request': request})
     return Response(serializer.data)
 
 @api_view(['POST'])
@@ -70,7 +70,7 @@ def api_rfid_login(request):
         user = serializer.validated_data['user']
         refresh = RefreshToken.for_user(user)
         return Response({
-            'user': UserSerializer(user).data,
+            'user': UserSerializer(user, context={'request': request}).data,
             'refresh': str(refresh),
             'access': str(refresh.access_token),
         }, status=status.HTTP_200_OK)

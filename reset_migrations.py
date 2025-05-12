@@ -10,8 +10,8 @@ import subprocess
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 APPS = [
-    "core", "accounts", "attendance", "members", "staff",
-    "subscriptions", "tickets", "invites", "receipts", "finance","devices"
+    "core", "accounts", "invites","attendance", "members", "staff",
+    "subscriptions", "tickets",  "receipts", "finance","devices","audit_trail"
 ]
 
 def create_static_dir():

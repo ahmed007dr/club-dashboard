@@ -1,30 +1,18 @@
 from rest_framework import serializers
+from audit_trail.serializers import TimeStampedSerializer
 from .models import Member
 
-class MemberSerializer(serializers.ModelSerializer):
+class MemberSerializer(TimeStampedSerializer):
     referred_by_name = serializers.CharField(source='referred_by.name', read_only=True)
     club_name = serializers.CharField(source='club.name', read_only=True)
 
     class Meta:
         model = Member
         fields = [
-            'id',
-            'club',
-            'club_name',
-            'name',
-            'membership_number',
-            'rfid_code',
-            'national_id',
-            'birth_date',
-            'phone',
-            'phone2',
-            'photo',
-            'job',
-            'address',
-            'note',
-            'created_at',
-            'referred_by',
-            'referred_by_name'
+            'id', 'club', 'club_name', 'name', 'membership_number', 'rfid_code',
+            'national_id', 'birth_date', 'phone', 'phone2', 'photo', 'job',
+            'address', 'note', 'created_at', 'referred_by', 'referred_by_name',
+            'created_by', 'created_at', 'updated_by', 'updated_at'
         ]
         extra_kwargs = {
             'photo': {'required': False, 'allow_null': True},

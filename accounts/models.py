@@ -1,10 +1,9 @@
-# accounts/models.py
-
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
-from core.models import Club  
+from core.models import Club
+from audit_trail.models import TimeStampedModel
 
-class User(AbstractUser):
+class User(TimeStampedModel, AbstractUser):
     club = models.ForeignKey(Club, on_delete=models.CASCADE, null=True, blank=True)
 
     ROLE_CHOICES = [
@@ -16,7 +15,7 @@ class User(AbstractUser):
     ]
     role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='reception')
 
-    rfid_code = models.CharField(max_length=32,unique=True,null=True,blank=True,help_text="RFID tag or card code")
+    rfid_code = models.CharField(max_length=32, unique=True, null=True, blank=True, help_text="RFID tag or card code")
 
     groups = models.ManyToManyField(
         Group,
