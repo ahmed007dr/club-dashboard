@@ -26,6 +26,9 @@ import AttendanceAnalysis from './components/dashboard/AttendanceAnalysis';
 import UserList from './components/dashboard/UserList';
 import AttendanceForm from './components/dashboard/AttendanceForm';
 import ShiftAttendanceList from "./components/dashboard/ShiftAttendanceList";
+import ExpenseCategory from "./components/dashboard/ExpenseCategory";
+import Expense from "./components/dashboard/Expense";
+import IncomeSources from "./components/dashboard/IncomeSources";
 
 import { Toaster } from 'react-hot-toast';
 
@@ -71,6 +74,9 @@ function App() {
           <Route path="attendance/:staffId" element={<AttendanceAnalysis />} />
           <Route path="staff-reports" element={<UserList/>} />
           <Route path="/shift-attendance" element={<ShiftAttendanceList />} />
+          <Route path="expense-category" element={<ExpenseCategory />} />
+        <Route path="expense" element={<Expense />} />
+        <Route path="income-sources" element={<IncomeSources />} />
         </Route>
         
       </Routes>

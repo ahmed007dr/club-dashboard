@@ -61,7 +61,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
         # Validate start_date
         if start_date and start_date < timezone.now().date():
-            raise serializers.ValidationError("Start date cannot be in the past.")
+            raise serializers.ValidationError("تاريخ البداية لا يمكن أن يكون في الماضي.")
 
         # Check for active subscriptions for the same member
         if member:
@@ -79,7 +79,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
             if active_subscriptions.exists() and not self.instance:
                 raise serializers.ValidationError(
-                    "This member already has an active subscription. Please wait until it expires or entries are exhausted."
+                    "هذا العضو لديه اشتراك نشط بالفعل. يرجى الانتظار حتى ينتهي أو تنفد الإدخالات."
                 )
 
             # Check for subscriptions with remaining_amount > 0
@@ -91,7 +91,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
             if unpaid_subscriptions.exists() and not self.instance:
                 raise serializers.ValidationError(
-                    "This member has unpaid amounts for previous subscriptions. Please settle all outstanding payments before creating a new subscription."
+                    "هذا العضو لديه مبالغ غير مدفوعة لاشتراكات سابقة. يرجى تسوية جميع المدفوعات المستحقة قبل إنشاء اشتراك جديد."
                 )
 
         return data

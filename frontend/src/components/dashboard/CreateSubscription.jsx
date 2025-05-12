@@ -3,11 +3,10 @@ import { useDispatch, useSelector } from "react-redux";
 import { postSubscription } from "../../redux/slices/subscriptionsSlice";
 import { fetchUsers } from "../../redux/slices/memberSlice";
 import { fetchSubscriptionTypes } from "../../redux/slices/subscriptionsSlice";
-import { toast } from "react-hot-toast";
 
 const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
-  const { subscriptionTypes, loading, error: subscriptionError } = useSelector(
+  const { subscriptionTypes, loading } = useSelector(
     (state) => state.subscriptions
   );
 
@@ -22,31 +21,31 @@ const CreateSubscription = ({ onClose }) => {
   const [members, setMembers] = useState([]);
   const [clubs, setClubs] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
-  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(""); // State for modal error message
+  const [isModalOpen, setIsModalOpen] = useState(false); // State for modal visibility
 
   // Fetch users (members) and clubs on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         const fetchedData = await dispatch(fetchUsers()).unwrap();
-        console.log('Raw fetched data:', fetchedData);
-
-        // fetchedData is an array
         const memberList = Array.isArray(fetchedData) ? fetchedData : [];
-        console.log('Member list:', memberList);
-
         setMembers(memberList);
 
         // Get unique clubs from members
         const uniqueClubs = Array.from(
           new Map(
-            memberList.map((m) => [m.club, { club_id: m.club, club_name: m.club_name }])
+            memberList.map((m) => [
+              m.club,
+              { club_id: m.club, club_name: m.club_name },
+            ])
           ).values()
         );
-
         setClubs(uniqueClubs);
       } catch (err) {
-        setError("Failed to fetch members. Please try again later: " + err.message);
+        setErrorMessage(err.message || "Failed to load member data");
+        setIsModalOpen(true);
       }
     };
 
@@ -75,14 +74,24 @@ const CreateSubscription = ({ onClose }) => {
   };
 
   // Handle form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const { club, member, type, start_date, paid_amount } = formData;
 
+    // Client-side validation
     if (!club || !member || !type || !start_date || !paid_amount) {
-      toast.error("يرجى ملء جميع الحقول.");
+      setErrorMessage("Please fill in all required fields");
+      setIsModalOpen(true);
       return;
     }
+
+    if (isNaN(parseFloat(paid_amount)) || parseFloat(paid_amount) <= 0) {
+      setErrorMessage("Paid amount must be a positive number");
+      setIsModalOpen(true);
+      return;
+    }
+
+    setIsSubmitting(true);
 
     const payload = {
       club: parseInt(club),
@@ -92,31 +101,70 @@ const CreateSubscription = ({ onClose }) => {
       paid_amount: parseFloat(paid_amount),
     };
 
-    dispatch(postSubscription(payload))
-      .unwrap()
-      .then(() => {
-        toast.success("تم إنشاء الاشتراك بنجاح!");
-        // Optional: Reset form
-        setFormData({
-          club: "",
-          member: "",
-          type: "",
-          start_date: "",
-          paid_amount: "",
-        });
-        if (onClose) onClose();
-      })
-      .catch((err) => {
-        toast.error("فشل في إنشاء الاشتراك: " + (err.message || "خطأ غير معروف"));
+    try {
+      await dispatch(postSubscription(payload)).unwrap();
+      setFormData({
+        club: "",
+        member: "",
+        type: "",
+        start_date: "",
+        paid_amount: "",
       });
+      if (onClose) onClose();
+    } catch (error) {
+      console.log("Full error object:", JSON.stringify(error, null, 2)); // Debug entire error
+      console.log("Error payload:", JSON.stringify(error.payload, null, 2)); // Debug payload
+      console.log("Error data:", JSON.stringify(error.data, null, 2)); // Debug data (if exists)
+      console.log("Error response:", JSON.stringify(error.response, null, 2)); // Debug response (if exists)
+
+      // Try multiple possible error locations
+      let errorData = error.payload || error.data || error.response || error;
+
+      console.log("Final errorData:", JSON.stringify(errorData, null, 2)); // Debug final errorData
+
+      if (errorData?.non_field_errors && Array.isArray(errorData.non_field_errors)) {
+        console.log("Handling non_field_errors:", errorData.non_field_errors); // Debug
+        setErrorMessage(errorData.non_field_errors[0]); // Use raw error message
+        setIsModalOpen(true);
+      } else {
+        console.log("Fallback error:", errorData); // Debug fallback
+        setErrorMessage(
+          errorData?.message || error.message || "An unexpected error occurred"
+        );
+        setIsModalOpen(true);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Close modal
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setErrorMessage("");
   };
 
   return (
     <div className="container mx-auto p-4" dir="rtl">
       <h2 className="text-xl font-bold mb-4">إنشاء اشتراك</h2>
 
-      {error && <p className="text-red-500">{error}</p>}
-      {subscriptionError && <p className="text-red-500">{subscriptionError}</p>}
+      {/* Error Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h3 className="text-lg font-bold mb-4">خطأ</h3>
+            <p className="text-red-600">{errorMessage}</p>
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={closeModal}
+                className="btn bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Club Select */}
@@ -128,6 +176,7 @@ const CreateSubscription = ({ onClose }) => {
             onChange={handleChange}
             className="w-full p-2 border rounded"
             required
+            disabled={isSubmitting}
           >
             <option value="">اختر النادي</option>
             {clubs.map((club) => (
@@ -147,6 +196,7 @@ const CreateSubscription = ({ onClose }) => {
             onChange={handleChange}
             className="w-full p-2 border rounded"
             required
+            disabled={isSubmitting || !formData.club}
           >
             <option value="">اختر العضو</option>
             {filteredMembers.map((member) => (
@@ -166,11 +216,12 @@ const CreateSubscription = ({ onClose }) => {
             onChange={handleChange}
             className="w-full p-2 border rounded"
             required
+            disabled={isSubmitting}
           >
             <option value="">اختر نوع الاشتراك</option>
             {subscriptionTypes?.map((type) => (
               <option key={type.id} value={type.id}>
-                {type.name}
+                {type.name} - {type.price} ر.س
               </option>
             ))}
           </select>
@@ -186,6 +237,8 @@ const CreateSubscription = ({ onClose }) => {
             onChange={handleChange}
             className="w-full p-2 border rounded"
             required
+            disabled={isSubmitting}
+            min={new Date().toISOString().split("T")[0]} // Prevent past dates
           />
         </div>
 
@@ -196,17 +249,23 @@ const CreateSubscription = ({ onClose }) => {
             type="number"
             name="paid_amount"
             step="0.01"
+            min="0"
             value={formData.paid_amount}
             onChange={handleChange}
             className="w-full p-2 border rounded"
             placeholder="أدخل المبلغ المدفوع"
             required
+            disabled={isSubmitting}
           />
         </div>
 
         {/* Submit Button */}
-        <button type="submit" className="btn">
-          إنشاء اشتراك
+        <button
+          type="submit"
+          className={`btn ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? "جاري المعالجة..." : "إنشاء اشتراك"}
         </button>
       </form>
     </div>
@@ -214,9 +273,6 @@ const CreateSubscription = ({ onClose }) => {
 };
 
 export default CreateSubscription;
-
-
-
 
 
 

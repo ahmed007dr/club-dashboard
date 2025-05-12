@@ -25,7 +25,7 @@ const SubscriptionList = () => {
     (state) => state.subscriptions
   );
 
-  console.log("Subscriptions:", subscriptions);
+  console.log('Subscriptions:', subscriptions);
 
   // State management
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,15 +47,13 @@ const SubscriptionList = () => {
     attendanceDays: '',
   });
 
-  // Sort subscriptions by start_date (newest first)
-  const sortedSubscriptions = [...subscriptions].sort((a, b) => {
-    return new Date(b.start_date) - new Date(a.start_date);
-  });
+  // Sort subscriptions by id (newest first - descending)
+  const sortedSubscriptions = [...subscriptions].sort((a, b) => b.id - a.id);
 
   // Apply filters to the sorted array
   const filteredSubscriptions = sortedSubscriptions.filter((subscription) => {
     const matchesMember = filters.memberName
-      ? subscription.member_name
+      ? subscription.member_details.name
           .toLowerCase()
           .includes(filters.memberName.toLowerCase())
       : true;
@@ -94,7 +92,7 @@ const SubscriptionList = () => {
     );
   });
 
-  // Pagination
+  // Pagination configuration
   const totalItems = filteredSubscriptions.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -104,12 +102,37 @@ const SubscriptionList = () => {
     indexOfLastItem
   );
 
+  // Generate pagination range
+  const getPaginationRange = () => {
+    const maxButtons = 5; // Maximum number of page buttons to show
+    const sideButtons = Math.floor(maxButtons / 2);
+
+    let start = Math.max(1, currentPage - sideButtons);
+    let end = Math.min(totalPages, currentPage + sideButtons);
+
+    // Adjust start and end to always show maxButtons when possible
+    if (end - start + 1 < maxButtons) {
+      if (currentPage <= sideButtons) {
+        end = Math.min(totalPages, maxButtons);
+      } else {
+        start = Math.max(1, totalPages - maxButtons + 1);
+      }
+    }
+
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  };
+
   // Handlers
   const handlePageChange = (pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
       setCurrentPage(pageNumber);
+      window.scrollTo(0, 0); // Scroll to top on page change
     }
   };
+
+  // Jump to first/last page
+  const goToFirstPage = () => handlePageChange(1);
+  const goToLastPage = () => handlePageChange(totalPages);
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -144,29 +167,29 @@ const SubscriptionList = () => {
   };
 
   const handlePayment = (subscription) => {
-    const amountStr = paymentAmounts[subscription.id] || "";
+    const amountStr = paymentAmounts[subscription.id] || '';
     const remainingAmount = parseFloat(subscription.remaining_amount);
-    
+
     // Validate the amount
-    if (!amountStr || amountStr === "0" || amountStr === "0.00") {
-      alert("الرجاء إدخال مبلغ صالح للدفع");
+    if (!amountStr || amountStr === '0' || amountStr === '0.00') {
+      alert('الرجاء إدخال مبلغ صالح للدفع');
       return;
     }
 
     const amount = parseFloat(amountStr);
-    
-   if (isNaN(amount)) {
-      alert("المبلغ المدخل غير صالح");
+
+    if (isNaN(amount)) {
+      alert('المبلغ المدخل غير صالح');
       return;
     }
 
     if (amount <= 0) {
-      alert("يجب أن يكون المبلغ أكبر من الصفر");
+      alert('يجب أن يكون المبلغ أكبر من الصفر');
       return;
     }
 
     if (amount > remainingAmount) {
-      alert("المبلغ المدخل أكبر من المبلغ المتبقي");
+      alert('المبلغ المدخل أكبر من المبلغ المتبقي');
       return;
     }
 
@@ -262,8 +285,8 @@ const SubscriptionList = () => {
             قائمة الاشتراكات
           </h2>
         </div>
-        <button 
-          onClick={() => setCreateModalOpen(true)} 
+        <button
+          onClick={() => setCreateModalOpen(true)}
           className="btn"
         >
           إضافة اشتراك
@@ -499,47 +522,88 @@ const SubscriptionList = () => {
       </div>
 
       {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center mt-6 space-x-2" dir="rtl">
-          <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className={`px-4 py-2 rounded-lg ${
-              currentPage === 1
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-blue-500 text-white hover:bg-blue-600'
-            } transition`}
-          >
-            السابق
-          </button>
-          {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-            (page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`px-4 py-2 rounded-lg ${
-                  currentPage === page
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                } transition`}
-              >
-                {page}
-              </button>
-            )
-          )}
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className={`px-4 py-2 rounded-lg ${
-              currentPage === totalPages
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-blue-500 text-white hover:bg-blue-600'
-            } transition`}
-          >
-            التالي
-          </button>
-        </div>
-      )}
+     {/* Pagination */}
+{totalItems === 0 && (
+  <div className="text-center text-sm text-gray-600 mt-6">
+    لا توجد اشتراكات لعرضها
+  </div>
+)}
+{totalItems > 0 && (
+  <div className="flex justify-center items-center mt-6 space-x-2" dir="rtl">
+    {/* First Page Button */}
+    <button
+      onClick={goToFirstPage}
+      disabled={currentPage === 1 || totalItems === 0}
+      className={`px-3 py-2 rounded-lg ${
+        currentPage === 1 || totalItems === 0
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : 'bg-blue-500 text-white hover:bg-blue-600'
+      } transition`}
+    >
+      الأول
+    </button>
+
+    {/* Previous Page Button */}
+    <button
+      onClick={() => handlePageChange(currentPage - 1)}
+      disabled={currentPage === 1 || totalItems === 0}
+      className={`px-3 py-2 rounded-lg ${
+        currentPage === 1 || totalItems === 0
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : 'bg-blue-500 text-white hover:bg-blue-600'
+      } transition`}
+    >
+      السابق
+    </button>
+
+    {/* Page Number Buttons */}
+    {getPaginationRange().map((page) => (
+      <button
+        key={page}
+        onClick={() => handlePageChange(page)}
+        disabled={totalItems === 0}
+        className={`px-3 py-2 rounded-lg ${
+          currentPage === page && totalItems > 0
+            ? 'bg-blue-600 text-white'
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+        } ${totalItems === 0 ? 'cursor-not-allowed' : ''} transition`}
+      >
+        {page}
+      </button>
+    ))}
+
+    {/* Next Page Button */}
+    <button
+      onClick={() => handlePageChange(currentPage + 1)}
+      disabled={currentPage === totalPages || totalItems === 0}
+      className={`px-3 py-2 rounded-lg ${
+        currentPage === totalPages || totalItems === 0
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : 'bg-blue-500 text-white hover:bg-blue-600'
+      } transition`}
+    >
+      التالي
+    </button>
+
+    {/* Last Page Button */}
+    <button
+      onClick={goToLastPage}
+      disabled={currentPage === totalPages || totalItems === 0}
+      className={`px-3 py-2 rounded-lg ${
+        currentPage === totalPages || totalItems === 0
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : 'bg-blue-500 text-white hover:bg-blue-600'
+      } transition`}
+    >
+      الأخير
+    </button>
+
+    {/* Page Info */}
+    <span className="text-sm text-gray-600 mx-2">
+      صفحة {currentPage} من {totalPages} (إجمالي: {totalItems} اشتراك)
+    </span>
+  </div>
+)}
 
       {/* Modals */}
       {createModalOpen && (
