@@ -247,40 +247,111 @@ const handleEditSubmit = async () => {
       </table>
 
       {/* Pagination Controls */}
-      <div className="flex justify-between items-center mt-4">
-        <div>
-          Showing {indexOfFirstItem + 1} to{' '}
-          {Math.min(indexOfLastItem, searchResult.length)} of {searchResult.length}{' '}
-          members
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => paginate(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Previous
-          </button>
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-            <button
-              key={page}
-              onClick={() => paginate(page)}
-              className={`px-3 py-1 rounded ${
-                currentPage === page ? 'bg-blue-700 text-white' : 'bg-gray-200'
-              }`}
-            >
-              {page}
-            </button>
-          ))}
-          <button
-            onClick={() => paginate(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1 bg-gray-200 rounded disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
+      {/* Pagination Controls */}
+<div className="flex justify-between items-center mt-4" dir="rtl">
+  {/* Info Message */}
+  {searchResult.length === 0 && (
+    <div className="text-sm text-gray-600">
+      لا توجد أعضاء لعرضهم
+    </div>
+  )}
+  {searchResult.length > 0 && (
+    <>
+      <div className="text-sm text-gray-600">
+        عرض {indexOfFirstItem + 1} إلى{' '}
+        {Math.min(indexOfLastItem, searchResult.length)} من {searchResult.length}{' '}
+        عضو
       </div>
+      <div className="flex gap-2">
+        {/* First Page Button */}
+        <button
+          onClick={() => paginate(1)}
+          disabled={currentPage === 1 || searchResult.length === 0}
+          className={`px-3 py-1 rounded ${
+            currentPage === 1 || searchResult.length === 0
+              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+              : 'bg-blue-700 text-white hover:bg-blue-800'
+          }`}
+        >
+          الأول
+        </button>
+
+        {/* Previous Page Button */}
+        <button
+          onClick={() => paginate(currentPage - 1)}
+          disabled={currentPage === 1 || searchResult.length === 0}
+          className={`px-3 py-1 rounded ${
+            currentPage === 1 || searchResult.length === 0
+              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+              : 'bg-blue-700 text-white hover:bg-blue-800'
+          }`}
+        >
+          السابق
+        </button>
+
+        {/* Page Number Buttons */}
+        {(() => {
+          const maxButtons = 5; // Maximum number of page buttons to show
+          const sideButtons = Math.floor(maxButtons / 2);
+          let start = Math.max(1, currentPage - sideButtons);
+          let end = Math.min(totalPages, currentPage + sideButtons);
+
+          // Adjust start and end to show maxButtons when possible
+          if (end - start + 1 < maxButtons) {
+            if (currentPage <= sideButtons) {
+              end = Math.min(totalPages, maxButtons);
+            } else {
+              start = Math.max(1, totalPages - maxButtons + 1);
+            }
+          }
+
+          return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
+            (page) => (
+              <button
+                key={page}
+                onClick={() => paginate(page)}
+                disabled={searchResult.length === 0}
+                className={`px-3 py-1 rounded ${
+                  currentPage === page && searchResult.length > 0
+                    ? 'bg-blue-700 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300'
+                } ${searchResult.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                {page}
+              </button>
+            )
+          );
+        })()}
+
+        {/* Next Page Button */}
+        <button
+          onClick={() => paginate(currentPage + 1)}
+          disabled={currentPage === totalPages || searchResult.length === 0}
+          className={`px-3 py-1 rounded ${
+            currentPage === totalPages || searchResult.length === 0
+              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+              : 'bg-blue-700 text-white hover:bg-blue-800'
+          }`}
+        >
+          التالي
+        </button>
+
+        {/* Last Page Button */}
+        <button
+          onClick={() => paginate(totalPages)}
+          disabled={currentPage === totalPages || searchResult.length === 0}
+          className={`px-3 py-1 rounded ${
+            currentPage === totalPages || searchResult.length === 0
+              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+              : 'bg-blue-700 text-white hover:bg-blue-800'
+          }`}
+        >
+          الأخير
+        </button>
+      </div>
+    </>
+  )}
+</div>
 
       {/* Add Modal */}
       {isAddModalOpen && (

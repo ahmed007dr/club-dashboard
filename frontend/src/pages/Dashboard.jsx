@@ -18,6 +18,9 @@ import { HiOutlineDocumentReport } from 'react-icons/hi';
 import { GiTeamIdea, GiMoneyStack, GiTicket } from 'react-icons/gi';
 import { BiLogIn, BiLogOut } from 'react-icons/bi';
 import { TbReportAnalytics } from "react-icons/tb";
+import { GiReceiveMoney } from "react-icons/gi";
+import { MdCategory } from "react-icons/md";
+import { GiPayMoney } from "react-icons/gi";
 const Dashboard = () => {
   const dispatch = useDispatch();
   const sidebarOpen = useSelector((state) => state.ui.sidebarOpen);
@@ -39,6 +42,8 @@ const navItems = [
       { path: 'attendance', name: 'الحضور', icon: <AiOutlineSchedule /> },
       { path: 'free-invites', name: 'الدعوات المجانية', icon: <RiVipCrown2Line /> },
       { path: 'subscriptions', name: 'الاشتراكات', icon: <MdOutlineSubscriptions /> },
+      { path: 'tickets', name: 'التذاكر', icon: <GiTicket /> },
+
     ],
   },
   {
@@ -47,9 +52,9 @@ const navItems = [
     children: [
       { path: 'staff', name: 'الموظفون', icon: <RiUserLine /> },
       { path: 'attendance-form', name: 'تسجيل الدخول والخروج', icon: <BiLogIn /> },
-      { path: 'shift-attendance', name: 'حضور موظفي الورديات', icon: <AiOutlineSchedule /> }, // ✅ New item added here
+      { path: 'shift-attendance', name: 'حضور موظفي الورديات', icon: <AiOutlineSchedule /> },
       { path: 'club', name: 'النادي', icon: <HiOutlineDocumentReport /> },
-      { path: 'tickets', name: 'التذاكر', icon: <GiTicket /> },
+      { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
     ],
   },
   {
@@ -60,14 +65,16 @@ const navItems = [
     ],
   },
   {
-    name: 'المحاسبة',
-    icon: <TbMoneybag />,
+    name: 'المالية',
+    icon: <GiMoneyStack />,
     children: [
-      { path: 'finance', name: 'المالية', icon: <GiMoneyStack /> },
-      { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
+      { path: 'income-sources', name: 'مصادر الدخل', icon: <GiReceiveMoney /> },
+      { path: 'expense-category', name: 'فئات المصروفات', icon: <MdCategory /> },
+      { path: 'expense', name: 'المصروفات', icon: <GiPayMoney /> },
     ],
   },
 ];
+
 
   
 

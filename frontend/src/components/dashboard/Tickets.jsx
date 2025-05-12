@@ -619,69 +619,116 @@ const Tickets = () => {
       </div>
 
       {/* Pagination Controls */}
-      {totalPages > 0 && (
-        <div className="flex flex-col sm:flex-row justify-between items-center mt-6 space-y-4 sm:space-y-0">
-          <div className="text-sm text-gray-700">
-            عرض {startIndex}–{endIndex} من {totalItems} تذكرة
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={itemsPerPage}
-              onChange={handleItemsPerPageChange}
-              className="border rounded px-2 py-1 text-sm"
-              aria-label="عدد التذاكر لكل صفحة"
-            >
-              {itemsPerPageOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option} لكل صفحة
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handlePrevious}
-              disabled={currentPage === 1}
-              className={`px-3 py-1 rounded-md text-sm ${
-                currentPage === 1
-                  ? "bg-gray-200 cursor-not-allowed"
-                  : "bg-blue-500 text-white hover:bg-blue-600"
-              }`}
-              aria-label="الصفحة السابقة"
-            >
-              السابق
-            </button>
-            {getPageNumbers().map((page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`px-3 py-1 rounded-md text-sm ${
-                  currentPage === page
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 hover:bg-gray-300"
-                }`}
-                aria-label={`الصفحة ${page}`}
-              >
-                {page}
-              </button>
-            ))}
-            {totalPages > getPageNumbers().length &&
-              getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
-                <span className="px-3 py-1 text-sm">...</span>
-              )}
-            <button
-              onClick={handleNext}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1 rounded-md text-sm ${
-                currentPage === totalPages
-                  ? "bg-gray-200 cursor-not-allowed"
-                  : "bg-blue-500 text-white hover:bg-blue-600"
-              }`}
-              aria-label="الصفحة التالية"
-            >
-              التالي
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Pagination Controls */}
+<div className="flex flex-col sm:flex-row justify-between items-center mt-6 space-y-4 sm:space-y-0" dir="rtl">
+  {/* Info Message */}
+  {totalItems === 0 && (
+    <div className="text-sm text-gray-600">
+      لا توجد تذاكر لعرضها
+    </div>
+  )}
+  {totalItems > 0 && (
+    <>
+      <div className="text-sm text-gray-700">
+        عرض {startIndex}–{endIndex} من {totalItems} تذكرة
+      </div>
+      <div className="flex items-center gap-2">
+        {/* Items Per Page Dropdown */}
+        <select
+          value={itemsPerPage}
+          onChange={handleItemsPerPageChange}
+          className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-green-200"
+          aria-label="عدد التذاكر لكل صفحة"
+        >
+          {itemsPerPageOptions.map((option) => (
+            <option key={option} value={option}>
+              {option} لكل صفحة
+            </option>
+          ))}
+        </select>
+
+        {/* First Page Button */}
+        <button
+          onClick={() => handlePageChange(1)}
+          disabled={currentPage === 1 || totalItems === 0}
+          className={`px-3 py-1 rounded-md text-sm ${
+            currentPage === 1 || totalItems === 0
+              ? 'bg-gray-200 cursor-not-allowed'
+              : 'bg-blue-500 text-white hover:bg-blue-600'
+          }`}
+          aria-label="الصفحة الأولى"
+        >
+          الأول
+        </button>
+
+        {/* Previous Page Button */}
+        <button
+          onClick={handlePrevious}
+          disabled={currentPage === 1 || totalItems === 0}
+          className={`px-3 py-1 rounded-md text-sm ${
+            currentPage === 1 || totalItems === 0
+              ? 'bg-gray-200 cursor-not-allowed'
+              : 'bg-blue-500 text-white hover:bg-blue-600'
+          }`}
+          aria-label="الصفحة السابقة"
+        >
+          السابق
+        </button>
+
+        {/* Page Number Buttons */}
+        {getPageNumbers().map((page) => (
+          <button
+            key={page}
+            onClick={() => handlePageChange(page)}
+            disabled={totalItems === 0}
+            className={`px-3 py-1 rounded-md text-sm ${
+              currentPage === page && totalItems > 0
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-200 hover:bg-gray-300'
+            } ${totalItems === 0 ? 'cursor-not-allowed' : ''}`}
+            aria-label={`الصفحة ${page}`}
+          >
+            {page}
+          </button>
+        ))}
+
+        {/* Ellipsis for Large Page Ranges */}
+        {totalPages > getPageNumbers().length &&
+          getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
+            <span className="px-3 py-1 text-sm">...</span>
+          )}
+
+        {/* Next Page Button */}
+        <button
+          onClick={handleNext}
+          disabled={currentPage === totalPages || totalItems === 0}
+          className={`px-3 py-1 rounded-md text-sm ${
+            currentPage === totalPages || totalItems === 0
+              ? 'bg-gray-200 cursor-not-allowed'
+              : 'bg-blue-500 text-white hover:bg-blue-600'
+          }`}
+          aria-label="الصفحة التالية"
+        >
+          التالي
+        </button>
+
+        {/* Last Page Button */}
+        <button
+          onClick={() => handlePageChange(totalPages)}
+          disabled={currentPage === totalPages || totalItems === 0}
+          className={`px-3 py-1 rounded-md text-sm ${
+            currentPage === totalPages || totalItems === 0
+              ? 'bg-gray-200 cursor-not-allowed'
+              : 'bg-blue-500 text-white hover:bg-blue-600'
+          }`}
+          aria-label="الصفحة الأخيرة"
+        >
+          الأخير
+        </button>
+      </div>
+    </>
+  )}
+</div>
 
       {/* Create Ticket Modal */}
       {showCreateModal && (

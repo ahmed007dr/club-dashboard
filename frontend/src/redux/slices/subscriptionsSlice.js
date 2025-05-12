@@ -143,12 +143,12 @@ export const deleteSubscriptionById = createAsyncThunk(
 
 
 export const postSubscription = createAsyncThunk(
-  'subscription/postSubscription',
+  "subscription/postSubscription",
   async (subscriptionData, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
 
-      if (!token) throw new Error('Access token not found');
+      if (!token) throw new Error("Access token not found");
 
       const response = await axios.post(
         `${BASE_URL}/subscriptions/api/subscriptions/`,
@@ -156,16 +156,15 @@ export const postSubscription = createAsyncThunk(
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
         }
       );
 
-      console.log('Subscription created successfully:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error creating subscription:', error.response?.data || error.message);
-      return rejectWithValue(error.response?.data || error.message);
+      // Silently pass the error data to the component
+      return rejectWithValue(error.response?.data || { message: error.message });
     }
   }
 );

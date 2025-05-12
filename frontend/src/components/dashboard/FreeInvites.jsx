@@ -498,47 +498,110 @@ const InviteList = () => {
       </div>
 
       {/* Pagination Controls */}
-      {filteredInvites.length > itemsPerPage && (
-        <div className="mt-6 flex justify-center items-center space-x-2 rtl">
-          <button
-            onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1}
-            className={`px-3 py-1 rounded-md ${
-              currentPage === 1
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-blue-600 text-white hover:bg-blue-700"
-            }`}
-          >
-            السابق
-          </button>
-          {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+     <div className="mt-6 flex justify-center items-center space-x-2" dir="rtl">
+  {/* Info Message */}
+  {filteredInvites.length === 0 && (
+    <div className="text-sm text-gray-600">
+      لا توجد دعوات لعرضها
+    </div>
+  )}
+  {filteredInvites.length > 0 && (
+    <>
+      <div className="text-sm text-gray-600 mx-4">
+        عرض {indexOfFirstItem + 1} إلى{' '}
+        {Math.min(indexOfLastItem, filteredInvites.length)} من{' '}
+        {filteredInvites.length} دعوة
+      </div>
+      <div className="flex gap-2">
+        {/* First Page Button */}
+        <button
+          onClick={() => handlePageChange(1)}
+          disabled={currentPage === 1 || filteredInvites.length === 0}
+          className={`px-3 py-1 rounded-md ${
+            currentPage === 1 || filteredInvites.length === 0
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          الأول
+        </button>
+
+        {/* Previous Page Button */}
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1 || filteredInvites.length === 0}
+          className={`px-3 py-1 rounded-md ${
+            currentPage === 1 || filteredInvites.length === 0
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          السابق
+        </button>
+
+        {/* Page Number Buttons */}
+        {(() => {
+          const maxButtons = 5; // Maximum number of page buttons to show
+          const sideButtons = Math.floor(maxButtons / 2);
+          let start = Math.max(1, currentPage - sideButtons);
+          let end = Math.min(totalPages, currentPage + sideButtons);
+
+          // Adjust start and end to show maxButtons when possible
+          if (end - start + 1 < maxButtons) {
+            if (currentPage <= sideButtons) {
+              end = Math.min(totalPages, maxButtons);
+            } else {
+              start = Math.max(1, totalPages - maxButtons + 1);
+            }
+          }
+
+          return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
             (page) => (
               <button
                 key={page}
                 onClick={() => handlePageChange(page)}
+                disabled={filteredInvites.length === 0}
                 className={`px-3 py-1 rounded-md ${
-                  currentPage === page
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
+                  currentPage === page && filteredInvites.length > 0
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                } ${filteredInvites.length === 0 ? 'cursor-not-allowed' : ''}`}
               >
                 {page}
               </button>
             )
-          )}
-          <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className={`px-3 py-1 rounded-md ${
-              currentPage === totalPages
-                ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                : "bg-blue-600 text-white hover:bg-blue-700"
-            }`}
-          >
-            التالي
-          </button>
-        </div>
-      )}
+          );
+        })()}
+
+        {/* Next Page Button */}
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages || filteredInvites.length === 0}
+          className={`px-3 py-1 rounded-md ${
+            currentPage === totalPages || filteredInvites.length === 0
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          التالي
+        </button>
+
+        {/* Last Page Button */}
+        <button
+          onClick={() => handlePageChange(totalPages)}
+          disabled={currentPage === totalPages || filteredInvites.length === 0}
+          className={`px-3 py-1 rounded-md ${
+            currentPage === totalPages || filteredInvites.length === 0
+              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
+          }`}
+        >
+          الأخير
+        </button>
+      </div>
+    </>
+  )}
+</div>
 
       {/* Add Invite Modal */}
       {showAddModal && (
