@@ -1,4 +1,3 @@
-// UpdateSubscriptionModal.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUsers } from '../../redux/slices/memberSlice';
@@ -21,20 +20,27 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
   const [clubs, setClubs] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Fetch users (members) and clubs on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         const fetchedData = await dispatch(fetchUsers()).unwrap();
-        const memberList = fetchedData.results;
-
+        
+        // Handle both array response and { results: [] } response
+        const memberList = Array.isArray(fetchedData) ? fetchedData : 
+                         fetchedData.results ? fetchedData.results : 
+                         [];
+        
         setMembers(memberList);
 
         // Get unique clubs from members
         const uniqueClubs = Array.from(
           new Map(
-            memberList.map((m) => [m.club, { club_id: m.club, club_name: m.club_name }])
+            memberList
+              .filter(m => m.club) // Only include members with clubs
+              .map((m) => [m.club, { club_id: m.club, club_name: m.club_name || `Club ${m.club}` }])
           ).values()
         );
 
@@ -42,6 +48,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
         setLoading(false);
       } catch (err) {
         console.error("Failed to fetch members:", err);
+        setError("Failed to load members data");
         setLoading(false);
       }
     };
@@ -52,7 +59,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
 
   // Update members dropdown when a club is selected
   useEffect(() => {
-    if (formData.club) {
+    if (formData.club && Array.isArray(members)) {
       const filtered = members.filter((m) => m.club === parseInt(formData.club));
       setFilteredMembers(filtered);
     } else {
@@ -73,14 +80,13 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
       });
       
       // If we have a club in the subscription, filter members immediately
-      if (subscription.club) {
+      if (subscription.club && Array.isArray(members)) {
         const filtered = members.filter((m) => m.club === parseInt(subscription.club));
         setFilteredMembers(filtered);
       }
     }
   }, [subscription, members]);
 
-  // Handle input change
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -89,7 +95,6 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
     }));
   };
 
-  // Handle form submission
   const handleSubmit = (e) => {
     e.preventDefault();
     if (onSubmit) {
@@ -99,13 +104,12 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
         member: parseInt(formData.member),
         type: parseInt(formData.type),
         paid_amount: parseFloat(formData.paid_amount),
-        id: subscription.id, // Include the subscription ID for the update
+        id: subscription.id,
       });
     }
-    onClose(); // Close modal after submission
+    onClose();
   };
 
-  // Don't render the modal if it's closed
   if (!isOpen) return null;
 
   if (loading) {
@@ -113,6 +117,22 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
         <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
           <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
+          <p className="text-red-500">{error}</p>
+          <button
+            className="mt-4 px-4 py-2 bg-gray-200 rounded"
+            onClick={onClose}
+          >
+            Close
+          </button>
         </div>
       </div>
     );
