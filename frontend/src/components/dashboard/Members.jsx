@@ -35,7 +35,7 @@ const [data, setData] = useState([
   const [error, setError] = useState(null);
   const [searchResult, setSearchResult] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5); // Configurable items per page
+  const [itemsPerPage] = useState(20); // Configurable items per page
 
  const members = useSelector((state) => state.member.items); // Remove .results
   const dispatch = useDispatch();
