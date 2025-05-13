@@ -14,6 +14,7 @@ class ExpenseCategory(models.Model):
             models.Index(fields=['club']),
             models.Index(fields=['name']),
         ]
+        ordering = ['name']  
 
 class Expense(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
@@ -40,6 +41,7 @@ class Expense(models.Model):
             models.Index(fields=['date']),
             models.Index(fields=['invoice_number']),
         ]
+        ordering = ['-date', 'id'] 
 
 class IncomeSource(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
@@ -54,6 +56,7 @@ class IncomeSource(models.Model):
             models.Index(fields=['club']),
             models.Index(fields=['name']),
         ]
+        ordering = ['name'] 
 
 class Income(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
@@ -74,3 +77,4 @@ class Income(models.Model):
             models.Index(fields=['date']),
             models.Index(fields=['related_receipt']),
         ]
+        ordering = ['-date', 'id']  
