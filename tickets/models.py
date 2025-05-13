@@ -1,6 +1,5 @@
 from django.db import models
 
-# Create your models here.
 class Ticket(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     buyer_name = models.CharField(max_length=255)
@@ -13,4 +12,10 @@ class Ticket(models.Model):
     def __str__(self):
         return f"{self.ticket_type} - {self.buyer_name}"
 
-
+    class Meta:
+        indexes = [
+            models.Index(fields=['club']),       # For filtering by club
+            models.Index(fields=['ticket_type']),# For filtering by ticket type
+            models.Index(fields=['used']),       # For filtering used/unused tickets
+            models.Index(fields=['issue_date']), # For date-based queries
+        ]

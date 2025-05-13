@@ -18,6 +18,11 @@ class SubscriptionType(models.Model):
 
     class Meta:
         unique_together = ['club', 'name']
+        indexes = [
+            models.Index(fields=['club']),    # For filtering by club
+            models.Index(fields=['name']),    # For searching by name
+            models.Index(fields=['is_active']),  # For filtering active types
+        ]
 
 class Subscription(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
@@ -42,3 +47,12 @@ class Subscription(models.Model):
         if self.type.max_entries == 0:  # Unlimited entries
             return True
         return self.entry_count < self.type.max_entries
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['club']),       # For filtering by club
+            models.Index(fields=['member']),     # For filtering by member
+            models.Index(fields=['type']),       # For filtering by subscription type
+            models.Index(fields=['start_date']), # For filtering active subscriptions
+            models.Index(fields=['end_date']),   # For filtering active subscriptions
+        ]

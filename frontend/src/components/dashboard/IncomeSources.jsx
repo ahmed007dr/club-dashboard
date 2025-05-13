@@ -104,8 +104,12 @@ const Income = () => {
   useEffect(() => {
     dispatch(fetchIncomes());
   }, [dispatch]);
-
   const filteredIncomes = useMemo(() => {
+    if (!Array.isArray(incomes)) {
+      console.warn("Expected incomes to be an array but got:", incomes);
+      return [];
+    }
+  
     return incomes
       .filter((income) => {
         return (
@@ -136,7 +140,7 @@ const Income = () => {
         return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
       });
   }, [incomes, incomeFilters, userClub, sortOrder]);
-
+  
   // Pagination calculations
   const incomePageCount = Math.ceil(filteredIncomes.length / pageSize);
   const paginatedIncomes = filteredIncomes.slice(

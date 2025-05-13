@@ -5,7 +5,7 @@ class Member(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     membership_number = models.CharField(max_length=50, unique=True)
-    rfid_code = models.CharField(max_length=50, unique=True, blank=True, null=True) 
+    rfid_code = models.CharField(max_length=50, unique=True, blank=True, null=True)
     national_id = models.CharField(max_length=14)
     birth_date = models.DateField()
     phone = models.CharField(max_length=20)
@@ -24,3 +24,11 @@ class Member(models.Model):
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['club']),              # For filtering by club
+            models.Index(fields=['membership_number']), # For fast lookup by membership
+            models.Index(fields=['rfid_code']),        # For fast lookup by RFID
+            models.Index(fields=['created_at']),       # For sorting by creation date
+        ]
