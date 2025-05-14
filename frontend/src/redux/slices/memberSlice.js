@@ -23,18 +23,28 @@ export const fetchUsers = createAsyncThunk('users/fetchUsers', async () => {
 });
 
 // Add user
-export const addMember = createAsyncThunk('users/addUser', async (newUser) => {
+export const addMember = createAsyncThunk('users/addUser', async (newUser, { rejectWithValue }) => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`${BASE_URL}/members/api/members/create/`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newUser),
-    });
-    const data = await res.json();
-    return data;
+    try {
+        const res = await fetch(`${BASE_URL}/members/api/members/create/`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(newUser),
+        });
+        if (!res.ok) {
+            const errorData = await res.json();
+            return rejectWithValue(errorData.message || 'Failed to add member');
+        }
+        const data = await res.json();
+        console.log('Add member response data:', data); // Log the response data
+        return data;
+    } catch (error) {
+        console.error('Error in addMember:', error);
+        return rejectWithValue('An unexpected error occurred');
+    }
 });
 
 // Edit user
@@ -161,11 +171,14 @@ const userSlice = createSlice({
             .addCase(fetchUsers.pending, (state) => {
                 state.isloading = true;
             })
-            .addCase(addMember.fulfilled, (state, action) => {
-                if (Array.isArray(state.items)) {
-                    state.items.push(action.payload);
-                }
-            })
+      .addCase(addMember.fulfilled, (state, action) => {
+  state.isloading = false;
+  if (Array.isArray(state.items)) {
+    state.items.unshift({ ...action.payload, club_name: action.payload.club?.name || '' }); // Ensure all fields are included
+  } else {
+    state.items = [{ ...action.payload, club_name: action.payload.club?.name || '' }];
+  }
+})
             .addCase(editMember.fulfilled, (state, action) => {
                 const { id, updatedUser } = action.payload;
                 if (Array.isArray(state.items)) {
