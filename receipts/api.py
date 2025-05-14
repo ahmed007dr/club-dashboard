@@ -10,17 +10,22 @@ from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub  
 from finance.models import Income , IncomeSource
 from django.utils.timezone import now
+from rest_framework.pagination import PageNumberPagination
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def receipt_list_api(request):
     if request.user.role == 'owner':
-        receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').all()  
+        receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').all().order_by('-date')
     else:
-        receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').filter(club=request.user.club)  
+        receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').filter(club=request.user.club).order_by('-date')
 
-    serializer = ReceiptSerializer(receipts, many=True)
-    return Response(serializer.data)
+    paginator = PageNumberPagination()
+    paginated_receipts = paginator.paginate_queryset(receipts, request)
+    serializer = ReceiptSerializer(paginated_receipts, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

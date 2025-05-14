@@ -9,14 +9,14 @@ from utils.permissions import IsOwnerOrRelatedToClub
 from django.db.models import Q
 from django.utils import timezone
 from members.models import Member
+from rest_framework.pagination import PageNumberPagination
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_list_api(request):
     search_term = request.GET.get('q', '')
-
     if request.user.role == 'owner':
-        attendances = Attendance.objects.select_related('subscription', 'subscription__member')
+        attendances = Attendance.objects.select_related('subscription', 'subscription__member').all()
     else:
         attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(subscription__club=request.user.club)
 
@@ -28,9 +28,12 @@ def attendance_list_api(request):
         )
 
     attendances = attendances.order_by('-attendance_date')
+    paginator = PageNumberPagination()
+    result_page = paginator.paginate_queryset(attendances, request)
+    serializer = AttendanceSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
-    serializer = AttendanceSerializer(attendances, many=True)
-    return Response(serializer.data)
+
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -46,9 +49,8 @@ def delete_attendance_api(request, attendance_id):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def entry_log_list_api(request):
     search_term = request.GET.get('q', '')
-
     if request.user.role == 'owner':
-        logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription')
+        logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').all()
     else:
         logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(club=request.user.club)
 
@@ -60,9 +62,10 @@ def entry_log_list_api(request):
         )
 
     logs = logs.order_by('-timestamp')
-
-    serializer = EntryLogSerializer(logs, many=True)
-    return Response(serializer.data)
+    paginator = PageNumberPagination()
+    result_page = paginator.paginate_queryset(logs, request)
+    serializer = EntryLogSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 
 @api_view(['POST'])
