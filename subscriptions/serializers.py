@@ -63,7 +63,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         if start_date and start_date < timezone.now().date():
             raise serializers.ValidationError("تاريخ البداية لا يمكن أن يكون في الماضي.")
 
-        # Check for active subscriptions for the same member
         if member:
             today = timezone.now().date()
             active_subscriptions = Subscription.objects.filter(

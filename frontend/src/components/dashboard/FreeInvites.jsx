@@ -273,7 +273,7 @@ const InviteList = () => {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 6;
+  const itemsPerPage = 20;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentInvites = filteredInvites.slice(indexOfFirstItem, indexOfLastItem);

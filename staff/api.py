@@ -9,20 +9,34 @@ from .serializers import ShiftSerializer, StaffAttendanceSerializer
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub
 from accounts.models import User
-from rest_framework.exceptions import ValidationError
 from django.db.models.functions import TruncDate
+from rest_framework.pagination import PageNumberPagination
 
 # Shift Management APIs
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def shift_list_api(request):
-    """Retrieve a list of shifts based on user role and club association."""
-    shifts = Shift.objects.select_related('club', 'staff', 'approved_by')
+def staff_shifts_api(request, staff_id):
+    shifts = Shift.objects.filter(staff_id=staff_id).select_related('club', 'approved_by').order_by('-date')
     if request.user.role != 'owner':
         shifts = shifts.filter(club=request.user.club)
-    
-    serializer = ShiftSerializer(shifts, many=True)
-    return Response(serializer.data)
+
+    paginator = PageNumberPagination()
+    result_page = paginator.paginate_queryset(shifts, request)
+    serializer = ShiftSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def shift_list_api(request):
+    shifts = Shift.objects.select_related('club', 'staff', 'approved_by').order_by('-date')
+    if request.user.role != 'owner':
+        shifts = shifts.filter(club=request.user.club)
+
+    paginator = PageNumberPagination()
+    result_page = paginator.paginate_queryset(shifts, request)
+    serializer = ShiftSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

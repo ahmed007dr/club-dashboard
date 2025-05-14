@@ -5,23 +5,61 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from rest_framework.pagination import PageNumberPagination
-from utils.permissions import IsOwnerOrRelatedToClub  #
+from utils.permissions import IsOwnerOrRelatedToClub  
 from .serializers import MemberSerializer
 from .models import Member
 from utils.generate_membership_number import generate_membership_number
 from django.db import IntegrityError
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_list_api(request):
     if request.user.role == 'owner':
-        members = Member.objects.all()
+        members = Member.objects.all().order_by('-id')
     else:
-        members = Member.objects.filter(club=request.user.club)
+        members = Member.objects.filter(club=request.user.club).order_by('-id')
     
-    members = members.order_by('-id')
-    serializer = MemberSerializer(members, many=True)
-    return Response(serializer.data)
+    paginator = PageNumberPagination()
+    result_page = paginator.paginate_queryset(members, request)
+    serializer = MemberSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def member_search_api(request):
+    search_term = request.GET.get('q', '')
+
+    search_filter = (
+        Q(name__icontains=search_term) |
+        Q(membership_number__icontains=search_term) |
+        Q(national_id__icontains=search_term) |
+        Q(rfid_code__icontains=search_term) |
+        Q(phone__icontains=search_term)
+    )
+
+    if request.user.role == 'owner':
+        members = Member.objects.filter(search_filter).order_by('-id')
+    else:
+        members = Member.objects.filter(Q(club=request.user.club) & search_filter).order_by('-id')
+
+    paginator = PageNumberPagination()
+    result_page = paginator.paginate_queryset(members, request)
+    serializer = MemberSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_user_profile(request):
+    user = request.user
+    profile_data = {
+        'username': user.username,
+        'email': user.email,
+    }
+    return Response(profile_data)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -70,36 +108,3 @@ def delete_member_api(request, member_id):
     member.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def member_search_api(request):
-    search_term = request.GET.get('q', '')
-
-    search_filter = (
-        Q(name__icontains=search_term) |
-        Q(membership_number__icontains=search_term) |
-        Q(national_id__icontains=search_term) |
-        Q(rfid_code__icontains=search_term) |
-        Q(phone__icontains=search_term)
-    )
-
-    if request.user.role == 'owner':
-        members = Member.objects.filter(search_filter)
-    else:
-        members = Member.objects.filter(Q(club=request.user.club) & search_filter)
-
-    serializer = MemberSerializer(members, many=True)
-    return Response(serializer.data)
-
-
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def api_user_profile(request):
-    user = request.user
-    profile_data = {
-        'username': user.username,
-        'email': user.email,
-    }
-    return Response(profile_data)

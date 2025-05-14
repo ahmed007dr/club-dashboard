@@ -11,17 +11,21 @@ from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub
 from decimal import Decimal
 from finance.models import Income, IncomeSource
+from rest_framework.pagination import PageNumberPagination
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_type_list(request):
     if request.method == 'GET':
         if request.user.role == 'owner':
-            types = SubscriptionType.objects.all()
+            types = SubscriptionType.objects.all().order_by('id')
         else:
-            types = SubscriptionType.objects.filter(club=request.user.club)
-        serializer = SubscriptionTypeSerializer(types, many=True)
-        return Response(serializer.data)
+            types = SubscriptionType.objects.filter(club=request.user.club).order_by('id')
+        
+        paginator = PageNumberPagination()
+        page = paginator.paginate_queryset(types, request)
+        serializer = SubscriptionTypeSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
         serializer = SubscriptionTypeSerializer(data=request.data, context={'request': request})
@@ -35,9 +39,9 @@ def subscription_type_list(request):
 def subscription_list(request):
     if request.method == 'GET':
         if request.user.role == 'owner':
-            subscriptions = Subscription.objects.select_related('member', 'type', 'club').all()
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club').all().order_by('-start_date')
         else:
-            subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club).order_by('-start_date')
 
         # Apply filters
         member_id = request.query_params.get('member')
@@ -51,8 +55,10 @@ def subscription_list(request):
         if club_id:
             subscriptions = subscriptions.filter(club_id=club_id)
             
-        serializer = SubscriptionSerializer(subscriptions, many=True)
-        return Response(serializer.data)
+        paginator = PageNumberPagination()
+        page = paginator.paginate_queryset(subscriptions, request)
+        serializer = SubscriptionSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
         serializer = SubscriptionSerializer(data=request.data, context={'request': request})
@@ -105,7 +111,6 @@ def subscription_type_detail(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
-        subscription_type = get_object_or_404(SubscriptionType, pk=pk)
         if Subscription.objects.filter(type=subscription_type).exists():
             return Response(
                 {'error': 'Cannot delete subscription type with active subscriptions'},
@@ -118,11 +123,14 @@ def subscription_type_detail(request, pk):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def active_subscription_types(request):
     if request.user.role == 'owner':
-        types = SubscriptionType.objects.filter(is_active=True)
+        types = SubscriptionType.objects.filter(is_active=True).order_by('id')
     else:
-        types = SubscriptionType.objects.filter(is_active=True, club=request.user.club)
-    serializer = SubscriptionTypeSerializer(types, many=True)
-    return Response(serializer.data)
+        types = SubscriptionType.objects.filter(is_active=True, club=request.user.club).order_by('id')
+    
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(types, request)
+    serializer = SubscriptionTypeSerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -157,37 +165,46 @@ def active_subscriptions(request):
         subscriptions = Subscription.objects.filter(
             start_date__lte=today,
             end_date__gte=today
-        )
+        ).order_by('-start_date')
     else:
         subscriptions = Subscription.objects.filter(
             start_date__lte=today,
             end_date__gte=today,
             club=request.user.club
-        )
-    serializer = SubscriptionSerializer(subscriptions, many=True)
-    return Response(serializer.data)
+        ).order_by('-start_date')
+    
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(subscriptions, request)
+    serializer = SubscriptionSerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expired_subscriptions(request):
     today = timezone.now().date()
     if request.user.role == 'owner':
-        subscriptions = Subscription.objects.filter(end_date__lt=today)
+        subscriptions = Subscription.objects.filter(end_date__lt=today).order_by('-end_date')
     else:
-        subscriptions = Subscription.objects.filter(end_date__lt=today, club=request.user.club)
-    serializer = SubscriptionSerializer(subscriptions, many=True)
-    return Response(serializer.data)
+        subscriptions = Subscription.objects.filter(end_date__lt=today, club=request.user.club).order_by('-end_date')
+    
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(subscriptions, request)
+    serializer = SubscriptionSerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def upcoming_subscriptions(request):
     today = timezone.now().date()
     if request.user.role == 'owner':
-        subscriptions = Subscription.objects.filter(start_date__gt=today)
+        subscriptions = Subscription.objects.filter(start_date__gt=today).order_by('start_date')
     else:
-        subscriptions = Subscription.objects.filter(start_date__gt=today, club=request.user.club)
-    serializer = SubscriptionSerializer(subscriptions, many=True)
-    return Response(serializer.data)
+        subscriptions = Subscription.objects.filter(start_date__gt=today, club=request.user.club).order_by('start_date')
+    
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(subscriptions, request)
+    serializer = SubscriptionSerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -270,11 +287,14 @@ def member_subscriptions(request):
         return Response({"error": "member_id parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
     
     if request.user.role == 'owner':
-        subscriptions = Subscription.objects.filter(member_id=member_id)
+        subscriptions = Subscription.objects.filter(member_id=member_id).order_by('-start_date')
     else:
-        subscriptions = Subscription.objects.filter(member_id=member_id, club=request.user.club)
-    serializer = SubscriptionSerializer(subscriptions, many=True)
-    return Response(serializer.data)
+        subscriptions = Subscription.objects.filter(member_id=member_id, club=request.user.club).order_by('-start_date')
+    
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(subscriptions, request)
+    serializer = SubscriptionSerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
