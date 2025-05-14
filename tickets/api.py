@@ -24,6 +24,16 @@ def ticket_list_api(request):
     serializer = TicketSerializer(tickets, many=True)
     return Response(serializer.data)
 
+    # if request.user.role == 'owner':
+    #     tickets = Ticket.objects.select_related('club', 'used_by').all().order_by('id')
+    # else:
+    #     tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club).order_by('id')
+
+    # paginator = PageNumberPagination()
+    # result_page = paginator.paginate_queryset(tickets, request)
+    # serializer = TicketSerializer(result_page, many=True)
+    # return paginator.get_paginated_response(serializer.data)
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_ticket_api(request):
