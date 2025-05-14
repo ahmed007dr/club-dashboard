@@ -57,7 +57,7 @@ MIDDLEWARE = [
     'django_user_agents.middleware.UserAgentMiddleware',
     # 'devices.middleware.DeviceAccessMiddleware',
     # 'devices.middleware.RestrictAdminByIPMiddleware',
-
+    'devices.middleware.RequestLoggingMiddleware',  
 ]
 
 ROOT_URLCONF = 'project.urls'
