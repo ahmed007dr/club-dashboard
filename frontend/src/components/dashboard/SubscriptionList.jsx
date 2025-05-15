@@ -118,8 +118,8 @@ const SubscriptionList = () => {
           setClubs(uniqueClubs);
 
           // Fetch subscription types
-          await dispatch(fetchSubscriptionTypes()).unwrap();
-          console.log("SubscriptionList: Fetched subscription types:", subscriptionTypes);
+          const subscriptionTypesData = await dispatch(fetchSubscriptionTypes({ page: 1 })).unwrap();
+          console.log("SubscriptionList: Fetched subscription types:", subscriptionTypesData);
         } catch (err) {
           console.error("SubscriptionList: Error fetching data:", err);
           setCreateErrorMessage(err.message || "فشل تحميل بيانات الأعضاء أو أنواع الاشتراك");
@@ -550,8 +550,8 @@ const SubscriptionList = () => {
                   <td className="py-1 px-2 text-sm">
                     {subscription.type_details.max_entries - subscription.entry_count}
                   </td>
-                  <td className="py-1 px-2 text-sm">${subscription.paid_amount}</td>
-                  <td className="py-1 px-2 text-sm">${subscription.remaining_amount}</td>
+                  <td className="py-1 px-2 text-sm">{subscription.paid_amount} ر.س</td>
+                  <td className="py-1 px-2 text-sm">{subscription.remaining_amount} ر.س</td>
                   <td className="py-1 px-2 text-sm">
                     <span
                       className={`px-1 py-0.5 rounded text-xs font-medium
@@ -565,7 +565,9 @@ const SubscriptionList = () => {
                             : ""
                         }`}
                     >
-                      {subscription.status}
+                      {subscription.status === "Active" ? "نشط" : 
+                       subscription.status === "Expired" ? "منتهي" : 
+                       subscription.status === "Upcoming" ? "قادم" : subscription.status}
                     </span>
                   </td>
                   <td className="py-1 px-2 flex items-center">
@@ -739,12 +741,12 @@ const SubscriptionList = () => {
             )}
             <form onSubmit={handleCreateSubmit} className="space-y-4">
               <div>
-                <label className="block font-medium">النادي</label>
+                <label className="block font-medium text-right">النادي</label>
                 <select
                   name="club"
                   value={createFormData.club}
                   onChange={handleCreateChange}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded text-right"
                   required
                   disabled={isSubmitting || usersLoading}
                 >
@@ -757,12 +759,12 @@ const SubscriptionList = () => {
                 </select>
               </div>
               <div>
-                <label className="block font-medium">العضو</label>
+                <label className="block font-medium text-right">العضو</label>
                 <select
                   name="member"
                   value={createFormData.member}
                   onChange={handleCreateChange}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded text-right"
                   required
                   disabled={isSubmitting || !createFormData.club || usersLoading}
                 >
@@ -775,17 +777,17 @@ const SubscriptionList = () => {
                 </select>
               </div>
               <div>
-                <label className="block font-medium">نوع الاشتراك</label>
+                <label className="block font-medium text-right">نوع الاشتراك</label>
                 <select
                   name="type"
                   value={createFormData.type}
                   onChange={handleCreateChange}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded text-right"
                   required
                   disabled={isSubmitting || subscriptionLoading}
                 >
                   <option value="">اختر نوع الاشتراك</option>
-                  {subscriptionTypes?.map((type) => (
+                  {(subscriptionTypes?.results || []).map((type) => (
                     <option key={type.id} value={type.id}>
                       {type.name} - {type.price} ر.س
                     </option>
@@ -793,20 +795,20 @@ const SubscriptionList = () => {
                 </select>
               </div>
               <div>
-                <label className="block font-medium">تاريخ البداية</label>
+                <label className="block font-medium text-right">تاريخ البداية</label>
                 <input
                   type="date"
                   name="start_date"
                   value={createFormData.start_date}
                   onChange={handleCreateChange}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded text-right"
                   required
                   disabled={isSubmitting}
                   min={new Date().toISOString().split("T")[0]}
                 />
               </div>
               <div>
-                <label className="block font-medium">المبلغ المدفوع</label>
+                <label className="block font-medium text-right">المبلغ المدفوع</label>
                 <input
                   type="number"
                   name="paid_amount"
@@ -814,7 +816,7 @@ const SubscriptionList = () => {
                   min="0"
                   value={createFormData.paid_amount}
                   onChange={handleCreateChange}
-                  className="w-full p-2 border rounded"
+                  className="w-full p-2 border rounded text-right"
                   placeholder="أدخل المبلغ المدفوع"
                   required
                   disabled={isSubmitting}
@@ -822,13 +824,13 @@ const SubscriptionList = () => {
               </div>
               <button
                 type="submit"
-                className={`btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 ${
+                className={`btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 w-full ${
                   isSubmitting ? "opacity-50 cursor-not-allowed" : ""
                 }`}
                 disabled={isSubmitting}
               >
                 {isSubmitting ? (
-                  <span className="flex items-center">
+                  <span className="flex items-center justify-center">
                     <svg
                       className="animate-spin h-5 w-5 mr-2 text-white"
                       xmlns="http://www.w3.org/2000/svg"
@@ -875,7 +877,7 @@ const SubscriptionList = () => {
       {detailModalOpen && detailSubscription && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h3 className="text-2xl font-semibold mb-4">تفاصيل الاشتراك</h3>
+            <h3 className="text-2xl font-semibold mb-4 text-right">تفاصيل الاشتراك</h3>
             <p>
               <strong>اسم العضو:</strong> {detailSubscription.member_name}
             </p>
@@ -886,14 +888,15 @@ const SubscriptionList = () => {
               <strong>تاريخ الانتهاء:</strong> {detailSubscription.end_date}
             </p>
             <p>
-              <strong>المبلغ المدفوع:</strong> ${detailSubscription.paid_amount}
+              <strong>المبلغ المدفوع:</strong> {detailSubscription.paid_amount} ر.س
             </p>
             <p>
-              <strong>المبلغ المتبقي:</strong> $
-              {detailSubscription.remaining_amount}
+              <strong>المبلغ المتبقي:</strong> {detailSubscription.remaining_amount} ر.س
             </p>
             <p>
-              <strong>الحالة:</strong> {detailSubscription.status}
+              <strong>الحالة:</strong> {detailSubscription.status === "Active" ? "نشط" : 
+                                      detailSubscription.status === "Expired" ? "منتهي" : 
+                                      detailSubscription.status === "Upcoming" ? "قادم" : detailSubscription.status}
             </p>
             <p>
               <strong>أيام الحضور:</strong> {detailSubscription.attendance_days}

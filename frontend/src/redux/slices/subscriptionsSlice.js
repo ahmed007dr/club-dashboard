@@ -3,57 +3,71 @@ import axios from 'axios';
 import BASE_URL from '../../config/api';
 
 export const fetchSubscriptionTypes = createAsyncThunk(
-  'subscriptionTypes/fetch',
-  async (_, { rejectWithValue }) => {
+  "subscriptions/fetchSubscriptionTypes",
+  async ({ page = 1 }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (!token) {
-        return rejectWithValue('Authentication token is missing.');
+        return rejectWithValue("Authentication token is missing.");
       }
 
-      const allResponse = await axios.get(`${BASE_URL}/subscriptions/api/subscription-types/`, {
+      // Fetch all subscription types with pagination
+      const allResponse = await axios.get(`${BASE_URL}/subscriptions/api/subscription-types/?page=${page}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
+      // Fetch active subscription types
       const activeResponse = await axios.get(`${BASE_URL}/subscriptions/api/subscription-types/active/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
 
-      let allSubscriptions = allResponse.data;
+      // Handle paginated response for all subscriptions
+      const allData = allResponse.data;
+      let allSubscriptions = allData.results || [];
       if (!Array.isArray(allSubscriptions)) {
-        if (allSubscriptions && Array.isArray(allSubscriptions.results)) {
-          allSubscriptions = allSubscriptions.results;
-        } else {
-          console.warn('allSubscriptions is not an array:', allSubscriptions);
-          allSubscriptions = [];
-        }
+        console.warn("allSubscriptions.results is not an array:", allSubscriptions);
+        allSubscriptions = [];
       }
 
+      // Handle response for active subscriptions
       let activeSubscriptions = activeResponse.data;
       if (!Array.isArray(activeSubscriptions)) {
-        if (activeSubscriptions && Array.isArray(activeSubscriptions.results)) {
-          activeSubscriptions = activeSubscriptions.results;
+        if (activeResponse.data && Array.isArray(activeResponse.data.results)) {
+          activeSubscriptions = activeResponse.data.results;
         } else {
-          console.warn('activeSubscriptions is not an array:', activeSubscriptions);
+          console.warn("activeSubscriptions is not an array:", activeSubscriptions);
           activeSubscriptions = [];
         }
       }
 
-      const activeIds = new Set(activeSubscriptions.map(sub => sub.id));
+      // Create a Set of active subscription IDs
+      const activeIds = new Set(activeSubscriptions.map((sub) => sub.id));
 
+      // Merge isActive field, prioritizing active endpoint but falling back to is_active
       const modifiedSubscriptions = allSubscriptions.map((sub) => ({
         ...sub,
-        isActive: activeIds.has(sub.id),
+        isActive: activeIds.has(sub.id) ? true : sub.is_active ?? false,
       }));
 
-      return modifiedSubscriptions;
+      // Return paginated response structure
+      return {
+        count: allData.count ?? 0,
+        results: modifiedSubscriptions,
+        next: allData.next ?? null,
+        previous: allData.previous ?? null,
+      };
     } catch (error) {
-      console.error('Error fetching subscription types:', error);
-      return rejectWithValue(error.response?.data || 'Failed to fetch subscription types');
+      console.error("Error fetching subscription types:", error);
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to fetch subscription types";
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -519,10 +533,12 @@ export const addAttendance = createAsyncThunk(
   }
 );
 
+
+
+
 const subscriptionsSlice = createSlice({
   name: 'subscriptions',
   initialState: {
-   
     subscriptionTypes: {
       count: 0,
       results: [],
@@ -562,7 +578,7 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.subscriptionTypes = {
           count: action.payload.count || 0,
-          results: action.payload.results || [],
+          results: Array.isArray(action.payload.results) ? action.payload.results : [],
           next: action.payload.next || null,
           previous: action.payload.previous || null,
         };
@@ -573,14 +589,21 @@ const subscriptionsSlice = createSlice({
       })
       .addCase(addSubscriptionType.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(addSubscriptionType.fulfilled, (state, action) => {
         state.loading = false;
-        state.subscriptionTypes.push(action.payload);
+        if (!Array.isArray(state.subscriptionTypes.results)) {
+          state.subscriptionTypes.results = [];
+        }
+        state.subscriptionTypes.results.push(action.payload);
+        state.subscriptionTypes.count = (state.subscriptionTypes.count || 0) + 1;
+        console.log('addSubscriptionType: Added type:', action.payload, 'New count:', state.subscriptionTypes.count);
       })
       .addCase(addSubscriptionType.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        console.error('addSubscriptionType failed:', action.payload);
       })
       .addCase(fetchSubscriptionTypeById.pending, (state) => {
         state.loading = true;
@@ -631,7 +654,7 @@ const subscriptionsSlice = createSlice({
       })
       .addCase(fetchSubscriptions.fulfilled, (state, action) => {
         state.status = "succeeded";
-        state.subscriptions = action.payload.subscriptions;
+        state.subscriptions = action.payload.subscriptions || [];
         state.pagination = {
           count: action.payload.count || 0,
           next: action.payload.next,
@@ -660,23 +683,40 @@ const subscriptionsSlice = createSlice({
       })
       .addCase(putSubscriptionType.fulfilled, (state, action) => {
         state.loading = false;
-        const updatedSubscription = action.payload;
-        const index = state.subscriptionTypes.findIndex(sub => sub.id === updatedSubscription.id);
+        const updatedSubscriptionType = action.payload;
+        const index = state.subscriptionTypes.results.findIndex(
+          (sub) => sub.id === updatedSubscriptionType.id
+        );
         if (index !== -1) {
-          state.subscriptionTypes[index] = updatedSubscription;
+          state.subscriptionTypes.results[index] = updatedSubscriptionType;
+        } else {
+          console.warn('putSubscriptionType: Subscription type ID not found:', updatedSubscriptionType.id);
         }
       })
       .addCase(putSubscriptionType.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+        console.error('putSubscriptionType failed:', action.payload);
+      })
+      .addCase(deleteSubscriptionType.pending, (state) => {
+        state.loading = true;
+        state.error = null;
       })
       .addCase(deleteSubscriptionType.fulfilled, (state, action) => {
-        state.subscriptionTypes = state.subscriptionTypes.filter(
+        state.loading = false;
+        if (!Array.isArray(state.subscriptionTypes.results)) {
+          state.subscriptionTypes.results = [];
+        }
+        state.subscriptionTypes.results = state.subscriptionTypes.results.filter(
           (sub) => sub.id !== action.payload
         );
+        state.subscriptionTypes.count = Math.max((state.subscriptionTypes.count || 0) - 1, 0);
+        console.log('deleteSubscriptionType: Removed type ID:', action.payload, 'New count:', state.subscriptionTypes.count);
       })
       .addCase(deleteSubscriptionType.rejected, (state, action) => {
+        state.loading = false;
         state.error = action.payload;
+        console.error('deleteSubscriptionType failed:', action.payload);
       })
       .addCase(fetchSubscriptionById.pending, (state) => {
         state.status = 'loading';
@@ -695,7 +735,7 @@ const subscriptionsSlice = createSlice({
       })
       .addCase(fetchActiveSubscriptions.fulfilled, (state, action) => {
         state.loading = false;
-        state.Activesubscription = action.payload;
+        state.Activesubscription = action.payload || [];
       })
       .addCase(fetchActiveSubscriptions.rejected, (state, action) => {
         state.loading = false;
@@ -707,7 +747,7 @@ const subscriptionsSlice = createSlice({
       })
       .addCase(fetchExpiredSubscriptions.fulfilled, (state, action) => {
         state.loading = false;
-        state.expiredSubscriptions = action.payload;
+        state.expiredSubscriptions = action.payload || [];
         console.log('Expired subscriptions fetched successfully:', action.payload);
       })
       .addCase(fetchExpiredSubscriptions.rejected, (state, action) => {
@@ -732,7 +772,7 @@ const subscriptionsSlice = createSlice({
       })
       .addCase(fetchUpcomingSubscriptions.fulfilled, (state, action) => {
         state.loading = false;
-        state.upcomingSubscriptions = action.payload;
+        state.upcomingSubscriptions = action.payload || [];
       })
       .addCase(fetchUpcomingSubscriptions.rejected, (state, action) => {
         state.loading = false;
@@ -778,9 +818,9 @@ const subscriptionsSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchMemberSubscriptions.fulfilled, (state, action) => {
+      .addCase(fetchMemberSubscriptions.fulfilled, (state) => {
         state.loading = false;
-        state.memberSubscriptions = action.payload;
+        state.memberSubscriptions = action.payload || [];
       })
       .addCase(fetchMemberSubscriptions.rejected, (state, action) => {
         state.loading = false;
