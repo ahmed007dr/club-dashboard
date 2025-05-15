@@ -8,7 +8,8 @@ class FreeInvite(models.Model):
     date = models.DateField()
     status = models.CharField(max_length=50, choices=[('pending', 'Pending'), ('used', 'Used')])
     invited_by = models.ForeignKey('members.Member', on_delete=models.SET_NULL, null=True, blank=True)
-
+    created_at = models.DateTimeField(auto_now_add=True)
+    
     def __str__(self):
         return self.guest_name
 
