@@ -98,8 +98,4 @@ def api_rfid_login(request):
             'access': str(refresh.access_token),
         }, status=status.HTTP_200_OK)
 
-<<<<<<< HEAD
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-=======
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
->>>>>>> 555f4ca6cd2d172558f9008fed010a88330dc60f
