@@ -74,10 +74,17 @@ class UserProfileSerializer(serializers.ModelSerializer):
     def get_permissions(self, user):
         """
         Returns a unique list of permission codenames from both user_permissions and groups.
+        Handles cases where user has no groups or permissions.
         """
-        direct_permissions = user.user_permissions.values_list('codename', flat=True)
-        group_permissions = Permission.objects.filter(group__user=user).values_list('codename', flat=True)
-        return list(set(direct_permissions) | set(group_permissions))
+        direct_permissions = list(user.user_permissions.values_list('codename', flat=True))
+        
+        group_permissions = []
+        if user.groups.exists():  # Check if user has any groups
+            group_permissions = list(
+                Permission.objects.filter(group__in=user.groups.all()).values_list('codename', flat=True)
+            )
+        
+        return list(set(direct_permissions + group_permissions))
 
 
 class LoginSerializer(serializers.Serializer):
