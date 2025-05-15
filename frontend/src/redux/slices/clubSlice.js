@@ -54,6 +54,70 @@ export const editClub = createAsyncThunk('clubs/editClub', async ({ id, updatedC
   }
 });
 
+// Add these new thunks for switching clubs
+export const switchClub = createAsyncThunk(
+  'clubs/switchClub',
+  async (clubId, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token'); // Ensure token is retrieved
+      const response = await fetch(`${BASE_URL}/core/api/switch-club/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ club_id: clubId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('❌ Failed to switch club:', errorData); // Log error
+        return rejectWithValue(errorData.message || "Failed to switch club.");
+      }
+
+      const data = await response.json();
+      console.log('✅ Club switched successfully:', data); // Log success
+      return data;
+    } catch (error) {
+      console.error('🔴 Error switching club:', error); // Log unexpected errors
+      return rejectWithValue(error.message || "An unexpected error occurred.");
+    }
+  }
+);
+
+
+export const fetchClubList = createAsyncThunk(
+  'clubs/fetchClubList',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token'); // ✅ Define token here
+
+      const response = await fetch(`${BASE_URL}/core/api/clubs-list/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Fetch failed:', errorData); // 🔍 log the error response
+        return rejectWithValue(errorData.message || 'Failed to fetch club list.');
+      }
+
+      const data = await response.json();
+      console.log('Fetched club list:', data); // 🔍 log the success response
+
+      return Array.isArray(data) ? data : [data];
+    } catch (error) {
+      console.error('Error fetching club list:', error);
+      return rejectWithValue(error.message || 'An unexpected error occurred.');
+    }
+  }
+);
+
+
 const clubSlice = createSlice({
   name: 'clubSlice',
   initialState: {
@@ -61,6 +125,9 @@ const clubSlice = createSlice({
     isLoading: true,
     selectedClub: null, // To store the selected club
     error: null, // To store errors
+     clubList: [], // List of clubs the user can switch to
+    currentClub: null,
+     isSwitching: false,
   },
   reducers: {},
   extraReducers: (builder) => {
@@ -85,8 +152,25 @@ const clubSlice = createSlice({
       })
       .addCase(editClub.rejected, (state, action) => {
         state.error = action.payload || action.error.message;
-      });
+      })
+            // Existing reducers for fetchClubs and editClub...
+   
+      .addCase(fetchClubList.fulfilled, (state, action) => {
+        state.clubList = action.payload;
+      })
+      .addCase(switchClub.pending, (state) => {
+        state.isSwitching = true;
+      })
+      .addCase(switchClub.fulfilled, (state, action) => {
+        state.isSwitching = false;
+        state.currentClub = action.payload;
+    
+      })
+      .addCase(switchClub.rejected, (state, action) => {
+        state.isSwitching = false;
+        state.error = action.payload || action.error.message;
+      })
   },
 });
-
+export const { setCurrentClub } = clubSlice.actions;
 export default clubSlice;

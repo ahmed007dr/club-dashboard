@@ -10,4 +10,7 @@ urlpatterns = [
     # === API ===
     path('api/club/', api.api_club_profile, name='api-club-profile'),
     path('api/club/edit/', api.api_edit_club, name='api-edit-club'),
+    path('api/switch-club/', api.api_switch_club, name='api-switch-club'),
+    path('api/clubs-list/', api.api_list_clubs, name='api-list-clubs'),
+
 ]
