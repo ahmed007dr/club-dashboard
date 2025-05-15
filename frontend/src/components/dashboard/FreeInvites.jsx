@@ -17,7 +17,6 @@ import { toast } from 'react-hot-toast';
 const InviteList = () => {
   const dispatch = useDispatch();
   const { invites, loading, error } = useSelector((state) => state.invites);
-  console.log(invites);
   const [userClub, setUserClub] = useState(null); // Logged-in user's club
   const [loadingProfile, setLoadingProfile] = useState(true); // Profile loading state
 

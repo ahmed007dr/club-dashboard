@@ -86,6 +86,7 @@ const Tickets = () => {
   }, [dispatch]);
 
   // Filter and sort tickets
+  console.log('tickets:', tickets);
   const filteredTickets = tickets
     .filter((ticket) => {
       const matchesClub =

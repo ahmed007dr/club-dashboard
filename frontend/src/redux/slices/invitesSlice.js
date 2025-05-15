@@ -13,7 +13,7 @@ export const fetchFreeInvites = createAsyncThunk(
           Authorization: token ? `Bearer ${token}` : '', // Add token if it exists
         },
       });
-      return response.data; // Assuming the API returns an array or object
+      return response.data.results; // Assuming the API returns an array or object
     }
   );
 

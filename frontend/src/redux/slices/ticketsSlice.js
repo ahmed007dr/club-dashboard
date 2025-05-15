@@ -15,7 +15,7 @@ export const fetchTickets = createAsyncThunk(
         },
       });
       // console.log(response.data)
-      return response.data;
+      return response.data.results;
     // return the response data to the fulfilled action
     } catch (error) {
       return thunkAPI.rejectWithValue(error.response?.data || 'An error occurred'); // handle error response
