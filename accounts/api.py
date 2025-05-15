@@ -4,13 +4,17 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
-from .serializers import UserSerializer, UserProfileSerializer, LoginSerializer ,RFIDLoginSerializer
-from utils.permissions import IsOwnerOrRelatedToClub  
+from .serializers import UserProfileSerializer, LoginSerializer, RFIDLoginSerializer
+from utils.permissions import IsOwnerOrRelatedToClub
 from .models import User
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_login(request):
+    """
+    Authenticate a user with username and password, returning user data with permissions and groups.
+    """
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         username = serializer.validated_data['username']
@@ -19,9 +23,10 @@ def api_login(request):
         user = authenticate(username=username, password=password)
         
         if user:
+            user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
             refresh = RefreshToken.for_user(user)
             return Response({
-                'user': UserSerializer(user).data,
+                'user': UserProfileSerializer(user).data,  # Use UserProfileSerializer
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }, status=status.HTTP_200_OK)
@@ -29,11 +34,15 @@ def api_login(request):
         return Response({
             'error': 'Invalid credentials'
         }, status=status.HTTP_401_UNAUTHORIZED)
-    return Response({'error': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def api_logout(request):
+    """
+    Blacklist a refresh token to log out the user.
+    """
     try:
         refresh_token = request.data.get('refresh')
         if not refresh_token:
@@ -41,38 +50,52 @@ def api_logout(request):
         token = RefreshToken(refresh_token)
         token.blacklist()
         return Response(status=status.HTTP_205_RESET_CONTENT)
-    except Exception as e:
+    except Exception:
         return Response(status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_profile(request):
-    serializer = UserProfileSerializer(request.user)
+    """
+    Return the profile of the authenticated user, including permissions and groups.
+    """
+    user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=request.user.id)
+    serializer = UserProfileSerializer(user)
     return Response(serializer.data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_list(request):
+    """
+    Return a list of users, filtered by club for non-owners, including permissions and groups.
+    """
     if request.user.role == 'owner':
-        users = User.objects.all()
+        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').all()
     else:
-        users = User.objects.filter(club=request.user.club)
+        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').filter(club=request.user.club)
 
     serializer = UserProfileSerializer(users, many=True)
     return Response(serializer.data)
 
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_rfid_login(request):
+    """
+    Authenticate a user with RFID code, returning user data with permissions and groups.
+    """
     serializer = RFIDLoginSerializer(data=request.data)
     
     if serializer.is_valid():
         user = serializer.validated_data['user']
+        user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
         refresh = RefreshToken.for_user(user)
         return Response({
-            'user': UserSerializer(user).data,
+            'user': UserProfileSerializer(user).data,  # Use UserProfileSerializer
             'refresh': str(refresh),
             'access': str(refresh.access_token),
         }, status=status.HTTP_200_OK)
 
-    return Response(serializer.errors, status=status.HTTP_401_UNAUTHORIZED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
