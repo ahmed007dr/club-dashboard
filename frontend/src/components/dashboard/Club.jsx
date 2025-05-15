@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { CiEdit } from "react-icons/ci";
 import { HiOutlineDocumentReport } from "react-icons/hi";
 import { useDispatch, useSelector } from "react-redux";
-import { Button } from "../ui/button";
 import { editClub, fetchClubs } from "@/redux/slices/clubSlice";
 
 const Club = () => {
@@ -20,6 +18,38 @@ const Club = () => {
   const error = useSelector((state) => state.club.error);
   const dispatch = useDispatch();
 
+  const parseDate = (dateInput) => {
+    if (!dateInput) return null;
+    
+    try {
+      if (typeof dateInput === 'object' && dateInput.toDate) {
+        return dateInput.toDate();
+      }
+      
+      if (typeof dateInput === 'number') {
+        return new Date(dateInput > 1e10 ? dateInput : dateInput * 1000);
+      }
+      
+      return new Date(dateInput);
+    } catch (e) {
+      console.error("Failed to parse date:", dateInput, e);
+      return null;
+    }
+  };
+
+  const formatDate = (dateInput) => {
+    const date = parseDate(dateInput);
+    if (!date || isNaN(date.getTime())) {
+      return "لا يوجد تاريخ";
+    }
+    
+    return date.toLocaleDateString("ar-EG", {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -31,53 +61,6 @@ const Club = () => {
     };
     fetchData();
   }, [dispatch]);
-
-  const formatDateForInput = (dateString) => {
-    const date = new Date(dateString);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    return `${year}-${month}-${day}T${hours}:${minutes}`;
-  };
-
-  const handleEditClick = (club) => {
-    setSelectedClub(club);
-    setFormData({
-      name: club.name,
-      location: club.location,
-      logo: club.logo || "",
-      createdAt: formatDateForInput(club.createdAt),
-    });
-    setModalOpen(true);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
-  const handleEditSubmit = () => {
-    const updatedClubs = clubs.map((c) =>
-      c.id === selectedClub.id ? { ...selectedClub, ...formData } : c
-    );
-
-    dispatch(editClub({ id: selectedClub.id, updatedClub: formData }))
-      .unwrap()
-      .then(() => {
-        setClubs(updatedClubs);
-        setModalOpen(false);
-      })
-      .catch((err) => {
-        console.error("Failed to edit club:", err);
-      });
-  };
-
-  const closeModal = () => {
-    setModalOpen(false);
-    setSelectedClub(null);
-  };
 
   if (isLoading) {
     return (
@@ -103,37 +86,32 @@ const Club = () => {
       </div>
       <table className="min-w-full border border-gray-200">
         <thead className="text-center">
-        <tr>
-    <th className="p-3 border-b">#</th>
-    <th className="p-3 border-b">الشعار</th>
-    <th className="p-3 border-b">الاسم</th>
-    <th className="p-3 border-b">الموقع</th>
-    <th className="p-3 border-b">تاريخ الإنشاء</th>
-</tr>
+          <tr>
+            <th className="p-3 border-b">#</th>
+            <th className="p-3 border-b">الشعار</th>
+            <th className="p-3 border-b">الاسم</th>
+            <th className="p-3 border-b">الموقع</th>
+            <th className="p-3 border-b">تاريخ الإنشاء</th>
+          </tr>
         </thead>
         <tbody>
           {clubs.map((club, index) => (
-            <tr key={club.id} className="">
+            <tr key={club.id} className="text-center">
               <td className="p-3 border-b">{index + 1}</td>
               <td className="p-3 border-b">
                 <img
-                  src={club.logo? club.logo : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"}
+                  src={club.logo || "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"}
                   alt={club.name}
-                  className="w-16 h-16 rounded-full object-cover"
+                  className="w-16 h-16 rounded-full object-cover mx-auto"
                 />
               </td>
               <td className="p-3 border-b">{club.name}</td>
               <td className="p-3 border-b">{club.location}</td>
-              <td className="p-3 border-b">
-                {new Date(club.createdAt).toLocaleDateString()}
-              </td>
-            
+              <td className="p-3 border-b">{formatDate(club.createdAt)}</td>
             </tr>
           ))}
         </tbody>
       </table>
-
-   
     </div>
   );
 };

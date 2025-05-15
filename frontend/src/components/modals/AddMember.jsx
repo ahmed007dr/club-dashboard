@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useDispatch } from "react-redux";
-import { addMember } from '../../redux/slices/memberSlice';
+import { useDispatch } from 'react-redux';
+import { addMember, fetchUsers } from '../../redux/slices/memberSlice';
 import { fetchClubs } from '../../redux/slices/clubSlice';
 import { toast } from 'react-hot-toast';
 
-const AddMember = ({ closeAddModal }) => {
+const AddMember = ({ closeAddModal, onAddSuccess }) => {
   const dispatch = useDispatch();
   const [clubs, setClubs] = useState([]);
-
   const [formData, setFormData] = useState({
     name: '',
     national_id: '',
@@ -38,9 +37,19 @@ const AddMember = ({ closeAddModal }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await dispatch(addMember(formData)).unwrap();
-      toast.success("تم إضافة العضو بنجاح!");
-      closeAddModal(); // Close modal after success
+      const addResult = await dispatch(addMember(formData)).unwrap();
+      console.log('addMember response:', addResult);
+      await new Promise((resolve) => setTimeout(resolve, 500)); // Wait for server
+      try {
+        const fetchResult = await dispatch(fetchUsers()).unwrap();
+        console.log('fetchUsers response:', fetchResult);
+      } catch (fetchError) {
+        console.error('fetchUsers error:', fetchError);
+        toast.error('تم إضافة العضو، لكن فشل تحديث القائمة. حاول التحديث يدويًا.');
+      }
+      toast.success('تم إضافة العضو بنجاح!');
+      closeAddModal();
+      onAddSuccess();
       setFormData({
         name: '',
         national_id: '',
@@ -55,8 +64,8 @@ const AddMember = ({ closeAddModal }) => {
         photo: null,
       });
     } catch (error) {
-      toast.error("فشل في إضافة العضو");
-      console.error("Add member error:", error);
+      toast.error('فشل في إضافة العضو');
+      console.error('Add member error:', error);
     }
   };
 
@@ -77,7 +86,6 @@ const AddMember = ({ closeAddModal }) => {
     <div className="max-h-[80vh] overflow-auto">
       <h2 className="text-3xl font-bold mb-8 text-center text-gray-800">إضافة عضو</h2>
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Full Name and National ID */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="name">الاسم الكامل</label>
@@ -92,7 +100,6 @@ const AddMember = ({ closeAddModal }) => {
               required
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="national_id">رقم الهوية</label>
             <input
@@ -107,8 +114,6 @@ const AddMember = ({ closeAddModal }) => {
             />
           </div>
         </div>
-
-        {/* Date of Birth and Phone Number */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="birth_date">تاريخ الميلاد</label>
@@ -122,7 +127,6 @@ const AddMember = ({ closeAddModal }) => {
               required
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="phone">رقم الهاتف</label>
             <input
@@ -137,8 +141,6 @@ const AddMember = ({ closeAddModal }) => {
             />
           </div>
         </div>
-
-        {/* Club, Referred By, RFID Code, Job, Address */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="club">النادي</label>
@@ -158,7 +160,6 @@ const AddMember = ({ closeAddModal }) => {
               ))}
             </select>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="referred_by">أُحيل بواسطة (رقم العضوية)</label>
             <input
@@ -172,8 +173,6 @@ const AddMember = ({ closeAddModal }) => {
             />
           </div>
         </div>
-
-        {/* RFID Code, Job, Address, Note */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="rfid_code">رمز RFID</label>
@@ -187,7 +186,6 @@ const AddMember = ({ closeAddModal }) => {
               placeholder="أدخل رمز RFID"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="job">الوظيفة</label>
             <input
@@ -201,7 +199,6 @@ const AddMember = ({ closeAddModal }) => {
             />
           </div>
         </div>
-
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="address">العنوان</label>
@@ -215,7 +212,6 @@ const AddMember = ({ closeAddModal }) => {
               placeholder="أدخل العنوان"
             />
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="note">ملاحظة</label>
             <input
@@ -229,8 +225,6 @@ const AddMember = ({ closeAddModal }) => {
             />
           </div>
         </div>
-
-        {/* Photo Upload */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="photo">صورة</label>
           <input
@@ -241,12 +235,8 @@ const AddMember = ({ closeAddModal }) => {
             className="w-full px-4 py-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500"
           />
         </div>
-
         <div>
-          <button
-            type="submit"
-            className="btn"
-          >
+          <button type="submit" className="btn">
             إضافة عضو
           </button>
         </div>
@@ -256,4 +246,3 @@ const AddMember = ({ closeAddModal }) => {
 };
 
 export default AddMember;
-

@@ -75,7 +75,7 @@ const SubscriptionList = () => {
         filterEndDate.setHours(0, 0, 0, 0)
       : true;
     const matchesClubName = filters.clubName
-      ? subscription.club_name
+      ? subscription.club_details.name
           .toLowerCase()
           .includes(filters.clubName.toLowerCase())
       : true;
