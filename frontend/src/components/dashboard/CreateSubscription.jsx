@@ -30,7 +30,10 @@ const CreateSubscription = ({ onClose }) => {
     const fetchData = async () => {
       try {
         const fetchedData = await dispatch(fetchUsers()).unwrap();
-        const memberList = Array.isArray(fetchedData) ? fetchedData : [];
+        console.log("Fetched member data:", fetchedData);
+        const memberList = Array.isArray(fetchedData.results)
+          ? fetchedData.results
+          : [];
         setMembers(memberList);
 
         // Get unique clubs from members
@@ -42,8 +45,10 @@ const CreateSubscription = ({ onClose }) => {
             ])
           ).values()
         );
+        console.log('Unique clubs:', uniqueClubs);
         setClubs(uniqueClubs);
       } catch (err) {
+        console.error("Error fetching member data:", err);
         setErrorMessage(err.message || "Failed to load member data");
         setIsModalOpen(true);
       }

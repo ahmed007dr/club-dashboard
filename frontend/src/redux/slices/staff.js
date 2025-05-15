@@ -20,7 +20,7 @@ export const fetchStaff = createAsyncThunk('staff/fetchStaff', async () => {
         throw new Error("Failed to fetch staff.");
     }
     const data = await res.json();
-    return data;
+    return data.results;
 });
 
 // Add staff

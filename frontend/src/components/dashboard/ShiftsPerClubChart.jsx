@@ -6,6 +6,7 @@ const ShiftsPerClubChart = () => {
   const staff = useSelector((state) => state.staff.items || []);
 
   // Aggregate shifts per club
+  console.log('staff:', staff);
   const clubCounts = staff.reduce((acc, shift) => {
     const clubName = shift.club_details?.name || 'Unknown';
     acc[clubName] = (acc[clubName] || 0) + 1;

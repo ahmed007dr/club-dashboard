@@ -21,7 +21,8 @@ export const fetchAttendances = createAsyncThunk(
       });
 
       // Sort by attendance_date (newest first)
-      const sortedData = [...response.data].sort((a, b) => 
+      console.log('Response data:', response.data);
+      const sortedData = [...response.data.results].sort((a, b) => 
         new Date(b.attendance_date) - new Date(a.attendance_date)
       );
       

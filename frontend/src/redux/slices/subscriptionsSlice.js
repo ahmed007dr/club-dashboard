@@ -27,11 +27,15 @@ export const fetchSubscriptionTypes = createAsyncThunk(
       const allSubscriptions = allResponse.data;
       const activeSubscriptions = activeResponse.data;
 
+      console.log("All subscriptions:", allSubscriptions);
+      console.log("Active subscriptions:", activeSubscriptions);
+
       // Get list of active subscription IDs
-      const activeIds = new Set(activeSubscriptions.map(sub => sub.id));
+      console.log("Active subscriptions:", activeSubscriptions);
+      const activeIds = new Set(activeSubscriptions.results.map(sub => sub.id));
 
       // Add isActive flag
-      const modifiedSubscriptions = allSubscriptions.map((sub) => ({
+      const modifiedSubscriptions = allSubscriptions.results.map((sub) => ({
         ...sub,
         isActive: activeIds.has(sub.id), // if the id is in active list, it's active
       }));
@@ -448,13 +452,18 @@ export const fetchSubscriptions = createAsyncThunk(
         axios.get(`${BASE_URL}/subscriptions/api/subscriptions/upcoming/`, config),
         axios.get(`${BASE_URL}/subscriptions/api/subscriptions/expired/`, config),
       ]);
+
+      console.log('All subscriptions:', allRes.data);
+      console.log('Active subscriptions:', activeRes.data);
+      console.log('Upcoming subscriptions:', upcomingRes.data);
+      console.log('Expired subscriptions:', expiredRes.data);
       
 
-      const activeIds = new Set(activeRes.data.map(sub => sub.id));
-      const upcomingIds = new Set(upcomingRes.data.map(sub => sub.id));
-      const expiredIds = new Set(expiredRes.data.map(sub => sub.id));
+      const activeIds = new Set(activeRes.data.results.map(sub => sub.id));
+      const upcomingIds = new Set(upcomingRes.data.results.map(sub => sub.id));
+      const expiredIds = new Set(expiredRes.data.results.map(sub => sub.id));
 
-      const subscriptionsWithStatus = allRes.data.map(sub => {
+      const subscriptionsWithStatus = allRes.data.results.map(sub => {
         if (activeIds.has(sub.id)) {
           return { ...sub, status: 'Active' };
         } else if (upcomingIds.has(sub.id)) {
