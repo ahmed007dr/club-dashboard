@@ -22,10 +22,9 @@ const CreateSubscription = ({ onClose }) => {
   const [clubs, setClubs] = useState([]);
   const [filteredMembers, setFilteredMembers] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(""); // State for modal error message
-  const [isModalOpen, setIsModalOpen] = useState(false); // State for modal visibility
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch users (members) and clubs on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -33,7 +32,6 @@ const CreateSubscription = ({ onClose }) => {
         const memberList = Array.isArray(fetchedData) ? fetchedData : [];
         setMembers(memberList);
 
-        // Get unique clubs from members
         const uniqueClubs = Array.from(
           new Map(
             memberList.map((m) => [
@@ -52,12 +50,10 @@ const CreateSubscription = ({ onClose }) => {
     fetchData();
   }, [dispatch]);
 
-  // Fetch subscription types on mount
   useEffect(() => {
     dispatch(fetchSubscriptionTypes());
   }, [dispatch]);
 
-  // Update members dropdown when a club is selected
   useEffect(() => {
     if (formData.club) {
       const filtered = members.filter((m) => m.club === parseInt(formData.club));
@@ -67,42 +63,47 @@ const CreateSubscription = ({ onClose }) => {
     }
   }, [formData.club, members]);
 
-  // Handle form input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { club, member, type, start_date, paid_amount } = formData;
 
-    // Client-side validation
     if (!club || !member || !type || !start_date || !paid_amount) {
-      setErrorMessage("Please fill in all required fields");
+      setErrorMessage("الرجاء ملء جميع الحقول المطلوبة");
       setIsModalOpen(true);
       return;
     }
 
-    if (isNaN(parseFloat(paid_amount)) || parseFloat(paid_amount) <= 0) {
-      setErrorMessage("Paid amount must be a positive number");
+    const amount = parseFloat(paid_amount);
+    if (isNaN(amount)) {
+      setErrorMessage("المبلغ المدخل غير صالح");
+      setIsModalOpen(true);
+      return;
+    }
+
+    if (amount <= 0) {
+      setErrorMessage("يجب أن يكون المبلغ أكبر من الصفر");
       setIsModalOpen(true);
       return;
     }
 
     setIsSubmitting(true);
 
-    const payload = {
-      club: parseInt(club),
-      member: parseInt(member),
-      type: parseInt(type),
-      start_date,
-      paid_amount: parseFloat(paid_amount),
-    };
-
     try {
+      const payload = {
+        club: parseInt(club),
+        member: parseInt(member),
+        type: parseInt(type),
+        start_date,
+        paid_amount: amount,
+      };
+
       await dispatch(postSubscription(payload)).unwrap();
+
       setFormData({
         club: "",
         member: "",
@@ -110,35 +111,25 @@ const CreateSubscription = ({ onClose }) => {
         start_date: "",
         paid_amount: "",
       });
+
       if (onClose) onClose();
     } catch (error) {
-      console.log("Full error object:", JSON.stringify(error, null, 2)); // Debug entire error
-      console.log("Error payload:", JSON.stringify(error.payload, null, 2)); // Debug payload
-      console.log("Error data:", JSON.stringify(error.data, null, 2)); // Debug data (if exists)
-      console.log("Error response:", JSON.stringify(error.response, null, 2)); // Debug response (if exists)
-
-      // Try multiple possible error locations
-      let errorData = error.payload || error.data || error.response || error;
-
-      console.log("Final errorData:", JSON.stringify(errorData, null, 2)); // Debug final errorData
-
-      if (errorData?.non_field_errors && Array.isArray(errorData.non_field_errors)) {
-        console.log("Handling non_field_errors:", errorData.non_field_errors); // Debug
-        setErrorMessage(errorData.non_field_errors[0]); // Use raw error message
-        setIsModalOpen(true);
-      } else {
-        console.log("Fallback error:", errorData); // Debug fallback
-        setErrorMessage(
-          errorData?.message || error.message || "An unexpected error occurred"
-        );
-        setIsModalOpen(true);
+      let errorMsg = "حدث خطأ أثناء إنشاء الاشتراك";
+      if (error?.non_field_errors) {
+        errorMsg = error.non_field_errors[0];
+      } else if (error?.message) {
+        errorMsg = error.message;
+      } else if (typeof error === "string") {
+        errorMsg = error;
       }
+
+      setErrorMessage(errorMsg);
+      setIsModalOpen(true);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Close modal
   const closeModal = () => {
     setIsModalOpen(false);
     setErrorMessage("");
@@ -148,7 +139,6 @@ const CreateSubscription = ({ onClose }) => {
     <div className="container mx-auto p-4" dir="rtl">
       <h2 className="text-xl font-bold mb-4">إنشاء اشتراك</h2>
 
-      {/* Error Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
@@ -167,7 +157,6 @@ const CreateSubscription = ({ onClose }) => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Club Select */}
         <div>
           <label className="block font-medium">النادي</label>
           <select
@@ -187,7 +176,6 @@ const CreateSubscription = ({ onClose }) => {
           </select>
         </div>
 
-        {/* Member Select */}
         <div>
           <label className="block font-medium">العضو</label>
           <select
@@ -207,7 +195,6 @@ const CreateSubscription = ({ onClose }) => {
           </select>
         </div>
 
-        {/* Subscription Type Select */}
         <div>
           <label className="block font-medium">نوع الاشتراك</label>
           <select
@@ -227,7 +214,6 @@ const CreateSubscription = ({ onClose }) => {
           </select>
         </div>
 
-        {/* Start Date */}
         <div>
           <label className="block font-medium">تاريخ البداية</label>
           <input
@@ -238,11 +224,10 @@ const CreateSubscription = ({ onClose }) => {
             className="w-full p-2 border rounded"
             required
             disabled={isSubmitting}
-            min={new Date().toISOString().split("T")[0]} // Prevent past dates
+            min={new Date().toISOString().split("T")[0]}
           />
         </div>
 
-        {/* Paid Amount */}
         <div>
           <label className="block font-medium">المبلغ المدفوع</label>
           <input
@@ -259,13 +244,40 @@ const CreateSubscription = ({ onClose }) => {
           />
         </div>
 
-        {/* Submit Button */}
         <button
           type="submit"
-          className={`btn ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+          className={`btn bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 ${
+            isSubmitting ? "opacity-50 cursor-not-allowed" : ""
+          }`}
           disabled={isSubmitting}
         >
-          {isSubmitting ? "جاري المعالجة..." : "إنشاء اشتراك"}
+          {isSubmitting ? (
+            <span className="flex items-center">
+              <svg
+                className="animate-spin h-5 w-5 mr-2 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v8h8a8 8 0 01-16 0z"
+                ></path>
+              </svg>
+              جاري المعالجة...
+            </span>
+          ) : (
+            "إنشاء اشتراك"
+          )}
         </button>
       </form>
     </div>
@@ -273,6 +285,4 @@ const CreateSubscription = ({ onClose }) => {
 };
 
 export default CreateSubscription;
-
-
 
