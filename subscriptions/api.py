@@ -20,7 +20,7 @@ def subscription_type_list(request):
         search_term = request.GET.get('q', '')
 
         if request.user.role == 'owner':
-            types = SubscriptionType.objects.all()
+            types = SubscriptionType.objects.all().order_by('id')
         else:
             types = SubscriptionType.objects.filter(club=request.user.club)
 
@@ -50,9 +50,9 @@ def subscription_list(request):
         search_term = request.GET.get('identifier', '')
 
         if request.user.role == 'owner':
-            subscriptions = Subscription.objects.select_related('member', 'type', 'club').all()
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club').all().order_by('-start_date')
         else:
-            subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club).order_by('-start_date')
 
         # Apply search filter
         if search_term:
@@ -326,7 +326,6 @@ def member_subscriptions(request):
     page = paginator.paginate_queryset(subscriptions, request)
     serializer = SubscriptionSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

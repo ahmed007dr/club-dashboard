@@ -3,19 +3,30 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 
-// Fetch all invites
+// Fetch all invites with pagination
 export const fetchFreeInvites = createAsyncThunk(
-    'invites/fetchFreeInvites',
-    async () => {
-      const token = localStorage.getItem('token');  // Get token from localStorage
+  'invites/fetchFreeInvites',
+  async (params = {}, { rejectWithValue }) => {
+    const token = localStorage.getItem('token');
+    try {
       const response = await axios.get(`${BASE_URL}/invites/api/free-invites/`, {
         headers: {
-          Authorization: token ? `Bearer ${token}` : '', // Add token if it exists
+          Authorization: `Bearer ${token}`,
         },
+        params: {
+          page: params.page,
+          page_size: params.page_size,
+          // Add any other filter params here
+          used: params.used,
+          // ... other filters
+        }
       });
-      return response.data; // Assuming the API returns an array or object
+      return response.data; // Should return {count, next, previous, results}
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
     }
-  );
+  }
+);
 
 // Add new invite
 export const addInvite = createAsyncThunk(
@@ -33,14 +44,13 @@ export const addInvite = createAsyncThunk(
           },
         }
       );
-      console.log('Invite added successfully:', response.data); // Log success message
       return response.data;
     } catch (error) {
-      console.error('Error adding invite:', error.response?.data || error.message); // Log error details
       return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
+
 // Fetch single invite by ID
 export const fetchInviteById = createAsyncThunk(
   'invites/fetchInviteById',
@@ -56,7 +66,6 @@ export const fetchInviteById = createAsyncThunk(
           },
         }
       );
-      console.log('Fetched invite:', response.data); // Log the fetched invite data
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -79,10 +88,8 @@ export const deleteInviteById = createAsyncThunk(
           },
         }
       );
-      console.log(`Invite with ID ${inviteId} deleted successfully.`); // Log success message
       return inviteId;
     } catch (error) {
-      console.error(`Error deleting invite with ID ${inviteId}:`, error.response?.data || error.message); // Log error details
       return rejectWithValue(error.response?.data || error.message);
     }
   }
@@ -104,16 +111,14 @@ export const editInviteById = createAsyncThunk(
           },
         }
       );
-      console.log(`Invite with ID ${inviteId} updated successfully:`, response.data); // Log success message
       return response.data;
     } catch (error) {
-      console.error(`Error updating invite with ID ${inviteId}:`, error.response?.data || error.message); // Log error details
       return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
 
-// Mark invite as used (similar to markTicketAsUsed)
+// Mark invite as used
 export const markInviteAsUsed = createAsyncThunk(
   'invites/markInviteAsUsed',
   async ({ inviteId, used_by }, { rejectWithValue }) => {
@@ -139,7 +144,12 @@ export const markInviteAsUsed = createAsyncThunk(
 const invitesSlice = createSlice({
   name: 'invites',
   initialState: {
-    invites: [],
+    invites: {
+      results: [],
+      count: 0,
+      next: null,
+      previous: null
+    },
     currentInvite: null,
     loading: false,
     error: null,
@@ -147,29 +157,43 @@ const invitesSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-    .addCase(fetchFreeInvites.pending, (state) => {
+      // Fetch Invites
+      .addCase(fetchFreeInvites.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(fetchFreeInvites.fulfilled, (state, action) => {
         state.loading = false;
-        state.invites = action.payload;
+        state.invites = {
+          results: action.payload.results,
+          count: action.payload.count,
+          next: action.payload.next,
+          previous: action.payload.previous
+        };
       })
       .addCase(fetchFreeInvites.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message;
+        state.error = action.payload;
       })
+      
+      // Add Invite
       .addCase(addInvite.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(addInvite.fulfilled, (state, action) => {
         state.loading = false;
-        state.invites.push(action.payload);
+        // Add new invite to beginning of results
+        state.invites.results.unshift(action.payload);
+        // Increment total count
+        state.invites.count += 1;
       })
       .addCase(addInvite.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+      
+      // Fetch Invite By ID
       .addCase(fetchInviteById.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -182,49 +206,61 @@ const invitesSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+      
+      // Delete Invite
       .addCase(deleteInviteById.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(deleteInviteById.fulfilled, (state, action) => {
         state.loading = false;
-        state.invites = state.invites.filter(
+        // Remove deleted invite from results
+        state.invites.results = state.invites.results.filter(
           (invite) => invite.id !== action.payload
         );
+        // Decrement total count
+        state.invites.count -= 1;
       })
       .addCase(deleteInviteById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+      
+      // Edit Invite
       .addCase(editInviteById.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(editInviteById.fulfilled, (state, action) => {
         state.loading = false;
-        const index = state.invites.findIndex(
+        // Update the invite in results array
+        const index = state.invites.results.findIndex(
           (invite) => invite.id === action.payload.id
         );
         if (index !== -1) {
-          state.invites[index] = action.payload;
+          state.invites.results[index] = action.payload;
         }
       })
       .addCase(editInviteById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+      
+      // Mark Invite as Used
       .addCase(markInviteAsUsed.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(markInviteAsUsed.fulfilled, (state, action) => {
         state.loading = false;
-        const index = state.invites.findIndex(
+        // Find and update the invite in results array
+        const index = state.invites.results.findIndex(
           (invite) => invite.id === action.payload.id
         );
+        
         if (index !== -1) {
-          state.invites[index] = {
-            ...state.invites[index],
+          state.invites.results[index] = {
+            ...state.invites.results[index],
             used: action.payload.used,
             used_by: action.payload.used_by,
             ...action.payload

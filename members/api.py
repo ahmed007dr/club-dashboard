@@ -11,15 +11,16 @@ from .models import Member
 from utils.generate_membership_number import generate_membership_number
 from django.db import IntegrityError
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_list_api(request):
     search_term = request.GET.get('q', '')
     
     if request.user.role == 'owner':
-        members = Member.objects.all()
+        members = Member.objects.all().order_by('-id')
     else:
-        members = Member.objects.filter(club=request.user.club)
+        members = Member.objects.filter(club=request.user.club).order_by('-id')
     
     if search_term:
         members = members.filter(
@@ -116,4 +117,3 @@ def delete_member_api(request, member_id):
     member = get_object_or_404(Member, id=member_id)
     member.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
-

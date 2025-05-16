@@ -16,14 +16,22 @@ import {
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
-import BASE_URL from '../../config/api';
-import { toast } from 'react-hot-toast';
-
-
+import BASE_URL from "../../config/api";
+import { toast } from "react-hot-toast";
 
 const Tickets = () => {
   const dispatch = useDispatch();
-  const { tickets, status, error } = useSelector((state) => state.tickets);
+  const {
+    tickets: {
+      results: tickets = [],
+      count: totalItems = 0,
+      next: nextPageUrl,
+      previous: prevPageUrl,
+    },
+    loading,
+    error,
+  } = useSelector((state) => state.tickets);
+
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -40,19 +48,9 @@ const Tickets = () => {
   const [filterBuyerName, setFilterBuyerName] = useState("");
   const [filterUsedStatus, setFilterUsedStatus] = useState("");
 
-  // Add Ticket Form
-  const [formData, setFormData] = useState({
-    club: "",
-    buyer_name: "",
-    ticket_type: "",
-    price: "",
-    used: false,
-    used_by: "",
-  });
-
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(6);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const itemsPerPageOptions = [5, 10, 20];
   const actionButtonsRef = useRef(null);
 
@@ -80,45 +78,61 @@ const Tickets = () => {
       });
   }, []);
 
-  // Load tickets on mount
+  // Calculate total pages based on count from backend
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+
+  // Load tickets with pagination
   useEffect(() => {
-    dispatch(fetchTickets());
-  }, [dispatch]);
+    if (userClub && currentPage <= totalPages) {
+      const params = {
+        page: currentPage,
+        page_size: itemsPerPage,
+        club: userClub?.id || "",
+        buyer_name: filterBuyerName,
+        ticket_type: filterTicketType,
+        used:
+          filterUsedStatus === "used"
+            ? "true"
+            : filterUsedStatus === "unused"
+            ? "false"
+            : "",
+      };
+      dispatch(fetchTickets(params));
+    }
+  }, [
+    dispatch,
+    currentPage,
+    itemsPerPage,
+    filterClub,
+    filterTicketType,
+    filterBuyerName,
+    filterUsedStatus,
+    userClub,
+    totalPages,
+  ]);
 
-  // Filter and sort tickets
-  const filteredTickets = tickets
-    .filter((ticket) => {
-      const matchesClub =
-        userClub && ticket.club.toString() === userClub.id.toString();
-      const matchesBuyer =
-        filterBuyerName === "" ||
-        ticket.buyer_name?.toLowerCase().includes(filterBuyerName.toLowerCase());
-      const matchesType =
-        filterTicketType === "" || ticket.ticket_type === filterTicketType;
-      const matchesStatus =
-        filterUsedStatus === "" ||
-        (filterUsedStatus === "used" && ticket.used) ||
-        (filterUsedStatus === "unused" && !ticket.used);
+  // Reset currentPage when totalPages or totalItems changes
+  useEffect(() => {
+    if (totalItems === 0) {
+      setCurrentPage(1);
+    } else if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, totalItems, currentPage]);
 
-      return matchesClub && matchesBuyer && matchesType && matchesStatus;
-    })
-    .sort((a, b) => b.id - a.id); // Sort by id in descending order (newest first)
-
-  // Pagination logic
-  const totalItems = filteredTickets.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const indexOfLastTicket = currentPage * itemsPerPage;
-  const indexOfFirstTicket = indexOfLastTicket - itemsPerPage;
-  const currentTickets = filteredTickets.slice(
-    indexOfFirstTicket,
-    indexOfLastTicket
-  );
-  const startIndex = indexOfFirstTicket + 1;
-  const endIndex = Math.min(indexOfLastTicket, totalItems);
+  // Add Ticket Form
+  const [formData, setFormData] = useState({
+    club: "",
+    buyer_name: "",
+    ticket_type: "",
+    price: "",
+    used: false,
+    used_by: "",
+  });
 
   // Generate page numbers (limited range)
   const getPageNumbers = () => {
-    const maxPagesToShow = 5;
+    const maxPagesToShow = 5; // Fixed syntax error
     const halfPages = Math.floor(maxPagesToShow / 2);
     let startPage = Math.max(1, currentPage - halfPages);
     let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
@@ -136,7 +150,7 @@ const Tickets = () => {
 
   // Pagination handlers
   const handlePageChange = (pageNumber) => {
-    if (pageNumber >= 1 && pageNumber <= totalPages) {
+    if (pageNumber >= 1 && pageNumber <= totalPages && totalItems > 0) {
       setCurrentPage(pageNumber);
     }
   };
@@ -156,13 +170,13 @@ const Tickets = () => {
   const handleItemsPerPageChange = (e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1);
+    setCurrentPage(1); // Reset to first page
   };
 
-  // Reset to first page when filters or itemsPerPage change
+  // Reset to first page when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [filterClub, filterTicketType, filterBuyerName, filterUsedStatus, itemsPerPage]);
+  }, [filterClub, filterTicketType, filterBuyerName, filterUsedStatus]);
 
   // Modal handlers
   const openCreateModal = () => {
@@ -259,7 +273,20 @@ const Tickets = () => {
       )
         .unwrap()
         .then(() => {
-          dispatch(fetchTickets());
+          const params = {
+            page: currentPage,
+            page_size: itemsPerPage,
+            club: userClub?.id || "",
+            buyer_name: filterBuyerName,
+            ticket_type: filterTicketType,
+            used:
+              filterUsedStatus === "used"
+                ? "true"
+                : filterUsedStatus === "unused"
+                ? "false"
+                : "",
+          };
+          dispatch(fetchTickets(params));
           toast.success("تم تعديل التذكرة بنجاح!");
           closeAllModals();
         })
@@ -275,7 +302,20 @@ const Tickets = () => {
       dispatch(deleteTicketById(selectedTicket.id))
         .unwrap()
         .then(() => {
-          dispatch(fetchTickets());
+          const params = {
+            page: currentPage > totalPages ? totalPages : currentPage,
+            page_size: itemsPerPage,
+            club: userClub?.id || "",
+            buyer_name: filterBuyerName,
+            ticket_type: filterTicketType,
+            used:
+              filterUsedStatus === "used"
+                ? "true"
+                : filterUsedStatus === "unused"
+                ? "false"
+                : "",
+          };
+          dispatch(fetchTickets(params));
           toast.success("تم حذف التذكرة بنجاح!");
           closeAllModals();
         })
@@ -286,7 +326,6 @@ const Tickets = () => {
     }
   };
 
-  // Handle mark as used action
   const handleMarkAsUsed = () => {
     if (selectedTicket) {
       dispatch(
@@ -297,7 +336,20 @@ const Tickets = () => {
       )
         .unwrap()
         .then(() => {
-          dispatch(fetchTickets());
+          const params = {
+            page: currentPage,
+            page_size: itemsPerPage,
+            club: userClub?.id || "",
+            buyer_name: filterBuyerName,
+            ticket_type: filterTicketType,
+            used:
+              filterUsedStatus === "used"
+                ? "true"
+                : filterUsedStatus === "unused"
+                ? "false"
+                : "",
+          };
+          dispatch(fetchTickets(params));
           toast.success("تم تحديد التذكرة كمستخدمة بنجاح!");
           closeAllModals();
         })
@@ -316,7 +368,7 @@ const Tickets = () => {
         type === "checkbox"
           ? checked
           : name === "used_by" || name === "price"
-          ? Number(value) || ""
+          ? value === "" ? "" : Number(value)
           : value,
     }));
   };
@@ -329,7 +381,7 @@ const Tickets = () => {
         type === "checkbox"
           ? checked
           : name === "price" || name === "used_by"
-          ? Number(value) || ""
+          ? value === "" ? "" : Number(value)
           : value,
     }));
   };
@@ -354,7 +406,20 @@ const Tickets = () => {
     dispatch(addTicket(ticketData))
       .unwrap()
       .then(() => {
-        dispatch(fetchTickets());
+        const params = {
+          page: 1, // Reset to first page after adding
+          page_size: itemsPerPage,
+          club: userClub?.id || "",
+          buyer_name: filterBuyerName,
+          ticket_type: filterTicketType,
+          used:
+            filterUsedStatus === "used"
+              ? "true"
+              : filterUsedStatus === "unused"
+              ? "false"
+              : "",
+        };
+        dispatch(fetchTickets(params));
         toast.success("تم إضافة التذكرة بنجاح!");
         closeAllModals();
       })
@@ -365,18 +430,20 @@ const Tickets = () => {
       });
   };
 
-  if (status === "loading" || loadingProfile)
+  // Display error toasts
+  useEffect(() => {
+    if (error && typeof error === "object" && error.detail) {
+      toast.error(`خطأ: ${error.detail}`);
+    }
+  }, [error]);
+
+  if (loading || loadingProfile) {
     return (
       <div className="flex justify-center items-center h-screen text-sm sm:text-base">
         جاري التحميل...
       </div>
     );
-  if (error)
-    return (
-      <div className="text-red-500 text-center p-4 text-sm sm:text-base">
-        خطأ: {error}
-      </div>
-    );
+  }
 
   return (
     <div className="container mx-auto p-4 sm:p-6" dir="rtl">
@@ -414,7 +481,7 @@ const Tickets = () => {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1"> رقم التذكرة </label>
+          <label className="block text-sm font-medium mb-1">رقم التذكرة</label>
           <input
             type="text"
             placeholder="بحث عن رقم التذكرة"
@@ -451,7 +518,7 @@ const Tickets = () => {
 
       {/* Tickets Table */}
       <div className="overflow-x-auto">
-        {currentTickets.length > 0 ? (
+        {Array.isArray(tickets) && tickets.length > 0 ? (
           <>
             {/* Table for Small Screens and Above */}
             <table className="min-w-full bg-white shadow rounded hidden sm:table">
@@ -478,14 +545,20 @@ const Tickets = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {currentTickets.map((ticket) => (
+                {tickets.map((ticket) => (
                   <tr key={ticket.id} className="hover:bg-gray-50">
-                    <td className="py-2 px-4 border-b text-center text-sm">{ticket.club_name}</td>
-                    <td className="py-2 px-4 border-b text-center text-sm">{ticket.buyer_name}</td>
+                    <td className="py-2 px-4 border-b text-center text-sm">
+                      {ticket.club_name}
+                    </td>
+                    <td className="py-2 px-4 border-b text-center text-sm">
+                      {ticket.buyer_name}
+                    </td>
                     <td className="py-2 px-4 border-b text-center text-sm">
                       {ticket.ticket_type_display}
                     </td>
-                    <td className="py-2 px-4 border-b text-center text-sm">{ticket.price} جنيه</td>
+                    <td className="py-2 px-4 border-b text-center text-sm">
+                      {ticket.price} جنيه
+                    </td>
                     <td className="py-2 px-4 border-b text-center text-sm">
                       <span
                         className={`px-2 py-1 rounded text-xs ${
@@ -498,7 +571,10 @@ const Tickets = () => {
                       </span>
                     </td>
                     <td className="py-2 px-4 border-b text-center">
-                      <div ref={actionButtonsRef} className="flex justify-center items-center gap-2">
+                      <div
+                        ref={actionButtonsRef}
+                        className="flex justify-center items-center gap-2"
+                      >
                         <DropdownMenu dir="rtl">
                           <DropdownMenuTrigger asChild>
                             <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
@@ -543,13 +619,15 @@ const Tickets = () => {
 
             {/* Card Layout for Mobile */}
             <div className="sm:hidden space-y-4">
-              {currentTickets.map((ticket) => (
+              {tickets.map((ticket) => (
                 <div
                   key={ticket.id}
                   className="border rounded-md p-4 bg-white shadow-sm"
                 >
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-semibold">{ticket.buyer_name}</span>
+                    <span className="text-sm font-semibold">
+                      {ticket.buyer_name}
+                    </span>
                     <DropdownMenu dir="rtl">
                       <DropdownMenuTrigger asChild>
                         <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
@@ -619,116 +697,110 @@ const Tickets = () => {
       </div>
 
       {/* Pagination Controls */}
-      {/* Pagination Controls */}
-<div className="flex flex-col sm:flex-row justify-between items-center mt-6 space-y-4 sm:space-y-0" dir="rtl">
-  {/* Info Message */}
-  {totalItems === 0 && (
-    <div className="text-sm text-gray-600">
-      لا توجد تذاكر لعرضها
-    </div>
-  )}
-  {totalItems > 0 && (
-    <>
-      <div className="text-sm text-gray-700">
-        عرض {startIndex}–{endIndex} من {totalItems} تذكرة
+      <div
+        className="flex flex-col sm:flex-row justify-between items-center mt-6 space-y-4 sm:space-y-0"
+        dir="rtl"
+      >
+        {totalItems === 0 && (
+          <div className="text-sm text-gray-600">لا توجد تذاكر لعرضها</div>
+        )}
+        {totalItems > 0 && (
+          <>
+            <div className="text-sm text-gray-700">
+              عرض {((currentPage - 1) * itemsPerPage) + 1}–
+              {Math.min(currentPage * itemsPerPage, totalItems)} من {totalItems}{" "}
+              تذكرة
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={itemsPerPage}
+                onChange={handleItemsPerPageChange}
+                className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-green-200"
+                aria-label="عدد التذاكر لكل صفحة"
+              >
+                {itemsPerPageOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option} لكل صفحة
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => handlePageChange(1)}
+                disabled={currentPage === 1 || totalItems === 0}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  currentPage === 1 || totalItems === 0
+                    ? "bg-gray-200 cursor-not-allowed"
+                    : "bg-blue-500 text-white hover:bg-blue-600"
+                }`}
+                aria-label="الصفحة الأولى"
+              >
+                الأول
+              </button>
+
+              <button
+                onClick={handlePrevious}
+                disabled={currentPage === 1 || totalItems === 0}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  currentPage === 1 || totalItems === 0
+                    ? "bg-gray-200 cursor-not-allowed"
+                    : "bg-blue-500 text-white hover:bg-blue-600"
+                }`}
+                aria-label="الصفحة السابقة"
+              >
+                السابق
+              </button>
+
+              {getPageNumbers().map((page) => (
+                <button
+                  key={page}
+                  onClick={() => handlePageChange(page)}
+                  disabled={totalItems === 0}
+                  className={`px-3 py-1 rounded-md text-sm ${
+                    currentPage === page && totalItems > 0
+                      ? "bg-blue-500 text-white"
+                      : "bg-gray-200 hover:bg-gray-300"
+                  } ${totalItems === 0 ? "cursor-not-allowed" : ""}`}
+                  aria-label={`الصفحة ${page}`}
+                >
+                  {page}
+                </button>
+              ))}
+
+              {totalPages > getPageNumbers().length &&
+                getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
+                  <span className="px-3 py-1 text-sm">...</span>
+                )}
+
+              <button
+                onClick={handleNext}
+                disabled={currentPage === totalPages || totalItems === 0}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  currentPage === totalPages || totalItems === 0
+                    ? "bg-gray-200 cursor-not-allowed"
+                    : "bg-blue-500 text-white hover:bg-blue-600"
+                }`}
+                aria-label="الصفحة التالية"
+              >
+                التالي
+              </button>
+
+              <button
+                onClick={() => handlePageChange(totalPages)}
+                disabled={currentPage === totalPages || totalItems === 0}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  currentPage === totalPages || totalItems === 0
+                    ? "bg-gray-200 cursor-not-allowed"
+                    : "bg-blue-500 text-white hover:bg-blue-600"
+                }`}
+                aria-label="الصفحة الأخيرة"
+              >
+                الأخير
+              </button>
+            </div>
+          </>
+        )}
       </div>
-      <div className="flex items-center gap-2">
-        {/* Items Per Page Dropdown */}
-        <select
-          value={itemsPerPage}
-          onChange={handleItemsPerPageChange}
-          className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-green-200"
-          aria-label="عدد التذاكر لكل صفحة"
-        >
-          {itemsPerPageOptions.map((option) => (
-            <option key={option} value={option}>
-              {option} لكل صفحة
-            </option>
-          ))}
-        </select>
-
-        {/* First Page Button */}
-        <button
-          onClick={() => handlePageChange(1)}
-          disabled={currentPage === 1 || totalItems === 0}
-          className={`px-3 py-1 rounded-md text-sm ${
-            currentPage === 1 || totalItems === 0
-              ? 'bg-gray-200 cursor-not-allowed'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
-          }`}
-          aria-label="الصفحة الأولى"
-        >
-          الأول
-        </button>
-
-        {/* Previous Page Button */}
-        <button
-          onClick={handlePrevious}
-          disabled={currentPage === 1 || totalItems === 0}
-          className={`px-3 py-1 rounded-md text-sm ${
-            currentPage === 1 || totalItems === 0
-              ? 'bg-gray-200 cursor-not-allowed'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
-          }`}
-          aria-label="الصفحة السابقة"
-        >
-          السابق
-        </button>
-
-        {/* Page Number Buttons */}
-        {getPageNumbers().map((page) => (
-          <button
-            key={page}
-            onClick={() => handlePageChange(page)}
-            disabled={totalItems === 0}
-            className={`px-3 py-1 rounded-md text-sm ${
-              currentPage === page && totalItems > 0
-                ? 'bg-blue-500 text-white'
-                : 'bg-gray-200 hover:bg-gray-300'
-            } ${totalItems === 0 ? 'cursor-not-allowed' : ''}`}
-            aria-label={`الصفحة ${page}`}
-          >
-            {page}
-          </button>
-        ))}
-
-        {/* Ellipsis for Large Page Ranges */}
-        {totalPages > getPageNumbers().length &&
-          getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
-            <span className="px-3 py-1 text-sm">...</span>
-          )}
-
-        {/* Next Page Button */}
-        <button
-          onClick={handleNext}
-          disabled={currentPage === totalPages || totalItems === 0}
-          className={`px-3 py-1 rounded-md text-sm ${
-            currentPage === totalPages || totalItems === 0
-              ? 'bg-gray-200 cursor-not-allowed'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
-          }`}
-          aria-label="الصفحة التالية"
-        >
-          التالي
-        </button>
-
-        {/* Last Page Button */}
-        <button
-          onClick={() => handlePageChange(totalPages)}
-          disabled={currentPage === totalPages || totalItems === 0}
-          className={`px-3 py-1 rounded-md text-sm ${
-            currentPage === totalPages || totalItems === 0
-              ? 'bg-gray-200 cursor-not-allowed'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
-          }`}
-          aria-label="الصفحة الأخيرة"
-        >
-          الأخير
-        </button>
-      </div>
-    </>
-  )}
-</div>
 
       {/* Create Ticket Modal */}
       {showCreateModal && (
@@ -741,7 +813,9 @@ const Tickets = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b p-4">
-              <h2 className="text-lg sm:text-xl font-semibold">إضافة تذكرة جديدة</h2>
+              <h2 className="text-lg sm:text-xl font-semibold">
+                إضافة تذكرة جديدة
+              </h2>
               <button
                 onClick={closeAllModals}
                 className="text-gray-500 hover:text-gray-700 text-lg"
@@ -757,7 +831,9 @@ const Tickets = () => {
               )}
               <form onSubmit={handleCreateSubmit} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-right">النادي</label>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    النادي
+                  </label>
                   <select
                     name="club"
                     value={formData.club}
@@ -774,19 +850,23 @@ const Tickets = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-right">رقم التذكر</label>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    رقم التذكرة
+                  </label>
                   <input
                     type="text"
                     name="buyer_name"
                     value={formData.buyer_name}
                     onChange={handleFormChange}
                     className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    placeholder="رقم التذكره"
+                    placeholder="رقم التذكرة"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-right">نوع التذكرة</label>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    نوع التذكرة
+                  </label>
                   <select
                     name="ticket_type"
                     value={formData.ticket_type}
@@ -795,12 +875,14 @@ const Tickets = () => {
                     required
                   >
                     <option value="">اختر نوع التذكرة</option>
-                    <option value="session">حصه فرديه</option>
-                    <option value="day_pass">برايفت</option>
+                    <option value="session">جلسة</option>
+                    <option value="day_pass">تصريح يومي</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-right">السعر (جنيه)</label>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    السعر (جنيه)
+                  </label>
                   <input
                     type="number"
                     name="price"
@@ -824,7 +906,9 @@ const Tickets = () => {
                 </div>
                 {formData.used && (
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-right">معرف العضو</label>
+                    <label className="block text-sm font-medium mb-1 text-right">
+                      معرف العضو
+                    </label>
                     <input
                       type="number"
                       name="used_by"
@@ -868,7 +952,9 @@ const Tickets = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b p-4">
-              <h2 className="text-lg sm:text-xl font-semibold">تعديل التذكرة</h2>
+              <h2 className="text-lg sm:text-xl font-semibold">
+                تعديل التذكرة
+              </h2>
               <button
                 onClick={closeAllModals}
                 className="text-gray-500 hover:text-gray-700 text-lg"
@@ -884,7 +970,9 @@ const Tickets = () => {
               )}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-right">النادي</label>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    النادي
+                  </label>
                   <select
                     name="club"
                     value={userClub?.id || ""}
@@ -900,7 +988,9 @@ const Tickets = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-right">اسم المشتري</label>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    رقم التذكرة
+                  </label>
                   <input
                     type="text"
                     name="buyer_name"
@@ -911,7 +1001,9 @@ const Tickets = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-right">نوع التذكرة</label>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    نوع التذكرة
+                  </label>
                   <select
                     name="ticket_type"
                     value={selectedTicket.ticket_type || ""}
@@ -925,7 +1017,9 @@ const Tickets = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1 text-right">السعر (جنيه)</label>
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    السعر (جنيه)
+                  </label>
                   <input
                     type="number"
                     name="price"
@@ -948,7 +1042,9 @@ const Tickets = () => {
                 </div>
                 {selectedTicket.used && (
                   <div>
-                    <label className="block text-sm font-medium mb-1 text-right">معرف العضو</label>
+                    <label className="block text-sm font-medium mb-1 text-right">
+                      معرف العضو
+                    </label>
                     <input
                       type="number"
                       name="used_by"
@@ -1018,8 +1114,6 @@ const Tickets = () => {
               </div>
             </div>
           </div>
-ί
-
         </div>
       )}
 
@@ -1034,7 +1128,9 @@ const Tickets = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b p-4">
-              <h2 className="text-lg sm:text-xl font-semibold">تحديد التذكرة كمستخدمة</h2>
+              <h2 className="text-lg sm:text-xl font-semibold">
+                تحديد التذكرة كمستخدمة
+              </h2>
               <button
                 onClick={closeAllModals}
                 className="text-gray-500 hover:text-gray-700 text-lg"
@@ -1044,7 +1140,10 @@ const Tickets = () => {
             </div>
             <div className="p-4 sm:p-6">
               <div className="mb-4">
-                <label htmlFor="usedBy" className="block text-sm font-medium mb-1 text-right">
+                <label
+                  htmlFor="usedBy"
+                  className="block text-sm font-medium mb-1 text-right"
+                >
                   معرف العضو
                 </label>
                 <input
@@ -1087,7 +1186,9 @@ const Tickets = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b p-4">
-              <h2 className="text-lg sm:text-xl font-semibold">تفاصيل التذكرة</h2>
+              <h2 className="text-lg sm:text-xl font-semibold">
+                تفاصيل التذكرة
+              </h2>
               <button
                 onClick={closeAllModals}
                 className="text-gray-500 hover:text-gray-700 text-lg"
@@ -1097,7 +1198,7 @@ const Tickets = () => {
             </div>
             <div className="p-4 sm:p-6">
               <p className="text-sm sm:text-base mb-2">
-                <strong>اسم المشتري:</strong> {selectedTicket.buyer_name}
+                <strong>رقم التذكرة:</strong> {selectedTicket.buyer_name}
               </p>
               <p className="text-sm sm:text-base mb-2">
                 <strong>السعر:</strong> {selectedTicket.price} جنيه

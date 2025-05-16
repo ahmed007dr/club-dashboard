@@ -1,83 +1,53 @@
 import React, { useEffect, useState } from "react";
 import AddMember from "../modals/AddMember";
 import { Link } from "react-router-dom";
-import { CiTrash } from "react-icons/ci";
-import { CiEdit } from "react-icons/ci";
+import { CiTrash, CiEdit } from "react-icons/ci";
 import { RiGroupLine } from "react-icons/ri";
 import { useSelector, useDispatch } from "react-redux";
 import { deleteMember, editMember, fetchUsers, searchMember } from "../../redux/slices/memberSlice";
 import { IoAddOutline } from "react-icons/io5";
 import toast from 'react-hot-toast';
 
-
 const Members = () => {
-const [data, setData] = useState([
-  {
-    id: '4',
-    photo: 'https://i.pravatar.cc/100?img=11',
-    name: 'ahmed El-Zahrani',
-    membership_number: '1008',
-    national_id: '102030405066',
-    phone: '0101234566',
-    phone2: '', // Add this
-    address: '', // Add this
-    rfid_code: '', // Add this
-    job: '', // Add this
-    note: '', // Add this
-    club_name: 'Sports Club',
-  },
-]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState(null);
-  const [searchResult, setSearchResult] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20); // Configurable items per page
+  const itemsPerPage = 20; // Matches backend configuration
 
- const members = useSelector((state) => state.member.items); // Remove .results
+  // Updated selectors
+  const members = useSelector((state) => state.member.items); // Now an array (results)
+  const pagination = useSelector((state) => state.member.pagination); // { count, next, previous }
   const dispatch = useDispatch();
 
   useEffect(() => {
-  const fetchData = async () => {
-    try {
-      const fetchedData = await dispatch(fetchUsers()).unwrap();
-      console.log('Raw fetched data:', fetchedData); // Log original data
+    const fetchData = async () => {
+      try {
+        const fetchedData = await dispatch(fetchUsers({ page: currentPage })).unwrap();
+        console.log('Raw fetched data:', fetchedData);
+      } catch (error) {
+        console.error('Fetch error:', error);
+        setError('Failed to fetch members. Please try again later: ' + error.message);
+      }
+    };
 
-      // Sort by id in descending order (newest to oldest)
-      const sortedData = [...fetchedData].sort((a, b) => b.id - a.id); // Remove .results
-      console.log('Sorted data:', sortedData); // Log sorted data
-
-      setSearchResult(sortedData);
-      setData(sortedData);
-    } catch (error) {
-      console.error('Fetch error:', error);
-      setError('Failed to fetch members. Please try again later: ' + error.message);
-    }
-  };
-
-  fetchData();
-}, [dispatch]); 
-  
+    fetchData();
+  }, [dispatch, currentPage]);
 
   const handleSearch = async (e) => {
     const query = e.target.value.toLowerCase();
     setSearchQuery(query);
     setCurrentPage(1); // Reset to first page on search
 
-    if (query.trim() === '') {
-      // Sort data by id in descending order when resetting search
-      const sortedData = [...data].sort((a, b) => b.id - a.id);
-      setSearchResult(sortedData);
-      return;
-    }
     try {
-      const result = await dispatch(searchMember(query)).unwrap();
-      // Sort search results by id in descending order
-      const sortedResult = [...result].sort((a, b) => b.id - a.id);
-      setSearchResult(sortedResult);
+      if (query.trim() === "") {
+        await dispatch(fetchUsers({ page: 1 })).unwrap();
+      } else {
+        await dispatch(searchMember({ query, page: 1 })).unwrap();
+      }
     } catch (error) {
       setError('Failed to search members. Please try again later: ' + error);
     }
@@ -96,70 +66,58 @@ const [data, setData] = useState([
 
     try {
       await dispatch(deleteMember(selectedMember.id)).unwrap();
-      const updatedData = data.filter((m) => m.id !== selectedMember.id);
-      // Sort updated data by id in descending order
-      const sortedUpdatedData = [...updatedData].sort((a, b) => b.id - a.id);
-      setData(sortedUpdatedData);
-      setSearchResult(sortedUpdatedData);
-      setIsDeleteModalOpen(false);
-      // Adjust current page if necessary
-      const totalPages = Math.ceil(sortedUpdatedData.length / itemsPerPage);
-      if (currentPage > totalPages) {
-        setCurrentPage(totalPages || 1);
+      // Refresh current page
+      const fetchedData = await dispatch(fetchUsers({ page: currentPage })).unwrap();
+      // If current page is empty and not the first page, go to previous page
+      if (fetchedData.results.length === 0 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
       }
+      setIsDeleteModalOpen(false);
+      toast.success("تم حذف العضو بنجاح");
     } catch (error) {
       setError('Failed to delete member. Please try again later: ' + error.message);
     }
   };
 
-  const handleEditClick = (member) => {
-    setSelectedMember(member);
-    setIsEditModalOpen(true);
-  };
+ const handleEditClick = (member) => {
+  setSelectedMember(member); // Corrected function name
+  setIsEditModalOpen(true);
+};
 
   const handleEditChange = (e) => {
     setSelectedMember({ ...selectedMember, [e.target.name]: e.target.value });
   };
 
-const handleEditSubmit = async () => {
-  try {
-    const toastId = toast.loading('جاري حفظ التعديلات...', {
-      position: 'top-center',
-    });
+  const handleEditSubmit = async () => {
+    try {
+      const toastId = toast.loading('جاري حفظ التعديلات...', {
+        position: 'top-center',
+      });
 
-    // Dispatch the edit action
-    await dispatch(
-      editMember({ id: selectedMember.id, updatedUser: selectedMember })
-    ).unwrap();
+      await dispatch(
+        editMember({ id: selectedMember.id, updatedUser: selectedMember })
+      ).unwrap();
 
-    // Update local state
-    const updatedData = data.map((m) =>
-      m.id === selectedMember.id ? selectedMember : m
-    );
-    const sortedUpdatedData = [...updatedData].sort((a, b) => b.id - a.id);
-    
-    setData(sortedUpdatedData);
-    setSearchResult(sortedUpdatedData);
-    setIsEditModalOpen(false);
-
-    toast.success('تم تحديث بيانات العضو بنجاح', {
-      id: toastId,
-    });
-  } catch (error) {
-    toast.error(`فشل في التحديث: ${error.message}`);
-  }
-};
+      // Refresh current page
+      await dispatch(fetchUsers({ page: currentPage })).unwrap();
+      setIsEditModalOpen(false);
+      toast.success('تم تحديث بيانات العضو بنجاح', { id: toastId });
+    } catch (error) {
+      toast.error(`فشل في التحديث: ${error.message}`);
+    }
+  };
 
   const openAddModal = () => setIsAddModalOpen(true);
   const closeAddModal = () => setIsAddModalOpen(false);
 
-  // Pagination logic
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = searchResult.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(searchResult.length / itemsPerPage);
+  // Updated pagination logic
+  const totalPages = Math.ceil(pagination.count / itemsPerPage);
 
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  const paginate = (pageNumber) => {
+    if (pageNumber >= 1 && pageNumber <= totalPages) {
+      setCurrentPage(pageNumber);
+    }
+  };
 
   return (
     <div className="p-4 overflow-x-auto" dir="rtl">
@@ -178,7 +136,7 @@ const handleEditSubmit = async () => {
       <div className="flex justify-end mb-4">
         <button
           onClick={openAddModal}
-          className="flex justify-end text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-blue-600 dark:hover:bg-blue-700 focus:outline-none dark:focus:ring-blue-800"
+          className="flex justify-end text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2"
         >
           <IoAddOutline className="flex inline-block text-xl" />
           إضافة عضو
@@ -200,10 +158,10 @@ const handleEditSubmit = async () => {
           </tr>
         </thead>
         <tbody>
-          {Array.isArray(currentItems) &&
-            currentItems.map((member, index) => (
+          {Array.isArray(members) &&
+            members.map((member, index) => (
               <tr key={member.id}>
-                <td className="p-3 border-b">{indexOfFirstItem + index + 1}</td>
+                <td className="p-3 border-b">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                 <td className="p-3 border-b">
                   <Link to={`/member/${member.id}`}>
                     <img
@@ -246,150 +204,141 @@ const handleEditSubmit = async () => {
         </tbody>
       </table>
 
-      {/* Pagination Controls */}
-      {/* Pagination Controls */}
-<div className="flex justify-between items-center mt-4" dir="rtl">
-  {/* Info Message */}
-  {searchResult.length === 0 && (
-    <div className="text-sm text-gray-600">
-      لا توجد أعضاء لعرضهم
-    </div>
-  )}
-  {searchResult.length > 0 && (
-    <>
-      <div className="text-sm text-gray-600">
-        عرض {indexOfFirstItem + 1} إلى{' '}
-        {Math.min(indexOfLastItem, searchResult.length)} من {searchResult.length}{' '}
-        عضو
-      </div>
-      <div className="flex gap-2">
-        {/* First Page Button */}
-        <button
-          onClick={() => paginate(1)}
-          disabled={currentPage === 1 || searchResult.length === 0}
-          className={`px-3 py-1 rounded ${
-            currentPage === 1 || searchResult.length === 0
-              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-              : 'bg-blue-700 text-white hover:bg-blue-800'
-          }`}
-        >
-          الأول
-        </button>
-
-        {/* Previous Page Button */}
-        <button
-          onClick={() => paginate(currentPage - 1)}
-          disabled={currentPage === 1 || searchResult.length === 0}
-          className={`px-3 py-1 rounded ${
-            currentPage === 1 || searchResult.length === 0
-              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-              : 'bg-blue-700 text-white hover:bg-blue-800'
-          }`}
-        >
-          السابق
-        </button>
-
-        {/* Page Number Buttons */}
-        {(() => {
-          const maxButtons = 5; // Maximum number of page buttons to show
-          const sideButtons = Math.floor(maxButtons / 2);
-          let start = Math.max(1, currentPage - sideButtons);
-          let end = Math.min(totalPages, currentPage + sideButtons);
-
-          // Adjust start and end to show maxButtons when possible
-          if (end - start + 1 < maxButtons) {
-            if (currentPage <= sideButtons) {
-              end = Math.min(totalPages, maxButtons);
-            } else {
-              start = Math.max(1, totalPages - maxButtons + 1);
-            }
-          }
-
-          return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
-            (page) => (
+      {/* Updated Pagination Controls */}
+      <div className="flex justify-between items-center mt-4" dir="rtl">
+        {pagination.count === 0 && (
+          <div className="text-sm text-gray-600">لا توجد أعضاء لعرضهم</div>
+        )}
+        {pagination.count > 0 && (
+          <>
+            <div className="text-sm text-gray-600">
+              عرض {(currentPage - 1) * itemsPerPage + 1} إلى{' '}
+              {Math.min(currentPage * itemsPerPage, pagination.count)} من {pagination.count} عضو
+            </div>
+            <div className="flex gap-2">
+              {/* First Page Button */}
               <button
-                key={page}
-                onClick={() => paginate(page)}
-                disabled={searchResult.length === 0}
+                onClick={() => paginate(1)}
+                disabled={currentPage === 1 || pagination.count === 0}
                 className={`px-3 py-1 rounded ${
-                  currentPage === page && searchResult.length > 0
-                    ? 'bg-blue-700 text-white'
-                    : 'bg-gray-200 hover:bg-gray-300'
-                } ${searchResult.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  currentPage === 1 || pagination.count === 0
+                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                }`}
               >
-                {page}
+                الأول
               </button>
-            )
-          );
-        })()}
 
-        {/* Next Page Button */}
-        <button
-          onClick={() => paginate(currentPage + 1)}
-          disabled={currentPage === totalPages || searchResult.length === 0}
-          className={`px-3 py-1 rounded ${
-            currentPage === totalPages || searchResult.length === 0
-              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-              : 'bg-blue-700 text-white hover:bg-blue-800'
-          }`}
-        >
-          التالي
-        </button>
+              {/* Previous Page Button */}
+              <button
+                onClick={() => paginate(currentPage - 1)}
+                disabled={!pagination.previous || pagination.count === 0}
+                className={`px-3 py-1 rounded ${
+                  !pagination.previous || pagination.count === 0
+                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                }`}
+              >
+                السابق
+              </button>
 
-        {/* Last Page Button */}
-        <button
-          onClick={() => paginate(totalPages)}
-          disabled={currentPage === totalPages || searchResult.length === 0}
-          className={`px-3 py-1 rounded ${
-            currentPage === totalPages || searchResult.length === 0
-              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-              : 'bg-blue-700 text-white hover:bg-blue-800'
-          }`}
-        >
-          الأخير
-        </button>
+              {/* Page Number Buttons */}
+              {(() => {
+                const maxButtons = 5;
+                const sideButtons = Math.floor(maxButtons / 2);
+                let start = Math.max(1, currentPage - sideButtons);
+                let end = Math.min(totalPages, currentPage + sideButtons);
+
+                if (end - start + 1 < maxButtons) {
+                  if (currentPage <= sideButtons) {
+                    end = Math.min(totalPages, maxButtons);
+                  } else {
+                    start = Math.max(1, totalPages - maxButtons + 1);
+                  }
+                }
+
+                return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
+                  (page) => (
+                    <button
+                      key={page}
+                      onClick={() => paginate(page)}
+                      disabled={pagination.count === 0}
+                      className={`px-3 py-1 rounded ${
+                        currentPage === page && pagination.count > 0
+                          ? 'bg-blue-700 text-white'
+                          : 'bg-gray-200 hover:bg-gray-300'
+                      } ${pagination.count === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      {page}
+                    </button>
+                  )
+                );
+              })()}
+
+              {/* Next Page Button */}
+              <button
+                onClick={() => paginate(currentPage + 1)}
+                disabled={!pagination.next || pagination.count === 0}
+                className={`px-3 py-1 rounded ${
+                  !pagination.next || pagination.count === 0
+                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                }`}
+              >
+                التالي
+              </button>
+
+              {/* Last Page Button */}
+              <button
+                onClick={() => paginate(totalPages)}
+                disabled={currentPage === totalPages || pagination.count === 0}
+                className={`px-3 py-1 rounded ${
+                  currentPage === totalPages || pagination.count === 0
+                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                }`}
+              >
+                الأخير
+              </button>
+            </div>
+          </>
+        )}
       </div>
-    </>
-  )}
-</div>
 
       {/* Add Modal */}
       {isAddModalOpen && (
-  <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(255, 255, 255, 0.2)]">
-    <div className="bg-white p-6 rounded-lg w-1/3 relative">
-      <button
-        onClick={closeAddModal}
-        className="absolute top-2 right-3 text-xl"
-      >
-        ×
-      </button>
-      <AddMember closeAddModal={closeAddModal} />
-    </div>
-  </div>
-)}
-
+        <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]">
+          <div className="bg-white p-6 rounded-lg w-1/3 relative">
+            <button
+              onClick={closeAddModal}
+              className="absolute top-2 right-3 text-xl"
+            >
+              ×
+            </button>
+            <AddMember closeAddModal={closeAddModal} />
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div
-          className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(249, 236, 236, 0.2)]"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.2)' }}
+          className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]"
         >
-          <div className="modal relative">
-            <h3 className="text-lg font-semibold mb-4">Confirm Deletion</h3>
+          <div className="modal relative bg-white p-6 rounded-lg">
+            <h3 className="text-lg font-semibold mb-4">تأكيد الحذف</h3>
             <p>
-              Are you sure you want to delete{' '}
-              <strong>{selectedMember?.name}</strong>?
+              هل أنت متأكد من حذف <strong>{selectedMember?.name}</strong>؟
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
                 onClick={() => setIsDeleteModalOpen(false)}
                 className="bg-gray-300 px-4 py-2 rounded"
               >
-                Cancel
+                إلغاء
               </button>
-              <button onClick={confirmDelete} className="btn">
-                Delete
+              <button onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded">
+                حذف
               </button>
             </div>
           </div>
@@ -397,145 +346,133 @@ const handleEditSubmit = async () => {
       )}
 
       {/* Edit Modal */}
-  {isEditModalOpen && selectedMember && (
-  <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]">
-    <div className="modal relative bg-white p-6 rounded-lg w-1/2">
-      <h3 className="text-lg font-semibold mb-4 text-right">تعديل العضو</h3>
-      <div className="grid grid-cols-2 gap-4">
-        {/* Column 1 */}
-        <div className="space-y-3">
-          <div className="flex flex-col">
-            <label className="text-right mb-1">الاسم الكامل</label>
-            <input
-              type="text"
-              name="name"
-              value={selectedMember.name}
-              onChange={handleEditChange}
-              className="border px-3 py-2 rounded text-right"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-right mb-1">رقم العضوية</label>
-            <input
-              type="text"
-              name="membership_number"
-              value={selectedMember.membership_number}
-              onChange={handleEditChange}
-              className="border px-3 py-2 rounded text-right"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-right mb-1">الرقم القومي</label>
-            <input
-              type="text"
-              name="national_id"
-              value={selectedMember.national_id}
-              onChange={handleEditChange}
-              className="border px-3 py-2 rounded text-right"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-right mb-1">رقم الهاتف الأساسي</label>
-            <input
-              type="text"
-              name="phone"
-              value={selectedMember.phone}
-              onChange={handleEditChange}
-              className="border px-3 py-2 rounded text-right"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-right mb-1">رقم الهاتف الثانوي</label>
-            <input
-              type="text"
-              name="phone2"
-              value={selectedMember.phone2 || ''}
-              onChange={handleEditChange}
-              className="border px-3 py-2 rounded text-right"
-            />
+      {isEditModalOpen && selectedMember && (
+        <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]">
+          <div className="modal relative bg-white p-6 rounded-lg w-1/2">
+            <h3 className="text-lg font-semibold mb-4 text-right">تعديل العضو</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="flex flex-col">
+                  <label className="text-right mb-1">الاسم الكامل</label>
+                  <input
+                    type="text"
+                    name="name"
+                    value={selectedMember.name}
+                    onChange={handleEditChange}
+                    className="border px-3 py-2 rounded text-right"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-right mb-1">رقم العضوية</label>
+                  <input
+                    type="text"
+                    name="membership_number"
+                    value={selectedMember.membership_number}
+                    onChange={handleEditChange}
+                    className="border px-3 py-2 rounded text-right"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-right mb-1">الرقم القومي</label>
+                  <input
+                    type="text"
+                    name="national_id"
+                    value={selectedMember.national_id}
+                    onChange={handleEditChange}
+                    className="border px-3 py-2 rounded text-right"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-right mb-1">رقم الهاتف الأساسي</label>
+                  <input
+                    type="text"
+                    name="phone"
+                    value={selectedMember.phone}
+                    onChange={handleEditChange}
+                    className="border px-3 py-2 rounded text-right"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-right mb-1">رقم الهاتف الثانوي</label>
+                  <input
+                    type="text"
+                    name="phone2"
+                    value={selectedMember.phone2 || ""}
+                    onChange={handleEditChange}
+                    className="border px-3 py-2 rounded text-right"
+                  />
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex flex-col">
+                  <label className="text-right mb-1">كود البطاقة (RFID)</label>
+                  <input
+                    type="text"
+                    name="rfid_code"
+                    value={selectedMember.rfid_code || ""}
+                    onChange={handleEditChange}
+                    className="border px-3 py-2 rounded text-right"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-right mb-1">الوظيفة</label>
+                  <input
+                    type="text"
+                    name="job"
+                    value={selectedMember.job || ""}
+                    onChange={handleEditChange}
+                    className="border px-3 py-2 rounded text-right"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-right mb-1">اسم النادي</label>
+                  <input
+                    type="text"
+                    name="club_name"
+                    value={selectedMember.club_name}
+                    disabled
+                    className="border px-3 py-2 rounded text-right bg-gray-100 cursor-not-allowed"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-right mb-1">العنوان</label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={selectedMember.address || ""}
+                    onChange={handleEditChange}
+                    className="border px-3 py-2 rounded text-right"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <label className="text-right mb-1">ملاحظات</label>
+                  <textarea
+                    name="note"
+                    value={selectedMember.note || ""}
+                    onChange={handleEditChange}
+                    className="border px-3 py-2 rounded text-right"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="bg-gray-300 px-4 py-2 rounded"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleEditSubmit}
+                className="bg-blue-600 text-white px-4 py-2 rounded"
+              >
+                حفظ التعديلات
+              </button>
+            </div>
           </div>
         </div>
-
-        {/* Column 2 */}
-        <div className="space-y-3">
-          <div className="flex flex-col">
-            <label className="text-right mb-1">كود البطاقة (RFID)</label>
-            <input
-              type="text"
-              name="rfid_code"
-              value={selectedMember.rfid_code || ''}
-              onChange={handleEditChange}
-              className="border px-3 py-2 rounded text-right"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-right mb-1">الوظيفة</label>
-            <input
-              type="text"
-              name="job"
-              value={selectedMember.job || ''}
-              onChange={handleEditChange}
-              className="border px-3 py-2 rounded text-right"
-            />
-          </div>
-
-      <div className="flex flex-col">
-  <label className="text-right mb-1">اسم النادي</label>
-  <input
-    type="text"
-    name="club_name"
-    value={selectedMember.club_name}
-    disabled
-    className="border px-3 py-2 rounded text-right bg-gray-100 cursor-not-allowed"
-  />
-</div>
-
-          <div className="flex flex-col">
-            <label className="text-right mb-1">العنوان</label>
-            <input
-              type="text"
-              name="address"
-              value={selectedMember.address || ''}
-              onChange={handleEditChange}
-              className="border px-3 py-2 rounded text-right"
-            />
-          </div>
-
-          <div className="flex flex-col">
-            <label className="text-right mb-1">ملاحظات</label>
-            <textarea
-              name="note"
-              value={selectedMember.note || ''}
-              onChange={handleEditChange}
-              className="border px-3 py-2 rounded text-right"
-              rows={2}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-end gap-2 mt-6">
-        <button
-          onClick={() => setIsEditModalOpen(false)}
-          className="bg-gray-300 px-4 py-2 rounded"
-        >
-          إلغاء
-        </button>
-        <button 
-          onClick={handleEditSubmit} 
-          className="bg-blue-600 text-white px-4 py-2 rounded"
-        >
-          حفظ التعديلات
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      )}
     </div>
   );
 };

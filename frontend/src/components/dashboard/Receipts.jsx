@@ -1,26 +1,21 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import {
   fetchReceipts,
   deleteReceipt,
   updateReceipt,
   fetchReceiptById,
-  fetchReceiptByInvoice,
 } from "../../redux/slices/receiptsSlice";
 import { CiTrash, CiEdit } from "react-icons/ci";
 import { HiOutlineDocumentReport } from "react-icons/hi";
 import AddReceiptForm from "./AddReceiptForm";
 import { Button } from "../ui/button";
 import { toast } from 'react-hot-toast';
-
 import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
-
-
-
 
 function Receipts() {
   const dispatch = useDispatch();
-  const { receipts, status, error, message, currentReceipt } = useSelector(
+  const { receipts, status, error, message, currentReceipt, pagination } = useSelector(
     (state) => state.receipts
   );
   const { subscriptions } = useSelector((state) => state.subscriptions);
@@ -50,9 +45,9 @@ function Receipts() {
   const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
 
   // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
-  const itemsPerPageOptions = [5, 10, 20];
+  const [currentPage, setCurrentPage] = useState(pagination.currentPage || 1);
+  const itemsPerPage = 20; // Fixed to 20 items per page
+  const totalPages = Math.ceil(pagination.count / itemsPerPage);
 
   // Search fields configuration
   const searchFields = [
@@ -64,11 +59,11 @@ function Receipts() {
     { value: "member_name", label: "اسم العضو" },
   ];
 
-  // Fetch data on mount
+  // Fetch data on mount and when currentPage changes
   useEffect(() => {
-    dispatch(fetchReceipts());
+    dispatch(fetchReceipts(currentPage));
     dispatch(fetchSubscriptions());
-  }, [dispatch]);
+  }, [dispatch, currentPage]);
 
   // Data filtering helpers
   const uniqueClubs = Array.from(
@@ -238,7 +233,7 @@ function Receipts() {
         })
       ).unwrap();
 
-      await dispatch(fetchReceipts());
+      await dispatch(fetchReceipts(currentPage));
       toast.success("تم تحديث الإيصال بنجاح");
     } catch (error) {
       console.error("Update error:", error);
@@ -257,7 +252,7 @@ function Receipts() {
   const confirmDelete = async () => {
     try {
       await dispatch(deleteReceipt(receiptToDelete)).unwrap();
-      await dispatch(fetchReceipts());
+      await dispatch(fetchReceipts(currentPage));
       toast.success("تم حذف الإيصال بنجاح");
     } catch (error) {
       console.error("Error deleting receipt:", error);
@@ -299,56 +294,13 @@ function Receipts() {
       new Date(b.date) - new Date(a.date)
     );
     setFilteredReceipts(sortedReceipts);
-    setCurrentPage(1);
   }, [receipts]);
 
-  // Pagination logic
-  const totalItems = filteredReceipts.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-  const paginatedReceipts = filteredReceipts.slice(startIndex, endIndex);
-
-  // Generate page numbers for display
-  const getPageNumbers = () => {
-    const maxPagesToShow = 5;
-    const halfPages = Math.floor(maxPagesToShow / 2);
-    let startPage = Math.max(1, currentPage - halfPages);
-    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
-
-    if (endPage - startPage + 1 < maxPagesToShow) {
-      startPage = Math.max(1, endPage - maxPagesToShow + 1);
-    }
-
-    const pages = [];
-    for (let i = startPage; i <= endPage; i++) {
-      pages.push(i);
-    }
-    return pages;
-  };
-
-  const handlePageChange = (pageNumber) => {
+  // Pagination handler
+  const paginate = (pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
       setCurrentPage(pageNumber);
     }
-  };
-
-  const handlePrevious = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  const handleNext = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
-  const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = parseInt(e.target.value);
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1);
   };
 
   if (status === "loading")
@@ -453,7 +405,7 @@ function Receipts() {
 
       {/* Receipts Table */}
       <div className="overflow-x-auto">
-        {paginatedReceipts.length > 0 ? (
+        {filteredReceipts.length > 0 ? (
           <>
             {/* Table for Small Screens and Above */}
             <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
@@ -483,7 +435,7 @@ function Receipts() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {paginatedReceipts.map((receipt) => (
+                {filteredReceipts.map((receipt) => (
                   <tr key={receipt.id}>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm flex gap-2">
                       <button
@@ -530,7 +482,7 @@ function Receipts() {
 
             {/* Card Layout for Mobile */}
             <div className="sm:hidden space-y-4">
-              {paginatedReceipts.map((receipt) => (
+              {filteredReceipts.map((receipt) => (
                 <div
                   key={receipt.id}
                   className="border rounded-md p-4 bg-white shadow-sm"
@@ -596,8 +548,8 @@ function Receipts() {
         <Button
           onClick={() =>
             setTotalInfo({
-              count: paginatedReceipts.length,
-              total: paginatedReceipts.reduce(
+              count: filteredReceipts.length,
+              total: filteredReceipts.reduce(
                 (acc, receipt) => acc + (parseFloat(receipt.amount) || 0),
                 0
               ),
@@ -621,87 +573,106 @@ function Receipts() {
       )}
 
       {/* Pagination Controls */}
-      {totalItems > 0 && (
-        <div className="mt-6">
-          {/* Items Per Page Selector */}
-          <div className="flex flex-col sm:flex-row justify-between items-center mb-4 space-y-2 sm:space-y-0">
-            <div>
-              <label className="text-sm text-gray-700">
-                عدد الإيصالات لكل صفحة:
-                <select
-                  value={itemsPerPage}
-                  onChange={handleItemsPerPageChange}
-                  className="ml-2 px-2 py-1 border border-gray-300 rounded-md text-sm"
-                  aria-label="عدد الإيصالات لكل صفحة"
-                >
-                  {itemsPerPageOptions.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="text-sm text-gray-700">
-              عرض {startIndex + 1}-{endIndex} من {totalItems} إيصال
-            </div>
-          </div>
+   {/* Pagination Controls */}
+<div className="flex justify-between items-center mt-4" dir="rtl">
+  {pagination.count === 0 && (
+    <div className="text-sm text-gray-600">لا توجد إيصالات لعرضها</div>
+  )}
+  {pagination.count > 0 && (
+    <>
+      <div className="text-sm text-gray-600">
+        عرض {(currentPage - 1) * itemsPerPage + 1} إلى{' '}
+        {Math.min(currentPage * itemsPerPage, pagination.count)} من {pagination.count} إيصال
+      </div>
+      <div className="flex gap-2">
+        {/* First Page Button */}
+        <button
+          onClick={() => paginate(1)}
+          disabled={currentPage === 1 || pagination.count === 0}
+          className={`px-3 py-1 rounded ${
+            currentPage === 1 || pagination.count === 0
+              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+              : 'bg-blue-700 text-white hover:bg-blue-800'
+          }`}
+        >
+          الأول
+        </button>
 
-          {/* Page Navigation */}
-          {totalPages > 1 && (
-            <div
-              className="flex justify-center items-center space-x-2 space-x-reverse"
-              dir="ltr"
-            >
-              <Button
-                onClick={handlePrevious}
-                disabled={currentPage === 1}
-                className={`px-3 py-1 text-sm ${
-                  currentPage === 1
-                    ? "bg-gray-200 cursor-not-allowed"
-                    : "bg-blue-500 text-white hover:bg-blue-600"
-                }`}
-                aria-label="الصفحة السابقة"
+        {/* Previous Page Button */}
+        <button
+          onClick={() => paginate(currentPage - 1)}
+          disabled={!pagination.previous || pagination.count === 0}
+          className={`px-3 py-1 rounded ${
+            !pagination.previous || pagination.count === 0
+              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+              : 'bg-blue-700 text-white hover:bg-blue-800'
+          }`}
+        >
+          السابق
+        </button>
+
+        {/* Page Number Buttons */}
+        {(() => {
+          const maxButtons = 5;
+          const sideButtons = Math.floor(maxButtons / 2);
+          let start = Math.max(1, currentPage - sideButtons);
+          let end = Math.min(totalPages, currentPage + sideButtons);
+
+          if (end - start + 1 < maxButtons) {
+            if (currentPage <= sideButtons) {
+              end = Math.min(totalPages, maxButtons);
+            } else {
+              start = Math.max(1, totalPages - maxButtons + 1);
+            }
+          }
+
+          return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
+            (page) => (
+              <button
+                key={page}
+                onClick={() => paginate(page)}
+                disabled={pagination.count === 0}
+                className={`px-3 py-1 rounded ${
+                  currentPage === page && pagination.count > 0
+                    ? 'bg-blue-700 text-white'
+                    : 'bg-gray-200 hover:bg-gray-300'
+                } ${pagination.count === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                السابق
-              </Button>
+                {page}
+              </button>
+            )
+          );
+        })()}
 
-              {getPageNumbers().map((page) => (
-                <Button
-                  key={page}
-                  onClick={() => handlePageChange(page)}
-                  className={`px-3 py-1 text-sm ${
-                    currentPage === page
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-200 hover:bg-gray-300"
-                  }`}
-                  aria-label={`الصفحة ${page}`}
-                >
-                  {page}
-                </Button>
-              ))}
+        {/* Next Page Button */}
+        <button
+          onClick={() => paginate(currentPage + 1)}
+          disabled={!pagination.next || pagination.count === 0}
+          className={`px-3 py-1 rounded ${
+            !pagination.next || pagination.count === 0
+              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+              : 'bg-blue-700 text-white hover:bg-blue-800'
+          }`}
+        >
+          التالي
+        </button>
 
-              {totalPages > getPageNumbers().length &&
-                getPageNumbers()[getPageNumbers().length - 1] < totalPages && (
-                  <span className="px-3 py-1 text-sm">...</span>
-                )}
-
-              <Button
-                onClick={handleNext}
-                disabled={currentPage === totalPages}
-                className={`px-3 py-1 text-sm ${
-                  currentPage === totalPages
-                    ? "bg-gray-200 cursor-not-allowed"
-                    : "bg-blue-500 text-white hover:bg-blue-600"
-                }`}
-                aria-label="الصفحة التالية"
-              >
-                التالي
-              </Button>
-            </div>
-          )}
-        </div>
-      )}
+        {/* Last Page Button */}
+        <button
+          onClick={() => paginate(totalPages)}
+          disabled={currentPage === totalPages || pagination.count === 0}
+          className={`px-3 py-1 rounded ${
+            currentPage === totalPages || pagination.count === 0
+              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+              : 'bg-blue-700 text-white hover:bg-blue-800'
+          }`}
+        >
+          الأخير
+        </button>
+      </div>
+    </>
+  )}
+</div>
 
       {/* Add Receipt Form Modal */}
       {showForm && (
@@ -753,7 +724,9 @@ function Receipts() {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6">
-              <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
+              <h3 className="text-lg sm:text-xl font-medium
+
+ leading-6 text-gray-900 mb-4">
                 تعديل الإيصال
               </h3>
               <form onSubmit={handleEditSubmit} className="space-y-4">
