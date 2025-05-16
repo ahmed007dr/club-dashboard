@@ -3,7 +3,12 @@ import { CiTrash, CiEdit } from "react-icons/ci";
 import { FaEye, FaPlus } from "react-icons/fa";
 import { RiUserLine } from "react-icons/ri";
 import { useDispatch, useSelector } from "react-redux";
-import { addStaff, deleteStaff, editStaff, fetchStaff } from "@/redux/slices/staff";
+import {
+  addStaff,
+  deleteStaff,
+  editStaff,
+  fetchStaff,
+} from "@/redux/slices/staff";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,11 +17,10 @@ import {
 } from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
 import BASE_URL from "@/config/api";
-import { Link } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import { Link } from "react-router-dom";
+import { toast } from "react-hot-toast";
 
-import axios from 'axios';
-
+import axios from "axios";
 
 const Staff = () => {
   const dispatch = useDispatch();
@@ -80,35 +84,67 @@ const Staff = () => {
     fetchUsersGroupedByClub();
   }, []);
 
-  // Fetch user profile
-  useEffect(() => {
-    setLoadingProfile(true);
-    fetch(`${BASE_URL}/accounts/api/profile/`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json",
-      },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        console.log("Profile data:", data);
-        const club = { id: data.club.id, name: data.club.name };
-        setUserClub(club);
-        setFilters((prev) => ({ ...prev, club: club.id.toString() }));
-        setFormData((prev) => ({ ...prev, club: club.id.toString() }));
-        setSelectedClubId(club.id.toString());
-        setProfileUser({ id: data.id, username: data.username });
-
-        const userClubData = clubs.find((c) => c.club_id === club.id);
-        if (userClubData) setSelectedClubUsers(userClubData.users);
-
-        setLoadingProfile(false);
-      })
-      .catch((err) => {
-        console.error("Failed to fetch profile:", err);
-        setLoadingProfile(false);
+  // Fetch users grouped by club
+  const fetchUsersGroupedByClub = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${BASE_URL}/accounts/api/users/`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-  }, [clubs]);
+
+      const clubsMap = {};
+      response.data.forEach((user) => {
+        if (!user.club) return;
+        if (!clubsMap[user.club.id]) {
+          clubsMap[user.club.id] = {
+            club_id: user.club.id,
+            club_name: user.club.name,
+            users: [],
+          };
+        }
+        clubsMap[user.club.id].users.push({
+          id: user.id,
+          username: user.username,
+          first_name: user.first_name,
+          last_name: user.last_name,
+        });
+      });
+      setClubs(Object.values(clubsMap));
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+    }
+  };
+
+  // Fetch user profile
+  const fetchProfile = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await axios.get(`${BASE_URL}/accounts/api/profile/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = response.data;
+      const club = { id: data.club.id, name: data.club.name };
+      setUserClub(club);
+      setFilters((prev) => ({
+        ...prev,
+        club: "",
+      }));
+      setFormData((prev) => ({ ...prev, club: club.id.toString() }));
+      setSelectedClubId(club.id.toString());
+      setProfileUser({ id: data.id, username: data.username });
+      setLoadingProfile(false);
+    } catch (error) {
+      console.error("Failed to fetch profile:", error);
+    }
+  };
+
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      await fetchUsersGroupedByClub(); // First fetch clubs
+      await fetchProfile(); // Then fetch profile
+    };
+    fetchInitialData();
+  }, []);
 
   // Fetch staff data
   useEffect(() => {
@@ -132,7 +168,7 @@ const Staff = () => {
         date: "",
         shift_start: "",
         shift_end: "",
-        club: userClub?.id?.toString() || "",
+        club: userClub?.id || "",
         staff: "",
         approved_by: null,
       });
@@ -142,7 +178,7 @@ const Staff = () => {
         date: shift.date || "",
         shift_start: shift.shift_start || "",
         shift_end: shift.shift_end || "",
-        club: userClub?.id?.toString() || shift.club_details.id.toString(),
+        club: userClub.id,
         staff: `${shift.staff_details.id}`,
         approved_by: shift.approved_by_details
           ? `${shift.approved_by_details.id}`
@@ -181,7 +217,9 @@ const Staff = () => {
         handleCloseModal();
       })
       .catch((err) => {
-        toast.error("فشل في إضافة الوردية: " + (err.message || "خطأ غير معروف"));
+        toast.error(
+          "فشل في إضافة الوردية: " + (err.message || "خطأ غير معروف")
+        );
       });
   };
 
@@ -229,7 +267,9 @@ const Staff = () => {
         handleCloseModal();
       })
       .catch((err) => {
-        toast.error("فشل في تعديل الوردية: " + (err.message || "خطأ غير معروف"));
+        toast.error(
+          "فشل في تعديل الوردية: " + (err.message || "خطأ غير معروف")
+        );
       });
   };
 
@@ -269,9 +309,11 @@ const Staff = () => {
   const filteredStaff = useMemo(() => {
     return staff
       .filter((shift) => {
+        // Club match should be true when no club is selected
         const clubMatch =
-          userClub &&
-          shift.club_details?.id.toString() === userClub.id.toString();
+          !filters.club || // ← Allow all clubs when empty
+          shift.club_details?.id.toString() === filters.club.toString();
+
         const staffMatch = filters.staff
           ? `${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`
               .toLowerCase()
@@ -280,10 +322,8 @@ const Staff = () => {
 
         return clubMatch && staffMatch;
       })
-      .sort((a, b) => {
-        return (b.id || 0) - (a.id || 0);
-      });
-  }, [staff, filters, userClub]);
+      .sort((a, b) => (b.id || 0) - (a.id || 0));
+  }, [staff, filters]);
 
   // Pagination logic
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -344,13 +384,13 @@ const Staff = () => {
             value={filters.club}
             onChange={(e) => setFilters({ ...filters, club: e.target.value })}
             className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-            disabled
           >
-            {userClub ? (
-              <option value={userClub.id}>{userClub.name}</option>
-            ) : (
-              <option value="">جاري التحميل...</option>
-            )}
+            <option value="">جميع الأندية</option>
+            {clubs.map((club) => (
+              <option key={club.club_id} value={club.club_id}>
+                {club.club_name}
+              </option>
+            ))}
           </select>
         </div>
         <div>
@@ -460,7 +500,8 @@ const Staff = () => {
                 >
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-semibold">
-                      التاريخ: {shift.date
+                      التاريخ:{" "}
+                      {shift.date
                         ? new Date(shift.date).toLocaleDateString("en-GB")
                         : "N/A"}
                     </span>
@@ -504,10 +545,10 @@ const Staff = () => {
                   <p className="text-sm">
                     <strong>نهاية الوردية:</strong>{" "}
                     {shift.shift_end
-                      ? parseTime(shift.shift_end).toLocaleTimeString(
-                          "en-GB",
-                          { hour: "2-digit", minute: "2-digit" }
-                        )
+                      ? parseTime(shift.shift_end).toLocaleTimeString("en-GB", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
                       : "Invalid date"}
                   </p>
                   <p className="text-sm">
@@ -609,7 +650,9 @@ const Staff = () => {
             )}
             <form onSubmit={handleAddSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">التاريخ</label>
+                <label className="block text-sm font-medium mb-1">
+                  التاريخ
+                </label>
                 <input
                   type="date"
                   name="date"
@@ -620,7 +663,9 @@ const Staff = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">بداية الوردية</label>
+                <label className="block text-sm font-medium mb-1">
+                  بداية الوردية
+                </label>
                 <input
                   type="time"
                   name="shift_start"
@@ -631,7 +676,9 @@ const Staff = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">نهاية الوردية</label>
+                <label className="block text-sm font-medium mb-1">
+                  نهاية الوردية
+                </label>
                 <input
                   type="time"
                   name="shift_end"
@@ -669,7 +716,7 @@ const Staff = () => {
                   onChange={handleFormChange}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
                   required
-                  disabled={!formData.club}
+                  disabled={!formData.club || loadingProfile}
                 >
                   <option value="">اختر موظف</option>
                   {selectedClubUsers.map((user) => (
@@ -680,17 +727,21 @@ const Staff = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
+                <label className="block text-sm font-medium mb-1">
+                  تمت الموافقة بواسطة
+                </label>
                 <select
                   name="approved_by"
                   value={formData.approved_by || ""}
                   onChange={handleFormChange}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-                  disabled={!formData.club}
+                  disabled={!formData.club || loadingProfile}
                 >
                   <option value="">اختر موافق</option>
                   {profileUser.id && (
-                    <option value={profileUser.id}>{profileUser.username}</option>
+                    <option value={profileUser.id}>
+                      {profileUser.username}
+                    </option>
                   )}
                 </select>
               </div>
@@ -730,14 +781,18 @@ const Staff = () => {
           >
             <h2 className="text-lg sm:text-xl font-bold mb-4">تعديل الوردية</h2>
             {formError && (
-              <div className="bg-red-100 text-red-7
-              00 p-2 rounded mb-4 text-right text-sm">
+              <div
+                className="bg-red-100 text-red-7
+              00 p-2 rounded mb-4 text-right text-sm"
+              >
                 {formError}
               </div>
             )}
             <form onSubmit={handleEditSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">التاريخ</label>
+                <label className="block text-sm font-medium mb-1">
+                  التاريخ
+                </label>
                 <input
                   type="date"
                   name="date"
@@ -748,7 +803,9 @@ const Staff = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">بداية الوردية</label>
+                <label className="block text-sm font-medium mb-1">
+                  بداية الوردية
+                </label>
                 <input
                   type="time"
                   name="shift_start"
@@ -759,7 +816,9 @@ const Staff = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">نهاية الوردية</label>
+                <label className="block text-sm font-medium mb-1">
+                  نهاية الوردية
+                </label>
                 <input
                   type="time"
                   name="shift_end"
@@ -780,13 +839,13 @@ const Staff = () => {
                   }}
                   className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
                   required
-                  disabled
                 >
                   {clubs.map((club) => (
                     <option key={club.club_id} value={club.club_id}>
                       {club.club_name}
                     </option>
                   ))}
+                  {!userClub && <option value="">جاري التحميل...</option>}
                 </select>
               </div>
               <div>
@@ -807,7 +866,9 @@ const Staff = () => {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">تمت الموافقة بواسطة</label>
+                <label className="block text-sm font-medium mb-1">
+                  تمت الموافقة بواسطة
+                </label>
                 <select
                   name="approved_by"
                   value={formData.approved_by || ""}
@@ -816,7 +877,9 @@ const Staff = () => {
                 >
                   <option value="">اختر موافق</option>
                   {profileUser.id && (
-                    <option value={profileUser.id}>{profileUser.username}</option>
+                    <option value={profileUser.id}>
+                      {profileUser.username}
+                    </option>
                   )}
                 </select>
               </div>

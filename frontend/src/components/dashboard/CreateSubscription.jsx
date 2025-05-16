@@ -1,15 +1,29 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { postSubscription } from "../../redux/slices/subscriptionsSlice";
 import { fetchUsers } from "../../redux/slices/memberSlice";
-import { fetchSubscriptionTypes } from "../../redux/slices/subscriptionsSlice";
+import {
+  Command,
+  CommandInput,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
-  const { subscriptionTypes, loading } = useSelector(
-    (state) => state.subscriptions
-  );
+  const { subscriptionTypes } = useSelector((state) => state.subscriptions);
 
+  // Form state
   const [formData, setFormData] = useState({
     club: "",
     member: "",
@@ -18,67 +32,88 @@ const CreateSubscription = ({ onClose }) => {
     paid_amount: "",
   });
 
-  const [members, setMembers] = useState([]);
+  // Data state
+  const [allMembers, setAllMembers] = useState([]);
   const [clubs, setClubs] = useState([]);
-  const [filteredMembers, setFilteredMembers] = useState([]);
+
+  // Member search and pagination
+  const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 10;
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState(""); // State for modal error message
-  const [isModalOpen, setIsModalOpen] = useState(false); // State for modal visibility
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch users (members) and clubs on mount
+  // Fetch initial data
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInitialData = async () => {
       try {
-        const fetchedData = await dispatch(fetchUsers()).unwrap();
-        console.log("Fetched member data:", fetchedData);
-        const memberList = Array.isArray(fetchedData.results)
-          ? fetchedData.results
-          : [];
-        setMembers(memberList);
+        const membersResult = await dispatch(fetchUsers()).unwrap();
+        setAllMembers(membersResult);
 
-        // Get unique clubs from members
+        // Extract unique clubs
         const uniqueClubs = Array.from(
           new Map(
-            memberList.map((m) => [
+            membersResult.results.map((m) => [
               m.club,
               { club_id: m.club, club_name: m.club_name },
             ])
           ).values()
         );
-        console.log('Unique clubs:', uniqueClubs);
         setClubs(uniqueClubs);
-      } catch (err) {
-        console.error("Error fetching member data:", err);
-        setErrorMessage(err.message || "Failed to load member data");
-        setIsModalOpen(true);
+      } catch (error) {
+        handleError(error, "Failed to load initial data");
+      } finally {
+        setIsInitialLoad(false);
       }
     };
 
-    fetchData();
+    fetchInitialData();
   }, [dispatch]);
 
-  // Fetch subscription types on mount
-  useEffect(() => {
-    dispatch(fetchSubscriptionTypes());
-  }, [dispatch]);
+  // Filtered and paginated members
+  const { filteredMembers, hasMore } = useMemo(() => {
+    if (!formData.club) return { filteredMembers: [], hasMore: false };
 
-  // Update members dropdown when a club is selected
-  useEffect(() => {
-    if (formData.club) {
-      const filtered = members.filter((m) => m.club === parseInt(formData.club));
-      setFilteredMembers(filtered);
-    } else {
-      setFilteredMembers([]);
+    const filtered = allMembers.results.filter(
+      (member) =>
+        member.club === parseInt(formData.club) &&
+        (member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (member.rfid_code &&
+            member.rfid_code.toLowerCase().includes(searchQuery.toLowerCase())))
+    );
+
+    return {
+      filteredMembers: filtered.slice(0, page * itemsPerPage),
+      hasMore: filtered.length > page * itemsPerPage,
+    };
+  }, [allMembers, formData.club, searchQuery, page]);
+
+  // Debounced search
+  const debouncedSearch = useCallback(() =>
+    debounce((query) => {
+      setSearchQuery(query);
+      setPage(1);
+    }, 300),
+    []
+  );
+
+  // Handle infinite scroll
+  const handleScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    const bottomThreshold = 50;
+
+    if (
+      scrollHeight - (scrollTop + clientHeight) < bottomThreshold &&
+      hasMore
+    ) {
+      setPage((prev) => prev + 1);
     }
-  }, [formData.club, members]);
-
-  // Handle form input changes
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { club, member, type, start_date, paid_amount } = formData;
@@ -127,7 +162,10 @@ const CreateSubscription = ({ onClose }) => {
 
       console.log("Final errorData:", JSON.stringify(errorData, null, 2)); // Debug final errorData
 
-      if (errorData?.non_field_errors && Array.isArray(errorData.non_field_errors)) {
+      if (
+        errorData?.non_field_errors &&
+        Array.isArray(errorData.non_field_errors)
+      ) {
         console.log("Handling non_field_errors:", errorData.non_field_errors); // Debug
         setErrorMessage(errorData.non_field_errors[0]); // Use raw error message
         setIsModalOpen(true);
@@ -143,44 +181,50 @@ const CreateSubscription = ({ onClose }) => {
     }
   };
 
-  // Close modal
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setErrorMessage("");
+  // Error handling
+  const handleError = (error, defaultMessage) => {
+    const errorMessage =
+      error?.payload?.message || error?.message || defaultMessage;
+    setErrorMessage(errorMessage);
+    setIsModalOpen(true);
   };
 
   return (
     <div className="container mx-auto p-4" dir="rtl">
-      <h2 className="text-xl font-bold mb-4">إنشاء اشتراك</h2>
+      <h2 className="text-xl font-bold mb-6">إنشاء اشتراك جديد</h2>
 
       {/* Error Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-            <h3 className="text-lg font-bold mb-4">خطأ</h3>
+            <h3 className="text-lg font-bold mb-4">حدث خطأ</h3>
             <p className="text-red-600">{errorMessage}</p>
             <div className="mt-4 flex justify-end">
-              <button
-                onClick={closeModal}
-                className="btn bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+              <Button
+                onClick={() => setIsModalOpen(false)}
+                variant="destructive"
               >
                 إغلاق
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* Club Select */}
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Club Selection */}
         <div>
-          <label className="block font-medium">النادي</label>
+          <label className="block text-sm font-medium mb-2">النادي</label>
           <select
-            name="club"
             value={formData.club}
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                club: e.target.value,
+                member: "", // Reset member on club change
+              })
+            }
+            className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
             disabled={isSubmitting}
           >
             <option value="">اختر النادي</option>
@@ -192,86 +236,161 @@ const CreateSubscription = ({ onClose }) => {
           </select>
         </div>
 
-        {/* Member Select */}
+        {/* Member Selection */}
         <div>
-          <label className="block font-medium">العضو</label>
-          <select
-            name="member"
-            value={formData.member}
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
-            disabled={isSubmitting || !formData.club}
-          >
-            <option value="">اختر العضو</option>
-            {filteredMembers.map((member) => (
-              <option key={member.id} value={member.id}>
-                {member.name}
-              </option>
-            ))}
-          </select>
+          <label className="block text-sm font-medium mb-2">العضو</label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                className="w-full justify-between"
+                disabled={!formData.club || isSubmitting}
+              >
+                {formData.member
+                  ? allMembers.results.find((m) => m.id === formData.member)
+                      ?.name
+                  : "اختر العضو..."}
+                <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command onScroll={handleScroll}>
+                <CommandInput
+                  placeholder="ابحث عن عضو بالاسم أو رقم RFID..."
+                  onValueChange={debouncedSearch}
+                />
+                <CommandList className="max-h-[300px]">
+                  <CommandGroup>
+                    {filteredMembers.map((member) => (
+                      <CommandItem
+                        key={member.id}
+                        value={member.id}
+                        onSelect={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            member: member.id === prev.member ? "" : member.id,
+                          }));
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            formData.member === member.id
+                              ? "opacity-100"
+                              : "opacity-0"
+                          )}
+                        />
+                        <div>
+                          <div>{member.name}</div>
+                          {member.rfid_code && (
+                            <div className="text-xs text-gray-500">
+                              RFID: {member.rfid_code}
+                            </div>
+                          )}
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+
+                  {!filteredMembers.length && !isInitialLoad && (
+                    <CommandEmpty>لا يوجد أعضاء</CommandEmpty>
+                  )}
+
+                  {hasMore && (
+                    <CommandItem className="justify-center text-sm text-gray-500">
+                      جاري تحميل المزيد...
+                    </CommandItem>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </div>
 
-        {/* Subscription Type Select */}
+        {/* Subscription Type */}
         <div>
-          <label className="block font-medium">نوع الاشتراك</label>
+          <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
           <select
-            name="type"
             value={formData.type}
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
+            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+            className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
             disabled={isSubmitting}
           >
-            <option value="">اختر نوع الاشتراك</option>
-            {subscriptionTypes?.map((type) => (
-              <option key={type.id} value={type.id}>
-                {type.name} - {type.price} ر.س
-              </option>
-            ))}
+            <option value="">اختر النوع</option>
+            {subscriptionTypes
+              .filter(
+                (type) =>
+                  type.club_details.id.toString() === formData.club.toString()
+              )
+              ?.map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name} - {type.price} ر.س
+                </option>
+              ))}
           </select>
         </div>
 
         {/* Start Date */}
         <div>
-          <label className="block font-medium">تاريخ البداية</label>
+          <label className="block text-sm font-medium mb-2">تاريخ البدء</label>
           <input
             type="date"
-            name="start_date"
             value={formData.start_date}
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            required
+            onChange={(e) =>
+              setFormData({ ...formData, start_date: e.target.value })
+            }
+            className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+            min={new Date().toISOString().split("T")[0]}
             disabled={isSubmitting}
-            min={new Date().toISOString().split("T")[0]} // Prevent past dates
           />
         </div>
 
         {/* Paid Amount */}
         <div>
-          <label className="block font-medium">المبلغ المدفوع</label>
+          <label className="block text-sm font-medium mb-2">
+            المبلغ المدفوع
+          </label>
           <input
             type="number"
-            name="paid_amount"
             step="0.01"
             min="0"
             value={formData.paid_amount}
-            onChange={handleChange}
-            className="w-full p-2 border rounded"
-            placeholder="أدخل المبلغ المدفوع"
-            required
+            onChange={(e) =>
+              setFormData({ ...formData, paid_amount: e.target.value })
+            }
+            className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+            placeholder="0.00"
             disabled={isSubmitting}
           />
         </div>
 
         {/* Submit Button */}
-        <button
-          type="submit"
-          className={`btn ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? "جاري المعالجة..." : "إنشاء اشتراك"}
-        </button>
+        <Button type="submit" className="w-full mt-6" disabled={isSubmitting}>
+          {isSubmitting ? (
+            <span className="flex items-center justify-center">
+              <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                  fill="none"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              جاري الحفظ...
+            </span>
+          ) : (
+            "إنشاء اشتراك"
+          )}
+        </Button>
       </form>
     </div>
   );
@@ -279,5 +398,14 @@ const CreateSubscription = ({ onClose }) => {
 
 export default CreateSubscription;
 
-
-
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}

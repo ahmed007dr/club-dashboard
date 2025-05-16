@@ -45,7 +45,7 @@ const IncomeSourcesList = () => {
       });
 
       // Sort by ID in descending order (newest first)
-      const sortedSources = response.data.sort((a, b) => b.id - a.id);
+      const sortedSources = response.data.results.sort((a, b) => b.id - a.id);
       setSources(sortedSources);
       toast.success('تم تحميل مصادر الدخل بنجاح', { id: loadingToast });
     } catch (error) {

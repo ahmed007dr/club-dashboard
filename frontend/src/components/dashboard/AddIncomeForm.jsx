@@ -55,7 +55,7 @@ const AddIncomeForm = () => {
             Authorization: `Bearer ${token}`,
           },
         });
-        setIncomeSources(response.data);
+        setIncomeSources(response.data.results);
       } catch (err) {
         console.error('فشل في جلب مصادر الدخل:', err);
         toast.error('فشل في تحميل مصادر الدخل');

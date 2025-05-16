@@ -25,7 +25,7 @@ export const fetchReceipts = createAsyncThunk(
       const response = await axios.get(`${API_BASE_URL}/receipts/`, {
         headers: getAuthHeaders(),
       });
-      return response.data;
+      return response.data.results;
     } catch (error) {
       console.error('Error fetching receipts:', error.response?.data || error.message);
       return rejectWithValue(error.response?.data || error.message);
