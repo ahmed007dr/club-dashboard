@@ -1,14 +1,16 @@
-
 from pathlib import Path
+from decouple import config, Csv
 
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-k#i%183_hpx5%@pfnvytqg9ssh&(ke-%!a+8(mjgr&k=qv5tux'
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = config('SECRET_KEY')
 
-DEBUG = True
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = []
-# ALLOWED_HOSTS = ['club-ft.com','www.club-ft.com'] # setting c panel
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
 
 INSTALLED_APPS = [
     "accounts",
@@ -18,7 +20,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
     'drf_yasg',  
     'rest_framework',
     'rest_framework_simplejwt',
@@ -26,11 +27,9 @@ INSTALLED_APPS = [
     'django_filters',
     "corsheaders",    
     'import_export',
-
     'django_user_agents',
     'simple_history',
     'user_visit',
-
     #apps
     "core",
     "members",
@@ -42,49 +41,33 @@ INSTALLED_APPS = [
     "staff",
     "invites",
     'devices',
-
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    "corsheaders.middleware.CorsMiddleware", # cros
+    "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_user_agents.middleware.UserAgentMiddleware',
-    # 'devices.middleware.DeviceAccessMiddleware',
-    # 'devices.middleware.RestrictAdminByIPMiddleware',
     'devices.middleware.RequestLoggingMiddleware',  
 ]
 
 ROOT_URLCONF = 'project.urls'
 
-
 AUTH_USER_MODEL = 'accounts.User'
 
-CORS_ORIGIN_ALLOW_ALL = True
-# CORS_ALLOW_ALL_ORIGINS = True
+CORS_ORIGIN_ALLOW_ALL = False
+CORS_ALLOWED_ORIGINS = config('CORS_ALLOWED_ORIGINS', cast=Csv())
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv())
 
-#CORS_ALLOWED_ALL_ORIGINS = False  # Disable allow all
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    #"https://club-ft.com", # setting c panel
-]
-CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    # "https://club-ft.com", # setting c panel
-]
-
-DEFAULT_ALLOWED_IPS = ['127.0.0.1', '197.38.235.139','197.38.113.240']
+DEFAULT_ALLOWED_IPS = config('DEFAULT_ALLOWED_IPS', cast=Csv())
 
 from datetime import timedelta
 
-# Combined REST_FRAMEWORK settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -98,12 +81,9 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    # 'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
-
     'PAGE_SIZE': 20,
 }
 
-# JWT Settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
@@ -117,7 +97,6 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [os.path.join(BASE_DIR, 'templates')],
-        # 'DIRS': [os.path.join(BASE_DIR, 'templates'),os.path.join(BASE_DIR, 'frontend', 'dist')], # setting c panel
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -131,32 +110,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'project.wsgi.application'
 
-
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': config('DB_ENGINE'),
+        'NAME': BASE_DIR / config('DB_NAME') if config('DB_ENGINE') == 'django.db.backends.sqlite3' else config('DB_NAME'),
+        'USER': config('DB_USER', default=''),
+        'PASSWORD': config('DB_PASSWORD', default=''),
+        'HOST': config('DB_HOST', default=''),
+        'PORT': config('DB_PORT', default=''),
     }
 }
-
-
-
-# # DATABASES = {
-# #     "default": {
-# #         "ENGINE": "django.db.backends.postgresql",
-# #         "NAME": "club",
-# #         "USER": "postgres",
-# #         "PASSWORD": "123",
-# #         "HOST": "db",
-# #         "PORT": "5432",
-# #     }
-# # }
-
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -173,25 +137,15 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
-# Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'Africa/Cairo'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
-
-# Basic settings
-BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_URL = 'static/' 
+STATICFILES_DIRS = [BASE_DIR / "static",]
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / "media"
 
 # Logging Configuration
 LOGGING = {
@@ -232,19 +186,6 @@ LOGGING = {
             'propagate': False,
         },
     },
-}# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
-
-STATIC_URL = 'static/' 
-STATICFILES_DIRS = [BASE_DIR / "static",] # setting c panel
-# STATICFILES_DIRS = [os.path.join(BASE_DIR, 'frontend', 'dist', 'assets')] # setting c panel
-# STATIC_ROOT = os.path.join(BASE_DIR, 'static') # setting c panel
-#add   path for url static & media
-MEDIA_URL='media/'
-MEDIA_ROOT=BASE_DIR / "media"
-
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

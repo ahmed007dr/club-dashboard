@@ -168,21 +168,45 @@ const Expense = () => {
   };
 
   const filteredExpenses = useMemo(() => {
-    if (!expenses) return [];
-    
-    return expenses.filter((expense) => {
+    if (!Array.isArray(expenses)) {
+      console.warn("Expected 'expenses' to be an array but got:", expenses);
+      return [];
+    }
+  
+    const filtered = expenses.filter((expense) => {
       const expenseDate = new Date(expense.date);
       const from = startDate ? new Date(startDate) : null;
       const to = endDate ? new Date(endDate) : null;
-
+  
       return (
         expense.club_details?.id === userClub?.id &&
         (!from || expenseDate >= from) &&
         (!to || expenseDate <= to)
       );
     });
+  
+    const sorted = filtered.sort((a, b) => {
+      if (a.created_at && b.created_at) {
+        return new Date(b.created_at) - new Date(a.created_at);
+      }
+      return b.id - a.id;
+    });
+  
+    console.log("Sorted expenses:", sorted.map(exp => ({
+      id: exp.id,
+      created_at: exp.created_at,
+      date: exp.date,
+    })));
+  
+    return sorted;
   }, [expenses, startDate, endDate, userClub]);
+  
+  const paginatedExpenses = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredExpenses.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredExpenses, currentPage]);
 
+  // Edit expense
   const handleEditClick = (expense) => {
     const sanitizedExpense = {
       ...expense,

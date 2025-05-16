@@ -17,11 +17,20 @@ from rest_framework.pagination import PageNumberPagination
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_type_list(request):
     if request.method == 'GET':
+        search_term = request.GET.get('q', '')
+
         if request.user.role == 'owner':
             types = SubscriptionType.objects.all().order_by('id')
         else:
-            types = SubscriptionType.objects.filter(club=request.user.club).order_by('id')
-        
+            types = SubscriptionType.objects.filter(club=request.user.club)
+
+        # Apply search filter
+        if search_term:
+            types = types.filter(
+                Q(name__icontains=search_term)
+            )
+
+        types = types.order_by('id')
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(types, request)
         serializer = SubscriptionTypeSerializer(page, many=True)
@@ -33,17 +42,27 @@ def subscription_type_list(request):
             subscription_type = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
     if request.method == 'GET':
+        search_term = request.GET.get('identifier', '')
+
         if request.user.role == 'owner':
             subscriptions = Subscription.objects.select_related('member', 'type', 'club').all().order_by('-start_date')
         else:
             subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club).order_by('-start_date')
 
-        # Apply filters
+        # Apply search filter
+        if search_term:
+            subscriptions = subscriptions.filter(
+                Q(member__name__icontains=search_term) |
+                Q(member__phone__icontains=search_term) |
+                Q(member__rfid_code__icontains=search_term)
+            )
+
+        # Apply existing filters
         member_id = request.query_params.get('member')
         type_id = request.query_params.get('type')
         club_id = request.query_params.get('club')
@@ -55,6 +74,7 @@ def subscription_list(request):
         if club_id:
             subscriptions = subscriptions.filter(club_id=club_id)
             
+        subscriptions = subscriptions.order_by('-start_date')
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page, many=True)
@@ -90,6 +110,7 @@ def subscription_list(request):
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -283,14 +304,24 @@ def make_payment(request, pk):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_subscriptions(request):
     member_id = request.query_params.get('member_id')
+    search_term = request.query_params.get('identifier', '')
+
     if not member_id:
         return Response({"error": "member_id parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
     
     if request.user.role == 'owner':
-        subscriptions = Subscription.objects.filter(member_id=member_id).order_by('-start_date')
+        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(member_id=member_id)
     else:
-        subscriptions = Subscription.objects.filter(member_id=member_id, club=request.user.club).order_by('-start_date')
+        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(member_id=member_id, club=request.user.club)
     
+    if search_term:
+        subscriptions = subscriptions.filter(
+            Q(member__name__icontains=search_term) |
+            Q(member__phone__icontains=search_term) |
+            Q(member__rfid_code__icontains=search_term)
+        )
+    
+    subscriptions = subscriptions.order_by('-start_date')
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
     serializer = SubscriptionSerializer(page, many=True)

@@ -46,7 +46,7 @@ def create_dummy_data():
             location=fake.address()[:100],
             created_at=timezone.now()
         )
-        clubs.append(club)  # التعديل: club -> clubs
+        clubs.append(club)
     print("Created 3 clubs")
 
     # Create Subscription Types (3 types per club)
@@ -70,14 +70,14 @@ def create_dummy_data():
             subscription_types.append(sub_type)
     print("Created subscription types")
 
-    # Create 200 Staff Users
+    # Create 100 Staff Users
     roles = ['owner', 'admin', 'reception', 'accountant', 'coach']
     staff_users = []
     users_to_create = []
     existing_rfids = set(User.objects.filter(rfid_code__isnull=False).values_list('rfid_code', flat=True))
     existing_usernames = set(User.objects.filter(username__isnull=False).values_list('username', flat=True))
     existing_emails = set(User.objects.filter(email__isnull=False).values_list('email', flat=True))
-    for _ in range(200):
+    for _ in range(100):
         while True:
             username = serial_generator("user", user_counter, 8)[:8]
             email = serial_generator("user", user_counter, 8) + "@example.com"
@@ -100,7 +100,7 @@ def create_dummy_data():
             first_name=fake.first_name()[:30],
             last_name=fake.last_name()[:30],
             rfid_code=rfid,
-            club=random.choice(clubs)  # Assign one club directly
+            club=random.choice(clubs)
         )
         users_to_create.append(user)
         user_counter += 1
@@ -109,11 +109,11 @@ def create_dummy_data():
     staff_users = User.objects.filter(username__in=[u.username for u in users_to_create]).all()
     print(f"Created {len(staff_users)} staff users")
 
-    # Create 6000 Members
+    # Create 200 Members
     members = []
-    for i in range(6000):
-        if i % 1000 == 0:
-            print(f"Creating members: {i}/6000")
+    for i in range(200):
+        if i % 50 == 0:
+            print(f"Creating members: {i}/200")
         while True:
             national_id = serial_generator("NAT", member_counter, 14)
             if national_id not in unique_national_ids:
@@ -134,7 +134,7 @@ def create_dummy_data():
                     break
             except ValueError:
                 continue
-        club = random.choices(clubs, weights=[0.4, 0.3, 0.3])[0]  # Slight bias for first club
+        club = random.choices(clubs, weights=[0.4, 0.3, 0.3])[0]
         member = Member(
             club=club,
             name=fake.name()[:100],
@@ -160,7 +160,7 @@ def create_dummy_data():
     print(f"Created {len(members)} members")
 
     # Update referrals (10% of members)
-    for member in random.sample(members, min(600, len(members))):
+    for member in random.sample(members, min(20, len(members))):
         possible_referrers = [m for m in members if m != member and m.club == member.club]
         if possible_referrers:
             member.referred_by = random.choice(possible_referrers)
@@ -172,7 +172,7 @@ def create_dummy_data():
     subscriptions_to_create = []
     subscriptions_to_update = []
     for i, member in enumerate(members):
-        if i % 1000 == 0:
+        if i % 50 == 0:
             print(f"Creating subscriptions: {i}/{len(members)}")
         num_subscriptions = random.randint(1, 2)
         club_sub_types = [st for st in subscription_types if st.club == member.club]
@@ -197,9 +197,9 @@ def create_dummy_data():
     Subscription.objects.bulk_create(subscriptions_to_create)
     print("Created subscriptions for all members")
 
-    # Create Tickets (5000 tickets)
+    # Create Tickets (150 tickets)
     tickets_to_create = []
-    for _ in range(5000):
+    for _ in range(150):
         ticket = Ticket(
             club=random.choice(clubs),
             buyer_name=fake.name()[:100],
@@ -211,28 +211,28 @@ def create_dummy_data():
         )
         tickets_to_create.append(ticket)
     Ticket.objects.bulk_create(tickets_to_create)
-    print("Created 5000 tickets")
+    print("Created 150 tickets")
 
-    # Create Receipts (3000 receipts)
+    # Create Receipts (150 receipts)
     receipts_to_create = []
-    for _ in range(3000):
+    for _ in range(150):
         subscription = random.choice(subscriptions) if fake.boolean() else None
         receipt = Receipt(
             club=subscription.club if subscription else random.choice(clubs),
             member=subscription.member if subscription else random.choice(members),
             subscription=subscription,
-            amount=round(random.uniform(50.00, 500.00), 2),
+            amount=round(random.uniform(50.00, 200.00), 2),
             payment_method=random.choice(['cash', 'visa', 'bank']),
             note=fake.sentence()[:100],
             issued_by=random.choice(staff_users)
         )
         receipts_to_create.append(receipt)
     Receipt.objects.bulk_create(receipts_to_create)
-    print("Created 3000 receipts")
+    print("Created 150 receipts")
 
-    # Create Entry Logs (10000 logs)
+    # Create Entry Logs (200 logs)
     entry_logs_to_create = []
-    for _ in range(10000):
+    for _ in range(200):
         member = random.choice(members)
         member_subscriptions = [s for s in subscriptions if s.member == member]
         related_subscription = random.choice(member_subscriptions) if member_subscriptions and fake.boolean() else None
@@ -246,11 +246,11 @@ def create_dummy_data():
         )
         entry_logs_to_create.append(entry_log)
     EntryLog.objects.bulk_create(entry_logs_to_create)
-    print("Created 10000 entry logs")
+    print("Created 200 entry logs")
 
-    # Create Attendance Records (15000 records)
+    # Create Attendance Records (200 records)
     attendance_to_create = []
-    for _ in range(15000):
+    for _ in range(200):
         member = random.choice(members)
         member_subscriptions = [s for s in subscriptions if s.member == member]
         if not member_subscriptions:
@@ -266,12 +266,12 @@ def create_dummy_data():
         subscriptions_to_update.append(subscription)
     Attendance.objects.bulk_create(attendance_to_create)
     Subscription.objects.bulk_update(subscriptions_to_update, ['entry_count'])
-    print("Created 15000 attendance records")
+    print("Created 200 attendance records")
 
-    # Create Shifts (1000 shifts)
+    # Create Shifts (150 shifts)
     shifts = []
     shifts_to_create = []
-    for _ in range(1000):
+    for _ in range(150):
         date = fake.date_this_year()
         start_time = fake.time_object()
         end_time = (datetime.combine(date, start_time) + timedelta(hours=random.randint(4, 8))).time()
@@ -288,11 +288,11 @@ def create_dummy_data():
         shifts_to_create.append(shift)
         shifts.append(shift)
     Shift.objects.bulk_create(shifts_to_create)
-    print("Created 1000 shifts")
+    print("Created 150 shifts")
 
-    # Create Staff Attendance (800 records)
+    # Create Staff Attendance (100 records)
     staff_attendance_to_create = []
-    for _ in range(800):
+    for _ in range(100):
         shift = random.choice(shifts)
         check_in = timezone.make_aware(
             datetime.combine(shift.date, shift.shift_start) + timedelta(minutes=random.randint(-15, 15))
@@ -311,11 +311,11 @@ def create_dummy_data():
         )
         staff_attendance_to_create.append(staff_attendance)
     StaffAttendance.objects.bulk_create(staff_attendance_to_create)
-    print("Created 800 staff attendance records")
+    print("Created 100 staff attendance records")
 
-    # Create Free Invites (1000 invites)
+    # Create Free Invites (150 invites)
     free_invites_to_create = []
-    for _ in range(1000):
+    for _ in range(150):
         free_invite = FreeInvite(
             club=random.choice(clubs),
             guest_name=fake.name()[:100],
@@ -326,7 +326,7 @@ def create_dummy_data():
         )
         free_invites_to_create.append(free_invite)
     FreeInvite.objects.bulk_create(free_invites_to_create)
-    print("Created 1000 free invites")
+    print("Created 150 free invites")
 
     # Create Expense Categories (3 per club)
     expense_categories = []
@@ -341,13 +341,13 @@ def create_dummy_data():
     ExpenseCategory.objects.bulk_create(expense_categories)
     print("Created expense categories")
 
-    # Create Expenses (500 expenses)
+    # Create Expenses (150 expenses)
     expenses_to_create = []
-    for _ in range(500):
+    for _ in range(150):
         expense = Expense(
             club=random.choice(clubs),
             category=random.choice(expense_categories),
-            amount=round(random.uniform(50.00, 1000.00), 2),
+            amount=round(random.uniform(50.00, 200.00), 2),
             description=fake.sentence()[:100],
             date=fake.date_this_year(),
             paid_by=random.choice(staff_users),
@@ -356,7 +356,7 @@ def create_dummy_data():
         expenses_to_create.append(expense)
         invoice_counter += 1
     Expense.objects.bulk_create(expenses_to_create)
-    print("Created 500 expenses")
+    print("Created 150 expenses")
 
     # Create Income Sources (3 per club)
     income_sources = []
@@ -371,14 +371,14 @@ def create_dummy_data():
     IncomeSource.objects.bulk_create(income_sources)
     print("Created income sources")
 
-    # Create Incomes (500 incomes)
+    # Create Incomes (150 incomes)
     incomes_to_create = []
-    for _ in range(500):
+    for _ in range(150):
         receipt = random.choice(Receipt.objects.all()) if fake.boolean() else None
         income = Income(
             club=receipt.club if receipt else random.choice(clubs),
             source=random.choice(income_sources),
-            amount=round(random.uniform(50.00, 1000.00), 2),
+            amount=round(random.uniform(50.00, 200.00), 2),
             description=fake.sentence()[:100],
             date=fake.date_this_year(),
             received_by=random.choice(staff_users),

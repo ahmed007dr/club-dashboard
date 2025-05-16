@@ -15,11 +15,21 @@ from django.db import IntegrityError
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_list_api(request):
+    search_term = request.GET.get('q', '')
+    
     if request.user.role == 'owner':
         members = Member.objects.all().order_by('-id')
     else:
         members = Member.objects.filter(club=request.user.club).order_by('-id')
     
+    if search_term:
+        members = members.filter(
+            Q(name__icontains=search_term) |
+            Q(phone__icontains=search_term) |
+            Q(rfid_code__icontains=search_term)
+        )
+    
+    members = members.order_by('-id')
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(members, request)
     serializer = MemberSerializer(result_page, many=True)

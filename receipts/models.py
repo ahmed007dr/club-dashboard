@@ -2,7 +2,6 @@ from django.db import models
 from members.models import Member
 from subscriptions.models import Subscription
 
-
 class Receipt(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     member = models.ForeignKey('members.Member', on_delete=models.CASCADE)
@@ -17,6 +16,15 @@ class Receipt(models.Model):
     def __str__(self):
         return f"Receipt #{self.id} - {self.amount} EGP"
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['club']),
+            models.Index(fields=['member']),
+            models.Index(fields=['subscription']),
+            models.Index(fields=['date']),
+            models.Index(fields=['invoice_number']),
+        ]
+
 class AutoCorrectionLog(models.Model):
     member = models.ForeignKey(Member, on_delete=models.CASCADE)
     old_subscription = models.ForeignKey(Subscription, null=True, blank=True, on_delete=models.SET_NULL, related_name='corrected_from')
@@ -26,3 +34,10 @@ class AutoCorrectionLog(models.Model):
 
     def __str__(self):
         return f"Correction for {self.member.name} on {self.created_at.strftime('%Y-%m-%d')}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['member']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['new_subscription']),
+        ]

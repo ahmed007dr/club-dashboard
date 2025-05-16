@@ -1,8 +1,6 @@
 from django.db import models
-from accounts.models import User
 from utils.generate_invoice import generate_invoice_number
 
-# Create your models here.
 class ExpenseCategory(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
@@ -10,6 +8,13 @@ class ExpenseCategory(models.Model):
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['club']),
+            models.Index(fields=['name']),
+        ]
+        ordering = ['name']  
 
 class Expense(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
@@ -29,14 +34,29 @@ class Expense(models.Model):
     def __str__(self):
         return f"{self.category.name} - {self.amount}"
 
+    class Meta:
+        indexes = [
+            models.Index(fields=['club']),
+            models.Index(fields=['category']),
+            models.Index(fields=['date']),
+            models.Index(fields=['invoice_number']),
+        ]
+        ordering = ['-date', 'id'] 
+
 class IncomeSource(models.Model):
-    
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
-    name = models.CharField(max_length=100)  
+    name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['club']),
+            models.Index(fields=['name']),
+        ]
+        ordering = ['name'] 
 
 class Income(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
@@ -46,7 +66,15 @@ class Income(models.Model):
     date = models.DateField()
     received_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     related_receipt = models.ForeignKey('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True)
-    # ticket = models.OneToOneField('tickets.Ticket', null=True, blank=True, on_delete=models.SET_NULL, related_name='income')
 
     def __str__(self):
         return f"{self.source.name} - {self.amount}"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['club']),
+            models.Index(fields=['source']),
+            models.Index(fields=['date']),
+            models.Index(fields=['related_receipt']),
+        ]
+        ordering = ['-date', 'id']  

@@ -96,12 +96,16 @@ const Income = () => {
 
   // Fetch data on page change or component mount
   useEffect(() => {
-    dispatch(fetchIncomes({ page: incomePage }));
-    dispatch(fetchIncomeSources({ page: incomeSourcesPage }));
-  }, [dispatch, incomePage, incomeSourcesPage]);
-
+    dispatch(fetchIncomes());
+  }, [dispatch]);
   const filteredIncomes = useMemo(() => {
-    return incomes.results?.filter((income) => {
+    if (!Array.isArray(incomes)) {
+      console.warn("Expected incomes to be an array but got:", incomes);
+      return [];
+    }
+  
+    return incomes
+      .filter((income) => {
         return (
           income.club_details?.id === userClub?.id &&
           (!incomeFilters.club ||
@@ -129,8 +133,8 @@ const Income = () => {
         const dateB = b.date ? new Date(b.date) : new Date(0);
         return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
       });
-  }, [incomes.results, incomeFilters, userClub, sortOrder]);
-
+  }, [incomes, incomeFilters, userClub, sortOrder]);
+  
   // Pagination calculations
   const incomePageCount = Math.ceil(incomes.count / 20); // 20 items per page
   const incomeSourcePageCount = Math.ceil(incomeSources.count / 20);

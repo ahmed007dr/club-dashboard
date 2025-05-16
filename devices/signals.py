@@ -2,7 +2,7 @@ from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.dispatch import receiver
 from django.utils.timezone import now
 from django.http import HttpResponseForbidden
-from .models import AllowedDevice, ExtendedUserVisit, DeviceSettings
+from .models import AllowedDevice, ExtendedUserVisit, DeviceSettings ,UserVisit
 from .utils import generate_device_id, update_last_seen
 import logging
 
@@ -21,7 +21,7 @@ def handle_login(sender, request, user, **kwargs):
     if not device_qs.exists():
         # Get max_allowed_devices from DeviceSettings
         device_settings = DeviceSettings.objects.first()
-        max_devices = device_settings.max_allowed_devices if device_settings else 6  # Fallback to 6
+        max_devices = device_settings.max_allowed_devices if device_settings else 50 # Fallback to 6
         
         if AllowedDevice.objects.filter(user=user, is_active=True).count() >= max_devices:
             logger.warning(
