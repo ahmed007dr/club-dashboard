@@ -26,23 +26,23 @@ const SubscriptionChart = () => {
   const data = [
     {
       name: "نشطة",
-      value: subscriptionTypes.filter((s) => s.is_active).length,
+      value: subscriptionTypes.results.filter((s) => s.is_active).length,
     },
     {
       name: "غير نشطة",
-      value: subscriptionTypes.filter((s) => !s.is_active).length,
+      value: subscriptionTypes.results.filter((s) => !s.is_active).length,
     },
     {
       name: "تشمل صالة الألعاب الرياضية",
-      value: subscriptionTypes.filter((s) => s.includes_gym).length,
+      value: subscriptionTypes.results.filter((s) => s.includes_gym).length,
     },
     {
       name: "تشمل المسبح",
-      value: subscriptionTypes.filter((s) => s.includes_pool).length,
+      value: subscriptionTypes.results.filter((s) => s.includes_pool).length,
     },
     {
       name: "تشمل الصفوف",
-      value: subscriptionTypes.filter((s) => s.includes_classes).length,
+      value: subscriptionTypes.results.filter((s) => s.includes_classes).length,
     },
   ].filter((item) => item.value > 0); // Remove zero-value entries
 

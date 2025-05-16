@@ -44,7 +44,7 @@ const Staff = () => {
     staff: "",
   });
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [clubs, setClubs] = useState([]);
   const [selectedClubId, setSelectedClubId] = useState("");
   const [selectedClubUsers, setSelectedClubUsers] = useState([]);

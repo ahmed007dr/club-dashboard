@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { postSubscription } from "../../redux/slices/subscriptionsSlice";
+import { fetchSubscriptionTypes, postSubscription } from "../../redux/slices/subscriptionsSlice";
 import { fetchUsers } from "../../redux/slices/memberSlice";
 import {
   Command,
@@ -51,6 +51,7 @@ const CreateSubscription = ({ onClose }) => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
+        await dispatch(fetchSubscriptionTypes()).unwrap();
         const membersResult = await dispatch(fetchUsers()).unwrap();
         setAllMembers(membersResult);
 
@@ -63,11 +64,11 @@ const CreateSubscription = ({ onClose }) => {
             ])
           ).values()
         );
-        console.log('Unique clubs:', uniqueClubs);
         setClubs(uniqueClubs);
       } catch (error) {
         handleError(error, "Failed to load initial data");
       } finally {
+        setIsInitialLoad(false);
       }
     };
 
@@ -318,14 +319,14 @@ const CreateSubscription = ({ onClose }) => {
             disabled={isSubmitting}
           >
             <option value="">اختر النوع</option>
-            {subscriptionTypes
+            {subscriptionTypes.results
               .filter(
                 (type) =>
                   type.club_details.id.toString() === formData.club.toString()
               )
               ?.map((type) => (
                 <option key={type.id} value={type.id}>
-                  {type.name} - {type.price} ر.س
+                  {type.name} - {type.price} جنيها
                 </option>
               ))}
           </select>

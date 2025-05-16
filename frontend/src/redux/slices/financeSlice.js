@@ -19,7 +19,7 @@ export const fetchExpenseCategories = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch expense categories.');
       }
-      return await response.json().then((data) => data.results);
+      return await response.json();
     } catch (error) {
       return rejectWithValue(error.message);
     }

@@ -6,25 +6,27 @@ import BASE_URL from '../../config/api';
 // Fetch all invites with pagination
 export const fetchFreeInvites = createAsyncThunk(
   'invites/fetchFreeInvites',
-  async (params = {}, { rejectWithValue }) => {
+  async (params = {}, ) => {
     const token = localStorage.getItem('token');
-    try {
-      const response = await axios.get(`${BASE_URL}/invites/api/free-invites/`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        params: {
-          page: params.page,
-          page_size: params.page_size,
-          // Add any other filter params here
-          used: params.used,
-          // ... other filters
+      const response = await axios.get(
+        `${BASE_URL}/invites/api/free-invites/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          params: {
+            page: params.page,
+            page_size: params.page_size,
+            // Add any other filter params here
+            used: params.used,
+            // ... other filters
+          },
         }
-      });
+      );
       return response.data.results; // Assuming the API returns an array or object
-    }
-  }
+  } 
 );
+
 
 // Add new invite
 export const addInvite = createAsyncThunk(

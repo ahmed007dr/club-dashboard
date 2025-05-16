@@ -7,7 +7,7 @@ function UserList() {
   const [users, setUsers] = useState([]);
   const [filter, setFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const usersPerPage = 5;
+  const usersPerPage = 20;
 
   useEffect(() => {
     const fetchUsers = async () => {

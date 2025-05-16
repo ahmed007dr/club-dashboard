@@ -3,19 +3,21 @@ import BASE_URL from '../../config/api';
 
 // Fetch paginated members
 export const fetchUsers = createAsyncThunk(
-  'users/fetchUsers',
-  async ({ page = 1 }, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
+  "users/fetchUsers",
+  async ({ page = 1 } = {}, { rejectWithValue }) => {
+    const token = localStorage.getItem("token");
     if (!token) {
-      return rejectWithValue("Authentication token is missing. Please log in again.");
+      return rejectWithValue(
+        "Authentication token is missing. Please log in again."
+      );
     }
 
     try {
       const res = await fetch(`${BASE_URL}/members/api/members/?page=${page}`, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
@@ -25,17 +27,21 @@ export const fetchUsers = createAsyncThunk(
         } else if (res.status === 404) {
           return rejectWithValue("No members found for this page.");
         } else if (res.status === 500) {
-          return rejectWithValue("Internal Server Error. Please try again later.");
+          return rejectWithValue(
+            "Internal Server Error. Please try again later."
+          );
         }
         const errorData = await res.json();
         return rejectWithValue(errorData.message || "Failed to fetch members.");
       }
 
       const data = await res.json();
-      return data; // Expect { count, next, previous, results }
+      return data;
     } catch (error) {
       console.error("Error fetching members:", error);
-      return rejectWithValue("An unexpected error occurred. Please try again later.");
+      return rejectWithValue(
+        "An unexpected error occurred. Please try again later."
+      );
     }
   }
 );

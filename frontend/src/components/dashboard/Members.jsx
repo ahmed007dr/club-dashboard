@@ -14,12 +14,29 @@ import { IoAddOutline } from "react-icons/io5";
 import toast from 'react-hot-toast';
 
 const Members = () => {
+  const [data, setData] = useState([
+    {
+      id: "4",
+      photo: "https://i.pravatar.cc/100?img=11",
+      name: "ahmed El-Zahrani",
+      membership_number: "1008",
+      national_id: "102030405066",
+      phone: "0101234566",
+      phone2: "", // Add this
+      address: "", // Add this
+      rfid_code: "", // Add this
+      job: "", // Add this
+      note: "", // Add this
+      club_name: "Sports Club",
+    },
+  ]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState(null);
+  const [searchResult, setSearchResult] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20; // Matches backend configuration
 
@@ -56,6 +73,14 @@ const Members = () => {
     } catch (error) {
       setError("Failed to search members. Please try again later: " + error);
     }
+  };
+
+  const onAddSuccess = () => {
+    const updatedData = [...data, selectedMember];
+    const sortedUpdatedData = [...updatedData].sort((a, b) => b.id - a.id);
+    setData(sortedUpdatedData);
+    setSearchResult(sortedUpdatedData);
+    setIsAddModalOpen(false);
   };
 
   const handleDeleteClick = (member) => {
@@ -168,7 +193,9 @@ const Members = () => {
           {Array.isArray(members) &&
             members.map((member, index) => (
               <tr key={member.id}>
-                <td className="p-3 border-b">{(currentPage - 1) * itemsPerPage + index + 1}</td>
+                <td className="p-3 border-b">
+                  {(currentPage - 1) * itemsPerPage + index + 1}
+                </td>
                 <td className="p-3 border-b">
                   <Link to={`/member/${member.id}`}>
                     <img
@@ -219,8 +246,9 @@ const Members = () => {
         {pagination.count > 0 && (
           <>
             <div className="text-sm text-gray-600">
-              عرض {(currentPage - 1) * itemsPerPage + 1} إلى{' '}
-              {Math.min(currentPage * itemsPerPage, pagination.count)} من {pagination.count} 
+              عرض {(currentPage - 1) * itemsPerPage + 1} إلى{" "}
+              {Math.min(currentPage * itemsPerPage, pagination.count)} من{" "}
+              {pagination.count}
             </div>
             <div className="flex gap-2">
               {/* First Page Button */}
@@ -229,8 +257,8 @@ const Members = () => {
                 disabled={currentPage === 1 || pagination.count === 0}
                 className={`px-3 py-1 rounded ${
                   currentPage === 1 || pagination.count === 0
-                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
                 }`}
               >
                 الأول
@@ -241,8 +269,8 @@ const Members = () => {
                 disabled={!pagination.previous || pagination.count === 0}
                 className={`px-3 py-1 rounded ${
                   !pagination.previous || pagination.count === 0
-                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
                 }`}
               >
                 السابق
@@ -263,22 +291,27 @@ const Members = () => {
                   }
                 }
 
-                return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
-                  (page) => (
-                    <button
-                      key={page}
-                      onClick={() => paginate(page)}
-                      disabled={pagination.count === 0}
-                      className={`px-3 py-1 rounded ${
-                        currentPage === page && pagination.count > 0
-                          ? 'bg-blue-700 text-white'
-                          : 'bg-gray-200 hover:bg-gray-300'
-                      } ${pagination.count === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      {page}
-                    </button>
-                  )
-                );
+                return Array.from(
+                  { length: end - start + 1 },
+                  (_, i) => start + i
+                ).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => paginate(page)}
+                    disabled={pagination.count === 0}
+                    className={`px-3 py-1 rounded ${
+                      currentPage === page && pagination.count > 0
+                        ? "bg-blue-700 text-white"
+                        : "bg-gray-200 hover:bg-gray-300"
+                    } ${
+                      pagination.count === 0
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ));
               })()}
 
               {/* Next Page Button */}
@@ -287,8 +320,8 @@ const Members = () => {
                 disabled={!pagination.next || pagination.count === 0}
                 className={`px-3 py-1 rounded ${
                   !pagination.next || pagination.count === 0
-                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
                 }`}
               >
                 التالي
@@ -316,18 +349,19 @@ const Members = () => {
       {/* Add Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(255, 255, 255, 0.2)]">
-        <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]">
-          <div className="bg-white p-6 rounded-lg w-1/3 relative">
-            <button
-              onClick={closeAddModal}
-              className="absolute top-2 right-3 text-xl"
-            >
-              ×
-            </button>
-            <AddMember
-              closeAddModal={closeAddModal}
-              onAddSuccess={onAddSuccess}
-            />
+          <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]">
+            <div className="bg-white p-6 rounded-lg w-1/3 relative">
+              <button
+                onClick={closeAddModal}
+                className="absolute top-2 right-3 text-xl"
+              >
+                ×
+              </button>
+              <AddMember
+                closeAddModal={closeAddModal}
+                onAddSuccess={onAddSuccess}
+              />
+            </div>
           </div>
         </div>
       )}
@@ -337,12 +371,11 @@ const Members = () => {
         <div
           className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(249, 236, 236, 0.2)]"
           style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
-          className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]"
         >
           <div className="modal relative bg-white p-6 rounded-lg">
             <h3 className="text-lg font-semibold mb-4">تأكيد الحذف</h3>
             <p>
-              هل أنت متأكد من حذف <strong>{selectedMember?.name}</strong؟
+              هل أنت متأكد من حذف <strong>{selectedMember?.name}</strong>
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -351,7 +384,10 @@ const Members = () => {
               >
                 إلغاء
               </button>
-              <button onClick={confirmDelete} className="bg-red-600 text-white px-4 py-2 rounded">
+              <button
+                onClick={confirmDelete}
+                className="bg-red-600 text-white px-4 py-2 rounded"
+              >
                 حذف
               </button>
             </div>
@@ -363,7 +399,9 @@ const Members = () => {
       {isEditModalOpen && selectedMember && (
         <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]">
           <div className="modal relative bg-white p-6 rounded-lg w-1/2">
-            <h3 className="text-lg font-semibold mb-4 text-right">تعديل العضو</h3>
+            <h3 className="text-lg font-semibold mb-4 text-right">
+              تعديل العضو
+            </h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="flex flex-col">
@@ -376,7 +414,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
-                
+
                 <div className="flex flex-col">
                   <label className="text-right mb-1">رقم العضوية</label>
                   <input
@@ -387,7 +425,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
-                
+
                 <div className="flex flex-col">
                   <label className="text-right mb-1">الرقم القومي</label>
                   <input
@@ -398,7 +436,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
-                
+
                 <div className="flex flex-col">
                   <label className="text-right mb-1">رقم الهاتف الأساسي</label>
                   <input
@@ -409,7 +447,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
-                
+
                 <div className="flex flex-col">
                   <label className="text-right mb-1">رقم الهاتف الثانوي</label>
                   <input
@@ -433,7 +471,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
-                
+
                 <div className="flex flex-col">
                   <label className="text-right mb-1">الوظيفة</label>
                   <input
@@ -444,7 +482,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
-                
+
                 <div className="flex flex-col">
                   <label className="text-right mb-1">اسم النادي</label>
                   <input
@@ -455,7 +493,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right bg-gray-100 cursor-not-allowed"
                   />
                 </div>
-                
+
                 <div className="flex flex-col">
                   <label className="text-right mb-1">العنوان</label>
                   <input
@@ -466,7 +504,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
-                
+
                 <div className="flex flex-col">
                   <label className="text-right mb-1">ملاحظات</label>
                   <textarea
@@ -479,7 +517,7 @@ const Members = () => {
                 </div>
               </div>
             </div>
-            
+
             <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={() => setIsEditModalOpen(false)}
