@@ -27,7 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
-import axios from 'axios';
+import IncomeSourcesList from './IncomeSourcesList';
 
 const labelMapping = {
   name: "الاسم",
@@ -38,11 +38,6 @@ const labelMapping = {
   date: "التاريخ",
   received_by: "المستلم",
 };
-
-import IncomeSourcesList from './IncomeSourcesList'; // Adjust the path as needed
-import IncomeSourceForm from './IncomeSourceForm';   // Adjust the path as needed
-
-
 
 const Income = () => {
   const dispatch = useDispatch();
@@ -73,9 +68,10 @@ const Income = () => {
 
   // Pagination states
   const [incomePage, setIncomePage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [incomeSourcesPage, setIncomeSourcesPage] = useState(1);
+  const maxButtons = 5; // Maximum number of page buttons to display
 
-  const { incomes, loading, error } = useSelector((state) => state.finance);
+  const { incomes, incomeSources, loading, error } = useSelector((state) => state.finance);
 
   useEffect(() => {
     fetch(`${BASE_URL}/accounts/api/profile/`, {
@@ -87,7 +83,6 @@ const Income = () => {
     })
       .then((response) => response.json())
       .then((data) => {
-        console.log("Fetched full user profile data:", data); // <-- Log all fetched data
         setUserClub({
           id: data.club.id,
           name: data.club.name,
@@ -98,9 +93,8 @@ const Income = () => {
         console.error("Failed to fetch user profile:", err);
       });
   }, []);
-  
 
-  // Fetch data on component mount
+  // Fetch data on page change or component mount
   useEffect(() => {
     dispatch(fetchIncomes());
   }, [dispatch]);
@@ -142,11 +136,26 @@ const Income = () => {
   }, [incomes, incomeFilters, userClub, sortOrder]);
   
   // Pagination calculations
-  const incomePageCount = Math.ceil(filteredIncomes.length / pageSize);
-  const paginatedIncomes = filteredIncomes.slice(
-    (incomePage - 1) * pageSize,
-    incomePage * pageSize
-  );
+  const incomePageCount = Math.ceil(incomes.count / 20); // 20 items per page
+  const incomeSourcePageCount = Math.ceil(incomeSources.count / 20);
+
+  // Generate page buttons (max 5)
+  const getPageButtons = (currentPage, totalPages) => {
+    const buttons = [];
+    const half = Math.floor(maxButtons / 2);
+    let startPage = Math.max(1, currentPage - half);
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    // Adjust startPage if endPage is at the max
+    if (endPage - startPage + 1 < maxButtons) {
+      startPage = Math.max(1, endPage - maxButtons + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      buttons.push(i);
+    }
+    return buttons;
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -223,26 +232,7 @@ const Income = () => {
     setCurrentItem(null);
     setShowModal(true);
   };
-  const [incomeSources, setIncomeSources] = useState([]);
-  useEffect(() => {
-    // Fetch income sources
-    const fetchSources = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`${BASE_URL}/finance/api/income-sources/`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-        setIncomeSources(response.data);
-      } catch (err) {
-        console.error('فشل في جلب مصادر الدخل:', err);
-        toast.error('فشل في تحميل مصادر الدخل');
-      }
-    };
 
-    fetchSources();
-  }, []);
   const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
 
@@ -268,46 +258,36 @@ const Income = () => {
   const handleIncomeFilterChange = (e) => {
     const { name, value } = e.target;
     setIncomeFilters((prev) => ({ ...prev, [name]: value }));
-    setIncomePage(1);
+    setIncomePage(1); // Reset to first page on filter change
   };
 
   const PaginationControls = ({ currentPage, setPage, pageCount }) => (
     <div className="flex items-center justify-between mt-4">
-      <div className="flex items-center gap-2">
-        <select
-          value={pageSize}
-          onChange={(e) => {
-            setPageSize(parseInt(e.target.value));
-            setPage(1);
-          }}
-          className="border rounded px-2 py-1"
-        >
-          {[5, 10, 20, 50].map((size) => (
-            <option key={size} value={size}>
-              {size} لكل صفحة
-            </option>
-          ))}
-        </select>
+      <Button
+        onClick={() => setPage(currentPage - 1)}
+        disabled={currentPage === 1}
+      >
+        السابق
+      </Button>
+      <div className="flex gap-2">
+        {getPageButtons(currentPage, pageCount).map((page) => (
+          <Button
+            key={page}
+            onClick={() => setPage(page)}
+            variant={currentPage === page ? "default" : "outline"}
+          >
+            {page}
+          </Button>
+        ))}
       </div>
-      <div className="flex items-center gap-2">
-        <Button
-          onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
-          disabled={currentPage === 1}
-        >
-          السابق
-        </Button>
-        <span>
-          صفحة {currentPage} من {pageCount}
-        </span>
-        <Button
-          onClick={() => setPage((prev) => Math.min(prev + 1, pageCount))}
-          disabled={currentPage === pageCount}
-        >
-          التالي
-        </Button>
-      </div>
+      <Button
+        onClick={() => setPage(currentPage + 1)}
+        disabled={currentPage === pageCount}
+      >
+        التالي
+      </Button>
     </div>
-  ); 
+  );
 
   return (
     <div className="p-6 space-y-6" dir="rtl">
@@ -332,6 +312,11 @@ const Income = () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <IncomeSourcesList />
+              <PaginationControls
+                currentPage={incomeSourcesPage}
+                setPage={setIncomeSourcesPage}
+                pageCount={incomeSourcePageCount}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -440,7 +425,7 @@ const Income = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-background">
-                    {paginatedIncomes.map((income) => (
+                    {filteredIncomes?.map((income) => (
                       <tr
                         key={income.id}
                         className="hover:bg-gray-100 transition"
@@ -530,139 +515,139 @@ const Income = () => {
 
       {/* Modal for adding/editing income */}
       {showModal && (
-  <div
-    className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
-    onClick={() => setShowModal(false)}
-  >
-    <div
-      className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <h3 className="text-xl font-semibold mb-4 text-right">
-        {currentItem ? "تعديل دخل" : "إضافة دخل"}
-      </h3>
-      <div className="grid grid-cols-1 gap-4">
-        {/* Club Field */}
-        <div>
-          <label className="block text-sm font-medium mb-1 text-right">
-            النادي
-          </label>
-          <select
-            name="club"
-            value={currentItem ? currentItem.club : newItem.club}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-            disabled // Disabled since it's the user's club
-          >
-            {userClub ? (
-              <option value={userClub.id}>{userClub.name}</option>
-            ) : (
-              <option value="">جاري التحميل...</option>
-            )}
-          </select>
-        </div>
-
-        {/* Source Field */}
-        <div>
-          <label className="block text-sm font-medium mb-1 text-right">
-            مصدر الدخل
-          </label>
-          <select
-            name="source"
-            value={currentItem ? currentItem.source : newItem.source}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-            required
-          >
-            <option value="">اختر مصدر الدخل</option>
-            {incomeSources.map((source) => (
-              <option key={source.id} value={source.id}>
-                {source.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Amount Field */}
-        <div>
-          <label className="block text-sm font-medium mb-1 text-right">
-            المبلغ
-          </label>
-          <input
-            type="number"
-            name="amount"
-            value={currentItem ? currentItem.amount || "" : newItem.amount || ""}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-            min="0"
-            step="0.01"
-          />
-        </div>
-
-        {/* Description Field */}
-        <div>
-          <label className="block text-sm font-medium mb-1 text-right">
-            الوصف
-          </label>
-          <textarea
-            name="description"
-            value={currentItem ? currentItem.description || "" : newItem.description || ""}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-            rows={3}
-          />
-        </div>
-
-        {/* Date Field */}
-        <div>
-          <label className="block text-sm font-medium mb-1 text-right">
-            التاريخ
-          </label>
-          <input
-            type="date"
-            name="date"
-            value={currentItem 
-              ? currentItem.date 
-                ? new Date(currentItem.date).toISOString().split('T')[0] 
-                : ""
-              : newItem.date || ""}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-          />
-        </div>
-
-        {/* Received By Field */}
-        <div>
-          <label className="block text-sm font-medium mb-1 text-right">
-            المستلم
-          </label>
-          <input
-            type="text"
-            name="received_by"
-            value={currentItem ? currentItem.received_by || "" : newItem.received_by || ""}
-            onChange={handleChange}
-            className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-            placeholder="اسم المستلم"
-          />
-        </div>
-      </div>
-      <div className="mt-6 flex justify-end gap-2">
-        <button
+        <div
+          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
           onClick={() => setShowModal(false)}
-          className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
         >
-          إلغاء
-        </button>
-        <button
-          onClick={handleSave}
-          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-        >
-          حفظ
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+          <div
+            className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-semibold mb-4 text-right">
+              {currentItem ? "تعديل دخل" : "إضافة دخل"}
+            </h3>
+            <div className="grid grid-cols-1 gap-4">
+              {/* Club Field */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  النادي
+                </label>
+                <select
+                  name="club"
+                  value={currentItem ? currentItem.club : newItem.club}
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                  disabled
+                >
+                  {userClub ? (
+                    <option value={userClub.id}>{userClub.name}</option>
+                  ) : (
+                    <option value="">جاري التحميل...</option>
+                  )}
+                </select>
+              </div>
+
+              {/* Source Field */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  مصدر الدخل
+                </label>
+                <select
+                  name="source"
+                  value={currentItem ? currentItem.source : newItem.source}
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                  required
+                >
+                  <option value="">اختر مصدر الدخل</option>
+                  {incomeSources.results.map((source) => (
+                    <option key={source.id} value={source.id}>
+                      {source.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Amount Field */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  المبلغ
+                </label>
+                <input
+                  type="number"
+                  name="amount"
+                  value={currentItem ? currentItem.amount || "" : newItem.amount || ""}
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+
+              {/* Description Field */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  الوصف
+                </label>
+                <textarea
+                  name="description"
+                  value={currentItem ? currentItem.description || "" : newItem.description || ""}
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                  rows={3}
+                />
+              </div>
+
+              {/* Date Field */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  التاريخ
+                </label>
+                <input
+                  type="date"
+                  name="date"
+                  value={currentItem
+                    ? currentItem.date
+                      ? new Date(currentItem.date).toISOString().split('T')[0]
+                      : ""
+                    : newItem.date || ""}
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                />
+              </div>
+
+              {/* Received By Field */}
+              <div>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  المستلم
+                </label>
+                <input
+                  type="text"
+                  name="received_by"
+                  value={currentItem ? currentItem.received_by || "" : newItem.received_by || ""}
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                  placeholder="اسم المستلم"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleSave}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                حفظ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete confirmation modal */}
       {confirmDeleteModal && (

@@ -12,13 +12,21 @@ import { RiVipCrown2Line } from "react-icons/ri";
 import BASE_URL from '../../config/api';
 import { toast } from 'react-hot-toast';
 
-
-
 const InviteList = () => {
   const dispatch = useDispatch();
-  const { invites, loading, error } = useSelector((state) => state.invites);
-  const [userClub, setUserClub] = useState(null); // Logged-in user's club
-  const [loadingProfile, setLoadingProfile] = useState(true); // Profile loading state
+  const { 
+    invites: { 
+      results: invites = [], 
+      count: totalItems = 0,
+      next: nextPageUrl,
+      previous: prevPageUrl
+    }, 
+    loading, 
+    error 
+  } = useSelector((state) => state.invites);
+  
+  const [userClub, setUserClub] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -51,6 +59,10 @@ const InviteList = () => {
     date: "",
   });
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20); // Changed to 20 items per page
+
   // Fetch user profile to get club details
   useEffect(() => {
     setLoadingProfile(true);
@@ -63,11 +75,12 @@ const InviteList = () => {
     })
       .then((response) => response.json())
       .then((data) => {
-        const club = { id: data.club.id, name: data.club.name };
-        console.log("Fetched userClub:", club);
-        setUserClub(club);
-        setFilters((prev) => ({ ...prev, club: club.id.toString() }));
-        setFormData((prev) => ({ ...prev, club: club.id.toString() }));
+        if (data && data.club && data.club.id) {
+          const club = { id: data.club.id, name: data.club.name };
+          setUserClub(club);
+          setFilters((prev) => ({ ...prev, club: club.id.toString() }));
+          setFormData((prev) => ({ ...prev, club: club.id.toString() }));
+        }
         setLoadingProfile(false);
       })
       .catch((err) => {
@@ -76,10 +89,21 @@ const InviteList = () => {
       });
   }, []);
 
-  // Fetch invites
+  // Fetch invites with pagination
   useEffect(() => {
-    dispatch(fetchFreeInvites());
-  }, [dispatch]);
+    if (userClub?.id) {
+      const params = {
+        page: currentPage,
+        page_size: itemsPerPage,
+        club: userClub.id,
+        guest_name: filters.guestName,
+        status: filters.status,
+        date: filters.date
+      };
+      
+      dispatch(fetchFreeInvites(params));
+    }
+  }, [dispatch, currentPage, itemsPerPage, filters, userClub]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -102,28 +126,6 @@ const InviteList = () => {
       [name]: value,
     }));
   };
-
-  // Sort invites by id in descending order (newest first) and then apply filters
-  const filteredInvites = [...invites]
-    .sort((a, b) => b.id - a.id) // Sort by id descending
-    .filter((invite) => {
-      const matchesGuest =
-        filters.guestName === "" ||
-        invite.guest_name.toLowerCase().includes(filters.guestName.toLowerCase());
-      const matchesStatus = filters.status === "" || invite.status === filters.status;
-      const matchesClub =
-        userClub && invite.club_details?.id.toString() === userClub.id.toString();
-      let matchesDate = true;
-      if (filters.date) {
-        const inviteDate = new Date(invite.date);
-        inviteDate.setHours(0, 0, 0, 0);
-        const selectedDate = new Date(filters.date);
-        selectedDate.setHours(0, 0, 0, 0);
-        matchesDate = inviteDate.getTime() === selectedDate.getTime();
-      }
-
-      return matchesGuest && matchesStatus && matchesClub && matchesDate;
-    });
 
   const validateForm = () => {
     const errors = {};
@@ -161,6 +163,16 @@ const InviteList = () => {
         invited_by: "",
       });
       setFormErrors({});
+      // Refresh invites with current filters/pagination
+      const params = {
+        page: currentPage,
+        page_size: itemsPerPage,
+        club: userClub?.id || '',
+        guest_name: filters.guestName,
+        status: filters.status,
+        date: filters.date
+      };
+      dispatch(fetchFreeInvites(params));
     } catch (error) {
       console.error("Failed to add invite:", error);
       toast.error("فشل في إضافة الدعوة");
@@ -194,6 +206,16 @@ const InviteList = () => {
       toast.success("تم تعديل الدعوة بنجاح");
       setShowEditModal(false);
       setFormErrors({});
+      // Refresh invites with current filters/pagination
+      const params = {
+        page: currentPage,
+        page_size: itemsPerPage,
+        club: userClub?.id || '',
+        guest_name: filters.guestName,
+        status: filters.status,
+        date: filters.date
+      };
+      dispatch(fetchFreeInvites(params));
     } catch (error) {
       console.error("Failed to edit invite:", error);
       toast.error("فشل في تعديل الدعوة");
@@ -208,6 +230,16 @@ const InviteList = () => {
       await dispatch(deleteInviteById(selectedInviteId)).unwrap();
       toast.success("تم حذف الدعوة بنجاح");
       setShowDeleteModal(false);
+      // Refresh invites with current filters/pagination
+      const params = {
+        page: currentPage,
+        page_size: itemsPerPage,
+        club: userClub?.id || '',
+        guest_name: filters.guestName,
+        status: filters.status,
+        date: filters.date
+      };
+      dispatch(fetchFreeInvites(params));
     } catch (error) {
       console.error("Failed to delete invite:", error);
       toast.error("فشل في حذف الدعوة");
@@ -232,6 +264,16 @@ const InviteList = () => {
       setShowMarkUsedModal(false);
       setMarkUsedData({ used_by: "" });
       setFormErrors({});
+      // Refresh invites with current filters/pagination
+      const params = {
+        page: currentPage,
+        page_size: itemsPerPage,
+        club: userClub?.id || '',
+        guest_name: filters.guestName,
+        status: filters.status,
+        date: filters.date
+      };
+      dispatch(fetchFreeInvites(params));
     } catch (error) {
       console.error("Failed to mark invite as used:", error);
       toast.error("فشل في تحديد الدعوة كمستخدمة");
@@ -270,25 +312,23 @@ const InviteList = () => {
     setShowDeleteModal(true);
   };
 
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20;
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentInvites = filteredInvites.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredInvites.length / itemsPerPage);
-
-  const handlePageChange = (pageNumber) => {
-    setCurrentPage(pageNumber);
-  };
-
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({
       ...prev,
       [name]: value,
     }));
-    setCurrentPage(1);
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    const newItemsPerPage = parseInt(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1); // Reset to first page when changing items per page
   };
 
   const getStatusBadge = (status) => {
@@ -311,19 +351,32 @@ const InviteList = () => {
     );
   };
 
-  if (loading || loadingProfile)
+  if (loading || loadingProfile) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
       </div>
     );
+  }
 
-  if (error)
+  if (!userClub) {
+    return (
+      <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+        لا يمكن تحميل بيانات النادي. يرجى التحقق من اتصالك بالإنترنت أو إعادة تسجيل الدخول.
+      </div>
+    );
+  }
+
+  if (error) {
     return (
       <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
         خطأ: {error}
       </div>
     );
+  }
+
+  // Calculate total pages based on backend count
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
 
   return (
     <div className="container mx-auto px-4 py-8" dir="rtl">
@@ -398,11 +451,8 @@ const InviteList = () => {
         />
       </div>
 
-      <div
-        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
-        dir="rtl"
-      >
-        {currentInvites.map((invite) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" dir="rtl">
+        {invites.map((invite) => (
           <div
             key={invite.id}
             className="rounded-lg shadow-md overflow-hidden border border-gray-200"
@@ -497,110 +547,86 @@ const InviteList = () => {
       </div>
 
       {/* Pagination Controls */}
-     <div className="mt-6 flex justify-center items-center space-x-2" dir="rtl">
-  {/* Info Message */}
-  {filteredInvites.length === 0 && (
-    <div className="text-sm text-gray-600">
-      لا توجد دعوات لعرضها
-    </div>
-  )}
-  {filteredInvites.length > 0 && (
-    <>
-      <div className="text-sm text-gray-600 mx-4">
-        عرض {indexOfFirstItem + 1} إلى{' '}
-        {Math.min(indexOfLastItem, filteredInvites.length)} من{' '}
-        {filteredInvites.length} دعوة
+      <div className="mt-6 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0" dir="rtl">
+        {/* Items Per Page Dropdown */}
+        <div className="flex items-center">
+          <span className="text-sm text-gray-600 mr-2">العناصر لكل صفحة:</span>
+          <select
+            value={itemsPerPage}
+            onChange={handleItemsPerPageChange}
+            className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring focus:ring-green-200"
+          >
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+          </select>
+        </div>
+
+        {/* Info Message */}
+        {totalItems === 0 ? (
+          <div className="text-sm text-gray-600">
+            لا توجد دعوات لعرضها
+          </div>
+        ) : (
+          <div className="text-sm text-gray-600">
+            عرض {((currentPage - 1) * itemsPerPage) + 1}–{Math.min(currentPage * itemsPerPage, totalItems)} من {totalItems} دعوة
+          </div>
+        )}
+
+        {/* Pagination Buttons */}
+        {totalItems > 0 && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handlePageChange(1)}
+              disabled={currentPage === 1}
+              className={`px-3 py-1 rounded-md text-sm ${
+                currentPage === 1
+                  ? 'bg-gray-200 cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              الأول
+            </button>
+            <button
+              onClick={() => handlePageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+              className={`px-3 py-1 rounded-md text-sm ${
+                currentPage === 1
+                  ? 'bg-gray-200 cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              السابق
+            </button>
+            <span className="px-2 text-sm">
+              الصفحة {currentPage} من {totalPages}
+            </span>
+            <button
+              onClick={() => handlePageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1 rounded-md text-sm ${
+                currentPage === totalPages
+                  ? 'bg-gray-200 cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              التالي
+            </button>
+            <button
+              onClick={() => handlePageChange(totalPages)}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1 rounded-md text-sm ${
+                currentPage === totalPages
+                  ? 'bg-gray-200 cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              الأخير
+            </button>
+          </div>
+        )}
       </div>
-      <div className="flex gap-2">
-        {/* First Page Button */}
-        <button
-          onClick={() => handlePageChange(1)}
-          disabled={currentPage === 1 || filteredInvites.length === 0}
-          className={`px-3 py-1 rounded-md ${
-            currentPage === 1 || filteredInvites.length === 0
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          الأول
-        </button>
-
-        {/* Previous Page Button */}
-        <button
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1 || filteredInvites.length === 0}
-          className={`px-3 py-1 rounded-md ${
-            currentPage === 1 || filteredInvites.length === 0
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          السابق
-        </button>
-
-        {/* Page Number Buttons */}
-        {(() => {
-          const maxButtons = 5; // Maximum number of page buttons to show
-          const sideButtons = Math.floor(maxButtons / 2);
-          let start = Math.max(1, currentPage - sideButtons);
-          let end = Math.min(totalPages, currentPage + sideButtons);
-
-          // Adjust start and end to show maxButtons when possible
-          if (end - start + 1 < maxButtons) {
-            if (currentPage <= sideButtons) {
-              end = Math.min(totalPages, maxButtons);
-            } else {
-              start = Math.max(1, totalPages - maxButtons + 1);
-            }
-          }
-
-          return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
-            (page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                disabled={filteredInvites.length === 0}
-                className={`px-3 py-1 rounded-md ${
-                  currentPage === page && filteredInvites.length > 0
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                } ${filteredInvites.length === 0 ? 'cursor-not-allowed' : ''}`}
-              >
-                {page}
-              </button>
-            )
-          );
-        })()}
-
-        {/* Next Page Button */}
-        <button
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === totalPages || filteredInvites.length === 0}
-          className={`px-3 py-1 rounded-md ${
-            currentPage === totalPages || filteredInvites.length === 0
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          التالي
-        </button>
-
-        {/* Last Page Button */}
-        <button
-          onClick={() => handlePageChange(totalPages)}
-          disabled={currentPage === totalPages || filteredInvites.length === 0}
-          className={`px-3 py-1 rounded-md ${
-            currentPage === totalPages || filteredInvites.length === 0
-              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-        >
-          الأخير
-        </button>
-      </div>
-    </>
-  )}
-</div>
 
       {/* Add Invite Modal */}
       {showAddModal && (

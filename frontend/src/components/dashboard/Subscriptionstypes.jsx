@@ -4,16 +4,13 @@ import { fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';
 import UpdateSubscriptionTypes from './UpdateSubscriptionTypes';
 import DeleteSubscriptionTypesModal from './DeleteSubscriptionTypesModal';
 import SubscriptionTypeDetails from './SubscriptionTypeDetails';
-import { FaEye, FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
 import CreateSubscriptionType from './CreateSubscriptionType';
+import { FaEye, FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
 import { CiShoppingTag } from 'react-icons/ci';
-
-
 
 const SubscriptionsTypes = () => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error } = useSelector((state) => state.subscriptions);
-  console.log('Subscription Types:', subscriptionTypes);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -27,16 +24,23 @@ const SubscriptionsTypes = () => {
   const [includesGym, setIncludesGym] = useState('');
   const [includesPool, setIncludesPool] = useState('');
   const [includesClasses, setIncludesClasses] = useState('');
-  
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(5);
+  const itemsPerPage = 20;
+  const maxButtons = 5;
 
   const openCreateModal = () => setIsCreateModalOpen(true);
   const closeCreateModal = () => setIsCreateModalOpen(false);
 
   useEffect(() => {
-    dispatch(fetchSubscriptionTypes());
-  }, [dispatch]);
+    dispatch(fetchSubscriptionTypes({ page: currentPage }))
+      .unwrap()
+      .catch((err) => {
+        if (err.includes("Page not found")) {
+          setCurrentPage(1);
+          dispatch(fetchSubscriptionTypes({ page: 1 }));
+        }
+      });
+  }, [dispatch, currentPage]);
 
   const openModal = (subscription) => {
     setSelectedSubscription(subscription);
@@ -68,17 +72,15 @@ const SubscriptionsTypes = () => {
     setIsDetailsModalOpen(false);
   };
 
-  // Sort subscriptions by id (descending order, assuming higher ID = newer)
-  const sortedSubscriptions = [...subscriptionTypes].sort((a, b) => b.id - a.id);
-
   // Filter logic
-  const filteredSubscriptions = sortedSubscriptions.filter((type) => {
+  const filteredSubscriptions = (subscriptionTypes.results || []).filter((type) => {
     const matchesSearch =
       searchQuery === '' || type.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && type.is_active) ||
-      (statusFilter === 'inactive' && !type.is_active);
+  statusFilter === 'all' ||
+  (statusFilter === 'active' && type.is_active) ||
+  (statusFilter === 'inactive' && !type.is_active);
+
     const matchesDuration =
       durationFilter === '' || type.duration_days === Number(durationFilter);
     const matchesGym =
@@ -102,39 +104,42 @@ const SubscriptionsTypes = () => {
       matchesPool &&
       matchesClasses
     );
-  });
+  }).sort((a, b) => b.id - a.id); // Sort by id descending
 
   // Pagination logic
-  const totalItems = filteredSubscriptions.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredSubscriptions.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil((subscriptionTypes.count || 0) / itemsPerPage);
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
+  const getPageButtons = () => {
+    const buttons = [];
+    const half = Math.floor(maxButtons / 2);
+    let startPage = Math.max(1, currentPage - half);
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    if (endPage - startPage + 1 < maxButtons) {
+      startPage = Math.max(1, endPage - maxButtons + 1);
     }
+
+    for (let i = startPage; i <= endPage; i++) {
+      buttons.push(i);
+    }
+    return buttons;
   };
 
-  const handlePrevPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  if (loading) return <div>Loading...</div>;
-  if (error) return <div>Error: {error}</div>;
+  if (loading) return <div className="text-right p-6">جاري التحميل...</div>;
+  if (error) return <div className="text-right p-6 text-red-600">خطأ: {error}</div>;
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6 mt-6">
-        <div className="flex items-start space-x-3">
-          <CiShoppingTag className="text-blue-600 w-9 h-9 text-2xl" />
-          <h1 className="text-2xl font-bold mb-4">أنواع الاشتراكات</h1>
+    <div className="p-6" dir="rtl">
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center space-x-3">
+          <CiShoppingTag className="text-blue-600 w-9 h-9" />
+          <h1 className="text-2xl font-bold">أنواع الاشتراكات</h1>
         </div>
-        <button onClick={openCreateModal} className="flex items-center btn">
-          <FaPlus />
+        <button
+          onClick={openCreateModal}
+          className="flex items-center bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+        >
+          <FaPlus className="mr-2" />
           إضافة نوع جديد
         </button>
       </div>
@@ -145,28 +150,28 @@ const SubscriptionsTypes = () => {
           placeholder="بحث بالاسم"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="border px-3 py-2 rounded-md w-full"
+          className="border px-3 py-2 rounded-md w-full text-right"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="border px-3 py-2 rounded-md w-full"
+          className="border px-3 py-2 rounded-md w-full text-right"
         >
           <option value="all">الحالة (الكل)</option>
           <option value="active">نشط</option>
           <option value="inactive">غير نشط</option>
         </select>
         <input
-          type="text"
-          placeholder="المدة (مثال: 30 )"
+          type="number"
+          placeholder="المدة (أيام)"
           value={durationFilter}
           onChange={(e) => setDurationFilter(e.target.value)}
-          className="border px-3 py-2 rounded-md w-full"
+          className="border px-3 py-2 rounded-md w-full text-right"
         />
         <select
           value={includesGym}
           onChange={(e) => setIncludesGym(e.target.value)}
-          className="border px-3 py-2 rounded-md w-full"
+          className="border px-3 py-2 rounded-md w-full text-right"
         >
           <option value="">يشمل الجيم؟</option>
           <option value="yes">نعم</option>
@@ -175,7 +180,7 @@ const SubscriptionsTypes = () => {
         <select
           value={includesPool}
           onChange={(e) => setIncludesPool(e.target.value)}
-          className="border px-3 py-2 rounded-md w-full"
+          className="border px-3 py-2 rounded-md w-full text-right"
         >
           <option value="">يشمل المسبح؟</option>
           <option value="yes">نعم</option>
@@ -184,7 +189,7 @@ const SubscriptionsTypes = () => {
         <select
           value={includesClasses}
           onChange={(e) => setIncludesClasses(e.target.value)}
-          className="border px-3 py-2 rounded-md w-full"
+          className="border px-3 py-2 rounded-md w-full text-right"
         >
           <option value="">يشمل الحصص؟</option>
           <option value="yes">نعم</option>
@@ -192,67 +197,72 @@ const SubscriptionsTypes = () => {
         </select>
       </div>
 
-      <ul>
-        {currentItems.map((type) => (
-          <li
-            key={type.id}
-            className="mb-4 p-4 border-b border-gray-200 flex items-start justify-between hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex flex-col">
-              <span className="text-lg font-semibold">{type.name}</span>
-              <div className="text-sm text-gray-600">
+      <ul className="space-y-4">
+        {filteredSubscriptions.length > 0 ? (
+          filteredSubscriptions.map((type) => (
+            <li
+              key={type.id}
+              className="p-4 border-b border-gray-200 flex items-start justify-between hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex flex-col">
+                <span className="text-lg font-semibold">{type.name}</span>
+                <div className="text-sm text-gray-600">
                 <p>
-                  نشط:{" "}
-                  {type.is_active ? (
-                    <span className="text-green-500">نعم</span>
-                  ) : (
-                    <span className="text-red-500">لا</span>
-                  )}
-                </p>
+  نشط:{" "}
+  {type.is_active ? (
+    <span className="text-green-500">نعم</span>
+  ) : (
+    <span className="text-red-500">لا</span>
+  )}
+</p>
+
+                </div>
               </div>
-            </div>
-            <div className="flex space-x-2">
-              <div className="relative group">
-                <button
-                  onClick={() => openDetailsModal(type)}
-                  className="text-green-500 p-2 rounded hover:text-green-600 transition-colors"
-                >
-                  <FaEye />
-                </button>
-                <span className="absolute -top-8 left-1/2 text-white transform -translate-x-1/2 bg-gray-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  View Details
-                </span>
+              <div className="flex space-x-2">
+                <div className="relative group">
+                  <button
+                    onClick={() => openDetailsModal(type)}
+                    className="text-green-500 p-2 rounded hover:text-green-600 transition-colors"
+                  >
+                    <FaEye />
+                  </button>
+                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    عرض التفاصيل
+                  </span>
+                </div>
+                <div className="relative group">
+                  <button
+                    onClick={() => openModal(type)}
+                    className="text-blue-500 p-2 rounded hover:text-blue-600 transition-colors"
+                  >
+                    <FaEdit />
+                  </button>
+                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    تعديل
+                  </span>
+                </div>
+                <div className="relative group">
+                  <button
+                    onClick={() => openDeleteModal(type)}
+                    className="text-red-500 p-2 rounded hover:text-red-600 transition-colors"
+                  >
+                    <FaTrash />
+                  </button>
+                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                    حذف
+                  </span>
+                </div>
               </div>
-              <div className="relative group">
-                <button
-                  onClick={() => openModal(type)}
-                  className="text-blue-500 p-2 rounded hover:text-blue-600 transition-colors"
-                >
-                  <FaEdit />
-                </button>
-                <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Edit
-                </span>
-              </div>
-              <div className="relative group">
-                <button
-                  onClick={() => openDeleteModal(type)}
-                  className="text-red-500 p-2 rounded hover:text-red-600 transition-colors"
-                >
-                  <FaTrash />
-                </button>
-                <span className="absolute -top-8 left-1/2 transform text-white -translate-x-1/2 bg-gray-800 text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                  Delete
-                </span>
-              </div>
-            </div>
-          </li>
-        ))}
+            </li>
+          ))
+        ) : (
+          <p className="text-right text-gray-600">لا توجد أنواع اشتراكات مطابقة</p>
+        )}
       </ul>
 
-      <div className="flex justify-between items-center mt-4">
+      <div className="flex justify-between items-center mt-6">
         <button
-          onClick={handlePrevPage}
+          onClick={() => setCurrentPage(currentPage - 1)}
           disabled={currentPage === 1}
           className={`px-4 py-2 rounded-md ${
             currentPage === 1
@@ -262,14 +272,26 @@ const SubscriptionsTypes = () => {
         >
           السابق
         </button>
-        <span>
-          صفحة {currentPage} من {totalPages}
-        </span>
+        <div className="flex gap-2">
+          {getPageButtons().map((pageNum) => (
+            <button
+              key={pageNum}
+              onClick={() => setCurrentPage(pageNum)}
+              className={`px-4 py-2 rounded-md ${
+                currentPage === pageNum
+                  ? "bg-blue-500 text-white"
+                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+              }`}
+            >
+              {pageNum}
+            </button>
+          ))}
+        </div>
         <button
-          onClick={handleNextPage}
-          disabled={currentPage === totalPages}
+          onClick={() => setCurrentPage(currentPage + 1)}
+          disabled={currentPage >= totalPages || totalPages === 0}
           className={`px-4 py-2 rounded-md ${
-            currentPage === totalPages
+            currentPage >= totalPages || totalPages === 0
               ? "bg-gray-300 cursor-not-allowed"
               : "bg-blue-500 text-white hover:bg-blue-600"
           }`}
@@ -279,23 +301,23 @@ const SubscriptionsTypes = () => {
       </div>
 
       {isModalOpen && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
-      <button
-        className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-        onClick={closeModal}
-      >
-        ✕
-      </button>
-      <h2 className="text-xl font-semibold mb-4">تحديث نوع الاشتراك</h2>
-      <UpdateSubscriptionTypes
-        subscriptionId={selectedSubscription.id}
-        subscriptionData={selectedSubscription}
-        closeModal={closeModal}  // Pass the closeModal function here
-      />
-    </div>
-  </div>
-)}
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              onClick={closeModal}
+            >
+              ✕
+            </button>
+            <h2 className="text-xl font-semibold mb-4 text-right">تحديث نوع الاشتراك</h2>
+            <UpdateSubscriptionTypes
+              subscriptionId={selectedSubscription.id}
+              subscriptionData={selectedSubscription}
+              closeModal={closeModal}
+            />
+          </div>
+        </div>
+      )}
 
       <DeleteSubscriptionTypesModal
         isOpen={isDeleteModalOpen}
@@ -312,26 +334,26 @@ const SubscriptionsTypes = () => {
             >
               ✕
             </button>
-            <h2 className="text-xl font-semibold mb-4">Subscription Details</h2>
+            <h2 className="text-xl font-semibold mb-4 text-right">تفاصيل نوع الاشتراك</h2>
             <SubscriptionTypeDetails id={subscriptionToView.id} />
           </div>
         </div>
       )}
 
-{isCreateModalOpen && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-    <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
-      <button
-        className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-        onClick={closeCreateModal}
-      >
-        ✕
-      </button>
-      <CreateSubscriptionType onClose={closeCreateModal} />
-    </div>
-  </div>
-)}
-
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
+            <button
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+              onClick={closeCreateModal}
+            >
+              ✕
+            </button>
+            <h2 className="text-xl font-semibold mb-4 text-right">إنشاء نوع اشتراك جديد</h2>
+            <CreateSubscriptionType onClose={closeCreateModal} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

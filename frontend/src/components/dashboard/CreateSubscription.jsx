@@ -63,11 +63,11 @@ const CreateSubscription = ({ onClose }) => {
             ])
           ).values()
         );
+        console.log('Unique clubs:', uniqueClubs);
         setClubs(uniqueClubs);
       } catch (error) {
         handleError(error, "Failed to load initial data");
       } finally {
-        setIsInitialLoad(false);
       }
     };
 

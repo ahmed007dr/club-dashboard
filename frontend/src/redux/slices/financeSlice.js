@@ -4,16 +4,17 @@ import BASE_URL from '../../config/api';
 // Async Thunks for Expense Categories
 export const fetchExpenseCategories = createAsyncThunk(
   'finance/fetchExpenseCategories',
-  async (_, { rejectWithValue }) => {
+  async (page = 1, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`${BASE_URL}/finance/api/expense-categories/`, {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/finance/api/expense-categories/?page=${page}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
+
       if (!response.ok) {
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch expense categories.');
@@ -24,6 +25,7 @@ export const fetchExpenseCategories = createAsyncThunk(
     }
   }
 );
+
 
 export const addExpenseCategory = createAsyncThunk(
   'finance/addExpenseCategory',
@@ -52,10 +54,10 @@ export const addExpenseCategory = createAsyncThunk(
 // Async Thunks for Expenses
 export const fetchExpenses = createAsyncThunk(
   'finance/fetchExpenses',
-  async (_, { rejectWithValue }) => {
+  async (page = 1, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`${BASE_URL}/finance/api/expenses/`, {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/finance/api/expenses/?page=${page}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -66,8 +68,7 @@ export const fetchExpenses = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch expenses.');
       }
-      
-      return await response.json();
+      return await response.json(); // Expect paginated response: { results, count, next, previous }
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -211,10 +212,10 @@ export const addIncomeSource = createAsyncThunk(
 // Async Thunks for Incomes
 export const fetchIncomes = createAsyncThunk(
   'finance/fetchIncomes',
-  async (_, { rejectWithValue }) => {
+  async ({ page = 1 }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`${BASE_URL}/finance/api/incomes/`, {
+      const response = await fetch(`${BASE_URL}/finance/api/incomes/?page=${page}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -227,7 +228,7 @@ export const fetchIncomes = createAsyncThunk(
       }
       return await response.json().then((data) => (data.results));
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.message || 'Failed to fetch incomes.');
     }
   }
 );
@@ -326,24 +327,42 @@ export const deleteIncome = createAsyncThunk(
 const financeSlice = createSlice({
   name: 'finance',
   initialState: {
-    expenseCategories: [],
+    expenseCategories: [], // Just store the current page's categories
+    expenseCategoriesPagination: { // Store pagination info from API
+      count: 0,
+      next: null,
+      previous: null,
+    },
     expenses: [],
+    expensesPagination: { count: 0, next: null, previous: null },
     incomeSources: [],
     incomes: [],
+    incomesPagination: { 
+      count: 0,
+      next: null,
+      previous: null,
+    },
     loading: false,
     error: null,
   },
   reducers: {},
   extraReducers: (builder) => {
+ 
     // Fetch Expense Categories
     builder.addCase(fetchExpenseCategories.pending, (state) => {
       state.loading = true;
       state.error = null;
     });
-    builder.addCase(fetchExpenseCategories.fulfilled, (state, action) => {
+  builder.addCase(fetchExpenseCategories.fulfilled, (state, action) => {
       state.loading = false;
-      state.expenseCategories = action.payload;
+      state.expenseCategories = action.payload.results;
+      state.expenseCategoriesPagination = {
+        count: action.payload.count,
+        next: action.payload.next,
+        previous: action.payload.previous,
+      };
     });
+
     builder.addCase(fetchExpenseCategories.rejected, (state, action) => {
       state.loading = false;
       state.error = action.payload;
@@ -368,9 +387,14 @@ const financeSlice = createSlice({
       state.loading = true;
       state.error = null;
     });
-    builder.addCase(fetchExpenses.fulfilled, (state, action) => {
+   builder.addCase(fetchExpenses.fulfilled, (state, action) => {
       state.loading = false;
-      state.expenses = action.payload;
+      state.expenses = action.payload.results;
+      state.expensesPagination = {
+        count: action.payload.count,
+        next: action.payload.next,
+        previous: action.payload.previous,
+      };
     });
     builder.addCase(fetchExpenses.rejected, (state, action) => {
       state.loading = false;
@@ -452,18 +476,23 @@ const financeSlice = createSlice({
     });
 
     // Fetch Incomes
-    builder.addCase(fetchIncomes.pending, (state) => {
-      state.loading = true;
-      state.error = null;
-    });
-    builder.addCase(fetchIncomes.fulfilled, (state, action) => {
-      state.loading = false;
-      state.incomes = action.payload;
-    });
-    builder.addCase(fetchIncomes.rejected, (state, action) => {
-      state.loading = false;
-      state.error = action.payload;
-    });
+     builder.addCase(fetchIncomes.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+       builder.addCase(fetchIncomes.fulfilled, (state, action) => {
+        state.loading = false;
+        state.incomes = {
+          count: action.payload.count || 0,
+          results: action.payload.results || [],
+          next: action.payload.next || null,
+          previous: action.payload.previous || null,
+        };
+      })
+       builder.addCase(fetchIncomes.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload || "An unknown error occurred";
+      })
 
     // Add Income
     builder.addCase(addIncome.pending, (state) => {

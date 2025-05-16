@@ -24,41 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
 import BASE_URL from "@/config/api";
-import {
-  fetchExpenseCategories,
-                              
-} from "../../redux/slices/financeSlice";    
-
-
-// Custom CSS for table and modal responsiveness
-const customStyles = `
-  @media (max-width: 640px) {
-    .responsive-table {
-      display: block;
-      overflow-x: auto;
-      white-space: nowrap;
-    }
-    .modal-content {
-      width: 100%;
-      height: 100%;
-      padding: 1rem;
-      border-radius: 0;
-    }
-  }
-  @media (min-width: 641px) {
-    .modal-content {
-      width: 100%;
-      max-width: 48rem; /* max-w-3xl */
-      height: auto;
-      max-height: 90vh;
-      padding: 1.5rem;
-      border-radius: 0.5rem;
-    }
-  }
-`;
-
-
-
+import { fetchExpenseCategories } from "../../redux/slices/financeSlice";    
 
 const Expense = () => {
   const dispatch = useDispatch();
@@ -81,11 +47,10 @@ const Expense = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [userClub, setUserClub] = useState(null);
   const [errors, setErrors] = useState({});
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
 
-  const { expenses, loading, error } = useSelector((state) => state.finance);
+  const { expenses, loading, error, expensesPagination } = useSelector((state) => state.finance);
   const { expenseCategories } = useSelector((state) => state.finance);
-  console.log("Expense Categories:", expenseCategories);
 
   useEffect(() => {
     dispatch(fetchExpenseCategories());
@@ -113,14 +78,11 @@ const Expense = () => {
       });
   }, []);
 
-  // Fetch expenses
+  // Fetch expenses with pagination
   useEffect(() => {
-    dispatch(fetchExpenses());
-  }, [dispatch]);
+    dispatch(fetchExpenses(currentPage));
+  }, [dispatch, currentPage]);
 
-
-
-  // Handle text input changes
   const handleChange = (e) => {
     const { name, value } = e.target;
     const updatedValue = name === "amount" ? (value === "" ? "" : parseFloat(value) || "") : value;
@@ -132,7 +94,6 @@ const Expense = () => {
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  // Handle file input change
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (currentExpense) {
@@ -143,7 +104,6 @@ const Expense = () => {
     setErrors((prev) => ({ ...prev, attachment: "" }));
   };
 
-  // Validate form data
   const validateForm = (data) => {
     const newErrors = {};
     if (!data.club || isNaN(parseInt(data.club))) newErrors.club = "النادي مطلوب.";
@@ -153,7 +113,6 @@ const Expense = () => {
     return newErrors;
   };
 
-  // Save expense (add or update)
   const handleSave = () => {
     const data = currentExpense || newExpense;
     const validationErrors = validateForm(data);
@@ -192,6 +151,7 @@ const Expense = () => {
           attachment: null,
         });
         setErrors({});
+        dispatch(fetchExpenses(currentPage));
       })
       .catch((err) => {
         console.error("فشل في حفظ المصروف:", err);
@@ -262,7 +222,6 @@ const Expense = () => {
     setShowModal(true);
   };
 
-  // Delete expense
   const handleDeleteClick = (id) => {
     setExpenseToDelete(id);
     setConfirmDeleteModal(true);
@@ -275,12 +234,17 @@ const Expense = () => {
         .then(() => {
           setConfirmDeleteModal(false);
           setExpenseToDelete(null);
+          dispatch(fetchExpenses(currentPage));
         })
         .catch((err) => {
           console.error("فشل في حذف المصروف:", err);
         });
     }
   };
+
+  const totalPages = expensesPagination?.count 
+    ? Math.ceil(expensesPagination.count / itemsPerPage)
+    : 1;
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
@@ -364,8 +328,8 @@ const Expense = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-background">
-                    {paginatedExpenses.length > 0 ? (
-                      paginatedExpenses.map((expense, index) => (
+                    {filteredExpenses.length > 0 ? (
+                      filteredExpenses.map((expense, index) => (
                         <tr key={index} className="hover:bg-gray-100 transition">
                           <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
                             {expense.club_details?.name || "غير متاح"}
@@ -430,11 +394,11 @@ const Expense = () => {
                   السابق
                 </button>
                 <span className="text-sm">
-                  صفحة {currentPage} من {Math.ceil(filteredExpenses.length / itemsPerPage)}
+                  صفحة {currentPage} من {totalPages}
                 </span>
                 <button
                   onClick={() => setCurrentPage((prev) => prev + 1)}
-                  disabled={currentPage === Math.ceil(filteredExpenses.length / itemsPerPage)}
+                  disabled={currentPage === totalPages || !expensesPagination?.next}
                   className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm disabled:opacity-50"
                 >
                   التالي
@@ -473,6 +437,7 @@ const Expense = () => {
         </TabsContent>
       </Tabs>
 
+      {/* Add/Edit Expense Modal */}
       {showModal && (
         <div
           className="fixed inset-0 z-40 flex justify-center items-start sm:items-center bg-black bg-opacity-50 overflow-y-auto"
@@ -553,7 +518,7 @@ const Expense = () => {
                       value={currentExpense ? currentExpense[name] || "" : newExpense[name] || ""}
                       onChange={handleChange}
                       step={step}
-                      className="w-full border px-3 py-2 rounded-md focus:outline-none piqu: focus:ring-green-200 text-right text-sm sm:text-base"
+                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
                     />
                     {errors[name] && (
                       <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
@@ -585,6 +550,7 @@ const Expense = () => {
         </div>
       )}
 
+      {/* Delete Confirmation Modal */}
       {confirmDeleteModal && (
         <div
           className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50"
