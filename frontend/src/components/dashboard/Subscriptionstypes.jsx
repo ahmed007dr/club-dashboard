@@ -77,9 +77,10 @@ const SubscriptionsTypes = () => {
     const matchesSearch =
       searchQuery === '' || type.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus =
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && type.isActive) ||
-      (statusFilter === 'inactive' && !type.isActive);
+  statusFilter === 'all' ||
+  (statusFilter === 'active' && type.is_active) ||
+  (statusFilter === 'inactive' && !type.is_active);
+
     const matchesDuration =
       durationFilter === '' || type.duration_days === Number(durationFilter);
     const matchesGym =
@@ -206,14 +207,15 @@ const SubscriptionsTypes = () => {
               <div className="flex flex-col">
                 <span className="text-lg font-semibold">{type.name}</span>
                 <div className="text-sm text-gray-600">
-                  <p>
-                    نشط:{" "}
-                    {type.isActive ? (
-                      <span className="text-green-500">نعم</span>
-                    ) : (
-                      <span className="text-red-500">لا</span>
-                    )}
-                  </p>
+                <p>
+  نشط:{" "}
+  {type.is_active ? (
+    <span className="text-green-500">نعم</span>
+  ) : (
+    <span className="text-red-500">لا</span>
+  )}
+</p>
+
                 </div>
               </div>
               <div className="flex space-x-2">

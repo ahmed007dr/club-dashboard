@@ -20,12 +20,23 @@ const getAuthHeaders = () => {
 // Async Thunks
 export const fetchReceipts = createAsyncThunk(
   'receipts/fetchAll',
-  async (_, { rejectWithValue }) => {
+  async (page = 1, { rejectWithValue }) => {
     try {
       const response = await axios.get(`${API_BASE_URL}/receipts/`, {
         headers: getAuthHeaders(),
+        params: {
+          page: page
+        }
       });
-      return response.data;
+      return {
+        data: response.data.results,
+        pagination: {
+          count: response.data.count,
+          next: response.data.next,
+          previous: response.data.previous,
+          currentPage: page
+        }
+      };
     } catch (error) {
       console.error('Error fetching receipts:', error.response?.data || error.message);
       return rejectWithValue(error.response?.data || error.message);
@@ -136,11 +147,20 @@ const receiptsSlice = createSlice({
     receipts: [],
     currentReceipt: null,
     status: 'idle',
-    error: null
+    error: null,
+    pagination: {
+      count: 0,
+      next: null,
+      previous: null,
+      currentPage: 1
+    }
   },
   reducers: {
     clearCurrentReceipt: (state) => {
       state.currentReceipt = null;
+    },
+    setCurrentPage: (state, action) => {
+      state.pagination.currentPage = action.payload;
     }
   },
   extraReducers: (builder) => {
@@ -151,11 +171,18 @@ const receiptsSlice = createSlice({
       })
       .addCase(fetchReceipts.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.receipts = action.payload;
+        state.receipts = action.payload.data;
+        state.pagination = {
+          ...state.pagination,
+          count: action.payload.pagination.count,
+          next: action.payload.pagination.next,
+          previous: action.payload.pagination.previous,
+          currentPage: action.payload.pagination.currentPage
+        };
       })
       .addCase(fetchReceipts.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload || action.error.message;
       })
       
       // Add receipt
@@ -164,32 +191,32 @@ const receiptsSlice = createSlice({
       })
       .addCase(addReceipt.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.receipts.push(action.payload);
+        // Add new receipt to beginning of array (assuming newest first)
+        state.receipts.unshift(action.payload);
+        // Increment total count
+        state.pagination.count += 1;
       })
       .addCase(addReceipt.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload || action.error.message;
       })
       
+      // Fetch receipt by invoice
       .addCase(fetchReceiptByInvoice.pending, (state) => {
         state.status = 'loading';
         state.error = null;
         state.message = null;
       })
-  
-      // Fulfilled state
       .addCase(fetchReceiptByInvoice.fulfilled, (state, action) => {
         state.status = 'succeeded';
         if (action.payload === null) {
           state.message = 'No receipt found for this invoice number.';
-          state.receipt = null;
+          state.currentReceipt = null;
         } else {
-          state.receipt = action.payload;
+          state.currentReceipt = action.payload;
           state.message = null;
         }
       })
-  
-      // Rejected state
       .addCase(fetchReceiptByInvoice.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload || action.error.message;
@@ -205,7 +232,7 @@ const receiptsSlice = createSlice({
       })
       .addCase(fetchReceiptById.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload || action.error.message;
       })
       
       // Delete receipt
@@ -214,11 +241,14 @@ const receiptsSlice = createSlice({
       })
       .addCase(deleteReceipt.fulfilled, (state, action) => {
         state.status = 'succeeded';
+        // Remove from receipts array if it exists there
         state.receipts = state.receipts.filter(receipt => receipt.id !== action.payload);
+        // Decrement total count
+        state.pagination.count = Math.max(0, state.pagination.count - 1);
       })
       .addCase(deleteReceipt.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload || action.error.message;
       })
       
       // Update receipt
@@ -227,19 +257,21 @@ const receiptsSlice = createSlice({
       })
       .addCase(updateReceipt.fulfilled, (state, action) => {
         state.status = 'succeeded';
+        // Update in receipts array if it exists there
         const index = state.receipts.findIndex(receipt => receipt.id === action.payload.id);
         if (index !== -1) {
           state.receipts[index] = action.payload;
         }
+        // Always update currentReceipt
         state.currentReceipt = action.payload;
       })
       .addCase(updateReceipt.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = action.error.message;
+        state.error = action.payload || action.error.message;
       });
   }
 });
 
-export const { clearCurrentReceipt } = receiptsSlice.actions;
+export const { clearCurrentReceipt, setCurrentPage } = receiptsSlice.actions;
 
 export default receiptsSlice.reducer;

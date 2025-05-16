@@ -591,15 +591,15 @@ const subscriptionsSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(addSubscriptionType.fulfilled, (state, action) => {
-        state.loading = false;
-        if (!Array.isArray(state.subscriptionTypes.results)) {
-          state.subscriptionTypes.results = [];
-        }
-        state.subscriptionTypes.results.push(action.payload);
-        state.subscriptionTypes.count = (state.subscriptionTypes.count || 0) + 1;
-        console.log('addSubscriptionType: Added type:', action.payload, 'New count:', state.subscriptionTypes.count);
-      })
+    .addCase(addSubscriptionType.fulfilled, (state, action) => {
+  state.loading = false;
+  if (!Array.isArray(state.subscriptionTypes.results)) {
+    state.subscriptionTypes.results = [];
+  }
+  state.subscriptionTypes.results.push(action.payload);
+  console.log('addSubscriptionType: Added type:', action.payload);
+})
+
       .addCase(addSubscriptionType.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;

@@ -11,18 +11,22 @@ from finance.models import Income
 from django.utils import timezone
 from django.forms.models import model_to_dict
 from finance.models import Income,IncomeSource
+from rest_framework.pagination import PageNumberPagination
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def ticket_list_api(request):
-
     if request.user.role == 'owner':
-        tickets = Ticket.objects.select_related('club', 'used_by').all()  
+        tickets = Ticket.objects.select_related('club', 'used_by').all().order_by('id')
     else:
-        tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club)  
+        tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club).order_by('id')
 
-    serializer = TicketSerializer(tickets, many=True)
-    return Response(serializer.data)
+    paginator = PageNumberPagination()
+    result_page = paginator.paginate_queryset(tickets, request)
+    serializer = TicketSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

@@ -9,6 +9,15 @@ from .serializers import (
 )
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub  
+from rest_framework.pagination import PageNumberPagination
+from datetime import datetime, timedelta
+from core.models import Club
+
+
+class StandardPagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 100
 
 # Expense Category Views
 @api_view(['GET', 'POST'])
@@ -16,19 +25,21 @@ from utils.permissions import IsOwnerOrRelatedToClub
 def expense_category_api(request):
     if request.method == 'GET':
         if request.user.role == 'owner':
-            categories = ExpenseCategory.objects.all() 
+            categories = ExpenseCategory.objects.all().order_by('id')
         else:
-            categories = ExpenseCategory.objects.filter(club=request.user.club)  
+            categories = ExpenseCategory.objects.filter(club=request.user.club).order_by('id')
 
-        serializer = ExpenseCategorySerializer(categories, many=True)
-        return Response(serializer.data)
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(categories, request)
+        serializer = ExpenseCategorySerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
         serializer = ExpenseCategorySerializer(data=request.data)
         if serializer.is_valid():
             category = serializer.save()
             if not IsOwnerOrRelatedToClub().has_object_permission(request, None, category):
-                category.delete() 
+                category.delete()
                 return Response({'error': 'You do not have permission to create an expense category for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -38,21 +49,27 @@ def expense_category_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_api(request):
     if request.method == 'GET':
-        if request.user.role == 'owner':
-            expenses = Expense.objects.select_related('category', 'paid_by').all()
+        if request.user.role in ['owner', 'admin']:
+            expenses = Expense.objects.select_related('category', 'paid_by').all().order_by('-date')
         else:
-            expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)
-        serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
-        return Response(serializer.data)
+            today = datetime.now().date()
+            two_days_ago = today - timedelta(days=2)
+            expenses = Expense.objects.select_related('category', 'paid_by').filter(
+                club=request.user.club,
+                date__gte=two_days_ago
+            ).order_by('-date')
+        
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(expenses, request)
+        serializer = ExpenseSerializer(page, many=True, context={'request': request})
+        return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
         data = request.data.copy()
         data['paid_by'] = request.user.id
         
-        # Check permission before saving
         club_id = data.get('club')
         if club_id:
-            from core.models import Club  #
             club = get_object_or_404(Club, id=club_id)
             if not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
                 return Response({'error': 'You do not have permission to create an expense for this club'}, status=status.HTTP_403_FORBIDDEN)
@@ -62,7 +79,6 @@ def expense_api(request):
             expense = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
 # Income Source Views
 @api_view(['GET', 'POST'])
@@ -70,12 +86,14 @@ def expense_api(request):
 def income_source_api(request):
     if request.method == 'GET':
         if request.user.role == 'owner':
-            sources = IncomeSource.objects.all()
+            sources = IncomeSource.objects.all().order_by('id')
         else:
-            sources = IncomeSource.objects.filter(club=request.user.club)
+            sources = IncomeSource.objects.filter(club=request.user.club).order_by('id')
 
-        serializer = IncomeSourceSerializer(sources, many=True)
-        return Response(serializer.data)
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(sources, request)
+        serializer = IncomeSourceSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
         serializer = IncomeSourceSerializer(data=request.data)
@@ -92,24 +110,34 @@ def income_source_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_api(request):
     if request.method == 'GET':
-        if request.user.role == 'owner':
-            incomes = Income.objects.select_related('source', 'received_by').all()  
+        if request.user.role in ['owner', 'admin']:
+            incomes = Income.objects.select_related('source', 'received_by').all().order_by('-date')
         else:
-            incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)  
-
-        serializer = IncomeSerializer(incomes, many=True)
-        return Response(serializer.data)
+            today = datetime.now().date()
+            two_days_ago = today - timedelta(days=2)
+            incomes = Income.objects.select_related('source', 'received_by').filter(
+                club=request.user.club,
+                date__gte=two_days_ago
+            ).order_by('-date')
+        
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(incomes, request)
+        serializer = IncomeSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
         data = request.data.copy()
         data['received_by'] = request.user.id
         
+        club_id = data.get('club')
+        if club_id:
+            club = get_object_or_404(Club, id=club_id)
+            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
+                return Response({'error': 'You do not have permission to create an income for this club'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = IncomeSerializer(data=data)
         if serializer.is_valid():
             income = serializer.save()
-            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, income):
-                income.delete()  
-                return Response({'error': 'You do not have permission to create an income for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
