@@ -19,9 +19,7 @@ export const fetchExpenseCategories = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch expense categories.');
       }
-
-      const data = await response.json();
-      return data; // Entire paginated response
+      return await response.json().then((data) => data.results);
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -167,7 +165,7 @@ export const fetchIncomeSources = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch income sources.');
       }
-      return await response.json();
+      return await response.json().then((data) => (data.results));
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -228,7 +226,7 @@ export const fetchIncomes = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch incomes.');
       }
-      return await response.json(); // Expected: { results: [], count: number, next: string|null, previous: string|null }
+      return await response.json().then((data) => (data.results));
     } catch (error) {
       return rejectWithValue(error.message || 'Failed to fetch incomes.');
     }

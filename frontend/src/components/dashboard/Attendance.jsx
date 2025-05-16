@@ -15,86 +15,92 @@ import {
   deleteAttendance,
   fetchAttendances,
 } from "@/redux/slices/AttendanceSlice";
-import { addEntryLog, fetchEntryLogs } from "@/redux/slices/EntryLogsSlice";
+import { fetchEntryLogs } from "@/redux/slices/EntryLogsSlice";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
-import {
-  fetchSubscriptions,
-  
-} from "../../redux/slices/subscriptionsSlice";
+import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
 import EntryForm from "./EntryForm";
-import { toast } from 'react-hot-toast';  // Import toast
+import { toast } from 'react-hot-toast';
 import { FaUser } from "react-icons/fa";
-
 
 const Attendance = () => {
   const dispatch = useDispatch();
 
-  // Select attendance and entry logs data from Redux store
-  const {
-    attendances,
-    loading: attendanceLoading,
-    error: attendanceError,
-  } = useSelector((state) => state.attendance);
-  console.log("Attendance data:", attendances);
-  const { subscriptions, status, error, updateStatus } = useSelector(
-    (state) => state.subscriptions
-  );
-  const {
-    entryLogs,
-    loading: entryLogsLoading,
-    error: entryLogsError,
-  } = useSelector((state) => state.entryLogs);
+  // Redux state
+  const { attendances, loading: attendanceLoading, error: attendanceError } = useSelector((state) => state.attendance);
+  const { subscriptions } = useSelector((state) => state.subscriptions);
+  const { items: entryLogs, loading: entryLogsLoading, error: entryLogsError } = useSelector((state) => state.entryLogs);
 
+  // State variables
   const [foundSubscription, setFoundSubscription] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
-
-  // Form states
-  const [newAttendance, setNewAttendance] = useState({
-    identifier: "",
-  });
-  const [newEntryLog, setNewEntryLog] = useState({
-    club: "",
-    member: "",
-  });
-
-  // Dialog states
+  const [newAttendance, setNewAttendance] = useState({ identifier: "" });
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [isEntryLogDialogOpen, setIsEntryLogDialogOpen] = useState(false);
 
-  // Filter states for Attendance
+  // Filters
   const [attendanceFilters, setAttendanceFilters] = useState({
     subscription: "",
     attendance_date: "",
     member_name: "",
   });
-
-  // Filter states for Entry Logs
   const [entryLogFilters, setEntryLogFilters] = useState({
     club: "",
     member: "",
     timestamp: "",
   });
 
-  // Pagination states for Attendance
+  // Pagination
   const [attendancePage, setAttendancePage] = useState(1);
-  const [attendanceItemsPerPage] = useState(5);
-
-  // Pagination states for Entry Logs
+  const [attendanceItemsPerPage] = useState(20);
   const [entryLogPage, setEntryLogPage] = useState(1);
-  const [entryLogItemsPerPage] = useState(5);
+  const [entryLogItemsPerPage] = useState(20);
 
-  // Fetch data on mount
   useEffect(() => {
     dispatch(fetchAttendances());
     dispatch(fetchEntryLogs());
+    dispatch(fetchSubscriptions());
   }, [dispatch]);
 
-  // Handle input changes
+  // Filtered data
+  const filteredAttendances = attendances
+    .filter(attendance => {
+      const subscriptionText = attendance.subscription?.name || "";
+      return (
+        subscriptionText.toLowerCase().includes(attendanceFilters.subscription.toLowerCase()) &&
+        attendance.attendance_date.includes(attendanceFilters.attendance_date) &&
+        (attendance.member_name?.toLowerCase().includes(attendanceFilters.member_name.toLowerCase()) || !attendanceFilters.member_name)
+      );
+    })
+    .sort((a, b) => b.id - a.id);
+
+  const filteredEntryLogs = entryLogs?.results ? entryLogs.results
+    .filter(log => {
+      return (
+        (log.club_details?.name?.toLowerCase().includes(entryLogFilters.club.toLowerCase()) || !entryLogFilters.club) &&
+        (log.member_details?.name?.toLowerCase().includes(entryLogFilters.member.toLowerCase()) || !entryLogFilters.member) &&
+        log.timestamp.includes(entryLogFilters.timestamp))
+    })
+    .sort((a, b) => b.id - a.id) : [];
+
+  // Pagination calculations
+  const totalAttendancePages = Math.ceil(filteredAttendances.length / attendanceItemsPerPage);
+  const paginatedAttendances = filteredAttendances.slice(
+    (attendancePage - 1) * attendanceItemsPerPage,
+    attendancePage * attendanceItemsPerPage
+  );
+
+  const totalEntryLogPages = Math.ceil(filteredEntryLogs.length / entryLogItemsPerPage);
+  const paginatedEntryLogs = filteredEntryLogs.slice(
+    (entryLogPage - 1) * entryLogItemsPerPage,
+    entryLogPage * entryLogItemsPerPage
+  );
+
+  // Handlers
   const handleAttendanceInputChange = (e) => {
     const { name, value } = e.target;
     setNewAttendance({ ...newAttendance, [name]: value });
@@ -103,102 +109,24 @@ const Attendance = () => {
     if (value.trim() === '') return;
 
     setSearchLoading(true);
-
-    // Search subscriptions by member phone or RFID code
     const subscription = subscriptions.find(sub =>
       sub.member_details?.phone === value ||
       sub.member_details?.rfid_code === value
     );
-
     setFoundSubscription(subscription || null);
     setSearchLoading(false);
   };
 
-  const handleEntryLogInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewEntryLog({ ...newEntryLog, [name]: value });
-  };
-
-  // Handle filter changes for Attendance
-  const handleAttendanceFilterChange = (e) => {
-    const { name, value } = e.target;
-    setAttendanceFilters({ ...attendanceFilters, [name]: value });
-    setAttendancePage(1); // Reset to first page on filter change
-  };
-
-  // Handle filter changes for Entry Logs
-  const handleEntryLogFilterChange = (e) => {
-    const { name, value } = e.target;
-    setEntryLogFilters({ ...entryLogFilters, [name]: value });
-    setEntryLogPage(1); // Reset to first page on filter change
-  };
-
-  // Filter and sort Attendance data
-  const filteredAttendances = attendances
-    .filter((attendance) => {
-      const subscriptionText =
-        typeof attendance.subscription === "string"
-          ? attendance.subscription
-          : attendance.subscription?.name || "";
-
-      const matchesSubscription = subscriptionText
-        .toLowerCase()
-        .includes(attendanceFilters.subscription.toLowerCase());
-
-      const matchesDate = attendance.attendance_date.includes(
-        attendanceFilters.attendance_date
-      );
-
-      const matchesMemberName = attendance.member_name
-        ?.toLowerCase()
-        .includes(attendanceFilters.member_name.toLowerCase()) ||
-        !attendanceFilters.member_name;
-
-      return matchesSubscription && matchesDate && matchesMemberName;
-    })
-    .sort((a, b) => b.id - a.id); // Sort by id in descending order (newest first)
-
-  const totalAttendancePages = Math.ceil(filteredAttendances.length / attendanceItemsPerPage);
-  const paginatedAttendances = filteredAttendances.slice(
-    (attendancePage - 1) * attendanceItemsPerPage,
-    attendancePage * attendanceItemsPerPage
-  );
-
-  // Filter and sort Entry Logs data
-  const filteredEntryLogs = entryLogs
-    .filter((log) => {
-      const matchesClub = log.club_details?.name
-        ?.toLowerCase()
-        .includes(entryLogFilters.club.toLowerCase()) || !entryLogFilters.club;
-      const matchesMember = log.member_details?.name
-        ?.toLowerCase()
-        .includes(entryLogFilters.member.toLowerCase()) || !entryLogFilters.member;
-      const matchesTimestamp = log.timestamp.includes(entryLogFilters.timestamp);
-      return matchesClub && matchesMember && matchesTimestamp;
-    })
-    .sort((a, b) => b.id - a.id); // Sort by id in descending order (newest first)
-
-  const totalEntryLogPages = Math.ceil(filteredEntryLogs.length / entryLogItemsPerPage);
-  const paginatedEntryLogs = filteredEntryLogs.slice(
-    (entryLogPage - 1) * entryLogItemsPerPage,
-    entryLogPage * entryLogItemsPerPage
-  );
-
   const handleAddAttendance = (e) => {
     e.preventDefault();
-
     if (!foundSubscription) {
       toast.error("الرجاء إدخال رقم هاتف أو كود RFID صحيح");
       return;
     }
-
-    // Check if subscription is active
     if (foundSubscription.status !== 'Active') {
       toast.error("لا يمكن تسجيل الحضور لاشتراك غير نشط");
       return;
     }
-
-    // Check if there are remaining entries
     if (foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0) {
       toast.error("لا توجد إدخالات متبقية في هذا الاشتراك");
       return;
@@ -210,7 +138,6 @@ const Attendance = () => {
       member_id: foundSubscription.member_details.id,
       member_name: foundSubscription.member_details.name,
       club_id: foundSubscription.club_details.id,
-      // Add any other required fields
     };
 
     dispatch(addAttendance(attendanceData))
@@ -220,44 +147,118 @@ const Attendance = () => {
         setNewAttendance({ identifier: "" });
         setFoundSubscription(null);
         setIsAttendanceDialogOpen(false);
-        dispatch(fetchAttendances()); // Refresh attendance list
-        dispatch(fetchSubscriptions()); // Refresh subscriptions list
+        dispatch(fetchAttendances());
+        dispatch(fetchSubscriptions());
       })
       .catch((err) => {
-        console.error("فشل في إضافة الحضور:", err);
         toast.error("فشل في إضافة الحضور: " + (err.message || "حدث خطأ"));
       });
   };
 
-  // Handle adding new entry log
-  const handleAddEntryLog = (e) => {
-    e.preventDefault();
-    if (!newEntryLog.club || !newEntryLog.member) {
-      alert("الرجاء ملء جميع الحقول الخاصة بسجل الدخول.");
-      return;
-    }
-    dispatch(addEntryLog(newEntryLog));
-    setNewEntryLog({ club: "", member: "" });
-    setIsEntryLogDialogOpen(false);
-  };
+  const PaginationControls = ({ 
+    currentPage, 
+    totalPages, 
+    itemsCount,
+    itemsPerPage,
+    onPageChange,
+    type 
+  }) => {
+    const maxButtons = 5;
+    const sideButtons = Math.floor(maxButtons / 2);
+    let start = Math.max(1, currentPage - sideButtons);
+    let end = Math.min(totalPages, currentPage + sideButtons);
 
-  // Pagination navigation for Attendance
-  const handleAttendancePageChange = (page) => {
-    if (page >= 1 && page <= totalAttendancePages) {
-      setAttendancePage(page);
+    if (end - start + 1 < maxButtons) {
+      if (currentPage <= sideButtons) {
+        end = Math.min(totalPages, maxButtons);
+      } else {
+        start = Math.max(1, totalPages - maxButtons + 1);
+      }
     }
-  };
 
-  // Pagination navigation for Entry Logs
-  const handleEntryLogPageChange = (page) => {
-    if (page >= 1 && page <= totalEntryLogPages) {
-      setEntryLogPage(page);
-    }
-  };
+    return (
+      <div className="flex justify-between items-center mt-4" dir="rtl">
+        {itemsCount === 0 ? (
+          <div className="text-sm text-gray-600">
+            {type === 'attendance' 
+              ? "لا توجد سجلات حضور لعرضها" 
+              : "لا توجد سجلات دخول لعرضها"}
+          </div>
+        ) : (
+          <>
+            <div className="text-sm text-gray-600">
+              عرض {(currentPage - 1) * itemsPerPage + 1} إلى{' '}
+              {Math.min(currentPage * itemsPerPage, itemsCount)} من{' '}
+              {itemsCount} سجل
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onPageChange(1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded ${
+                  currentPage === 1
+                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                }`}
+              >
+                الأول
+              </button>
+              <button
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded ${
+                  currentPage === 1
+                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                }`}
+              >
+                السابق
+              </button>
 
-  useEffect(() => {
-    dispatch(fetchSubscriptions());
-  }, [dispatch]);
+              {Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
+                (page) => (
+                  <button
+                    key={page}
+                    onClick={() => onPageChange(page)}
+                    className={`px-3 py-1 rounded ${
+                      currentPage === page
+                        ? 'bg-blue-700 text-white'
+                        : 'bg-gray-200 hover:bg-gray-300'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )
+              )}
+
+              <button
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 rounded ${
+                  currentPage === totalPages
+                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                }`}
+              >
+                التالي
+              </button>
+              <button
+                onClick={() => onPageChange(totalPages)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 rounded ${
+                  currentPage === totalPages
+                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                }`}
+              >
+                الأخير
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -276,7 +277,6 @@ const Attendance = () => {
               <CardDescription>إدارة سجلات الحضور</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Attendance Filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm mb-1">رقم الاشتراك</label>
@@ -284,7 +284,7 @@ const Attendance = () => {
                     type="text"
                     name="subscription"
                     value={attendanceFilters.subscription}
-                    onChange={handleAttendanceFilterChange}
+                    onChange={(e) => setAttendanceFilters({...attendanceFilters, subscription: e.target.value})}
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث برقم الاشتراك"
                   />
@@ -295,7 +295,7 @@ const Attendance = () => {
                     type="date"
                     name="attendance_date"
                     value={attendanceFilters.attendance_date}
-                    onChange={handleAttendanceFilterChange}
+                    onChange={(e) => setAttendanceFilters({...attendanceFilters, attendance_date: e.target.value})}
                     className="border px-3 py-2 rounded w-full"
                   />
                 </div>
@@ -305,166 +305,21 @@ const Attendance = () => {
                     type="text"
                     name="member_name"
                     value={attendanceFilters.member_name}
-                    onChange={handleAttendanceFilterChange}
+                    onChange={(e) => setAttendanceFilters({...attendanceFilters, member_name: e.target.value})}
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم العضو"
                   />
                 </div>
               </div>
 
-              {/* Add Attendance Button */}
-              <Button
-                variant="default"
-                onClick={() => setIsAttendanceDialogOpen(true)}
-              >
+              <Button onClick={() => setIsAttendanceDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 إضافة حضور
               </Button>
 
-              {/* Attendance Dialog */}
-              {isAttendanceDialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-                  <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full relative" dir="rtl">
-                    <button
-                      onClick={() => {
-                        setIsAttendanceDialogOpen(false);
-                        setFoundSubscription(null);
-                        setNewAttendance({ identifier: "" });
-                      }}
-                      className="absolute top-3 left-3 text-gray-400 hover:text-gray-600 text-2xl"
-                    >
-                      ×
-                    </button>
-                    <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">إضافة حضور</h3>
-                    <form onSubmit={handleAddAttendance} className="space-y-5">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          رقم الهاتف أو كود RFID
-                        </label>
-                        <input
-                          type="text"
-                          name="identifier"
-                          value={newAttendance.identifier}
-                          onChange={handleAttendanceInputChange}
-                          className="border border-gray-300 focus:border-blue-500 focus:ring-blue-500 px-4 py-2 rounded-md w-full transition duration-150"
-                          placeholder="أدخل رقم الهاتف أو كود RFID"
-                          required
-                          autoFocus
-                        />
-                      </div>
-
-                      {searchLoading && (
-                        <div className="text-center text-sm text-gray-600">جاري البحث...</div>
-                      )}
-
-                      {foundSubscription && (
-                        <div className="border-t pt-5 mt-5 space-y-4">
-                          <h4 className="font-semibold text-gray-700">بيانات الاشتراك:</h4>
-                          <div className="flex items-start gap-4">
-                            {foundSubscription.member_details?.photo ? (
-                              <img
-                                src={foundSubscription.member_details.photo}
-                                alt="Member"
-                                className="w-12 h-12 rounded-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xl">
-                                <FaUser />
-                              </div>
-                            )}
-                            <div className="flex-1 space-y-1">
-                              <p className="font-medium text-gray-800">
-                                {foundSubscription.member_details?.name}
-                              </p>
-                              <p className="text-sm text-gray-500">
-                                #{foundSubscription.member_details?.membership_number}
-                              </p>
-                              <p className="text-sm text-red-500">
-                                <span className="font-medium text-gray-700">المبلغ المتبقي: </span>
-                                {foundSubscription.remaining_amount}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
-                            <p>
-                              <span className="font-medium">النادي: </span>
-                              {foundSubscription.club_details?.name}
-                            </p>
-                            <p>
-                              <span className="font-medium">الحالة: </span>
-                              <span
-                                className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                                  foundSubscription.status === "Active"
-                                    ? "bg-green-100 text-green-600"
-                                    : foundSubscription.status === "Expired"
-                                    ? "bg-red-100 text-red-600"
-                                    : "bg-blue-100 text-blue-600"
-                                }`}
-                              >
-                                {foundSubscription.status}
-                              </span>
-                            </p>
-                            <p>
-                              <span className="font-medium">الهاتف: </span>
-                              {foundSubscription.member_details?.phone}
-                            </p>
-                            <p>
-                              <span className="font-medium">RFID: </span>
-                              {foundSubscription.member_details?.rfid_code || "غير مسجل"}
-                            </p>
-                            <p>
-                              <span className="font-medium">تاريخ البدء: </span>
-                              {new Date(foundSubscription.start_date).toLocaleDateString("ar-EG")}
-                            </p>
-                            <p>
-                              <span className="font-medium">تاريخ الانتهاء: </span>
-                              {new Date(foundSubscription.end_date).toLocaleDateString("ar-EG")}
-                            </p>
-                            <p className="col-span-2">
-                              <span className="font-medium">الإدخالات المتبقية: </span>
-                              <span
-                                className={`font-bold ${
-                                  foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0
-                                    ? "text-red-600"
-                                    : "text-green-600"
-                                }`}
-                              >
-                                {foundSubscription.type_details.max_entries - foundSubscription.entry_count}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                / {foundSubscription.type_details.max_entries}
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-                      )}
-
-                      {newAttendance.identifier && !foundSubscription && !searchLoading && (
-                        <p className="text-red-500 text-sm">لا يوجد اشتراك بهذا الرقم أو كود RFID</p>
-                      )}
-
-                      <button
-                        type="submit"
-                        className={`w-full py-2 rounded-md text-white font-semibold transition duration-150 ${
-                          foundSubscription
-                            ? "bg-green-600 hover:bg-green-700"
-                            : "bg-gray-400 cursor-not-allowed"
-                        }`}
-                        disabled={!foundSubscription}
-                      >
-                        تأكيد الحضور
-                      </button>
-                    </form>
-                  </div>
-                </div>
-              )}
-
-              {/* Attendance Table */}
               {attendanceLoading && <p>جاري تحميل بيانات الحضور...</p>}
-              {attendanceError && (
-                <p className="text-red-500">خطأ: {attendanceError}</p>
-              )}
+              {attendanceError && <p className="text-red-500">خطأ: {attendanceError}</p>}
+
               {!attendanceLoading && !attendanceError && (
                 <>
                   <div className="rounded-md border">
@@ -478,10 +333,7 @@ const Attendance = () => {
                       </thead>
                       <tbody className="divide-y divide-border bg-background">
                         {paginatedAttendances.map((attendance) => (
-                          <tr
-                            key={attendance.id}
-                            className="hover:bg-gray-100 transition"
-                          >
+                          <tr key={attendance.id} className="hover:bg-gray-100 transition">
                             <td className="px-4 py-3 text-sm">{attendance.attendance_date}</td>
                             <td className="px-4 py-3 text-sm">
                               {attendance.member_name || "غير متاح"}
@@ -509,24 +361,14 @@ const Attendance = () => {
                     </table>
                   </div>
 
-                  {/* Attendance Pagination */}
-                  <div className="flex justify-between items-center mt-4">
-                    <Button
-                      onClick={() => handleAttendancePageChange(attendancePage - 1)}
-                      disabled={attendancePage === 1}
-                    >
-                      السابق
-                    </Button>
-                    <span>
-                      صفحة {attendancePage} من {totalAttendancePages}
-                    </span>
-                    <Button
-                      onClick={() => handleAttendancePageChange(attendancePage + 1)}
-                      disabled={attendancePage === totalAttendancePages}
-                    >
-                      التالي
-                    </Button>
-                  </div>
+                  <PaginationControls
+                    currentPage={attendancePage}
+                    totalPages={totalAttendancePages}
+                    itemsCount={filteredAttendances.length}
+                    itemsPerPage={attendanceItemsPerPage}
+                    onPageChange={setAttendancePage}
+                    type="attendance"
+                  />
                 </>
               )}
             </CardContent>
@@ -541,7 +383,6 @@ const Attendance = () => {
               <CardDescription>إدارة سجلات الدخول</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Entry Log Filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm mb-1">اسم النادي</label>
@@ -549,7 +390,7 @@ const Attendance = () => {
                     type="text"
                     name="club"
                     value={entryLogFilters.club}
-                    onChange={handleEntryLogFilterChange}
+                    onChange={(e) => setEntryLogFilters({...entryLogFilters, club: e.target.value})}
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم النادي"
                   />
@@ -560,7 +401,7 @@ const Attendance = () => {
                     type="text"
                     name="member"
                     value={entryLogFilters.member}
-                    onChange={handleEntryLogFilterChange}
+                    onChange={(e) => setEntryLogFilters({...entryLogFilters, member: e.target.value})}
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم العضو"
                   />
@@ -571,40 +412,21 @@ const Attendance = () => {
                     type="text"
                     name="timestamp"
                     value={entryLogFilters.timestamp}
-                    onChange={handleEntryLogFilterChange}
+                    onChange={(e) => setEntryLogFilters({...entryLogFilters, timestamp: e.target.value})}
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث بالتاريخ"
                   />
                 </div>
               </div>
 
-              {/* Add Entry Log Button */}
               <Button onClick={() => setIsEntryLogDialogOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 إضافة سجل دخول
               </Button>
 
-              {/* Entry Log Dialog */}
-              {isEntryLogDialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-                  <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
-                    <button
-                      onClick={() => setIsEntryLogDialogOpen(false)}
-                      className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
-                    >
-                      ×
-                    </button>
-                    <h3 className="text-lg font-semibold mb-4">إضافة سجل دخول</h3>
-                    <EntryForm onSuccess={() => setIsEntryLogDialogOpen(false)} />
-                  </div>
-                </div>
-              )}
-
-              {/* Entry Logs Table */}
               {entryLogsLoading && <p>جاري تحميل سجلات الدخول...</p>}
-              {entryLogsError && (
-                <p className="text-red-500">خطأ: {entryLogsError}</p>
-              )}
+              {entryLogsError && <p className="text-red-500">خطأ: {entryLogsError}</p>}
+
               {!entryLogsLoading && !entryLogsError && (
                 <>
                   <div className="rounded-md border">
@@ -618,10 +440,7 @@ const Attendance = () => {
                       </thead>
                       <tbody className="divide-y divide-border bg-background">
                         {paginatedEntryLogs.map((log) => (
-                          <tr
-                            key={log.id}
-                            className="hover:bg-gray-100 transition"
-                          >
+                          <tr key={log.id} className="hover:bg-gray-100 transition">
                             <td className="px-4 py-3 text-sm">
                               {log.club_details?.name || "غير متاح"}
                             </td>
@@ -635,30 +454,175 @@ const Attendance = () => {
                     </table>
                   </div>
 
-                  {/* Entry Logs Pagination */}
-                  <div className="flex justify-between items-center mt-4">
-                    <Button
-                      onClick={() => handleEntryLogPageChange(entryLogPage - 1)}
-                      disabled={entryLogPage === 1}
-                    >
-                      السابق
-                    </Button>
-                    <span>
-                      صفحة {entryLogPage} من {totalEntryLogPages}
-                    </span>
-                    <Button
-                      onClick={() => handleEntryLogPageChange(entryLogPage + 1)}
-                      disabled={entryLogPage === totalEntryLogPages}
-                    >
-                      التالي
-                    </Button>
-                  </div>
+                  <PaginationControls
+                    currentPage={entryLogPage}
+                    totalPages={totalEntryLogPages}
+                    itemsCount={filteredEntryLogs.length}
+                    itemsPerPage={entryLogItemsPerPage}
+                    onPageChange={setEntryLogPage}
+                    type="entry-logs"
+                  />
                 </>
               )}
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Attendance Dialog */}
+      {isAttendanceDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full relative" dir="rtl">
+            <button
+              onClick={() => {
+                setIsAttendanceDialogOpen(false);
+                setFoundSubscription(null);
+                setNewAttendance({ identifier: "" });
+              }}
+              className="absolute top-3 left-3 text-gray-400 hover:text-gray-600 text-2xl"
+            >
+              ×
+            </button>
+            <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">إضافة حضور</h3>
+            <form onSubmit={handleAddAttendance} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  رقم الهاتف أو كود RFID
+                </label>
+                <input
+                  type="text"
+                  name="identifier"
+                  value={newAttendance.identifier}
+                  onChange={handleAttendanceInputChange}
+                  className="border border-gray-300 focus:border-blue-500 focus:ring-blue-500 px-4 py-2 rounded-md w-full transition duration-150"
+                  placeholder="أدخل رقم الهاتف أو كود RFID"
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {searchLoading && (
+                <div className="text-center text-sm text-gray-600">جاري البحث...</div>
+              )}
+
+              {foundSubscription && (
+                <div className="border-t pt-5 mt-5 space-y-4">
+                  <h4 className="font-semibold text-gray-700">بيانات الاشتراك:</h4>
+                  <div className="flex items-start gap-4">
+                    {foundSubscription.member_details?.photo ? (
+                      <img
+                        src={foundSubscription.member_details.photo}
+                        alt="Member"
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xl">
+                        <FaUser />
+                      </div>
+                    )}
+                    <div className="flex-1 space-y-1">
+                      <p className="font-medium text-gray-800">
+                        {foundSubscription.member_details?.name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        #{foundSubscription.member_details?.membership_number}
+                      </p>
+                      <p className="text-sm text-red-500">
+                        <span className="font-medium text-gray-700">المبلغ المتبقي: </span>
+                        {foundSubscription.remaining_amount}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
+                    <p>
+                      <span className="font-medium">النادي: </span>
+                      {foundSubscription.club_details?.name}
+                    </p>
+                    <p>
+                      <span className="font-medium">الحالة: </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          foundSubscription.status === "Active"
+                            ? "bg-green-100 text-green-600"
+                            : foundSubscription.status === "Expired"
+                            ? "bg-red-100 text-red-600"
+                            : "bg-blue-100 text-blue-600"
+                        }`}
+                      >
+                        {foundSubscription.status}
+                      </span>
+                    </p>
+                    <p>
+                      <span className="font-medium">الهاتف: </span>
+                      {foundSubscription.member_details?.phone}
+                    </p>
+                    <p>
+                      <span className="font-medium">RFID: </span>
+                      {foundSubscription.member_details?.rfid_code || "غير مسجل"}
+                    </p>
+                    <p>
+                      <span className="font-medium">تاريخ البدء: </span>
+                      {new Date(foundSubscription.start_date).toLocaleDateString("ar-EG")}
+                    </p>
+                    <p>
+                      <span className="font-medium">تاريخ الانتهاء: </span>
+                      {new Date(foundSubscription.end_date).toLocaleDateString("ar-EG")}
+                    </p>
+                    <p className="col-span-2">
+                      <span className="font-medium">الإدخالات المتبقية: </span>
+                      <span
+                        className={`font-bold ${
+                          foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0
+                            ? "text-red-600"
+                            : "text-green-600"
+                        }`}
+                      >
+                        {foundSubscription.type_details.max_entries - foundSubscription.entry_count}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        / {foundSubscription.type_details.max_entries}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {newAttendance.identifier && !foundSubscription && !searchLoading && (
+                <p className="text-red-500 text-sm">لا يوجد اشتراك بهذا الرقم أو كود RFID</p>
+              )}
+
+              <button
+                type="submit"
+                className={`w-full py-2 rounded-md text-white font-semibold transition duration-150 ${
+                  foundSubscription
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-gray-400 cursor-not-allowed"
+                }`}
+                disabled={!foundSubscription}
+              >
+                تأكيد الحضور
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Entry Log Dialog */}
+      {isEntryLogDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
+            <button
+              onClick={() => setIsEntryLogDialogOpen(false)}
+              className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
+            >
+              ×
+            </button>
+            <h3 className="text-lg font-semibold mb-4">إضافة سجل دخول</h3>
+            <EntryForm onSuccess={() => setIsEntryLogDialogOpen(false)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

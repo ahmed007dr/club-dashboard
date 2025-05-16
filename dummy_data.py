@@ -77,7 +77,7 @@ def create_dummy_data():
     existing_rfids = set(User.objects.filter(rfid_code__isnull=False).values_list('rfid_code', flat=True))
     existing_usernames = set(User.objects.filter(username__isnull=False).values_list('username', flat=True))
     existing_emails = set(User.objects.filter(email__isnull=False).values_list('email', flat=True))
-    for _ in range(200):
+    for _ in range(20):
         while True:
             username = serial_generator("user", user_counter, 8)[:8]
             email = serial_generator("user", user_counter, 8) + "@example.com"
@@ -111,7 +111,7 @@ def create_dummy_data():
 
     # Create 6000 Members
     members = []
-    for i in range(6000):
+    for i in range(300):
         if i % 1000 == 0:
             print(f"Creating members: {i}/6000")
         while True:
@@ -160,7 +160,7 @@ def create_dummy_data():
     print(f"Created {len(members)} members")
 
     # Update referrals (10% of members)
-    for member in random.sample(members, min(600, len(members))):
+    for member in random.sample(members, min(50, len(members))):
         possible_referrers = [m for m in members if m != member and m.club == member.club]
         if possible_referrers:
             member.referred_by = random.choice(possible_referrers)
@@ -199,7 +199,7 @@ def create_dummy_data():
 
     # Create Tickets (5000 tickets)
     tickets_to_create = []
-    for _ in range(5000):
+    for _ in range(50):
         ticket = Ticket(
             club=random.choice(clubs),
             buyer_name=fake.name()[:100],
@@ -215,7 +215,7 @@ def create_dummy_data():
 
     # Create Receipts (3000 receipts)
     receipts_to_create = []
-    for _ in range(3000):
+    for _ in range(30):
         subscription = random.choice(subscriptions) if fake.boolean() else None
         receipt = Receipt(
             club=subscription.club if subscription else random.choice(clubs),
@@ -232,7 +232,7 @@ def create_dummy_data():
 
     # Create Entry Logs (10000 logs)
     entry_logs_to_create = []
-    for _ in range(10000):
+    for _ in range(1000):
         member = random.choice(members)
         member_subscriptions = [s for s in subscriptions if s.member == member]
         related_subscription = random.choice(member_subscriptions) if member_subscriptions and fake.boolean() else None
@@ -250,7 +250,7 @@ def create_dummy_data():
 
     # Create Attendance Records (15000 records)
     attendance_to_create = []
-    for _ in range(15000):
+    for _ in range(1000):
         member = random.choice(members)
         member_subscriptions = [s for s in subscriptions if s.member == member]
         if not member_subscriptions:
@@ -292,7 +292,7 @@ def create_dummy_data():
 
     # Create Staff Attendance (800 records)
     staff_attendance_to_create = []
-    for _ in range(800):
+    for _ in range(80):
         shift = random.choice(shifts)
         check_in = timezone.make_aware(
             datetime.combine(shift.date, shift.shift_start) + timedelta(minutes=random.randint(-15, 15))
@@ -315,7 +315,7 @@ def create_dummy_data():
 
     # Create Free Invites (1000 invites)
     free_invites_to_create = []
-    for _ in range(1000):
+    for _ in range(100):
         free_invite = FreeInvite(
             club=random.choice(clubs),
             guest_name=fake.name()[:100],
@@ -343,7 +343,7 @@ def create_dummy_data():
 
     # Create Expenses (500 expenses)
     expenses_to_create = []
-    for _ in range(500):
+    for _ in range(50):
         expense = Expense(
             club=random.choice(clubs),
             category=random.choice(expense_categories),
@@ -373,7 +373,7 @@ def create_dummy_data():
 
     # Create Incomes (500 incomes)
     incomes_to_create = []
-    for _ in range(500):
+    for _ in range(50):
         receipt = random.choice(Receipt.objects.all()) if fake.boolean() else None
         income = Income(
             club=receipt.club if receipt else random.choice(clubs),

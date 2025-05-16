@@ -21,9 +21,7 @@ export const fetchFreeInvites = createAsyncThunk(
           // ... other filters
         }
       });
-      return response.data; // Should return {count, next, previous, results}
-    } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      return response.data.results; // Assuming the API returns an array or object
     }
   }
 );

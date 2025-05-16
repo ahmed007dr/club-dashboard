@@ -4,7 +4,12 @@ import { Link } from "react-router-dom";
 import { CiTrash, CiEdit } from "react-icons/ci";
 import { RiGroupLine } from "react-icons/ri";
 import { useSelector, useDispatch } from "react-redux";
-import { deleteMember, editMember, fetchUsers, searchMember } from "../../redux/slices/memberSlice";
+import {
+  deleteMember,
+  editMember,
+  fetchUsers,
+  searchMember,
+} from "../../redux/slices/memberSlice";
 import { IoAddOutline } from "react-icons/io5";
 import toast from 'react-hot-toast';
 
@@ -49,7 +54,7 @@ const Members = () => {
         await dispatch(searchMember({ query, page: 1 })).unwrap();
       }
     } catch (error) {
-      setError('Failed to search members. Please try again later: ' + error);
+      setError("Failed to search members. Please try again later: " + error);
     }
   };
 
@@ -60,7 +65,7 @@ const Members = () => {
 
   const confirmDelete = async () => {
     if (!selectedMember) {
-      setError('No member selected for deletion.');
+      setError("No member selected for deletion.");
       return;
     }
 
@@ -75,7 +80,9 @@ const Members = () => {
       setIsDeleteModalOpen(false);
       toast.success("تم حذف العضو بنجاح");
     } catch (error) {
-      setError('Failed to delete member. Please try again later: ' + error.message);
+      setError(
+        "Failed to delete member. Please try again later: " + error.message
+      );
     }
   };
 
@@ -168,7 +175,7 @@ const Members = () => {
                       src={
                         member.photo
                           ? member.photo
-                          : 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s'
+                          : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"
                       }
                       alt="member"
                       className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
@@ -213,7 +220,7 @@ const Members = () => {
           <>
             <div className="text-sm text-gray-600">
               عرض {(currentPage - 1) * itemsPerPage + 1} إلى{' '}
-              {Math.min(currentPage * itemsPerPage, pagination.count)} من {pagination.count} عضو
+              {Math.min(currentPage * itemsPerPage, pagination.count)} من {pagination.count} 
             </div>
             <div className="flex gap-2">
               {/* First Page Button */}
@@ -229,7 +236,6 @@ const Members = () => {
                 الأول
               </button>
 
-              {/* Previous Page Button */}
               <button
                 onClick={() => paginate(currentPage - 1)}
                 disabled={!pagination.previous || pagination.count === 0}
@@ -291,11 +297,13 @@ const Members = () => {
               {/* Last Page Button */}
               <button
                 onClick={() => paginate(totalPages)}
-                disabled={currentPage === totalPages || pagination.count === 0}
+                disabled={
+                  currentPage === totalPages || searchResult.length === 0
+                }
                 className={`px-3 py-1 rounded ${
-                  currentPage === totalPages || pagination.count === 0
-                    ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-                    : 'bg-blue-700 text-white hover:bg-blue-800'
+                  currentPage === totalPages || searchResult.length === 0
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
                 }`}
               >
                 الأخير
@@ -307,6 +315,7 @@ const Members = () => {
 
       {/* Add Modal */}
       {isAddModalOpen && (
+        <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(255, 255, 255, 0.2)]">
         <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]">
           <div className="bg-white p-6 rounded-lg w-1/3 relative">
             <button
@@ -315,7 +324,10 @@ const Members = () => {
             >
               ×
             </button>
-            <AddMember closeAddModal={closeAddModal} />
+            <AddMember
+              closeAddModal={closeAddModal}
+              onAddSuccess={onAddSuccess}
+            />
           </div>
         </div>
       )}
@@ -323,12 +335,14 @@ const Members = () => {
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div
+          className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(249, 236, 236, 0.2)]"
+          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
           className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]"
         >
           <div className="modal relative bg-white p-6 rounded-lg">
             <h3 className="text-lg font-semibold mb-4">تأكيد الحذف</h3>
             <p>
-              هل أنت متأكد من حذف <strong>{selectedMember?.name}</strong>؟
+              هل أنت متأكد من حذف <strong>{selectedMember?.name}</strong؟
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button
@@ -362,6 +376,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
+                
                 <div className="flex flex-col">
                   <label className="text-right mb-1">رقم العضوية</label>
                   <input
@@ -372,6 +387,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
+                
                 <div className="flex flex-col">
                   <label className="text-right mb-1">الرقم القومي</label>
                   <input
@@ -382,6 +398,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
+                
                 <div className="flex flex-col">
                   <label className="text-right mb-1">رقم الهاتف الأساسي</label>
                   <input
@@ -392,6 +409,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
+                
                 <div className="flex flex-col">
                   <label className="text-right mb-1">رقم الهاتف الثانوي</label>
                   <input
@@ -403,6 +421,7 @@ const Members = () => {
                   />
                 </div>
               </div>
+
               <div className="space-y-3">
                 <div className="flex flex-col">
                   <label className="text-right mb-1">كود البطاقة (RFID)</label>
@@ -414,6 +433,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
+                
                 <div className="flex flex-col">
                   <label className="text-right mb-1">الوظيفة</label>
                   <input
@@ -424,6 +444,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
+                
                 <div className="flex flex-col">
                   <label className="text-right mb-1">اسم النادي</label>
                   <input
@@ -434,6 +455,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right bg-gray-100 cursor-not-allowed"
                   />
                 </div>
+                
                 <div className="flex flex-col">
                   <label className="text-right mb-1">العنوان</label>
                   <input
@@ -444,6 +466,7 @@ const Members = () => {
                     className="border px-3 py-2 rounded text-right"
                   />
                 </div>
+                
                 <div className="flex flex-col">
                   <label className="text-right mb-1">ملاحظات</label>
                   <textarea
@@ -456,6 +479,7 @@ const Members = () => {
                 </div>
               </div>
             </div>
+            
             <div className="flex justify-end gap-2 mt-6">
               <button
                 onClick={() => setIsEditModalOpen(false)}

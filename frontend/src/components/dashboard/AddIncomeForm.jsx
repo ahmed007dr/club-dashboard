@@ -66,7 +66,6 @@ const AddIncomeForm = () => {
             ordering: 'id', // Sort by ID
           },
         });
-
         setIncomeSources(response.data.results || []);
         toast.success('تم تحميل مصادر الدخل بنجاح', { id: loadingToast });
       } catch (error) {
