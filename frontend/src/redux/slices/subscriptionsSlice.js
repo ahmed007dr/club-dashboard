@@ -904,9 +904,9 @@ const subscriptionsSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchMemberSubscriptions.fulfilled, (state) => {
+      .addCase(fetchMemberSubscriptions.fulfilled, (state, action) => {
         state.loading = false;
-        state.memberSubscriptions = action.payload || [];
+        state.memberSubscriptions = action.payload.results|| [];
       })
       .addCase(fetchMemberSubscriptions.rejected, (state, action) => {
         state.loading = false;

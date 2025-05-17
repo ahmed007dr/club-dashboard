@@ -11,7 +11,8 @@ class MemberByMembershipNumberField(serializers.PrimaryKeyRelatedField):
         try:
             return Member.objects.get(membership_number=data)
         except Member.DoesNotExist:
-            raise serializers.ValidationError("عضو غير موجود برقم العضوية المدخل.")
+            # raise serializers.ValidationError("عضو غير موجود برقم العضوية المدخل.")
+            return None
 
     def to_representation(self, value):
         if isinstance(value, Member):

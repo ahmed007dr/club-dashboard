@@ -44,6 +44,7 @@ export const addInvite = createAsyncThunk(
           },
         }
       );
+      console.warn(response.data)
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -184,7 +185,11 @@ const invitesSlice = createSlice({
       .addCase(addInvite.fulfilled, (state, action) => {
         state.loading = false;
         // Add new invite to beginning of results
-        state.invites.results.unshift(action.payload);
+        console.log(state.invites);
+        state.invites.results = [
+          action.payload.club_details,
+          ...state.invites.results,
+        ];
         // Increment total count
         state.invites.count += 1;
       })

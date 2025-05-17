@@ -20,7 +20,6 @@ import { CiShoppingTag } from 'react-icons/ci';
 
 const MemberSubscriptions = () => {
   const { memberId } = useParams();
-  console.log('Member ID:', memberId); // Debugging line to check the memberId
   const dispatch = useDispatch();
 
   const { memberSubscriptions, status, error, subscriptionStatus } = useSelector(
@@ -31,7 +30,7 @@ const MemberSubscriptions = () => {
   // Fetch member subscriptions when component mounts or memberId changes
   useEffect(() => {
     if (memberId) {
-      dispatch(fetchMemberSubscriptions(memberId));
+        dispatch(fetchMemberSubscriptions(memberId));
     }
   }, [dispatch, memberId]);
 
