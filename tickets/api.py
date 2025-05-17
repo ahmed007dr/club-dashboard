@@ -10,23 +10,37 @@ from finance.serializers import IncomeSerializer
 from finance.models import Income
 from django.utils import timezone
 from django.forms.models import model_to_dict
-from finance.models import Income, IncomeSource
+from finance.models import Income,IncomeSource
 from rest_framework.pagination import PageNumberPagination
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def ticket_list_api(request):
     if request.user.role == 'owner':
-        tickets = Ticket.objects.select_related('club', 'used_by').all().order_by('-id')
+        tickets = Ticket.objects.select_related('club', 'used_by').all()
     else:
-        tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club).order_by('-id')
+        tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club)
+
+    ticket_type = request.query_params.get('ticket_type')
+    used = request.query_params.get('used')
+    issue_date = request.query_params.get('issue_date')
+    buyer_name = request.query_params.get('buyer_name')
+
+    if ticket_type:
+        tickets = tickets.filter(ticket_type=ticket_type)
+    if used is not None:  
+        tickets = tickets.filter(used=used.lower() == 'true')
+    if issue_date:
+        tickets = tickets.filter(issue_date=issue_date)
+    if buyer_name:
+        tickets = tickets.filter(buyer_name__icontains=buyer_name)
+
+    tickets = tickets.order_by('-issue_date')
 
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(tickets, request)
     serializer = TicketSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -35,33 +49,33 @@ def add_ticket_api(request):
     if serializer.is_valid():
         ticket = serializer.save()
         
-        if ticket.price > 0:
-            source, _ = IncomeSource.objects.get_or_create(
-                club=ticket.club,
-                name='Ticket',
-                defaults={'description': 'ارباح بيع تذاكر'}
-            )
+    if ticket.price > 0:
+        source, _ = IncomeSource.objects.get_or_create(
+            club=ticket.club,
+            name='Ticket',
+            defaults={'description': 'ارباح بيع تذاكر'}
+        )
 
-            income = Income.objects.create(
-                club=ticket.club,
-                source=source,
-                amount=ticket.price,
-                description=f"بيع تذكره بنوع  {ticket.ticket_type}",
-                date=timezone.now().date(),
-                received_by=request.user
-            )
+        income = Income.objects.create(
+            club=ticket.club,
+            source=source,
+            amount=ticket.price,
+            description=f"بيع تذكره بنوع  {ticket.ticket_type}",
+            date=timezone.now().date(),
+            received_by=request.user
+        )
 
-            income_serializer = IncomeSerializer(data=income)
 
-            if income_serializer.is_valid():
-                income_serializer.save()
+        income_serializer = IncomeSerializer(data=income)
+
+        if income_serializer.is_valid():
+            income_serializer.save()
 
         if not IsOwnerOrRelatedToClub().has_object_permission(request, None, ticket):
             ticket.delete()  
             return Response({'error': 'You do not have permission to create a ticket for this club'}, status=status.HTTP_403_FORBIDDEN)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -70,7 +84,6 @@ def ticket_detail_api(request, ticket_id):
 
     serializer = TicketSerializer(ticket)
     return Response(serializer.data)
-
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -86,7 +99,6 @@ def edit_ticket_api(request, ticket_id):
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_ticket_api(request, ticket_id):
@@ -94,7 +106,6 @@ def delete_ticket_api(request, ticket_id):
 
     ticket.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

@@ -37,15 +37,22 @@ const EntryForm = ({ onSuccess }) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
 
-    if (name === 'identifier') {
+    if (name === "identifier") {
       setFoundMember(null);
-      if (!value.trim()) return;
+      const searchValue = value.trim().toUpperCase(); // Normalize input
+
+      if (!searchValue) return;
 
       setSearchLoading(true);
-      const subscription = subscriptions.find(sub =>
-        sub.member_details?.phone === value ||
-        sub.member_details?.rfid_code === value
-      );
+
+      // Improved search logic
+      const subscription = subscriptions.find((sub) => {
+        const member = sub.member_details || {};
+        return (
+          member.phone?.trim() === searchValue ||
+          member.rfid_code?.toUpperCase() === searchValue
+        );
+      });
 
       if (subscription) {
         setFoundMember({
@@ -65,18 +72,20 @@ const EntryForm = ({ onSuccess }) => {
           remaining_amount: subscription.remaining_amount,
           entry_count: subscription.entry_count,
           max_entries: subscription.type_details?.max_entries,
-          remaining_entries: subscription.type_details?.max_entries - subscription.entry_count,
+          remaining_entries:
+            subscription.type_details?.max_entries - subscription.entry_count,
           subscription_type: subscription.type_details?.name,
-          price: subscription.type_details?.price
+          price: subscription.type_details?.price,
         });
 
         if (!formData.club && subscription.club_details) {
-          setFormData(prev => ({
+          setFormData((prev) => ({
             ...prev,
-            club: subscription.club_details.id
+            club: subscription.club_details.id,
           }));
         }
       }
+
       setSearchLoading(false);
     }
   };
@@ -138,9 +147,15 @@ const EntryForm = ({ onSuccess }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 max-w-md mx-auto p-6 border rounded-lg shadow-md" dir="rtl">
-      <h2 className="text-xl font-semibold mb-4 text-center">سجل الدخول للنادي</h2>
-      
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-4 max-w-md mx-auto p-6 border rounded-lg shadow-md"
+      dir="rtl"
+    >
+      <h2 className="text-xl font-semibold mb-4 text-center">
+        سجل الدخول للنادي
+      </h2>
+
       <div>
         <label className="block text-sm mb-1">النادي</label>
         <select
@@ -180,7 +195,11 @@ const EntryForm = ({ onSuccess }) => {
 
       {formData.identifier && !foundMember && !searchLoading && (
         <div className="text-red-500 text-sm text-center">
-          <p>لا يوجد اشتراك بهذا الرقم أو كود RFID</p>
+          <p>
+            {formData.identifier.match(/[A-Za-z]/)
+              ? "لا يوجد اشتراك مسجل بهذا الكود RFID"
+              : "لا يوجد اشتراك مسجل بهذا الرقم"}
+          </p>
         </div>
       )}
 
@@ -207,7 +226,9 @@ const EntryForm = ({ onSuccess }) => {
                 #{foundMember.membership_number || "غير متوفر"}
               </p>
               <p className="text-sm text-red-500">
-                <span className="font-medium text-gray-700">المبلغ المتبقي: </span>
+                <span className="font-medium text-gray-700">
+                  المبلغ المتبقي:{" "}
+                </span>
                 {foundMember.remaining_amount || "غير متوفر"}
               </p>
             </div>
@@ -242,19 +263,20 @@ const EntryForm = ({ onSuccess }) => {
             </p>
             <p>
               <span className="font-medium">تاريخ البدء: </span>
-              {foundMember.start_date 
-                ? new Date(foundMember.start_date).toLocaleDateString("ar-EG") 
+              {foundMember.start_date
+                ? new Date(foundMember.start_date).toLocaleDateString("ar-EG")
                 : "غير متوفر"}
             </p>
             <p>
               <span className="font-medium">تاريخ الانتهاء: </span>
-              {foundMember.end_date 
-                ? new Date(foundMember.end_date).toLocaleDateString("ar-EG") 
+              {foundMember.end_date
+                ? new Date(foundMember.end_date).toLocaleDateString("ar-EG")
                 : "غير متوفر"}
             </p>
             <p className="col-span-2">
               <span className="font-medium">الإدخالات المتبقية: </span>
-              {foundMember.max_entries !== undefined && foundMember.remaining_entries !== undefined ? (
+              {foundMember.max_entries !== undefined &&
+              foundMember.remaining_entries !== undefined ? (
                 <>
                   <span
                     className={`font-bold ${

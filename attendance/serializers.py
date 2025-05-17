@@ -9,11 +9,11 @@ from accounts.serializers import UserSerializer
 from django.db.models import Q
 from django.utils import timezone
 
-
 class AttendanceSerializer(serializers.ModelSerializer):
     identifier = serializers.CharField(write_only=True)
     membership_number = serializers.SerializerMethodField()
     member_name = serializers.SerializerMethodField()
+    rfid_code = serializers.SerializerMethodField()  
     subscription_details = SubscriptionSerializer(source='subscription', read_only=True)
 
     class Meta:
@@ -24,16 +24,21 @@ class AttendanceSerializer(serializers.ModelSerializer):
             'subscription',
             'subscription_details',
             'attendance_date',
+            'entry_time', 
             'membership_number',
             'member_name',
+            'rfid_code',  
         ]
-        read_only_fields = ['attendance_date', 'membership_number', 'member_name', 'subscription']
+        read_only_fields = ['attendance_date', 'entry_time', 'membership_number', 'member_name', 'rfid_code', 'subscription']
 
     def get_membership_number(self, obj):
         return obj.subscription.member.membership_number
 
     def get_member_name(self, obj):
         return obj.subscription.member.name
+
+    def get_rfid_code(self, obj):
+        return obj.subscription.member.rfid_code  
 
     def create(self, validated_data):
         identifier = validated_data.pop('identifier')
@@ -58,10 +63,12 @@ class AttendanceSerializer(serializers.ModelSerializer):
 
         validated_data['subscription'] = active_subscription
         return super().create(validated_data)
+    
 
 class EntryLogSerializer(serializers.ModelSerializer):
     identifier = serializers.CharField(write_only=True)
     member_name = serializers.SerializerMethodField()
+    rfid_code = serializers.SerializerMethodField()  # New field for rfid_code
     club_details = ClubSerializer(source='club', read_only=True)
     approved_by_details = UserSerializer(source='approved_by', read_only=True)
     subscription_details = SubscriptionSerializer(source='related_subscription', read_only=True)
@@ -75,14 +82,18 @@ class EntryLogSerializer(serializers.ModelSerializer):
             'club',
             'approved_by',
             'member_name',
+            'rfid_code',  
             'club_details',
             'approved_by_details',
             'subscription_details',
         ]
-        read_only_fields = ['timestamp', 'member_name', 'related_subscription']
+        read_only_fields = ['timestamp', 'member_name', 'rfid_code', 'related_subscription']
 
     def get_member_name(self, obj):
         return obj.member.name
+
+    def get_rfid_code(self, obj):
+        return obj.member.rfid_code  
 
     def create(self, validated_data):
         identifier = validated_data.pop('identifier')

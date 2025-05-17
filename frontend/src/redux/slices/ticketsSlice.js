@@ -5,9 +5,9 @@ import BASE_URL from '../../config/api';
 
 // Create the async thunk for fetching tickets with pagination
 export const fetchTickets = createAsyncThunk(
-  'tickets/fetchTickets',
+  "tickets/fetchTickets",
   async (params, thunkAPI) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem("token");
     try {
       const response = await axios.get(`${BASE_URL}/tickets/api/tickets/`, {
         headers: {
@@ -19,12 +19,15 @@ export const fetchTickets = createAsyncThunk(
           club: params.club,
           buyer_name: params.buyer_name,
           ticket_type: params.ticket_type,
-          used: params.used
-        }
+          used: params.used,
+          issue_date: params.issue_date,
+        },
       });
       return response.data;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.response?.data || 'An error occurred');
+      return thunkAPI.rejectWithValue(
+        error.response?.data || "An error occurred"
+      );
     }
   }
 );

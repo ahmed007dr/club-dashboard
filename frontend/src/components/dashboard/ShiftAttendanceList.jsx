@@ -10,7 +10,7 @@ const ShiftAttendanceList = () => {
   console.log(shiftAttendances);
   // State management
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(20);
   const [filters, setFilters] = useState({
     staffName: '',
     clubName: '',

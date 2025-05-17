@@ -45,11 +45,13 @@ const Attendance = () => {
   // Filters
   const [attendanceFilters, setAttendanceFilters] = useState({
     subscription: "",
+    rfid: "", 
     attendance_date: "",
     member_name: "",
   });
   const [entryLogFilters, setEntryLogFilters] = useState({
     club: "",
+    rfid: "",
     member: "",
     timestamp: "",
   });
@@ -68,24 +70,32 @@ const Attendance = () => {
 
   // Filtered data
   const filteredAttendances = attendances
-    .filter(attendance => {
+    .filter((attendance) => {
       const subscriptionText = attendance.subscription?.name || "";
       return (
-        subscriptionText.toLowerCase().includes(attendanceFilters.subscription.toLowerCase()) &&
-        attendance.attendance_date.includes(attendanceFilters.attendance_date) &&
-        (attendance.member_name?.toLowerCase().includes(attendanceFilters.member_name.toLowerCase()) || !attendanceFilters.member_name)
+        subscriptionText
+          .toLowerCase()
+          .includes(attendanceFilters.subscription.toLowerCase()) &&
+        attendance.attendance_date.includes(
+          attendanceFilters.attendance_date
+        ) &&
+        (attendance.rfid_code
+          ?.toUpperCase()
+          .includes(attendanceFilters.rfid.toUpperCase()) ||
+          !attendanceFilters.rfid)
       );
     })
     .sort((a, b) => b.id - a.id);
 
- const filteredEntryLogs = entryLogs
-  .filter(log => {
-    return (
-      (log.club_details?.name?.toLowerCase().includes(entryLogFilters.club.toLowerCase()) || !entryLogFilters.club) &&
-      (log.member_details?.name?.toLowerCase().includes(entryLogFilters.member.toLowerCase()) || !entryLogFilters.member) &&
-      log.timestamp.includes(entryLogFilters.timestamp))
-  })
-  .sort((a, b) => b.id - a.id);
+    const filteredEntryLogs = entryLogs
+    .filter(log => {
+      return (
+        (log.club_details?.name?.toLowerCase().includes(entryLogFilters.club.toLowerCase()) || !entryLogFilters.club) &&
+        (log.member_details?.name?.toLowerCase().includes(entryLogFilters.member.toLowerCase()) || !entryLogFilters.member) &&
+        (log.rfid_code?.toUpperCase().includes(entryLogFilters.rfid.toUpperCase()) || !entryLogFilters.rfid) &&
+        log.timestamp.includes(entryLogFilters.timestamp))
+    })
+    .sort((a, b) => b.id - a.id);
 
   // Pagination calculations
   const totalAttendancePages = Math.ceil(filteredAttendances.length / attendanceItemsPerPage);
@@ -103,16 +113,24 @@ const Attendance = () => {
   // Handlers
   const handleAttendanceInputChange = (e) => {
     const { name, value } = e.target;
-    setNewAttendance({ ...newAttendance, [name]: value });
+    const searchValue = value.trim().toUpperCase();
+    setNewAttendance({ ...newAttendance, [name]: searchValue });
     setFoundSubscription(null);
 
-    if (value.trim() === '') return;
+
+    if (!searchValue) return;
 
     setSearchLoading(true);
-    const subscription = subscriptions.find(sub =>
-      sub.member_details?.phone === value ||
-      sub.member_details?.rfid_code === value
-    );
+
+    const subscription = subscriptions.find((sub) => {
+      const member = sub.member_details || {};
+      console.log(member.rfid_code);
+      return (
+        member.phone?.trim() === searchValue ||
+        member.rfid_code?.trim().toUpperCase() === searchValue
+      );
+    });
+
     setFoundSubscription(subscription || null);
     setSearchLoading(false);
   };
@@ -260,9 +278,12 @@ const Attendance = () => {
     );
   };
 
+
   return (
     <div className="space-y-6" dir="rtl">
-      <h1 className="text-2xl font-bold tracking-tight">إدارة الحضور و الدخول</h1>
+      <h1 className="text-2xl font-bold tracking-tight">
+        إدارة الحضور و الدخول
+      </h1>
       <Tabs defaultValue="attendance" dir="rtl">
         <TabsList dir="rtl">
           <TabsTrigger value="attendance">سجلات الحضور</TabsTrigger>
@@ -279,14 +300,19 @@ const Attendance = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm mb-1">رقم الاشتراك</label>
+                  <label className="block text-sm mb-1">كود RFID</label>
                   <input
                     type="text"
-                    name="subscription"
-                    value={attendanceFilters.subscription}
-                    onChange={(e) => setAttendanceFilters({...attendanceFilters, subscription: e.target.value})}
-                    className="border px-3 py-2 rounded w-full"
-                    placeholder="ابحث برقم الاشتراك"
+                    name="rfid"
+                    value={attendanceFilters.rfid}
+                    onChange={(e) =>
+                      setAttendanceFilters({
+                        ...attendanceFilters,
+                        rfid: e.target.value.toUpperCase(),
+                      })
+                    }
+                    className="border px-3 py-2 rounded w-full uppercase"
+                    placeholder="ابحث بكود RFID"
                   />
                 </div>
                 <div>
@@ -295,7 +321,12 @@ const Attendance = () => {
                     type="date"
                     name="attendance_date"
                     value={attendanceFilters.attendance_date}
-                    onChange={(e) => setAttendanceFilters({...attendanceFilters, attendance_date: e.target.value})}
+                    onChange={(e) =>
+                      setAttendanceFilters({
+                        ...attendanceFilters,
+                        attendance_date: e.target.value,
+                      })
+                    }
                     className="border px-3 py-2 rounded w-full"
                   />
                 </div>
@@ -305,7 +336,12 @@ const Attendance = () => {
                     type="text"
                     name="member_name"
                     value={attendanceFilters.member_name}
-                    onChange={(e) => setAttendanceFilters({...attendanceFilters, member_name: e.target.value})}
+                    onChange={(e) =>
+                      setAttendanceFilters({
+                        ...attendanceFilters,
+                        member_name: e.target.value,
+                      })
+                    }
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم العضو"
                   />
@@ -318,7 +354,9 @@ const Attendance = () => {
               </Button>
 
               {attendanceLoading && <p>جاري تحميل بيانات الحضور...</p>}
-              {attendanceError && <p className="text-red-500">خطأ: {attendanceError}</p>}
+              {attendanceError && (
+                <p className="text-red-500">خطأ: {attendanceError}</p>
+              )}
 
               {!attendanceLoading && !attendanceError && (
                 <>
@@ -326,15 +364,43 @@ const Attendance = () => {
                     <table className="min-w-full divide-y divide-border">
                       <thead>
                         <tr className="bg-muted/50">
-                          <th className="px-4 py-3 text-right text-sm font-medium">تاريخ الحضور</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">اسم العضو</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">الإجراءات</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            RFID
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            تاريخ الحضور
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            اسم العضو
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            الإجراءات
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border bg-background">
                         {paginatedAttendances.map((attendance) => (
-                          <tr key={attendance.id} className="hover:bg-gray-100 transition">
-                            <td className="px-4 py-3 text-sm">{attendance.attendance_date}</td>
+                          <tr
+                            key={attendance.id}
+                            className="hover:bg-gray-100 transition"
+                          >
+                            <td className="px-4 py-3 text-sm">
+                              {attendance.rfid_code || "غير متاح"}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {new Date(
+                                attendance.attendance_date +
+                                  "T" +
+                                  attendance.entry_time
+                              ).toLocaleString("en-US", {
+                                year: "numeric",
+                                month: "2-digit",
+                                day: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                second: "2-digit",
+                              })}
+                            </td>
                             <td className="px-4 py-3 text-sm">
                               {attendance.member_name || "غير متاح"}
                             </td>
@@ -345,9 +411,14 @@ const Attendance = () => {
                                     <MoreVertical className="h-5 w-5" />
                                   </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="w-40"
+                                >
                                   <DropdownMenuItem
-                                    onClick={() => dispatch(deleteAttendance(attendance.id))}
+                                    onClick={() =>
+                                      dispatch(deleteAttendance(attendance.id))
+                                    }
                                     className="cursor-pointer text-red-600 hover:bg-red-50"
                                   >
                                     حذف
@@ -383,14 +454,35 @@ const Attendance = () => {
               <CardDescription>إدارة سجلات الدخول</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm mb-1">كود RFID</label>
+                  <input
+                    type="text"
+                    name="rfid"
+                    value={entryLogFilters.rfid}
+                    onChange={(e) =>
+                      setEntryLogFilters({
+                        ...entryLogFilters,
+                        rfid: e.target.value.toUpperCase(),
+                      })
+                    }
+                    className="border px-3 py-2 rounded w-full uppercase"
+                    placeholder="ابحث بكود RFID"
+                  />
+                </div>
                 <div>
                   <label className="block text-sm mb-1">اسم النادي</label>
                   <input
                     type="text"
                     name="club"
                     value={entryLogFilters.club}
-                    onChange={(e) => setEntryLogFilters({...entryLogFilters, club: e.target.value})}
+                    onChange={(e) =>
+                      setEntryLogFilters({
+                        ...entryLogFilters,
+                        club: e.target.value,
+                      })
+                    }
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم النادي"
                   />
@@ -401,7 +493,12 @@ const Attendance = () => {
                     type="text"
                     name="member"
                     value={entryLogFilters.member}
-                    onChange={(e) => setEntryLogFilters({...entryLogFilters, member: e.target.value})}
+                    onChange={(e) =>
+                      setEntryLogFilters({
+                        ...entryLogFilters,
+                        member: e.target.value,
+                      })
+                    }
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم العضو"
                   />
@@ -412,7 +509,12 @@ const Attendance = () => {
                     type="text"
                     name="timestamp"
                     value={entryLogFilters.timestamp}
-                    onChange={(e) => setEntryLogFilters({...entryLogFilters, timestamp: e.target.value})}
+                    onChange={(e) =>
+                      setEntryLogFilters({
+                        ...entryLogFilters,
+                        timestamp: e.target.value,
+                      })
+                    }
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث بالتاريخ"
                   />
@@ -425,7 +527,9 @@ const Attendance = () => {
               </Button>
 
               {entryLogsLoading && <p>جاري تحميل سجلات الدخول...</p>}
-              {entryLogsError && <p className="text-red-500">خطأ: {entryLogsError}</p>}
+              {entryLogsError && (
+                <p className="text-red-500">خطأ: {entryLogsError}</p>
+              )}
 
               {!entryLogsLoading && !entryLogsError && (
                 <>
@@ -433,21 +537,45 @@ const Attendance = () => {
                     <table className="min-w-full divide-y divide-border">
                       <thead>
                         <tr className="bg-muted/50">
-                          <th className="px-4 py-3 text-right text-sm font-medium">النادي</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">العضو</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">الوقت والتاريخ</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            RFID
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            النادي
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            العضو
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            الوقت والتاريخ
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border bg-background">
                         {paginatedEntryLogs.map((log) => (
-                          <tr key={log.id} className="hover:bg-gray-100 transition">
+                          <tr
+                            key={log.id}
+                            className="hover:bg-gray-100 transition"
+                          >
+                            <td className="px-4 py-3 text-sm">
+                              {log.rfid_code}
+                            </td>
                             <td className="px-4 py-3 text-sm">
                               {log.club_details?.name || "غير متاح"}
                             </td>
                             <td className="px-4 py-3 text-sm">
                               {log.member_name || "غير متاح"}
                             </td>
-                            <td className="px-4 py-3 text-sm">{log.timestamp}</td>
+                            <td className="px-4 py-3 text-sm">
+                              {new Intl.DateTimeFormat('en-US', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              }).format(new Date(log.timestamp))}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -472,7 +600,10 @@ const Attendance = () => {
       {/* Attendance Dialog */}
       {isAttendanceDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full relative" dir="rtl">
+          <div
+            className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full relative"
+            dir="rtl"
+          >
             <button
               onClick={() => {
                 setIsAttendanceDialogOpen(false);
@@ -483,7 +614,9 @@ const Attendance = () => {
             >
               ×
             </button>
-            <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">إضافة حضور</h3>
+            <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">
+              إضافة حضور
+            </h3>
             <form onSubmit={handleAddAttendance} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -502,12 +635,16 @@ const Attendance = () => {
               </div>
 
               {searchLoading && (
-                <div className="text-center text-sm text-gray-600">جاري البحث...</div>
+                <div className="text-center text-sm text-gray-600">
+                  جاري البحث...
+                </div>
               )}
 
               {foundSubscription && (
                 <div className="border-t pt-5 mt-5 space-y-4">
-                  <h4 className="font-semibold text-gray-700">بيانات الاشتراك:</h4>
+                  <h4 className="font-semibold text-gray-700">
+                    بيانات الاشتراك:
+                  </h4>
                   <div className="flex items-start gap-4">
                     {foundSubscription.member_details?.photo ? (
                       <img
@@ -528,7 +665,9 @@ const Attendance = () => {
                         #{foundSubscription.member_details?.membership_number}
                       </p>
                       <p className="text-sm text-red-500">
-                        <span className="font-medium text-gray-700">المبلغ المتبقي: </span>
+                        <span className="font-medium text-gray-700">
+                          المبلغ المتبقي:{" "}
+                        </span>
                         {foundSubscription.remaining_amount}
                       </p>
                     </div>
@@ -559,26 +698,34 @@ const Attendance = () => {
                     </p>
                     <p>
                       <span className="font-medium">RFID: </span>
-                      {foundSubscription.member_details?.rfid_code || "غير مسجل"}
+                      {foundSubscription.member_details?.rfid_code ||
+                        "غير مسجل"}
                     </p>
                     <p>
                       <span className="font-medium">تاريخ البدء: </span>
-                      {new Date(foundSubscription.start_date).toLocaleDateString("ar-EG")}
+                      {new Date(
+                        foundSubscription.start_date
+                      ).toLocaleDateString("ar-EG")}
                     </p>
                     <p>
                       <span className="font-medium">تاريخ الانتهاء: </span>
-                      {new Date(foundSubscription.end_date).toLocaleDateString("ar-EG")}
+                      {new Date(foundSubscription.end_date).toLocaleDateString(
+                        "ar-EG"
+                      )}
                     </p>
                     <p className="col-span-2">
                       <span className="font-medium">الإدخالات المتبقية: </span>
                       <span
                         className={`font-bold ${
-                          foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0
+                          foundSubscription.type_details.max_entries -
+                            foundSubscription.entry_count <=
+                          0
                             ? "text-red-600"
                             : "text-green-600"
                         }`}
                       >
-                        {foundSubscription.type_details.max_entries - foundSubscription.entry_count}
+                        {foundSubscription.type_details.max_entries -
+                          foundSubscription.entry_count}
                       </span>
                       <span className="text-xs text-gray-500">
                         / {foundSubscription.type_details.max_entries}
@@ -588,9 +735,15 @@ const Attendance = () => {
                 </div>
               )}
 
-              {newAttendance.identifier && !foundSubscription && !searchLoading && (
-                <p className="text-red-500 text-sm">لا يوجد اشتراك بهذا الرقم أو كود RFID</p>
-              )}
+              {!searchLoading &&
+                newAttendance.identifier &&
+                !foundSubscription && (
+                  <p className="text-red-500 text-sm">
+                    {newAttendance.identifier.match(/[a-zA-Z]/)
+                      ? "لا يوجد اشتراك مسجل بهذا الكود RFID"
+                      : "لا يوجد اشتراك مسجل بهذا الرقم"}
+                  </p>
+                )}
 
               <button
                 type="submit"

@@ -18,6 +18,7 @@ import {
 import { MoreVertical } from "lucide-react";
 import BASE_URL from "../../config/api";
 import { toast } from "react-hot-toast";
+import { useDebounce } from "@/hooks/useDebounce";
 
 const Tickets = () => {
   const dispatch = useDispatch();
@@ -43,10 +44,12 @@ const Tickets = () => {
   const [formError, setFormError] = useState(null);
 
   // Filters
-  const [filterClub, setFilterClub] = useState("");
   const [filterTicketType, setFilterTicketType] = useState("");
-  const [filterBuyerName, setFilterBuyerName] = useState("");
   const [filterUsedStatus, setFilterUsedStatus] = useState("");
+  const [filterBuyerName, setFilterBuyerName] = useState("");
+  const debouncedBuyerName = useDebounce(filterBuyerName, 500);
+  const [filterIssueDate, setFilterIssueDate] = useState("");
+  const debouncedIssueDate = useDebounce(filterIssueDate, 500);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,8 +71,6 @@ const Tickets = () => {
       .then((data) => {
         const club = { id: data.club.id, name: data.club.name };
         setUserClub(club);
-        setFilterClub(club.id.toString());
-        setFormData((prev) => ({ ...prev, club: club.id.toString() }));
         setLoadingProfile(false);
       })
       .catch((err) => {
@@ -81,14 +82,12 @@ const Tickets = () => {
   // Calculate total pages based on count from backend
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
-  // Load tickets with pagination
+  // Load tickets with pagination and filters
   useEffect(() => {
-    if (userClub && currentPage <= totalPages) {
+    if (userClub) {
       const params = {
         page: currentPage,
         page_size: itemsPerPage,
-        club: userClub?.id || "",
-        buyer_name: filterBuyerName,
         ticket_type: filterTicketType,
         used:
           filterUsedStatus === "used"
@@ -96,33 +95,20 @@ const Tickets = () => {
             : filterUsedStatus === "unused"
             ? "false"
             : "",
+        issue_date: debouncedIssueDate, // Use debounced value
+        buyer_name: debouncedBuyerName, // Use debounced value
       };
       dispatch(fetchTickets(params));
     }
-  }, [
-    dispatch,
-    currentPage,
-    itemsPerPage,
-    filterClub,
-    filterTicketType,
-    filterBuyerName,
-    filterUsedStatus,
-    userClub,
-    totalPages,
-  ]);
+  }, [currentPage, debouncedBuyerName, debouncedIssueDate, dispatch, filterTicketType, filterUsedStatus, itemsPerPage, userClub]);
 
-  // Reset currentPage when totalPages or totalItems changes
+  // Reset currentPage when filters change
   useEffect(() => {
-    if (totalItems === 0) {
-      setCurrentPage(1);
-    } else if (currentPage > totalPages && totalPages > 0) {
-      setCurrentPage(totalPages);
-    }
-  }, [totalPages, totalItems, currentPage]);
+    setCurrentPage(1);
+  }, [filterTicketType, filterUsedStatus, filterIssueDate]);
 
   // Add Ticket Form
   const [formData, setFormData] = useState({
-    club: "",
     buyer_name: "",
     ticket_type: "",
     price: "",
@@ -132,7 +118,7 @@ const Tickets = () => {
 
   // Generate page numbers (limited range)
   const getPageNumbers = () => {
-    const maxPagesToShow = 5; // Fixed syntax error
+    const maxPagesToShow = 5;
     const halfPages = Math.floor(maxPagesToShow / 2);
     let startPage = Math.max(1, currentPage - halfPages);
     let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
@@ -170,19 +156,13 @@ const Tickets = () => {
   const handleItemsPerPageChange = (e) => {
     const newItemsPerPage = parseInt(e.target.value);
     setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1); // Reset to first page
-  };
-
-  // Reset to first page when filters change
-  useEffect(() => {
     setCurrentPage(1);
-  }, [filterClub, filterTicketType, filterBuyerName, filterUsedStatus]);
+  };
 
   // Modal handlers
   const openCreateModal = () => {
     closeAllModals();
     setFormData({
-      club: userClub?.id?.toString() || "",
       buyer_name: "",
       ticket_type: "",
       price: "",
@@ -257,12 +237,13 @@ const Tickets = () => {
   const handleEditSave = () => {
     if (selectedTicket && userClub) {
       const updatedTicketData = {
-        club: Number(userClub.id),
         buyer_name: selectedTicket.buyer_name,
         ticket_type: selectedTicket.ticket_type,
         price: Number(selectedTicket.price),
         used: selectedTicket.used,
-        used_by: selectedTicket.used ? Number(selectedTicket.used_by) || null : null,
+        used_by: selectedTicket.used
+          ? Number(selectedTicket.used_by) || null
+          : null,
       };
 
       dispatch(
@@ -276,15 +257,9 @@ const Tickets = () => {
           const params = {
             page: currentPage,
             page_size: itemsPerPage,
-            club: userClub?.id || "",
-            buyer_name: filterBuyerName,
             ticket_type: filterTicketType,
-            used:
-              filterUsedStatus === "used"
-                ? "true"
-                : filterUsedStatus === "unused"
-                ? "false"
-                : "",
+            used: filterUsedStatus,
+            issue_date: filterIssueDate,
           };
           dispatch(fetchTickets(params));
           toast.success("تم تعديل التذكرة بنجاح!");
@@ -292,7 +267,9 @@ const Tickets = () => {
         })
         .catch((err) => {
           console.error("Failed to edit ticket:", err);
-          setFormError("فشل في تعديل التذكرة: " + (err.message || "خطأ غير معروف"));
+          setFormError(
+            "فشل في تعديل التذكرة: " + (err.message || "خطأ غير معروف")
+          );
         });
     }
   };
@@ -303,17 +280,11 @@ const Tickets = () => {
         .unwrap()
         .then(() => {
           const params = {
-            page: currentPage > totalPages ? totalPages : currentPage,
+            page: currentPage,
             page_size: itemsPerPage,
-            club: userClub?.id || "",
-            buyer_name: filterBuyerName,
             ticket_type: filterTicketType,
-            used:
-              filterUsedStatus === "used"
-                ? "true"
-                : filterUsedStatus === "unused"
-                ? "false"
-                : "",
+            used: filterUsedStatus,
+            issue_date: filterIssueDate,
           };
           dispatch(fetchTickets(params));
           toast.success("تم حذف التذكرة بنجاح!");
@@ -339,15 +310,9 @@ const Tickets = () => {
           const params = {
             page: currentPage,
             page_size: itemsPerPage,
-            club: userClub?.id || "",
-            buyer_name: filterBuyerName,
             ticket_type: filterTicketType,
-            used:
-              filterUsedStatus === "used"
-                ? "true"
-                : filterUsedStatus === "unused"
-                ? "false"
-                : "",
+            used: filterUsedStatus,
+            issue_date: filterIssueDate,
           };
           dispatch(fetchTickets(params));
           toast.success("تم تحديد التذكرة كمستخدمة بنجاح!");
@@ -368,7 +333,9 @@ const Tickets = () => {
         type === "checkbox"
           ? checked
           : name === "used_by" || name === "price"
-          ? value === "" ? "" : Number(value)
+          ? value === ""
+            ? ""
+            : Number(value)
           : value,
     }));
   };
@@ -381,7 +348,9 @@ const Tickets = () => {
         type === "checkbox"
           ? checked
           : name === "price" || name === "used_by"
-          ? value === "" ? "" : Number(value)
+          ? value === ""
+            ? ""
+            : Number(value)
           : value,
     }));
   };
@@ -395,7 +364,7 @@ const Tickets = () => {
     }
 
     const ticketData = {
-      club: Number(formData.club),
+      club: userClub.id,
       buyer_name: formData.buyer_name,
       ticket_type: formData.ticket_type,
       price: Number(formData.price),
@@ -407,17 +376,11 @@ const Tickets = () => {
       .unwrap()
       .then(() => {
         const params = {
-          page: 1, // Reset to first page after adding
+          page: 1,
           page_size: itemsPerPage,
-          club: userClub?.id || "",
-          buyer_name: filterBuyerName,
           ticket_type: filterTicketType,
-          used:
-            filterUsedStatus === "used"
-              ? "true"
-              : filterUsedStatus === "unused"
-              ? "false"
-              : "",
+          used: filterUsedStatus,
+          issue_date: filterIssueDate,
         };
         dispatch(fetchTickets(params));
         toast.success("تم إضافة التذكرة بنجاح!");
@@ -425,7 +388,9 @@ const Tickets = () => {
       })
       .catch((err) => {
         console.error("Failed to create ticket:", err);
-        setFormError("فشل في إضافة التذكرة: " + (err.message || "خطأ غير معروف"));
+        setFormError(
+          "فشل في إضافة التذكرة: " + (err.message || "خطأ غير معروف")
+        );
         toast.error("فشل في إضافة التذكرة");
       });
   };
@@ -464,27 +429,12 @@ const Tickets = () => {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">النادي</label>
-          <select
-            className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-            value={filterClub}
-            onChange={(e) => setFilterClub(e.target.value)}
-            disabled
-          >
-            {userClub ? (
-              <option value={userClub.id}>{userClub.name}</option>
-            ) : (
-              <option value="">جاري التحميل...</option>
-            )}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">رقم التذكرة</label>
+          <label className="block text-sm font-medium mb-1">اسم المشتري</label>
           <input
             type="text"
-            placeholder="بحث عن رقم التذكرة"
+            placeholder="ابحث باسم المشتري"
             className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
             value={filterBuyerName}
             onChange={(e) => setFilterBuyerName(e.target.value)}
@@ -514,6 +464,17 @@ const Tickets = () => {
             <option value="unused">متاحة</option>
           </select>
         </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            تاريخ الإصدار
+          </label>
+          <input
+            type="date"
+            className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+            value={filterIssueDate}
+            onChange={(e) => setFilterIssueDate(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* Tickets Table */}
@@ -525,10 +486,10 @@ const Tickets = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="py-2 px-4 border-b text-center text-sm font-medium text-gray-700">
-                    اسم النادي
+                    اسم المشتري
                   </th>
                   <th className="py-2 px-4 border-b text-center text-sm font-medium text-gray-700">
-                    رقم التذكرة
+                    تاريخ الإصدار
                   </th>
                   <th className="py-2 px-4 border-b text-center text-sm font-medium text-gray-700">
                     نوع التذكرة
@@ -548,15 +509,17 @@ const Tickets = () => {
                 {tickets.map((ticket) => (
                   <tr key={ticket.id} className="hover:bg-gray-50">
                     <td className="py-2 px-4 border-b text-center text-sm">
-                      {ticket.club_name}
-                    </td>
-                    <td className="py-2 px-4 border-b text-center text-sm">
                       {ticket.buyer_name}
                     </td>
                     <td className="py-2 px-4 border-b text-center text-sm">
-                      <p className="text-sm">
-   {ticket.ticket_type_display === "Session" ? "جلسة" : ticket.ticket_type_display === "Day Pass" ? "تصريح يومي" : ticket.ticket_type_display}
-</p>
+                      {ticket.issue_date}
+                    </td>
+                    <td className="py-2 px-4 border-b text-center text-sm">
+                      {ticket.ticket_type_display === "Session"
+                        ? "جلسة"
+                        : ticket.ticket_type_display === "Day Pass"
+                        ? "تصريح يومي"
+                        : ticket.ticket_type_display}
                     </td>
                     <td className="py-2 px-4 border-b text-center text-sm">
                       {ticket.price} جنيه
@@ -667,11 +630,13 @@ const Tickets = () => {
                     </DropdownMenu>
                   </div>
                   <p className="text-sm">
-                    <strong>النادي:</strong> {ticket.club_name}
+                    <strong>نوع التذكرة:</strong>{" "}
+                    {ticket.ticket_type_display === "Session"
+                      ? "جلسة"
+                      : ticket.ticket_type_display === "Day Pass"
+                      ? "تصريح يومي"
+                      : ticket.ticket_type_display}
                   </p>
-                 <p className="text-sm">
-  <strong>نوع التذكرة:</strong> {ticket.ticket_type_display === "Session" ? "جلسة" : ticket.ticket_type_display === "Day Pass" ? "تصريح يومي" : ticket.ticket_type_display}
-</p>
                   <p className="text-sm">
                     <strong>السعر:</strong> {ticket.price} جنيه
                   </p>
@@ -709,7 +674,7 @@ const Tickets = () => {
         {totalItems > 0 && (
           <>
             <div className="text-sm text-gray-700">
-              عرض {((currentPage - 1) * itemsPerPage) + 1}–
+              عرض {(currentPage - 1) * itemsPerPage + 1}–
               {Math.min(currentPage * itemsPerPage, totalItems)} من {totalItems}{" "}
               تذكرة
             </div>
@@ -834,26 +799,7 @@ const Tickets = () => {
               <form onSubmit={handleCreateSubmit} className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1 text-right">
-                    النادي
-                  </label>
-                  <select
-                    name="club"
-                    value={formData.club}
-                    onChange={handleFormChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    required
-                    disabled
-                  >
-                    {userClub ? (
-                      <option value={userClub.id}>{userClub.name}</option>
-                    ) : (
-                      <option value="">جاري التحميل...</option>
-                    )}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-right">
-                    رقم التذكرة
+                    اسم المشتري
                   </label>
                   <input
                     type="text"
@@ -861,7 +807,7 @@ const Tickets = () => {
                     value={formData.buyer_name}
                     onChange={handleFormChange}
                     className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    placeholder="رقم التذكرة"
+                    placeholder="اسم المشتري"
                     required
                   />
                 </div>
@@ -973,25 +919,7 @@ const Tickets = () => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium mb-1 text-right">
-                    النادي
-                  </label>
-                  <select
-                    name="club"
-                    value={userClub?.id || ""}
-                    onChange={handleInputChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    disabled
-                  >
-                    {userClub ? (
-                      <option value={userClub.id}>{userClub.name}</option>
-                    ) : (
-                      <option value="">جاري التحميل...</option>
-                    )}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-right">
-                    رقم التذكرة
+                    اسم المشتري
                   </label>
                   <input
                     type="text"
@@ -1200,16 +1128,14 @@ const Tickets = () => {
             </div>
             <div className="p-4 sm:p-6">
               <p className="text-sm sm:text-base mb-2">
-                <strong>رقم التذكرة:</strong> {selectedTicket.buyer_name}
+                <strong>اسم المشتري:</strong> {selectedTicket.buyer_name}
               </p>
               <p className="text-sm sm:text-base mb-2">
                 <strong>السعر:</strong> {selectedTicket.price} جنيه
               </p>
               <p className="text-sm sm:text-base mb-2">
-                <strong>النادي:</strong> {selectedTicket.club_name}
-              </p>
-              <p className="text-sm sm:text-base mb-2">
-                <strong>نوع التذكرة:</strong> {selectedTicket.ticket_type_display}
+                <strong>نوع التذكرة:</strong>{" "}
+                {selectedTicket.ticket_type_display}
               </p>
               <p className="text-sm sm:text-base mb-2">
                 <strong>الحالة:</strong>{" "}
