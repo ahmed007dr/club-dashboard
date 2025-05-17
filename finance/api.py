@@ -38,9 +38,9 @@ def expense_category_api(request):
         serializer = ExpenseCategorySerializer(data=request.data)
         if serializer.is_valid():
             category = serializer.save()
-            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, category):
-                category.delete()
-                return Response({'error': 'You do not have permission to create an expense category for this club'}, status=status.HTTP_403_FORBIDDEN)
+            # if not IsOwnerOrRelatedToClub().has_object_permission(request, None, category):
+            #     category.delete()
+            #     return Response({'error': 'You do not have permission to create an expense category for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -71,8 +71,8 @@ def expense_api(request):
         club_id = data.get('club')
         if club_id:
             club = get_object_or_404(Club, id=club_id)
-            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
-                return Response({'error': 'You do not have permission to create an expense for this club'}, status=status.HTTP_403_FORBIDDEN)
+            # if not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
+            #     return Response({'error': 'You do not have permission to create an expense for this club'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = ExpenseSerializer(data=data, context={'request': request})
         if serializer.is_valid():
@@ -99,9 +99,9 @@ def income_source_api(request):
         serializer = IncomeSourceSerializer(data=request.data)
         if serializer.is_valid():
             source = serializer.save()
-            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, source):
-                source.delete()
-                return Response({'error': 'You do not have permission to create an income source for this club'}, status=status.HTTP_403_FORBIDDEN)
+            # if not IsOwnerOrRelatedToClub().has_object_permission(request, None, source):
+            #     source.delete()
+            #     return Response({'error': 'You do not have permission to create an income source for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -132,8 +132,8 @@ def income_api(request):
         club_id = data.get('club')
         if club_id:
             club = get_object_or_404(Club, id=club_id)
-            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
-                return Response({'error': 'You do not have permission to create an income for this club'}, status=status.HTTP_403_FORBIDDEN)
+            # if not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
+            #     return Response({'error': 'You do not have permission to create an income for this club'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = IncomeSerializer(data=data)
         if serializer.is_valid():
