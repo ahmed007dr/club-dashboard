@@ -6,6 +6,7 @@ from members.serializers import MemberSerializer
 from django.utils import timezone
 from django.db import models
 
+
 class SubscriptionTypeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
 
@@ -20,12 +21,8 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
             'club': {'required': True}
         }
 
-    def validate_club(self, value):
-        request = self.context.get('request')
-        if request and not IsOwnerOrRelatedToClub().has_object_permission(request, None, value):
-            raise serializers.ValidationError("You do not have permission to create a subscription type for this club.")
-        return value
-    
+
+
 
 class SubscriptionSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
@@ -54,10 +51,10 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         if club and subscription_type and subscription_type.club != club:
             raise serializers.ValidationError("The subscription type must belong to the same club as the subscription.")
 
-        # Validate user permission for the club
-        request = self.context.get('request')
-        if request and club and not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
-            raise serializers.ValidationError("You do not have permission to create a subscription for this club.")
+        # # Validate user permission for the club
+        # request = self.context.get('request')
+        # if request and club and not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
+        #     raise serializers.ValidationError("You do not have permission to create a subscription for this club.")
 
         # Validate start_date
         if start_date and start_date < timezone.now().date():
