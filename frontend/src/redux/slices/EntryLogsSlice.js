@@ -1,12 +1,13 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import BASE_URL from '../../config/api';
 
+
 // Async thunk for fetching entry logs
 export const fetchEntryLogs = createAsyncThunk(
   'entryLogs/fetchEntryLogs',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
+      const token = localStorage.getItem('token');
       const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/`, {
         method: 'GET',
         headers: {
@@ -21,10 +22,7 @@ export const fetchEntryLogs = createAsyncThunk(
       }
 
       const data = await response.json();
-
-      // ✅ Log fetched data after successful response
       console.log('Fetched entry logs:', data);
-
       return data;
     } catch (error) {
       return rejectWithValue(error.message);
@@ -59,12 +57,17 @@ export const addEntryLog = createAsyncThunk(
 );
 
 // Slice definition
+
+// Slice definition
 const entryLogsSlice = createSlice({
   name: 'entryLogs',
   initialState: {
-    entryLogs: [],
+    items: [],  // Changed from entryLogs to items for consistency
     loading: false,
     error: null,
+    count: 0,
+    next: null,
+    previous: null
   },
   reducers: {},
   extraReducers: (builder) => {
@@ -76,7 +79,10 @@ const entryLogsSlice = createSlice({
       })
       .addCase(fetchEntryLogs.fulfilled, (state, action) => {
         state.loading = false;
-        state.entryLogs = action.payload;
+        state.items = action.payload.results; // Store just the results
+        state.count = action.payload.count;
+        state.next = action.payload.next;
+        state.previous = action.payload.previous;
       })
       .addCase(fetchEntryLogs.rejected, (state, action) => {
         state.loading = false;
@@ -89,7 +95,8 @@ const entryLogsSlice = createSlice({
       })
       .addCase(addEntryLog.fulfilled, (state, action) => {
         state.loading = false;
-        state.entryLogs.push(action.payload); // Optimistic update
+        state.items.unshift(action.payload); // Add new log at beginning
+        state.count += 1;
       })
       .addCase(addEntryLog.rejected, (state, action) => {
         state.loading = false;

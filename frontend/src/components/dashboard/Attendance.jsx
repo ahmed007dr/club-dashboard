@@ -33,7 +33,7 @@ const Attendance = () => {
   // Redux state
   const { attendances, loading: attendanceLoading, error: attendanceError } = useSelector((state) => state.attendance);
   const { subscriptions } = useSelector((state) => state.subscriptions);
-  const { items: entryLogs, loading: entryLogsLoading, error: entryLogsError } = useSelector((state) => state.entryLogs);
+ const { items: entryLogs, loading: entryLogsLoading, error: entryLogsError } = useSelector((state) => state.entryLogs);
 
   // State variables
   const [foundSubscription, setFoundSubscription] = useState(null);
@@ -78,14 +78,14 @@ const Attendance = () => {
     })
     .sort((a, b) => b.id - a.id);
 
-  const filteredEntryLogs = entryLogs?.results ? entryLogs.results
-    .filter(log => {
-      return (
-        (log.club_details?.name?.toLowerCase().includes(entryLogFilters.club.toLowerCase()) || !entryLogFilters.club) &&
-        (log.member_details?.name?.toLowerCase().includes(entryLogFilters.member.toLowerCase()) || !entryLogFilters.member) &&
-        log.timestamp.includes(entryLogFilters.timestamp))
-    })
-    .sort((a, b) => b.id - a.id) : [];
+ const filteredEntryLogs = entryLogs
+  .filter(log => {
+    return (
+      (log.club_details?.name?.toLowerCase().includes(entryLogFilters.club.toLowerCase()) || !entryLogFilters.club) &&
+      (log.member_details?.name?.toLowerCase().includes(entryLogFilters.member.toLowerCase()) || !entryLogFilters.member) &&
+      log.timestamp.includes(entryLogFilters.timestamp))
+  })
+  .sort((a, b) => b.id - a.id);
 
   // Pagination calculations
   const totalAttendancePages = Math.ceil(filteredAttendances.length / attendanceItemsPerPage);

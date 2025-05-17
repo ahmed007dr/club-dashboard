@@ -554,7 +554,9 @@ const Tickets = () => {
                       {ticket.buyer_name}
                     </td>
                     <td className="py-2 px-4 border-b text-center text-sm">
-                      {ticket.ticket_type_display}
+                      <p className="text-sm">
+   {ticket.ticket_type_display === "Session" ? "جلسة" : ticket.ticket_type_display === "Day Pass" ? "تصريح يومي" : ticket.ticket_type_display}
+</p>
                     </td>
                     <td className="py-2 px-4 border-b text-center text-sm">
                       {ticket.price} جنيه
@@ -667,9 +669,9 @@ const Tickets = () => {
                   <p className="text-sm">
                     <strong>النادي:</strong> {ticket.club_name}
                   </p>
-                  <p className="text-sm">
-                    <strong>نوع التذكرة:</strong> {ticket.ticket_type_display}
-                  </p>
+                 <p className="text-sm">
+  <strong>نوع التذكرة:</strong> {ticket.ticket_type_display === "Session" ? "جلسة" : ticket.ticket_type_display === "Day Pass" ? "تصريح يومي" : ticket.ticket_type_display}
+</p>
                   <p className="text-sm">
                     <strong>السعر:</strong> {ticket.price} جنيه
                   </p>

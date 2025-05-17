@@ -357,13 +357,16 @@ export const fetchExpiredSubscriptions = createAsyncThunk(
 
 export const fetchMemberSubscriptions = createAsyncThunk(
   "subscriptions/fetchMemberSubscriptions",
-  async (memberId, { rejectWithValue }) => {
+  async ({ memberId, page = 1 }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
         `${BASE_URL}/subscriptions/api/subscriptions/member/`,
         {
-          params: { member_id: memberId },
+          params: { 
+            member_id: memberId,
+            page: page
+          },
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -376,7 +379,6 @@ export const fetchMemberSubscriptions = createAsyncThunk(
     }
   }
 );
-
 export const fetchSubscriptionStats = createAsyncThunk(
   "subscriptions/fetchSubscriptionStats",
   async (_, { rejectWithValue }) => {
@@ -904,18 +906,21 @@ const subscriptionsSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchMemberSubscriptions.fulfilled, (state, action) => {
-        state.loading = false;
-        state.memberSubscriptions = action.payload.results|| [];
-      })
-      .addCase(fetchMemberSubscriptions.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-      .addCase(addAttendance.fulfilled, (state, action) => {
-        state.loading = false;
-        state.attendances.push(action.payload);
-      });
+   .addCase(fetchMemberSubscriptions.fulfilled, (state, action) => {
+    state.loading = false;
+    state.memberSubscriptions = action.payload || [];
+})
+.addCase(fetchMemberSubscriptions.rejected, (state, action) => {
+  state.loading = false;
+  // Ensure error is a string
+  state.error = typeof action.payload === 'object' 
+    ? action.payload.message || 'An error occurred' 
+    : action.payload;
+})
+.addCase(addAttendance.fulfilled, (state, action) => {
+    state.loading = false;
+    state.attendances.push(action.payload);
+});
   },
 });
 

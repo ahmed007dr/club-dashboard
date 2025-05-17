@@ -88,7 +88,7 @@ export const getStaffById = createAsyncThunk('staff/getStaffById', async (id) =>
     console.log("Fetching staff data for ID:", id); // Debugging line
 
     try {
-        const res = await fetch(`${BASE_URL}/staff/api/shifts/staff/${id}/`, {
+        const res = await fetch(`${BASE_URL}/staff/api/staff/${id}/shifts`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,

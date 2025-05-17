@@ -53,9 +53,7 @@ const Income = () => {
   });
   const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
   const [userClub, setUserClub] = useState(null);
-  const [sortOrder, setSortOrder] = useState("desc"); // "desc" for newest first, "asc" for oldest first
-
-  // Filter states
+  const [sortOrder, setSortOrder] = useState("desc");
   const [incomeFilters, setIncomeFilters] = useState({
     source: "",
     amountMin: "",
@@ -65,13 +63,13 @@ const Income = () => {
     received_by: "",
     club: "",
   });
-
-  // Pagination states
   const [incomePage, setIncomePage] = useState(1);
   const [incomeSourcesPage, setIncomeSourcesPage] = useState(1);
-  const maxButtons = 5; // Maximum number of page buttons to display
+  const maxButtons = 5;
 
-  const { incomes, incomeSources, loading, error } = useSelector((state) => state.finance);
+  const { incomes, incomeSources, loading, error, incomesPagination } = useSelector(
+    (state) => state.finance
+  );
 
   useEffect(() => {
     fetch(`${BASE_URL}/accounts/api/profile/`, {
@@ -94,17 +92,18 @@ const Income = () => {
       });
   }, []);
 
-  // Fetch data on page change or component mount
   useEffect(() => {
-    dispatch(fetchIncomes());
-  }, [dispatch]);
+    dispatch(fetchIncomes({ page: incomePage }));
+    dispatch(fetchIncomeSources());
+  }, [dispatch, incomePage]);
+
   const filteredIncomes = useMemo(() => {
+    const incomeArray = Array.isArray(incomes) ? incomes : [];
     if (!Array.isArray(incomes)) {
       console.warn("Expected incomes to be an array but got:", incomes);
-      return [];
     }
-  
-    return incomes
+
+    return incomeArray
       .filter((income) => {
         return (
           income.club_details?.id === userClub?.id &&
@@ -134,19 +133,16 @@ const Income = () => {
         return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
       });
   }, [incomes, incomeFilters, userClub, sortOrder]);
-  
-  // Pagination calculations
-  const incomePageCount = Math.ceil(incomes.count / 20); // 20 items per page
-  const incomeSourcePageCount = Math.ceil(incomeSources.count / 20);
 
-  // Generate page buttons (max 5)
+  const incomePageCount = Math.ceil(incomesPagination.count / 20);
+  const incomeSourcePageCount = Math.ceil(incomeSources.length / 20);
+
   const getPageButtons = (currentPage, totalPages) => {
     const buttons = [];
     const half = Math.floor(maxButtons / 2);
     let startPage = Math.max(1, currentPage - half);
     let endPage = Math.min(totalPages, startPage + maxButtons - 1);
 
-    // Adjust startPage if endPage is at the max
     if (endPage - startPage + 1 < maxButtons) {
       startPage = Math.max(1, endPage - maxButtons + 1);
     }
@@ -258,7 +254,7 @@ const Income = () => {
   const handleIncomeFilterChange = (e) => {
     const { name, value } = e.target;
     setIncomeFilters((prev) => ({ ...prev, [name]: value }));
-    setIncomePage(1); // Reset to first page on filter change
+    setIncomePage(1);
   };
 
   const PaginationControls = ({ currentPage, setPage, pageCount }) => (
@@ -301,7 +297,6 @@ const Income = () => {
           <TabsTrigger value="incomes">الايرادات</TabsTrigger>
         </TabsList>
 
-        {/* Revenue Sources Tab */}
         <TabsContent value="sources" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -321,7 +316,6 @@ const Income = () => {
           </Card>
         </TabsContent>
 
-        {/* Incomes Tab */}
         <TabsContent value="incomes" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -331,7 +325,6 @@ const Income = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Sort Toggle Button */}
               <div className="flex justify-end">
                 <Button
                   onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
@@ -341,7 +334,6 @@ const Income = () => {
                 </Button>
               </div>
 
-              {/* Filters */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 {["club", "source", "amountMin", "amountMax", "dateFrom", "dateTo", "received_by"].map(
                   (field) => (
@@ -479,7 +471,6 @@ const Income = () => {
                 setPage={setIncomePage}
                 pageCount={incomePageCount}
               />
-              {/* Compute Total Button */}
               <div className="flex justify-end mt-4">
                 <Button
                   onClick={() =>
@@ -497,7 +488,6 @@ const Income = () => {
                 </Button>
               </div>
 
-              {/* Total Info Display */}
               {totalInfo.count > 0 && (
                 <div className="mt-4 bg-gray-50 border rounded-md p-4 text-right space-y-1">
                   <p className="text-sm font-semibold text-gray-700">
@@ -513,7 +503,6 @@ const Income = () => {
         </TabsContent>
       </Tabs>
 
-      {/* Modal for adding/editing income */}
       {showModal && (
         <div
           className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50"
@@ -527,7 +516,6 @@ const Income = () => {
               {currentItem ? "تعديل دخل" : "إضافة دخل"}
             </h3>
             <div className="grid grid-cols-1 gap-4">
-              {/* Club Field */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-right">
                   النادي
@@ -547,7 +535,6 @@ const Income = () => {
                 </select>
               </div>
 
-              {/* Source Field */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-right">
                   مصدر الدخل
@@ -560,7 +547,7 @@ const Income = () => {
                   required
                 >
                   <option value="">اختر مصدر الدخل</option>
-                  {incomeSources.results.map((source) => (
+                  {incomeSources.map((source) => (
                     <option key={source.id} value={source.id}>
                       {source.name}
                     </option>
@@ -568,7 +555,6 @@ const Income = () => {
                 </select>
               </div>
 
-              {/* Amount Field */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-right">
                   المبلغ
@@ -584,7 +570,6 @@ const Income = () => {
                 />
               </div>
 
-              {/* Description Field */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-right">
                   الوصف
@@ -598,7 +583,6 @@ const Income = () => {
                 />
               </div>
 
-              {/* Date Field */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-right">
                   التاريخ
@@ -616,7 +600,6 @@ const Income = () => {
                 />
               </div>
 
-              {/* Received By Field */}
               <div>
                 <label className="block text-sm font-medium mb-1 text-right">
                   المستلم
@@ -649,7 +632,6 @@ const Income = () => {
         </div>
       )}
 
-      {/* Delete confirmation modal */}
       {confirmDeleteModal && (
         <div
           className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50"

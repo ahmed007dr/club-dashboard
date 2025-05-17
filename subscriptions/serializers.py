@@ -22,7 +22,11 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
         }
 
 
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 037ff06 (update)
 
 class SubscriptionSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)

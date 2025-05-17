@@ -6,27 +6,24 @@ import BASE_URL from '../../config/api';
 // Fetch all invites with pagination
 export const fetchFreeInvites = createAsyncThunk(
   'invites/fetchFreeInvites',
-  async (params = {}, ) => {
+  async (params = {}) => {
     const token = localStorage.getItem('token');
-      const response = await axios.get(
-        `${BASE_URL}/invites/api/free-invites/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          params: {
-            page: params.page,
-            page_size: params.page_size,
-            // Add any other filter params here
-            used: params.used,
-            // ... other filters
-          },
-        }
-      );
-      return response.data.results; // Assuming the API returns an array or object
-  } 
+    const response = await axios.get(
+      `${BASE_URL}/invites/api/free-invites/`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        params: {
+          page: params.page,
+          page_size: params.page_size,
+          used: params.used,
+        },
+      }
+    );
+    return response.data; // Return the full response, not just .results
+  }
 );
-
 
 // Add new invite
 export const addInvite = createAsyncThunk(
@@ -163,15 +160,26 @@ const invitesSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchFreeInvites.fulfilled, (state, action) => {
-        state.loading = false;
-        state.invites = {
-          results: action.payload.results,
-          count: action.payload.count,
-          next: action.payload.next,
-          previous: action.payload.previous
-        };
-      })
+    .addCase(fetchFreeInvites.fulfilled, (state, action) => {
+  state.loading = false;
+  // Ensure we have a valid payload with results array
+  if (action.payload && Array.isArray(action.payload.results)) {
+    state.invites = {
+      results: action.payload.results,
+      count: action.payload.count || 0,
+      next: action.payload.next || null,
+      previous: action.payload.previous || null,
+    };
+  } else {
+    // Fallback to empty state if payload is invalid
+    state.invites = {
+      results: [],
+      count: 0,
+      next: null,
+      previous: null,
+    };
+  }
+})
       .addCase(fetchFreeInvites.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
@@ -182,17 +190,27 @@ const invitesSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(addInvite.fulfilled, (state, action) => {
-        state.loading = false;
-        // Add new invite to beginning of results
-        console.log(state.invites);
-        state.invites.results = [
-          action.payload.club_details,
-          ...state.invites.results,
-        ];
-        // Increment total count
-        state.invites.count += 1;
-      })
+.addCase(addInvite.fulfilled, (state, action) => {
+  state.loading = false;
+  
+  // Ensure state.invites exists
+  if (!state.invites) {
+    state.invites = {
+      results: [],
+      count: 0,
+      next: null,
+      previous: null,
+    };
+  }
+
+  // Ensure results is an array
+  if (!Array.isArray(state.invites.results)) {
+    state.invites.results = [];
+  }
+
+  // Add the new invite
+  state.invites.results.unshift(action.payload);
+})
       .addCase(addInvite.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;

@@ -26,12 +26,11 @@ export const fetchExpenseCategories = createAsyncThunk(
   }
 );
 
-
 export const addExpenseCategory = createAsyncThunk(
   'finance/addExpenseCategory',
   async (newCategory, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
+      const token = localStorage.getItem('token');
       const response = await fetch(`${BASE_URL}/finance/api/expense-categories/`, {
         method: 'POST',
         headers: {
@@ -68,7 +67,7 @@ export const fetchExpenses = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch expenses.');
       }
-      return await response.json(); // Expect paginated response: { results, count, next, previous }
+      return await response.json();
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -84,9 +83,8 @@ export const addExpense = createAsyncThunk(
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
-          // Do not set Content-Type; browser sets multipart/form-data automatically
         },
-        body: newExpense, // Send FormData directly
+        body: newExpense,
       });
 
       if (!response.ok) {
@@ -105,14 +103,13 @@ export const updateExpense = createAsyncThunk(
   'finance/updateExpense',
   async ({ id, updatedData }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
+      const token = localStorage.getItem('token');
       const response = await fetch(`${BASE_URL}/finance/api/expenses/${id}/`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
-          
         },
-        body:updatedData,
+        body: updatedData,
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -129,7 +126,7 @@ export const deleteExpense = createAsyncThunk(
   'finance/deleteExpense',
   async (id, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
+      const token = localStorage.getItem('token');
       const response = await fetch(`${BASE_URL}/finance/api/expenses/${id}/`, {
         method: 'DELETE',
         headers: {
@@ -141,7 +138,7 @@ export const deleteExpense = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to delete expense.');
       }
-      return id; // Return the ID of the deleted expense
+      return id;
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -153,7 +150,7 @@ export const fetchIncomeSources = createAsyncThunk(
   'finance/fetchIncomeSources',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
+      const token = localStorage.getItem('token');
       const response = await fetch(`${BASE_URL}/finance/api/income-sources/`, {
         method: 'GET',
         headers: {
@@ -165,7 +162,7 @@ export const fetchIncomeSources = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch income sources.');
       }
-      return await response.json().then((data) => (data.results));
+      return await response.json();
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -173,37 +170,26 @@ export const fetchIncomeSources = createAsyncThunk(
 );
 
 export const addIncomeSource = createAsyncThunk(
-  'finance/addIncomeSource',
+  'finance/add SpitIncomeSource',
   async (newSource, { rejectWithValue }) => {
     try {
-      console.log('Attempting to add income source with data:', newSource);
-      
       const token = localStorage.getItem('token');
-      console.log('Retrieved token from localStorage:', token ? 'exists' : 'missing');
-      
       const response = await fetch(`${BASE_URL}/finance/api/income-sources/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json', // Make sure to include this if sending JSON
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newSource), // Make sure to stringify if sending JSON
+        body: JSON.stringify(newSource),
       });
 
-      console.log('Response status:', response.status);
-      
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Error response from server:', errorData);
         return rejectWithValue(errorData.message || 'Failed to add income source.');
       }
       
-      const responseData = await response.json();
-      console.log('Successfully added income source:', responseData);
-      return responseData;
-      
+      return await response.json();
     } catch (error) {
-      console.error('Caught an error:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -214,21 +200,26 @@ export const fetchIncomes = createAsyncThunk(
   'finance/fetchIncomes',
   async ({ page = 1 }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`${BASE_URL}/finance/api/incomes/?page=${page}`, {
-        method: 'GET',
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No token found');
+
+      const url = `${BASE_URL}/finance/api/incomes/?page=${page}`;
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
+
       if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to fetch incomes.');
+        const errorData = await response.json().catch(() => ({}));
+        return rejectWithValue(errorData.message || `HTTP error! status: ${response.status}`);
       }
-      return await response.json().then((data) => (data.results));
+
+      const data = await response.json();
+      return data; // Expect { results, count, next, previous }
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch incomes.');
+      return rejectWithValue(error.message || 'Failed to fetch incomes');
     }
   }
 );
@@ -237,11 +228,7 @@ export const addIncome = createAsyncThunk(
   'finance/addIncome',
   async (newIncome, { rejectWithValue }) => {
     try {
-      console.log('Starting income submission with data:', newIncome);
-      
       const token = localStorage.getItem('token');
-      console.log('Retrieved auth token:', token ? 'exists' : 'missing');
-      
       const response = await fetch(`${BASE_URL}/finance/api/incomes/`, {
         method: 'POST',
         headers: {
@@ -251,26 +238,13 @@ export const addIncome = createAsyncThunk(
         body: JSON.stringify(newIncome),
       });
 
-      console.log('Received response with status:', response.status);
-      
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Server responded with error:', {
-          status: response.status,
-          error: errorData
-        });
         return rejectWithValue(errorData.message || 'Failed to add income.');
       }
-      
-      const responseData = await response.json();
-      console.log('Income successfully recorded:', responseData);
-      return responseData;
-      
+
+      return await response.json();
     } catch (error) {
-      console.error('Error occurred during income submission:', {
-        error: error.message,
-        stack: error.stack
-      });
       return rejectWithValue(error.message);
     }
   }
@@ -280,7 +254,7 @@ export const updateIncome = createAsyncThunk(
   'finance/updateIncome',
   async ({ id, updatedData }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
+      const token = localStorage.getItem('token');
       const response = await fetch(`${BASE_URL}/finance/api/incomes/${id}/`, {
         method: 'PUT',
         headers: {
@@ -304,7 +278,7 @@ export const deleteIncome = createAsyncThunk(
   'finance/deleteIncome',
   async (id, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
+      const token = localStorage.getItem('token');
       const response = await fetch(`${BASE_URL}/finance/api/incomes/${id}/`, {
         method: 'DELETE',
         headers: {
@@ -316,7 +290,7 @@ export const deleteIncome = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to delete income.');
       }
-      return id; // Return the ID of the deleted income
+      return id;
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -327,33 +301,24 @@ export const deleteIncome = createAsyncThunk(
 const financeSlice = createSlice({
   name: 'finance',
   initialState: {
-    expenseCategories: [], // Just store the current page's categories
-    expenseCategoriesPagination: { // Store pagination info from API
-      count: 0,
-      next: null,
-      previous: null,
-    },
+    expenseCategories: [],
+    expenseCategoriesPagination: { count: 0, next: null, previous: null },
     expenses: [],
     expensesPagination: { count: 0, next: null, previous: null },
     incomeSources: [],
     incomes: [],
-    incomesPagination: { 
-      count: 0,
-      next: null,
-      previous: null,
-    },
+    incomesPagination: { count: 0, next: null, previous: null },
     loading: false,
     error: null,
   },
   reducers: {},
   extraReducers: (builder) => {
- 
     // Fetch Expense Categories
     builder.addCase(fetchExpenseCategories.pending, (state) => {
       state.loading = true;
       state.error = null;
     });
-  builder.addCase(fetchExpenseCategories.fulfilled, (state, action) => {
+    builder.addCase(fetchExpenseCategories.fulfilled, (state, action) => {
       state.loading = false;
       state.expenseCategories = action.payload.results;
       state.expenseCategoriesPagination = {
@@ -362,7 +327,6 @@ const financeSlice = createSlice({
         previous: action.payload.previous,
       };
     });
-
     builder.addCase(fetchExpenseCategories.rejected, (state, action) => {
       state.loading = false;
       state.error = action.payload;
@@ -387,7 +351,7 @@ const financeSlice = createSlice({
       state.loading = true;
       state.error = null;
     });
-   builder.addCase(fetchExpenses.fulfilled, (state, action) => {
+    builder.addCase(fetchExpenses.fulfilled, (state, action) => {
       state.loading = false;
       state.expenses = action.payload.results;
       state.expensesPagination = {
@@ -454,7 +418,7 @@ const financeSlice = createSlice({
     });
     builder.addCase(fetchIncomeSources.fulfilled, (state, action) => {
       state.loading = false;
-      state.incomeSources = action.payload;
+      state.incomeSources = action.payload.results || action.payload;
     });
     builder.addCase(fetchIncomeSources.rejected, (state, action) => {
       state.loading = false;
@@ -476,23 +440,23 @@ const financeSlice = createSlice({
     });
 
     // Fetch Incomes
-     builder.addCase(fetchIncomes.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-       builder.addCase(fetchIncomes.fulfilled, (state, action) => {
-        state.loading = false;
-        state.incomes = {
-          count: action.payload.count || 0,
-          results: action.payload.results || [],
-          next: action.payload.next || null,
-          previous: action.payload.previous || null,
-        };
-      })
-       builder.addCase(fetchIncomes.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload || "An unknown error occurred";
-      })
+    builder.addCase(fetchIncomes.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchIncomes.fulfilled, (state, action) => {
+      state.loading = false;
+      state.incomes = action.payload.results || action.payload;
+      state.incomesPagination = {
+        count: action.payload.count || 0,
+        next: action.payload.next || null,
+        previous: action.payload.previous || null,
+      };
+    });
+    builder.addCase(fetchIncomes.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload || 'An unknown error occurred';
+    });
 
     // Add Income
     builder.addCase(addIncome.pending, (state) => {
