@@ -13,20 +13,31 @@ from django.forms.models import model_to_dict
 from finance.models import Income,IncomeSource
 from rest_framework.pagination import PageNumberPagination
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def ticket_list_api(request):
     if request.user.role == 'owner':
-        tickets = Ticket.objects.select_related('club', 'used_by').all().order_by('id')
+        tickets = Ticket.objects.select_related('club', 'used_by').all()
     else:
-        tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club).order_by('id')
+        tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club)
+
+    ticket_type = request.query_params.get('ticket_type')
+    used = request.query_params.get('used')
+    issue_date = request.query_params.get('issue_date')
+
+    if ticket_type:
+        tickets = tickets.filter(ticket_type=ticket_type)
+    if used is not None:  
+        tickets = tickets.filter(used=used.lower() == 'true')
+    if issue_date:
+        tickets = tickets.filter(issue_date=issue_date)
+
+    tickets = tickets.order_by('id')
 
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(tickets, request)
     serializer = TicketSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
