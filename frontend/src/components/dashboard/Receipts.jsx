@@ -20,7 +20,6 @@ function Receipts() {
     (state) => state.receipts
   );
   const { subscriptions } = useSelector((state) => state.subscriptions);
-  const canAddReceipt = usePermission("add_receipt");
 
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,6 +43,11 @@ function Receipts() {
   const [receiptToDelete, setReceiptToDelete] = useState(null);
   const [filteredReceipts, setFilteredReceipts] = useState(receipts);
   const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
+  
+  const canViewReceipts = usePermission("view_receipt");
+  const canEditReceipts = usePermission("change_receipt");
+  const canDeleteReceipts = usePermission("delete_receipt");
+  const canAddReceipts = usePermission("add_receipt");
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(pagination.currentPage || 1);
@@ -317,6 +321,14 @@ function Receipts() {
       </div>
     );
 
+  if (!canViewReceipts) {
+    return (
+      <div className="text-red-500 text-center p-4 text-sm sm:text-base">
+        ليس لديك صلاحية لاظهار الإيصالات
+      </div>
+    )
+  }
+
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8" dir="rtl">
       {/* Header and Add Receipt Button */}
@@ -454,7 +466,9 @@ function Receipts() {
                         <CiTrash className="w-5 h-5" />
                       </button>
                     </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm">{receipt.amount}</td>
+                    <td className="px-4 sm:px-6 py-4 text-sm">
+                      {receipt.amount}
+                    </td>
                     <td className="px-4 sm:px-6 py-4 text-sm capitalize">
                       {receipt.payment_method === "cash"
                         ? "نقدي"
@@ -523,10 +537,12 @@ function Receipts() {
                       : receipt.payment_method}
                   </p>
                   <p className="text-sm">
-                    <strong>النادي:</strong> {receipt.club_details?.name || "غير معروف"}
+                    <strong>النادي:</strong>{" "}
+                    {receipt.club_details?.name || "غير معروف"}
                   </p>
                   <p className="text-sm">
-                    <strong>العضو:</strong> {receipt.member_details?.name || "غير معروف"}
+                    <strong>العضو:</strong>{" "}
+                    {receipt.member_details?.name || "غير معروف"}
                   </p>
                   <p className="text-sm">
                     <strong>ملاحظة:</strong> {receipt.note || "لا يوجد"}
@@ -574,109 +590,115 @@ function Receipts() {
       )}
 
       {/* Pagination Controls */}
-   {/* Pagination Controls */}
-<div className="flex justify-between items-center mt-4" dir="rtl">
-  {pagination.count === 0 && (
-    <div className="text-sm text-gray-600">لا توجد إيصالات لعرضها</div>
-  )}
-  {pagination.count > 0 && (
-    <>
-      <div className="text-sm text-gray-600">
-        عرض {(currentPage - 1) * itemsPerPage + 1} إلى{' '}
-        {Math.min(currentPage * itemsPerPage, pagination.count)} من {pagination.count} إيصال
-      </div>
-      <div className="flex gap-2">
-        {/* First Page Button */}
-        <button
-          onClick={() => paginate(1)}
-          disabled={currentPage === 1 || pagination.count === 0}
-          className={`px-3 py-1 rounded ${
-            currentPage === 1 || pagination.count === 0
-              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-              : 'bg-blue-700 text-white hover:bg-blue-800'
-          }`}
-        >
-          الأول
-        </button>
-
-        {/* Previous Page Button */}
-        <button
-          onClick={() => paginate(currentPage - 1)}
-          disabled={!pagination.previous || pagination.count === 0}
-          className={`px-3 py-1 rounded ${
-            !pagination.previous || pagination.count === 0
-              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-              : 'bg-blue-700 text-white hover:bg-blue-800'
-          }`}
-        >
-          السابق
-        </button>
-
-        {/* Page Number Buttons */}
-        {(() => {
-          const maxButtons = 5;
-          const sideButtons = Math.floor(maxButtons / 2);
-          let start = Math.max(1, currentPage - sideButtons);
-          let end = Math.min(totalPages, currentPage + sideButtons);
-
-          if (end - start + 1 < maxButtons) {
-            if (currentPage <= sideButtons) {
-              end = Math.min(totalPages, maxButtons);
-            } else {
-              start = Math.max(1, totalPages - maxButtons + 1);
-            }
-          }
-
-          return Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
-            (page) => (
+      {/* Pagination Controls */}
+      <div className="flex justify-between items-center mt-4" dir="rtl">
+        {pagination.count === 0 && (
+          <div className="text-sm text-gray-600">لا توجد إيصالات لعرضها</div>
+        )}
+        {pagination.count > 0 && (
+          <>
+            <div className="text-sm text-gray-600">
+              عرض {(currentPage - 1) * itemsPerPage + 1} إلى{" "}
+              {Math.min(currentPage * itemsPerPage, pagination.count)} من{" "}
+              {pagination.count} إيصال
+            </div>
+            <div className="flex gap-2">
+              {/* First Page Button */}
               <button
-                key={page}
-                onClick={() => paginate(page)}
-                disabled={pagination.count === 0}
+                onClick={() => paginate(1)}
+                disabled={currentPage === 1 || pagination.count === 0}
                 className={`px-3 py-1 rounded ${
-                  currentPage === page && pagination.count > 0
-                    ? 'bg-blue-700 text-white'
-                    : 'bg-gray-200 hover:bg-gray-300'
-                } ${pagination.count === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  currentPage === 1 || pagination.count === 0
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
+                }`}
               >
-                {page}
+                الأول
               </button>
-            )
-          );
-        })()}
 
-        {/* Next Page Button */}
-        <button
-          onClick={() => paginate(currentPage + 1)}
-          disabled={!pagination.next || pagination.count === 0}
-          className={`px-3 py-1 rounded ${
-            !pagination.next || pagination.count === 0
-              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-              : 'bg-blue-700 text-white hover:bg-blue-800'
-          }`}
-        >
-          التالي
-        </button>
+              {/* Previous Page Button */}
+              <button
+                onClick={() => paginate(currentPage - 1)}
+                disabled={!pagination.previous || pagination.count === 0}
+                className={`px-3 py-1 rounded ${
+                  !pagination.previous || pagination.count === 0
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
+                }`}
+              >
+                السابق
+              </button>
 
-        {/* Last Page Button */}
-        <button
-          onClick={() => paginate(totalPages)}
-          disabled={currentPage === totalPages || pagination.count === 0}
-          className={`px-3 py-1 rounded ${
-            currentPage === totalPages || pagination.count === 0
-              ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-              : 'bg-blue-700 text-white hover:bg-blue-800'
-          }`}
-        >
-          الأخير
-        </button>
+              {/* Page Number Buttons */}
+              {(() => {
+                const maxButtons = 5;
+                const sideButtons = Math.floor(maxButtons / 2);
+                let start = Math.max(1, currentPage - sideButtons);
+                let end = Math.min(totalPages, currentPage + sideButtons);
+
+                if (end - start + 1 < maxButtons) {
+                  if (currentPage <= sideButtons) {
+                    end = Math.min(totalPages, maxButtons);
+                  } else {
+                    start = Math.max(1, totalPages - maxButtons + 1);
+                  }
+                }
+
+                return Array.from(
+                  { length: end - start + 1 },
+                  (_, i) => start + i
+                ).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => paginate(page)}
+                    disabled={pagination.count === 0}
+                    className={`px-3 py-1 rounded ${
+                      currentPage === page && pagination.count > 0
+                        ? "bg-blue-700 text-white"
+                        : "bg-gray-200 hover:bg-gray-300"
+                    } ${
+                      pagination.count === 0
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ));
+              })()}
+
+              {/* Next Page Button */}
+              <button
+                onClick={() => paginate(currentPage + 1)}
+                disabled={!pagination.next || pagination.count === 0}
+                className={`px-3 py-1 rounded ${
+                  !pagination.next || pagination.count === 0
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
+                }`}
+              >
+                التالي
+              </button>
+
+              {/* Last Page Button */}
+              <button
+                onClick={() => paginate(totalPages)}
+                disabled={currentPage === totalPages || pagination.count === 0}
+                className={`px-3 py-1 rounded ${
+                  currentPage === totalPages || pagination.count === 0
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
+                }`}
+              >
+                الأخير
+              </button>
+            </div>
+          </>
+        )}
       </div>
-    </>
-  )}
-</div>
 
       {/* Add Receipt Form Modal */}
-      {showForm && canAddReceipt && (
+      {showForm && canAddReceipts && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6">
@@ -694,7 +716,7 @@ function Receipts() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {showDeleteConfirm && (
+      {showDeleteConfirm && canDeleteReceipts && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="p-4 sm:p-6">
@@ -721,13 +743,15 @@ function Receipts() {
       )}
 
       {/* Edit Modal */}
-      {showEditModal && (
+      {showEditModal && canEditReceipts && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6">
-              <h3 className="text-lg sm:text-xl font-medium
+              <h3
+                className="text-lg sm:text-xl font-medium
 
- leading-6 text-gray-900 mb-4">
+ leading-6 text-gray-900 mb-4"
+              >
                 تعديل الإيصال
               </h3>
               <form onSubmit={handleEditSubmit} className="space-y-4">

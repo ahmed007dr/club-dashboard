@@ -24,7 +24,8 @@ import {
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
 import BASE_URL from "@/config/api";
-import { fetchExpenseCategories } from "../../redux/slices/financeSlice";    
+import { fetchExpenseCategories } from "../../redux/slices/financeSlice";
+import usePermission from "@/hooks/usePermission";
 
 const Expense = () => {
   const dispatch = useDispatch();
@@ -49,8 +50,15 @@ const Expense = () => {
   const [errors, setErrors] = useState({});
   const itemsPerPage = 10;
 
-  const { expenses, loading, error, expensesPagination } = useSelector((state) => state.finance);
+  const { expenses, loading, error, expensesPagination } = useSelector(
+    (state) => state.finance
+  );
   const { expenseCategories } = useSelector((state) => state.finance);
+
+  const canViewExpense = usePermission("view_expense");
+  const canAddExpense = usePermission("add_expense");
+  const canEditExpense = usePermission("change_expense");
+  const canDeleteExpense = usePermission("delete_expense");
 
   useEffect(() => {
     dispatch(fetchExpenseCategories());
@@ -85,7 +93,8 @@ const Expense = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    const updatedValue = name === "amount" ? (value === "" ? "" : parseFloat(value) || "") : value;
+    const updatedValue =
+      name === "amount" ? (value === "" ? "" : parseFloat(value) || "") : value;
     if (currentExpense) {
       setCurrentExpense((prev) => ({ ...prev, [name]: updatedValue }));
     } else {
@@ -106,8 +115,10 @@ const Expense = () => {
 
   const validateForm = (data) => {
     const newErrors = {};
-    if (!data.club || isNaN(parseInt(data.club))) newErrors.club = "النادي مطلوب.";
-    if (!data.category || isNaN(parseInt(data.category))) newErrors.category = "الفئة مطلوبة.";
+    if (!data.club || isNaN(parseInt(data.club)))
+      newErrors.club = "النادي مطلوب.";
+    if (!data.category || isNaN(parseInt(data.category)))
+      newErrors.category = "الفئة مطلوبة.";
     if (!data.amount && data.amount !== 0) newErrors.amount = "المبلغ مطلوب.";
     if (!data.date) newErrors.date = "التاريخ مطلوب.";
     return newErrors;
@@ -158,7 +169,9 @@ const Expense = () => {
         if (err && typeof err === "object") {
           const formattedErrors = {};
           Object.keys(err).forEach((key) => {
-            formattedErrors[key] = Array.isArray(err[key]) ? err[key][0] : err[key];
+            formattedErrors[key] = Array.isArray(err[key])
+              ? err[key][0]
+              : err[key];
           });
           setErrors(formattedErrors);
         } else {
@@ -172,35 +185,38 @@ const Expense = () => {
       console.warn("Expected 'expenses' to be an array but got:", expenses);
       return [];
     }
-  
+
     const filtered = expenses.filter((expense) => {
       const expenseDate = new Date(expense.date);
       const from = startDate ? new Date(startDate) : null;
       const to = endDate ? new Date(endDate) : null;
-  
+
       return (
         expense.club_details?.id === userClub?.id &&
         (!from || expenseDate >= from) &&
         (!to || expenseDate <= to)
       );
     });
-  
+
     const sorted = filtered.sort((a, b) => {
       if (a.created_at && b.created_at) {
         return new Date(b.created_at) - new Date(a.created_at);
       }
       return b.id - a.id;
     });
-  
-    console.log("Sorted expenses:", sorted.map(exp => ({
-      id: exp.id,
-      created_at: exp.created_at,
-      date: exp.date,
-    })));
-  
+
+    console.log(
+      "Sorted expenses:",
+      sorted.map((exp) => ({
+        id: exp.id,
+        created_at: exp.created_at,
+        date: exp.date,
+      }))
+    );
+
     return sorted;
   }, [expenses, startDate, endDate, userClub]);
-  
+
   const paginatedExpenses = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredExpenses.slice(startIndex, startIndex + itemsPerPage);
@@ -242,9 +258,21 @@ const Expense = () => {
     }
   };
 
-  const totalPages = expensesPagination?.count 
+  const totalPages = expensesPagination?.count
     ? Math.ceil(expensesPagination.count / itemsPerPage)
     : 1;
+
+  if (!canViewExpense) {
+    return (
+      <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
+        <div className="flex items-center justify-center h-full">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">
+            ليست لديك صلاحية للوصول لهذه الصفحة{" "}
+          </h1>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
@@ -330,7 +358,10 @@ const Expense = () => {
                   <tbody className="divide-y divide-border bg-background">
                     {filteredExpenses.length > 0 ? (
                       filteredExpenses.map((expense, index) => (
-                        <tr key={index} className="hover:bg-gray-100 transition">
+                        <tr
+                          key={index}
+                          className="hover:bg-gray-100 transition"
+                        >
                           <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
                             {expense.club_details?.name || "غير متاح"}
                           </td>
@@ -338,7 +369,9 @@ const Expense = () => {
                             {expense.category_details?.name || "غير متاح"}
                           </td>
                           <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                            {expense.amount ? `${expense.amount} جنيه` : "غير متاح"}
+                            {expense.amount
+                              ? `${expense.amount} جنيه`
+                              : "غير متاح"}
                           </td>
                           <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
                             {expense.description || "غير متاح"}
@@ -376,7 +409,10 @@ const Expense = () => {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={8} className="px-4 py-3 text-center text-sm">
+                        <td
+                          colSpan={8}
+                          className="px-4 py-3 text-center text-sm"
+                        >
                           لا توجد مصروفات متاحة
                         </td>
                       </tr>
@@ -387,7 +423,9 @@ const Expense = () => {
 
               <div className="flex justify-between items-center mt-4">
                 <button
-                  onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(prev - 1, 1))
+                  }
                   disabled={currentPage === 1}
                   className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm disabled:opacity-50"
                 >
@@ -398,7 +436,9 @@ const Expense = () => {
                 </span>
                 <button
                   onClick={() => setCurrentPage((prev) => prev + 1)}
-                  disabled={currentPage === totalPages || !expensesPagination?.next}
+                  disabled={
+                    currentPage === totalPages || !expensesPagination?.next
+                  }
                   className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm disabled:opacity-50"
                 >
                   التالي
@@ -411,7 +451,8 @@ const Expense = () => {
                     setTotalInfo({
                       count: filteredExpenses.length,
                       total: filteredExpenses.reduce(
-                        (acc, expense) => acc + (parseFloat(expense.amount) || 0),
+                        (acc, expense) =>
+                          acc + (parseFloat(expense.amount) || 0),
                         0
                       ),
                     })
@@ -459,7 +500,9 @@ const Expense = () => {
                   </label>
                   <select
                     name="club"
-                    value={currentExpense ? currentExpense.club : newExpense.club}
+                    value={
+                      currentExpense ? currentExpense.club : newExpense.club
+                    }
                     onChange={handleChange}
                     className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
                     disabled
@@ -483,9 +526,14 @@ const Expense = () => {
                   </label>
                   <select
                     name="category"
-                    value={currentExpense ? currentExpense.category : newExpense.category}
+                    value={
+                      currentExpense
+                        ? currentExpense.category
+                        : newExpense.category
+                    }
                     onChange={handleChange}
                     className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+                    disabled={currentExpense ? !canEditExpense : !canAddExpense}
                   >
                     <option value="">اختر الفئة</option>
                     {loading && <option disabled>جاري التحميل...</option>}
@@ -504,7 +552,12 @@ const Expense = () => {
                 </div>
 
                 {[
-                  { label: "المبلغ", name: "amount", type: "number", step: "0.01" },
+                  {
+                    label: "المبلغ",
+                    name: "amount",
+                    type: "number",
+                    step: "0.01",
+                  },
                   { label: "الوصف", name: "description", type: "text" },
                   { label: "التاريخ", name: "date", type: "date" },
                 ].map(({ label, name, type, step }) => (
@@ -515,10 +568,17 @@ const Expense = () => {
                     <input
                       type={type}
                       name={name}
-                      value={currentExpense ? currentExpense[name] || "" : newExpense[name] || ""}
+                      value={
+                        currentExpense
+                          ? currentExpense[name] || ""
+                          : newExpense[name] || ""
+                      }
                       onChange={handleChange}
                       step={step}
                       className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+                      disabled={
+                        currentExpense ? !canEditExpense : !canAddExpense
+                      }
                     />
                     {errors[name] && (
                       <p className="text-red-500 text-xs sm:text-sm text-right mt-1">
@@ -540,9 +600,18 @@ const Expense = () => {
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-3 sm:px-4 py-1 sm:py-2 bg-green-500 text-white rounded hover:bg-green-600 text-sm sm:text-base"
+                  className={`px-3 sm:px-4 py-1 sm:py-2 text-white rounded text-sm sm:text-base ${
+                    currentExpense
+                      ? canEditExpense
+                        ? "bg-green-500 hover:bg-green-600"
+                        : "bg-gray-400 cursor-not-allowed"
+                      : canAddExpense
+                      ? "bg-green-500 hover:bg-green-600"
+                      : "bg-gray-400 cursor-not-allowed"
+                  }`}
+                  disabled={currentExpense ? !canEditExpense : !canAddExpense}
                 >
-                  حفظ
+                  {currentExpense ? "حفظ التعديلات" : "إضافة"}
                 </button>
               </div>
             </div>
@@ -551,7 +620,7 @@ const Expense = () => {
       )}
 
       {/* Delete Confirmation Modal */}
-      {confirmDeleteModal && (
+      {confirmDeleteModal && canDeleteExpense && (
         <div
           className="fixed inset-0 z-50 flex justify-center items-center bg-black bg-opacity-50"
           onClick={() => setConfirmDeleteModal(false)}

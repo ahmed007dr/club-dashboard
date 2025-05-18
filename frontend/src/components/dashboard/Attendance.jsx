@@ -37,6 +37,8 @@ const Attendance = () => {
  const { items: entryLogs, loading: entryLogsLoading, error: entryLogsError } = useSelector((state) => state.entryLogs);
 
  const canViewAttendance = usePermission("view_attendance");
+ const canAddAttendance = usePermission("add_attendance");
+ const canAddEntryLog = usePermission("change_subscriptiontype");
 
   // State variables
   const [foundSubscription, setFoundSubscription] = useState(null);
@@ -44,6 +46,7 @@ const Attendance = () => {
   const [newAttendance, setNewAttendance] = useState({ identifier: "" });
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [isEntryLogDialogOpen, setIsEntryLogDialogOpen] = useState(false);
+  
 
   // Filters
   const [attendanceFilters, setAttendanceFilters] = useState({
@@ -611,7 +614,7 @@ const Attendance = () => {
         </Tabs>
 
         {/* Attendance Dialog */}
-        {isAttendanceDialogOpen && (
+        {isAttendanceDialogOpen && canAddAttendance && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
             <div
               className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full relative"
@@ -777,7 +780,7 @@ const Attendance = () => {
         )}
 
         {/* Entry Log Dialog */}
-        {isEntryLogDialogOpen && (
+        {isEntryLogDialogOpen && canAddEntryLog && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
             <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
               <button

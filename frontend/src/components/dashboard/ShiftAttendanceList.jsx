@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchShiftAttendances } from '../../redux/slices/AttendanceSlice';
 import { Link } from 'react-router-dom';
+import usePermission from '@/hooks/usePermission';
 
 const ShiftAttendanceList = () => {
   const dispatch = useDispatch();
@@ -18,6 +19,8 @@ const ShiftAttendanceList = () => {
     dateTo: '',
     status: 'all'
   });
+
+  const canViewShifts = usePermission("view_shift");
 
   useEffect(() => {
     dispatch(fetchShiftAttendances());
@@ -59,6 +62,17 @@ const ShiftAttendanceList = () => {
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
+
+  if (!canViewShifts) {
+    return (
+      <div className="p-5" dir="rtl">
+        <h2 className="text-2xl font-bold mb-6 text-gray-800">حضور موظفي الورديات</h2>
+        <div className="p-4 bg-red-50 text-red-700 rounded-lg mb-4 flex items-center justify-between">
+          <span>ليس لديك صلاحية عرض حضور الموظفين</span>
+        </div>
+      </div> 
+    )
+  }
 
   return (
     <div className="p-5" dir="rtl">
