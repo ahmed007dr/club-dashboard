@@ -11,10 +11,12 @@ from django.utils import timezone
 from members.models import Member
 from rest_framework.pagination import PageNumberPagination
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def attendance_list_api(request):
+def attendance_list_api(request):    
     search_term = request.GET.get('q', '')
+
     if request.user.role == 'owner':
         attendances = Attendance.objects.select_related('subscription', 'subscription__member').all()
     else:
@@ -28,27 +30,32 @@ def attendance_list_api(request):
         )
 
     attendances = attendances.order_by('-attendance_date')
+
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(attendances, request)
     serializer = AttendanceSerializer(result_page, many=True)
+
     return paginator.get_paginated_response(serializer.data)
-
-
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def delete_attendance_api(request, attendance_id):
+def delete_attendance_api(request, attendance_id):    
     attendance = get_object_or_404(Attendance, id=attendance_id)
+
     subscription = attendance.subscription
+
     subscription.entry_count = max(0, subscription.entry_count - 1)  # Decrease entry count
     subscription.save()
+
     attendance.delete()
+
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def entry_log_list_api(request):
+def entry_log_list_api(request):    
     search_term = request.GET.get('q', '')
+
     if request.user.role == 'owner':
         logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').all()
     else:
@@ -62,16 +69,20 @@ def entry_log_list_api(request):
         )
 
     logs = logs.order_by('-timestamp')
+
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(logs, request)
-    serializer = EntryLogSerializer(result_page, many=True)
-    return paginator.get_paginated_response(serializer.data)
 
+    serializer = EntryLogSerializer(result_page, many=True)
+
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_attendance_api(request):
+    
     serializer = AttendanceSerializer(data=request.data)
+
     if serializer.is_valid():
         attendance = serializer.save()
 
@@ -83,6 +94,7 @@ def add_attendance_api(request):
             )
 
         subscription = attendance.subscription
+
         if not subscription.can_enter():
             attendance.delete()
             return Response(
@@ -101,10 +113,12 @@ def add_attendance_api(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def create_entry_log_api(request):
+    
     data = request.data.copy()
     data['approved_by'] = request.user.id
 
     serializer = EntryLogSerializer(data=data)
+
     if serializer.is_valid():
         entry_log = serializer.save()
 
@@ -116,12 +130,15 @@ def create_entry_log_api(request):
             )
 
         subscription = entry_log.related_subscription
-        if subscription and not subscription.can_enter():
-            entry_log.delete()
-            return Response(
-                {'error': 'لا يمكن تسجيل الدخول: تم الوصول للحد الأقصى لعدد الدخول'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        if subscription:
+            if not subscription.can_enter():
+                entry_log.delete()
+                return Response(
+                    {'error': 'لا يمكن تسجيل الدخول: تم الوصول للحد الأقصى لعدد الدخول'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            print("تم تنفيذ خطوة: لا يوجد اشتراك مرتبط بسجل الدخول")
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
