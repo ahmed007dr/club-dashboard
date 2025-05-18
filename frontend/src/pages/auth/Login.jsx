@@ -1,53 +1,31 @@
 import React, { useState } from 'react';
 import img from '../../images/img.png';
 import { toast } from 'react-hot-toast';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import BASE_URL from '../../config/api';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginUser } from '../../redux/slices/authSlice';
 
 const Login = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rfidCode, setRfidCode] = useState('');
-  const [useRfid, setUseRfid] = useState(false); // Toggle between login methods
-  const [loading, setLoading] = useState(false);
+  const [useRfid, setUseRfid] = useState(false);
   const navigator = useNavigate();
+  const dispatch = useDispatch();
+  const { loading, error } = useSelector((state) => state.auth);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-  
-    try {
-      const endpoint = useRfid 
-        ? `${BASE_URL}/accounts/api/login/rfid/`
-        : `${BASE_URL}/accounts/api/login/`;
-      
-      const payload = useRfid
-        ? { rfid_code: rfidCode }
-        : { username, password };
-
-      const response = await axios.post(endpoint, payload);
-  
-      const { access, refresh } = response.data;
-  
-      if (!access) {
-        toast.error('Access token is missing! Please check backend.');
-        return;
-      }
-  
-      localStorage.setItem('token', access);
-      localStorage.setItem('refreshToken', refresh);
-  
+    
+    const resultAction = await dispatch(
+      loginUser({ username, password, rfidCode, useRfid })
+    );
+    
+    if (loginUser.fulfilled.match(resultAction)) {
       toast.success('Login successful!');
-      navigator('/');  
-    } catch (error) {
-      if (error.response?.data?.error) {
-        toast.error(error.response.data.error);
-      } else {
-        toast.error(`Login failed! ${error.message}`);
-      }
-    } finally {
-      setLoading(false);
+      navigator('/');
+    } else if (loginUser.rejected.match(resultAction)) {
+      toast.error(resultAction.payload || 'Login failed!');
     }
   };
 
@@ -84,7 +62,7 @@ const Login = () => {
               <div>
                 <label className="block text-sm font-medium mb-1">RFID Code</label>
                 <input
-                   type="password"
+                  type="password"
                   value={rfidCode}
                   onChange={(e) => setRfidCode(e.target.value)}
                   className="w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-900"
