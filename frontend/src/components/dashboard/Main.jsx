@@ -17,26 +17,10 @@ import SubscriptionStats from "./SubscriptionStats";
 import SubscriptionChart from "./SubscriptionChart";
 import ShiftsPerClubChart from "./ShiftsPerClubChart";
 
-const isToday = (dateStr) => {
-  const today = new Date();
-  const date = new Date(dateStr);
-  return (
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth() === today.getMonth() &&
-    date.getDate() === today.getDate()
-  );
-};
-
-const filterByDate = (data, isTodayView) => {
-  if (!Array.isArray(data)) return [];
-  if (!isTodayView) return data;
-  return data.filter((item) => isToday(item.created_at));
-};
-
 const Main = () => {
   const dispatch = useDispatch();
-
   const [isTodayView, setIsTodayView] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [totalMembers, setTotalMembers] = useState(0);
   const [totalSubscriptions, setTotalSubscriptions] = useState(0);
@@ -46,88 +30,105 @@ const Main = () => {
   const [totalInvites, setTotalInvites] = useState(0);
   const [totalReceipts, setTotalReceipts] = useState(0);
 
-  const fetchAll = () => {
-    dispatch(fetchUsers())
-      .unwrap()
-      .then((res) => {
-        const data = Array.isArray(res?.results) ? res.results : [];
-        setTotalMembers(filterByDate(data, isTodayView).length);
-      })
-      .catch((err) => {
-        console.error("Error fetching users:", err);
-        setTotalMembers(0);
-      });
+  const fetchAll = async () => {
+    setIsLoading(true);
+    try {
+      await Promise.all([
+        dispatch(fetchUsers())
+          .unwrap()
+          .then((res) => {
+            console.log('Users data:', res);
+            setTotalMembers(res?.count || 0);
+          })
+          .catch((err) => {
+            console.error("Error fetching users:", err);
+            setTotalMembers(0);
+          }),
 
-    dispatch(fetchSubscriptions())
-      .unwrap()
-      .then((res) => {
-        const data = Array.isArray(res?.results) ? res.results : [];
-        setTotalSubscriptions(filterByDate(data, isTodayView).length);
-      })
-      .catch((err) => {
-        console.error("Error fetching subscriptions:", err);
-        setTotalSubscriptions(0);
-      });
+        dispatch(fetchSubscriptions())
+          .unwrap()
+          .then((res) => {
+            console.log('Subscriptions data:', res);
+            setTotalSubscriptions(res?.count || 0);
+          })
+          .catch((err) => {
+            console.error("Error fetching subscriptions:", err);
+            setTotalSubscriptions(0);
+          }),
 
-    dispatch(fetchTickets())
-      .unwrap()
-      .then((res) => {
-        const data = Array.isArray(res?.results) ? res.results : [];
-        setTotalTickets(filterByDate(data, isTodayView).length);
-      })
-      .catch((err) => {
-        console.error("Error fetching tickets:", err);
-        setTotalTickets(0);
-      });
+        dispatch(fetchTickets())
+          .unwrap()
+          .then((res) => {
+            console.log('Tickets data:', res);
+            setTotalTickets(res?.count || res?.results?.length || 0);
+          })
+          .catch((err) => {
+            console.error("Error fetching tickets:", err);
+            setTotalTickets(0);
+          }),
 
-    dispatch(fetchAttendances())
-      .unwrap()
-      .then((res) => {
-        const data = Array.isArray(res?.results) ? res.results : [];
-        setTotalAttendances(filterByDate(data, isTodayView).length);
-      })
-      .catch((err) => {
-        console.error("Error fetching attendances:", err);
-        setTotalAttendances(0);
-      });
+        dispatch(fetchAttendances())
+          .unwrap()
+          .then((res) => {
+            console.log('Attendances data:', res);
+            // Handle case where res is the array or res.results contains the array
+            const attendanceCount = Array.isArray(res) ? res.length : (res?.count || res?.results?.length || 0);
+            setTotalAttendances(attendanceCount);
+          })
+          .catch((err) => {
+            console.error("Error fetching attendances:", err);
+            setTotalAttendances(0);
+          }),
 
-    dispatch(fetchStaff())
-      .unwrap()
-      .then((res) => {
-        const data = Array.isArray(res?.results) ? res.results : [];
-        setTotalStaff(filterByDate(data, isTodayView).length);
-      })
-      .catch((err) => {
-        console.error("Error fetching staff:", err);
-        setTotalStaff(0);
-      });
+        dispatch(fetchStaff())
+          .unwrap()
+          .then((res) => {
+            console.log('Staff data:', res);
+            // Handle case where res is the array or res.results contains the array
+            const staffCount = Array.isArray(res) ? res.length : (res?.count || res?.results?.length || 0);
+            setTotalStaff(staffCount);
+          })
+          .catch((err) => {
+            console.error("Error fetching staff:", err);
+            setTotalStaff(0);
+          }),
 
-    dispatch(fetchFreeInvites())
-      .unwrap()
-      .then((res) => {
-        const data = Array.isArray(res?.results) ? res.results : [];
-        setTotalInvites(filterByDate(data, isTodayView).length);
-      })
-      .catch((err) => {
-        console.error("Error fetching free invites:", err);
-        setTotalInvites(0);
-      });
+        dispatch(fetchFreeInvites())
+          .unwrap()
+          .then((res) => {
+            console.log('Free invites data:', res);
+            setTotalInvites(res?.count || 0);
+          })
+          .catch((err) => {
+            console.error("Error fetching free invites:", err);
+            setTotalInvites(0);
+          }),
 
-    dispatch(fetchReceipts())
-      .unwrap()
-      .then((res) => {
-        const data = Array.isArray(res?.results) ? res.results : [];
-        setTotalReceipts(filterByDate(data, isTodayView).length);
-      })
-      .catch((err) => {
-        console.error("Error fetching receipts:", err);
-        setTotalReceipts(0);
-      });
+        dispatch(fetchReceipts())
+          .unwrap()
+          .then((res) => {
+            console.log('Receipts data:', res);
+            setTotalReceipts(res?.data?.length || 0);
+          })
+          .catch((err) => {
+            console.error("Error fetching receipts:", err);
+            setTotalReceipts(0);
+          }),
+      ]);
+    } catch (err) {
+      console.error("Error fetching data:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchAll();
   }, [dispatch, isTodayView]);
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
   const cardClasses =
     "bg-white rounded-2xl p-4 sm:p-6 shadow transition hover:shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4";
@@ -151,22 +152,62 @@ const Main = () => {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-        <DataCard label="إجمالي التذاكر" value={totalTickets} icon={<IoTicketOutline className={iconClasses} />} link="/tickets" />
-        <DataCard label="إجمالي الأعضاء" value={totalMembers} icon={<RiGroupLine className={iconClasses} />} link="/members" />
-        <DataCard label="إجمالي الاشتراكات" value={totalSubscriptions} icon={<MdSubscriptions className={iconClasses} />} link="/subscriptions" />
-        <DataCard label="إجمالي الحضور" value={totalAttendances} icon={<FaRegCalendarCheck className={iconClasses} />} link="/attendance" />
-        <DataCard label="إجمالي الموظفين" value={totalStaff} icon={<BsPeopleFill className={iconClasses} />} link="/staff" />
-        <DataCard label="الدعوات" value={totalInvites} icon={<RiVipCrown2Line className={iconClasses} />} link="/free-invites" />
-        <DataCard label="الإيصالات" value={totalReceipts} icon={<FaReceipt className={iconClasses} />} link="/receipts" />
+        <DataCard
+          label="إجمالي التذاكر"
+          value={totalTickets}
+          icon={<IoTicketOutline className={iconClasses} />}
+          link="/tickets"
+        />
+        <DataCard
+          label="إجمالي الأعضاء"
+          value={totalMembers}
+          icon={<RiGroupLine className={iconClasses} />}
+          link="/members"
+        />
+        <DataCard
+          label="إجمالي الاشتراكات"
+          value={totalSubscriptions}
+          icon={<MdSubscriptions className={iconClasses} />}
+          link="/subscriptions"
+        />
+        <DataCard
+          label="إجمالي الحضور"
+          value={totalAttendances}
+          icon={<FaRegCalendarCheck className={iconClasses} />}
+          link="/attendance"
+        />
+        <DataCard
+          label="إجمالي الموظفين"
+          value={totalStaff}
+          icon={<BsPeopleFill className={iconClasses} />}
+          link="/staff"
+        />
+        <DataCard
+          label="الدعوات"
+          value={totalInvites}
+          icon={<RiVipCrown2Line className={iconClasses} />}
+          link="/free-invites"
+        />
+        <DataCard
+          label="الإيصالات"
+          value={totalReceipts}
+          icon={<FaReceipt className={iconClasses} />}
+          link="/receipts"
+        />
       </div>
 
-      {/* Charts Section */}
       <div className="flex flex-col sm:flex-row items-start justify-between gap-4 sm:gap-6 mt-6">
-        <div className="w-full sm:w-1/2"><SubscriptionStats /></div>
-        <div className="w-full sm:w-1/2"><SubscriptionChart /></div>
+        <div className="w-full sm:w-1/2">
+          <SubscriptionStats />
+        </div>
+        <div className="w-full sm:w-1/2">
+          <SubscriptionChart />
+        </div>
       </div>
 
-      <div className="mt-6"><ShiftsPerClubChart /></div>
+      <div className="mt-6">
+        <ShiftsPerClubChart />
+      </div>
     </div>
   );
 };
@@ -181,7 +222,9 @@ const DataCard = ({ label, value, icon, link }) => {
     <div className={cardClasses}>
       <div className="text-center sm:text-right">
         <h3 className="text-gray-600 text-sm sm:text-base font-semibold">{label}</h3>
-        <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">{value}</p>
+        <p className="text-2xl sm:text-3xl font-extrabold text-gray-800 truncate">
+          {value !== undefined ? value : 'Loading...'}
+        </p>
         <Link to={link} className={textLinkClasses}>عرض الكل</Link>
       </div>
       {icon}

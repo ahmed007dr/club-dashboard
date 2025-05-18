@@ -1,26 +1,30 @@
+// features/auth/authSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 
+
+
 export const loginUser = createAsyncThunk(
   'auth/login',
-  async ({ username, password }, { rejectWithValue }) => {
+  async ({ username, password, rfidCode, useRfid }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${BASE_URL}/accounts/api/login/`, {
-        username,
-        password
-      });
+      const endpoint = useRfid 
+        ? `${BASE_URL}/accounts/api/login/rfid/`
+        : `${BASE_URL}/accounts/api/login/`;
       
-      // Only handle what the login endpoint returns
-      return {
-        token: response.data.access,
-        refreshToken: response.data.refresh,
-        // Only include user if it's returned by the login endpoint
-        ...(response.data.user && { user: response.data.user })
-      };
+      const payload = useRfid
+        ? { rfid_code: rfidCode }
+        : { username, password };
+
+      const response = await axios.post(endpoint, payload);
       
+      // Assuming the backend returns user data along with tokens
+      const { access, refresh, user } = response.data;
+      
+      return { access, refresh, user };
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Login failed');
+      return rejectWithValue(error.response?.data?.error || error.message);
     }
   }
 );
@@ -32,7 +36,7 @@ const authSlice = createSlice({
     refreshToken: localStorage.getItem('refreshToken') || null,
     user: JSON.parse(localStorage.getItem('user')) || null,
     loading: false,
-    error: null
+    error: null,
   },
   reducers: {
     logout: (state) => {
@@ -42,10 +46,17 @@ const authSlice = createSlice({
       state.token = null;
       state.refreshToken = null;
       state.user = null;
+      state.error = null;
     },
-    setUser: (state, action) => {
-      state.user = action.payload;
-      localStorage.setItem('user', JSON.stringify(action.payload));
+    clearError: (state) => {
+      state.error = null;
+    },
+    // Add a reducer to load user from localStorage on app initialization
+    loadUserFromStorage: (state) => {
+      const user = localStorage.getItem('user');
+      if (user) {
+        state.user = JSON.parse(user);
+      }
     }
   },
   extraReducers: (builder) => {
@@ -56,24 +67,20 @@ const authSlice = createSlice({
       })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
-        state.token = action.payload.token;
-        state.refreshToken = action.payload.refreshToken;
+        state.token = action.payload.access;
+        state.refreshToken = action.payload.refresh;
+        state.user = action.payload.user;
         
-        // Only set user if it was provided in the login response
-        if (action.payload.user) {
-          state.user = action.payload.user;
-          localStorage.setItem('user', JSON.stringify(action.payload.user));
-        }
-        
-        localStorage.setItem('token', action.payload.token);
-        localStorage.setItem('refreshToken', action.payload.refreshToken);
+        localStorage.setItem('token', action.payload.access);
+        localStorage.setItem('refreshToken', action.payload.refresh);
+        localStorage.setItem('user', JSON.stringify(action.payload.user));
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
-  }
+  },
 });
 
-export const { logout, setUser } = authSlice.actions;
+export const { logout, clearError, loadUserFromStorage } = authSlice.actions;
 export default authSlice.reducer;
