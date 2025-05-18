@@ -1,5 +1,7 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { toast } from 'react-hot-toast';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register'; 
@@ -17,19 +19,19 @@ import Profile from './components/dashboard/Profile';
 import Staff from './components/dashboard/Staff';
 import Finance from './components/dashboard/Finance';
 import MemberSubscriptions from './components/dashboard/MemberSubscriptions';
-import Member from "./pages/member/Member"; 
-import AddMember from "./components/modals/AddMember"; 
+import Member from './pages/member/Member'; 
+import AddMember from './components/modals/AddMember'; 
 import StaffProfile from './components/dashboard/StaffProfile';
 import CheckInForm from './components/dashboard/CheckInForm';
 import OutForm from './components/dashboard/OutForm';
 import AttendanceAnalysis from './components/dashboard/AttendanceAnalysis';
 import UserList from './components/dashboard/UserList';
 import AttendanceForm from './components/dashboard/AttendanceForm';
-import ShiftAttendanceList from "./components/dashboard/ShiftAttendanceList";
-import ExpenseCategory from "./components/dashboard/ExpenseCategory";
-import Expense from "./components/dashboard/Expense";
-import IncomeSources from "./components/dashboard/IncomeSources";
-
+import ShiftAttendanceList from './components/dashboard/ShiftAttendanceList';
+import ExpenseCategory from './components/dashboard/ExpenseCategory';
+import Expense from './components/dashboard/Expense';
+import IncomeSources from './components/dashboard/IncomeSources';
+import useTokenRefresh from './hooks/useTokenRefresh';
 import { Toaster } from 'react-hot-toast';
 
 // Route protection component
@@ -43,6 +45,18 @@ const ProtectedRoute = ({ element }) => {
 };
 
 function App() {
+  const navigate = useNavigate();
+  const { error } = useTokenRefresh(); // Use the custom hook to refresh token every 40 minutes
+  const { token } = useSelector((state) => state.auth);
+
+  // Handle token refresh errors by redirecting to login
+  React.useEffect(() => {
+    if (error) {
+      toast.error(`جلسة منتهية، يرجى تسجيل الدخول مجدداً: ${error}`);
+      navigate('/login');
+    }
+  }, [error, navigate]);
+
   return (
     <div>
       <Navbar />
@@ -75,12 +89,10 @@ function App() {
           <Route path="staff-reports" element={<UserList/>} />
           <Route path="/shift-attendance" element={<ShiftAttendanceList />} />
           <Route path="expense-category" element={<ExpenseCategory />} />
-        <Route path="expense" element={<Expense />} />
-        <Route path="income-sources" element={<IncomeSources />} />
+          <Route path="expense" element={<Expense />} />
+          <Route path="income-sources" element={<IncomeSources />} />
         </Route>
-        
       </Routes>
-      
     </div>
   );
 }
