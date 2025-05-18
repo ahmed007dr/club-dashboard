@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
+import usePermission from "@/hooks/usePermission";
 
 const SubscriptionList = () => {
   const dispatch = useDispatch();
@@ -28,7 +29,9 @@ const SubscriptionList = () => {
     (state) => state.subscriptions
   );
 
-  console.log("Subscriptions:", subscriptions);
+  const canAddSubscription = usePermission("add_subscription");
+  const canUpdateSubscription = usePermission("change_subscription");
+  const canDeleteSubscription = usePermission("delete_subscription");
 
   // State management
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,7 +50,7 @@ const SubscriptionList = () => {
     startDate: "",
     endDate: "",
     clubName: "",
-   entryCount: "",
+    entryCount: "",
   });
 
   // Sort subscriptions by id (newest first - descending)
@@ -354,20 +357,20 @@ const SubscriptionList = () => {
         </div>
 
         {/* Attendance Days Filter */}
-     <div className="flex flex-col w-56">
-  <label className="text-sm font-medium text-gray-700 mb-1 text-right">
-    عدد الإدخالات
-  </label>
-  <input
-    type="number"
-    name="entryCount"
-    value={filters.entryCount}
-    onChange={handleFilterChange}
-    placeholder="تصفية حسب عدد الإدخالات"
-    min="0"
-    className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
-  />
-</div>
+        <div className="flex flex-col w-56">
+          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
+            عدد الإدخالات
+          </label>
+          <input
+            type="number"
+            name="entryCount"
+            value={filters.entryCount}
+            onChange={handleFilterChange}
+            placeholder="تصفية حسب عدد الإدخالات"
+            min="0"
+            className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
+          />
+        </div>
 
         {/* Status Filter */}
         <div className="flex flex-col w-56">
@@ -625,7 +628,7 @@ const SubscriptionList = () => {
       )}
 
       {/* Modals */}
-      {createModalOpen && (
+      {createModalOpen && canAddSubscription && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full relative">
             <button
@@ -642,7 +645,7 @@ const SubscriptionList = () => {
         </div>
       )}
 
-      {isModalOpen && (
+      {isModalOpen && canUpdateSubscription && (
         <UpdateSubscriptionModal
           isOpen={isModalOpen}
           onClose={closeModal}
@@ -651,83 +654,122 @@ const SubscriptionList = () => {
         />
       )}
 
-      <DeleteSubscriptionModal
+      {canDeleteSubscription && <DeleteSubscriptionModal
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         subscription={selectedSubscription}
-      />
+      />}
 
       {detailModalOpen && detailSubscription && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-         <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
-  <h3 className="text-2xl font-semibold mb-4 text-gray-800">تفاصيل الاشتراك</h3>
-  
-  <div className="space-y-3 mb-4">
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <p className="text-gray-600 font-medium">اسم العضو:</p>
-        <p className="text-gray-800">{detailSubscription.member_details.name}</p>
-      </div>
-      <div>
-        <p className="text-gray-600 font-medium">رقم العضوية:</p>
-        <p className="text-gray-800">250515009</p>
-      </div>
-    </div>
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+            <h3 className="text-2xl font-semibold mb-4 text-gray-800">
+              تفاصيل الاشتراك
+            </h3>
 
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <p className="text-gray-600 font-medium">تاريخ البدء:</p>
-        <p className="text-gray-800">{detailSubscription.start_date}</p>
-      </div>
-      <div>
-        <p className="text-gray-600 font-medium">تاريخ الانتهاء:</p>
-        <p className="text-gray-800">{detailSubscription.end_date}</p>
-      </div>
-    </div>
+            <div className="space-y-3 mb-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-600 font-medium">اسم العضو:</p>
+                  <p className="text-gray-800">
+                    {detailSubscription.member_details.name}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-medium">رقم العضوية:</p>
+                  <p className="text-gray-800">250515009</p>
+                </div>
+              </div>
 
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <p className="text-gray-600 font-medium">المبلغ المدفوع:</p>
-        <p className="text-green-600 font-medium">${detailSubscription.paid_amount}</p>
-      </div>
-      <div>
-        <p className="text-gray-600 font-medium">المبلغ المتبقي:</p>
-        <p className="text-red-600 font-medium">${detailSubscription.remaining_amount}</p>
-      </div>
-    </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-600 font-medium">تاريخ البدء:</p>
+                  <p className="text-gray-800">
+                    {detailSubscription.start_date}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-medium">تاريخ الانتهاء:</p>
+                  <p className="text-gray-800">{detailSubscription.end_date}</p>
+                </div>
+              </div>
 
-    <div className="grid grid-cols-2 gap-4">
-      <div>
-        <p className="text-gray-600 font-medium">عدد الإدخالات:</p>
-        <p className="text-gray-800">{detailSubscription.entry_count}</p>
-      </div>
-      <div>
-        <p className="text-gray-600 font-medium">اسم النادي:</p>
-        <p className="text-gray-800">{detailSubscription.club_details.name}</p>
-      </div>
-    </div>
-  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-600 font-medium">المبلغ المدفوع:</p>
+                  <p className="text-green-600 font-medium">
+                    ${detailSubscription.paid_amount}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-medium">المبلغ المتبقي:</p>
+                  <p className="text-red-600 font-medium">
+                    ${detailSubscription.remaining_amount}
+                  </p>
+                </div>
+              </div>
 
-  <div className="border-t pt-4">
-    <h4 className="text-lg font-semibold mb-2 text-gray-800">معلومات إضافية</h4>
-    <div className="space-y-2">
-      <p><span className="text-gray-600 font-medium">رقم الهوية:</span> 87356596775325</p>
-      <p><span className="text-gray-600 font-medium">تاريخ الميلاد:</span> 1969-09-04</p>
-      <p><span className="text-gray-600 font-medium">الهاتف:</span> 222222222222</p>
-      <p><span className="text-gray-600 font-medium">هاتف إضافي:</span> 3333333333333</p>
-      <p><span className="text-gray-600 font-medium">المهنة:</span> Telecommunications researcher</p>
-      <p><span className="text-gray-600 font-medium">العنوان:</span> 97646 Whitaker Manors, New Matthew, AS 18521</p>
-      <p><span className="text-gray-600 font-medium">ملاحظات:</span> Guess despite again network.</p>
-    </div>
-  </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-600 font-medium">عدد الإدخالات:</p>
+                  <p className="text-gray-800">
+                    {detailSubscription.entry_count}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600 font-medium">اسم النادي:</p>
+                  <p className="text-gray-800">
+                    {detailSubscription.club_details.name}
+                  </p>
+                </div>
+              </div>
+            </div>
 
-  <button
-    onClick={() => setDetailModalOpen(false)}
-    className="mt-6 w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-  >
-    إغلاق
-  </button>
-</div>
+            <div className="border-t pt-4">
+              <h4 className="text-lg font-semibold mb-2 text-gray-800">
+                معلومات إضافية
+              </h4>
+              <div className="space-y-2">
+                <p>
+                  <span className="text-gray-600 font-medium">رقم الهوية:</span>{" "}
+                  87356596775325
+                </p>
+                <p>
+                  <span className="text-gray-600 font-medium">
+                    تاريخ الميلاد:
+                  </span>{" "}
+                  1969-09-04
+                </p>
+                <p>
+                  <span className="text-gray-600 font-medium">الهاتف:</span>{" "}
+                  222222222222
+                </p>
+                <p>
+                  <span className="text-gray-600 font-medium">هاتف إضافي:</span>{" "}
+                  3333333333333
+                </p>
+                <p>
+                  <span className="text-gray-600 font-medium">المهنة:</span>{" "}
+                  Telecommunications researcher
+                </p>
+                <p>
+                  <span className="text-gray-600 font-medium">العنوان:</span>{" "}
+                  97646 Whitaker Manors, New Matthew, AS 18521
+                </p>
+                <p>
+                  <span className="text-gray-600 font-medium">ملاحظات:</span>{" "}
+                  Guess despite again network.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setDetailModalOpen(false)}
+              className="mt-6 w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+            >
+              إغلاق
+            </button>
+          </div>
         </div>
       )}
     </div>

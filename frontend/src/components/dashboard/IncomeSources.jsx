@@ -28,6 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
 import IncomeSourcesList from './IncomeSourcesList';
+import usePermission from "@/hooks/usePermission";
 
 const labelMapping = {
   name: "الاسم",
@@ -41,6 +42,7 @@ const labelMapping = {
 
 const Income = () => {
   const dispatch = useDispatch();
+  const canAddIncome = usePermission("add_income");
   const [showModal, setShowModal] = useState(false);
   const [currentItem, setCurrentItem] = useState(null);
   const [newItem, setNewItem] = useState({
@@ -377,7 +379,7 @@ const Income = () => {
                 )}
               </div>
 
-              <AddIncomeForm />
+             {canAddIncome && <AddIncomeForm />}
 
               {loading && (
                 <p className="text-lg text-gray-600 text-right">

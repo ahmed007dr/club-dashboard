@@ -12,6 +12,7 @@ import AddReceiptForm from "./AddReceiptForm";
 import { Button } from "../ui/button";
 import { toast } from 'react-hot-toast';
 import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
+import usePermission from "@/hooks/usePermission";
 
 function Receipts() {
   const dispatch = useDispatch();
@@ -19,7 +20,7 @@ function Receipts() {
     (state) => state.receipts
   );
   const { subscriptions } = useSelector((state) => state.subscriptions);
-  console.log("subscriptions", subscriptions);
+  const canAddReceipt = usePermission("add_receipt");
 
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -675,7 +676,7 @@ function Receipts() {
 </div>
 
       {/* Add Receipt Form Modal */}
-      {showForm && (
+      {showForm && canAddReceipt && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6">

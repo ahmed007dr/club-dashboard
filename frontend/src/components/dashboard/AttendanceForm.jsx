@@ -5,6 +5,7 @@ import { FaUser } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
+import usePermission from '@/hooks/usePermission';
 
 const AttendanceForm = () => {
   const [rfidCodeCheckIn, setRfidCodeCheckIn] = useState('');
@@ -16,6 +17,8 @@ const AttendanceForm = () => {
   
   const dispatch = useDispatch();
   const { loading } = useSelector((state) => state.attendance);
+
+  const canAddAttendance = usePermission("add_attendance");
 
   // Fetch staff list on component mount
   useEffect(() => {
@@ -95,6 +98,12 @@ const AttendanceForm = () => {
       toast.error(result.payload?.error || 'فشل في تسجيل الخروج');
     }
   };
+
+  if (!canAddAttendance) return (
+    <div className="flex items-center justify-center h-screen">
+      <p className="text-2xl font-bold text-red-500">لا يمكنك الوصول لهذه الصفحة</p>
+    </div>
+  );
 
   return (
     <div className="flex flex-col md:flex-row items-center justify-center gap-4 p-4">

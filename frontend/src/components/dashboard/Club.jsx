@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { HiOutlineDocumentReport } from "react-icons/hi";
 import { useDispatch, useSelector } from "react-redux";
 import { editClub, fetchClubs } from "@/redux/slices/clubSlice";
+import usePermission from "@/hooks/usePermission";
 
 const Club = () => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -12,6 +13,8 @@ const Club = () => {
     logo: "",
     createdAt: "",
   });
+
+  const canViewClubs = usePermission("view_club")
 
   const [clubs, setClubs] = useState([]);
   const isLoading = useSelector((state) => state.club.isLoading);
@@ -62,13 +65,21 @@ const Club = () => {
     fetchData();
   }, [dispatch]);
 
-  if (isLoading) {
+  if (!canViewClubs) {
     return (
       <div className="flex justify-center items-center h-screen text-sm sm:text-base">
-        جاري التحميل...
+        ليس لديك صلاحية للوصول لهذه الصفحة
       </div>
     );
   }
+  
+    if (isLoading) {
+      return (
+        <div className="flex justify-center items-center h-screen text-sm sm:text-base">
+          جاري التحميل...
+        </div>
+      );
+    }
 
   if (error) {
     return (
