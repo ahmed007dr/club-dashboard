@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice'; 
+import usePermission from '@/hooks/usePermission';
 
 const ActiveSubscriptionTypes = () => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error } = useSelector((state) => state.subscriptions);
+  const canViewSubscriptionTypes = usePermission("view_subscriptiontype");
   console.log('Subscription Types:', subscriptionTypes); // Debugging line to check the subscription types data
   useEffect(() => {
     dispatch(fetchSubscriptionTypes());
@@ -12,6 +14,14 @@ const ActiveSubscriptionTypes = () => {
 
   const activeSubscriptions = subscriptionTypes.filter((sub) => sub.isActive);
   const inactiveSubscriptions = subscriptionTypes.filter((sub) => !sub.isActive);
+
+  if (!canViewSubscriptionTypes) {
+    return (
+      <div className="text-center text-red-500 mt-4">
+        You do not have permission to view subscription types.
+      </div>
+    );
+  }
 
   if (loading) {
     return <div className="text-center text-gray-500 mt-4">Loading...</div>;
