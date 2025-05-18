@@ -19,9 +19,17 @@ import { MoreVertical } from "lucide-react";
 import BASE_URL from "../../config/api";
 import { toast } from "react-hot-toast";
 import { useDebounce } from "@/hooks/useDebounce";
+import usePermission from "@/hooks/usePermission";
+import { RiForbidLine } from "react-icons/ri";
 
 const Tickets = () => {
   const dispatch = useDispatch();
+  // Permission checks
+  const canViewTickets = usePermission("view_ticket");
+  const canAddTickets = usePermission("add_ticket");
+  const canEditTickets = usePermission("change_ticket");
+  const canDeleteTickets = usePermission("delete_ticket");
+
   const {
     tickets: {
       results: tickets = [],
@@ -59,6 +67,10 @@ const Tickets = () => {
 
   // Fetch user profile to get club details
   useEffect(() => {
+    if (!canViewTickets) {
+      setLoadingProfile(false);
+      return;
+    }
     setLoadingProfile(true);
     fetch(`${BASE_URL}/accounts/api/profile/`, {
       method: "GET",
@@ -77,14 +89,14 @@ const Tickets = () => {
         console.error("Failed to fetch user profile:", err);
         setLoadingProfile(false);
       });
-  }, []);
+  }, [canViewTickets]);
 
   // Calculate total pages based on count from backend
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
   // Load tickets with pagination and filters
   useEffect(() => {
-    if (userClub) {
+    if (userClub && canViewTickets) {
       const params = {
         page: currentPage,
         page_size: itemsPerPage,
@@ -95,12 +107,22 @@ const Tickets = () => {
             : filterUsedStatus === "unused"
             ? "false"
             : "",
-        issue_date: debouncedIssueDate, // Use debounced value
-        buyer_name: debouncedBuyerName, // Use debounced value
+        issue_date: debouncedIssueDate,
+        buyer_name: debouncedBuyerName,
       };
       dispatch(fetchTickets(params));
     }
-  }, [currentPage, debouncedBuyerName, debouncedIssueDate, dispatch, filterTicketType, filterUsedStatus, itemsPerPage, userClub]);
+  }, [
+    currentPage,
+    debouncedBuyerName,
+    debouncedIssueDate,
+    dispatch,
+    filterTicketType,
+    filterUsedStatus,
+    itemsPerPage,
+    userClub,
+    canViewTickets,
+  ]);
 
   // Reset currentPage when filters change
   useEffect(() => {
@@ -402,6 +424,21 @@ const Tickets = () => {
     }
   }, [error]);
 
+  // Conditional rendering for no permission
+  if (!canViewTickets) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen text-center p-4" dir="rtl">
+        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+          <RiForbidLine className="text-red-600 text-2xl" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-700 mb-2">لا يوجد صلاحية</h2>
+        <p className="text-gray-500 max-w-md">
+          ليس لديك الصلاحيات اللازمة لعرض التذاكر. يرجى التواصل مع المسؤول.
+        </p>
+      </div>
+    );
+  }
+
   if (loading || loadingProfile) {
     return (
       <div className="flex justify-center items-center h-screen text-sm sm:text-base">
@@ -418,14 +455,16 @@ const Tickets = () => {
           <IoTicketOutline className="text-blue-600 w-6 h-6 sm:w-8 sm:h-8" />
           <h2 className="text-xl sm:text-2xl font-bold">التذاكر</h2>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-2 w-full sm:w-auto btn"
-          disabled={loadingProfile || !userClub}
-        >
-          <FaPlus className="w-4 h-4" />
-          إضافة تذكرة جديدة
-        </button>
+        {canAddTickets && (
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-2 w-full sm:w-auto btn"
+            disabled={loadingProfile || !userClub}
+          >
+            <FaPlus className="w-4 h-4" />
+            إضافة تذكرة جديدة
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -553,12 +592,14 @@ const Tickets = () => {
                             >
                               بيانات
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={(e) => openEditModal(ticket, e)}
-                              className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                            >
-                              تعديل
-                            </DropdownMenuItem>
+                            {canEditTickets && (
+                              <DropdownMenuItem
+                                onClick={(e) => openEditModal(ticket, e)}
+                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                              >
+                                تعديل
+                              </DropdownMenuItem>
+                            )}
                             {!ticket.used && (
                               <DropdownMenuItem
                                 onClick={(e) => openMarkAsUsedModal(ticket, e)}
@@ -567,12 +608,14 @@ const Tickets = () => {
                                 تحديد كمستخدمة
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem
-                              onClick={(e) => openDeleteModal(ticket, e)}
-                              className="cursor-pointer text-red-600 hover:bg-red-50"
-                            >
-                              حذف
-                            </DropdownMenuItem>
+                            {canDeleteTickets && (
+                              <DropdownMenuItem
+                                onClick={(e) => openDeleteModal(ticket, e)}
+                                className="cursor-pointer text-red-600 hover:bg-red-50"
+                              >
+                                حذف
+                              </DropdownMenuItem>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -606,12 +649,14 @@ const Tickets = () => {
                         >
                           بيانات
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={(e) => openEditModal(ticket, e)}
-                          className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                        >
-                          تعديل
-                        </DropdownMenuItem>
+                        {canEditTickets && (
+                          <DropdownMenuItem
+                            onClick={(e) => openEditModal(ticket, e)}
+                            className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                          >
+                            تعديل
+                          </DropdownMenuItem>
+                        )}
                         {!ticket.used && (
                           <DropdownMenuItem
                             onClick={(e) => openMarkAsUsedModal(ticket, e)}
@@ -620,12 +665,14 @@ const Tickets = () => {
                             تحديد كمستخدمة
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem
-                          onClick={(e) => openDeleteModal(ticket, e)}
-                          className="cursor-pointer text-red-600 hover:bg-red-50"
-                        >
-                          حذف
-                        </DropdownMenuItem>
+                        {canDeleteTickets && (
+                          <DropdownMenuItem
+                            onClick={(e) => openDeleteModal(ticket, e)}
+                            className="cursor-pointer text-red-600 hover:bg-red-50"
+                          >
+                            حذف
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -1025,7 +1072,7 @@ const Tickets = () => {
               </button>
             </div>
             <div className="p-4 sm:p-6">
-              <p className="text-sm sm:text-base">
+              <p className="text-sm">
                 هل أنت متأكد أنك تريد حذف تذكرة "{selectedTicket.buyer_name}"؟
               </p>
               <div className="flex justify-end gap-2 mt-4">
@@ -1099,7 +1146,7 @@ const Tickets = () => {
                 >
                   تأكيد
                 </button>
-              </div>
+                </div>
             </div>
           </div>
         </div>

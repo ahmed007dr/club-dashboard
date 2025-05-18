@@ -7,6 +7,8 @@ import SubscriptionTypeDetails from './SubscriptionTypeDetails';
 import CreateSubscriptionType from './CreateSubscriptionType';
 import { FaEye, FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
 import { CiShoppingTag } from 'react-icons/ci';
+import { RiForbidLine } from 'react-icons/ri';
+import usePermission from '@/hooks/usePermission';
 
 const SubscriptionsTypes = () => {
   const dispatch = useDispatch();
@@ -27,6 +29,13 @@ const SubscriptionsTypes = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
   const maxButtons = 5;
+
+  // Permission checks at the top
+  const canViewSubscriptionTypes = usePermission("view_subscriptiontype");
+  const canAddSubscriptionTypes = usePermission("add_subscriptiontype");
+  const canEditSubscriptionTypes = usePermission("change_subscriptiontype");
+  const canDeleteSubscriptionTypes = usePermission("delete_subscriptiontype");
+
 
   const openCreateModal = () => setIsCreateModalOpen(true);
   const closeCreateModal = () => setIsCreateModalOpen(false);
@@ -128,6 +137,22 @@ const SubscriptionsTypes = () => {
   if (loading) return <div className="text-right p-6">جاري التحميل...</div>;
   if (error) return <div className="text-right p-6 text-red-600">خطأ: {error}</div>;
 
+    // Early return if no view permission
+  if (!canViewSubscriptionTypes) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen text-center p-4" dir="rtl">
+        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+          <RiForbidLine className="text-red-600 text-2xl" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-700 mb-2">لا يوجد صلاحية</h2>
+        <p className="text-gray-500 max-w-md">
+          ليس لديك الصلاحيات اللازمة لعرض أنواع الاشتراكات. يرجى التواصل مع المسؤول.
+        </p>
+      </div>
+    );
+  }
+
+
   return (
     <div className="p-6" dir="rtl">
       <div className="flex justify-between items-center mb-6">
@@ -135,13 +160,15 @@ const SubscriptionsTypes = () => {
           <CiShoppingTag className="text-blue-600 w-9 h-9" />
           <h1 className="text-2xl font-bold">أنواع الاشتراكات</h1>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
-        >
-          <FaPlus className="mr-2" />
-          إضافة نوع جديد
-        </button>
+           {canAddSubscriptionTypes && (
+          <button
+            onClick={openCreateModal}
+            className="flex items-center bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+          >
+            <FaPlus className="mr-2" />
+            إضافة نوع جديد
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -230,28 +257,32 @@ const SubscriptionsTypes = () => {
                     عرض التفاصيل
                   </span>
                 </div>
-                <div className="relative group">
-                  <button
-                    onClick={() => openModal(type)}
-                    className="text-blue-500 p-2 rounded hover:text-blue-600 transition-colors"
-                  >
-                    <FaEdit />
-                  </button>
-                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    تعديل
-                  </span>
-                </div>
-                <div className="relative group">
-                  <button
-                    onClick={() => openDeleteModal(type)}
-                    className="text-red-500 p-2 rounded hover:text-red-600 transition-colors"
-                  >
-                    <FaTrash />
-                  </button>
-                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    حذف
-                  </span>
-                </div>
+                  {canEditSubscriptionTypes && (
+                  <div className="relative group">
+                    <button
+                      onClick={() => openModal(type)}
+                      className="text-blue-500 p-2 rounded hover:text-blue-600 transition-colors"
+                    >
+                      <FaEdit />
+                    </button>
+                    <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      تعديل
+                    </span>
+                  </div>
+                )}
+                    {canDeleteSubscriptionTypes && (
+                  <div className="relative group">
+                    <button
+                      onClick={() => openDeleteModal(type)}
+                      className="text-red-500 p-2 rounded hover:text-red-600 transition-colors"
+                    >
+                      <FaTrash />
+                    </button>
+                    <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      حذف
+                    </span>
+                  </div>
+                )}
               </div>
             </li>
           ))

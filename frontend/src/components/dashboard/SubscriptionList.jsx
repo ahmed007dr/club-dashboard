@@ -25,9 +25,11 @@ import usePermission from "@/hooks/usePermission";
 
 const SubscriptionList = () => {
   const dispatch = useDispatch();
-  const { subscriptions, status, error, updateStatus } = useSelector(
+  const { subscriptions, pagination, status, error, updateStatus } = useSelector(
     (state) => state.subscriptions
   );
+  console.log("Subscriptions data:", subscriptions);
+  console.log("Pagination:", pagination);
 
   const canAddSubscription = usePermission("add_subscription");
   const canUpdateSubscription = usePermission("change_subscription");
@@ -53,10 +55,21 @@ const SubscriptionList = () => {
     entryCount: "",
   });
 
+  // Normalize status values
+  const normalizeStatus = (status) => {
+    if (!status || status === "unknown") return "غير معروف";
+    const statusMap = {
+      active: "Active",
+      expired: "Expired",
+      upcoming: "Upcoming",
+    };
+    return statusMap[status.toLowerCase()] || "غير معروف";
+  };
+
   // Sort subscriptions by id (newest first - descending)
   const sortedSubscriptions = [...subscriptions].sort((a, b) => b.id - a.id);
 
-  // Apply filters to the sorted array
+  // Apply filters to the sorted array (client-side filtering)
   const filteredSubscriptions = sortedSubscriptions.filter((subscription) => {
     const matchesMember = filters.memberName
       ? subscription.member_details.name
@@ -64,7 +77,7 @@ const SubscriptionList = () => {
           .includes(filters.memberName.toLowerCase())
       : true;
     const matchesStatus = filters.status
-      ? subscription.status === filters.status
+      ? normalizeStatus(subscription.status) === filters.status
       : true;
     const subscriptionStartDate = new Date(subscription.start_date);
     const subscriptionEndDate = new Date(subscription.end_date);
@@ -85,9 +98,9 @@ const SubscriptionList = () => {
           .toLowerCase()
           .includes(filters.clubName.toLowerCase())
       : true;
-   const matchesEntryCount = filters.entryCount
-  ? subscription.entry_count === parseInt(filters.entryCount)
-  : true;
+    const matchesEntryCount = filters.entryCount
+      ? subscription.entry_count === parseInt(filters.entryCount)
+      : true;
     return (
       matchesMember &&
       matchesStatus &&
@@ -99,24 +112,18 @@ const SubscriptionList = () => {
   });
 
   // Pagination configuration
-  const totalItems = filteredSubscriptions.length;
+  const totalItems = pagination.count || 0;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentSubscriptions = filteredSubscriptions.slice(
-    indexOfFirstItem,
-    indexOfLastItem
-  );
+  const currentSubscriptions = filteredSubscriptions;
 
   // Generate pagination range
   const getPaginationRange = () => {
-    const maxButtons = 5; // Maximum number of page buttons to show
+    const maxButtons = 5;
     const sideButtons = Math.floor(maxButtons / 2);
 
     let start = Math.max(1, currentPage - sideButtons);
     let end = Math.min(totalPages, currentPage + sideButtons);
 
-    // Adjust start and end to always show maxButtons when possible
     if (end - start + 1 < maxButtons) {
       if (currentPage <= sideButtons) {
         end = Math.min(totalPages, maxButtons);
@@ -132,11 +139,10 @@ const SubscriptionList = () => {
   const handlePageChange = (pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
       setCurrentPage(pageNumber);
-      window.scrollTo(0, 0); // Scroll to top on page change
+      window.scrollTo(0, 0);
     }
   };
 
-  // Jump to first/last page
   const goToFirstPage = () => handlePageChange(1);
   const goToLastPage = () => handlePageChange(totalPages);
 
@@ -163,7 +169,6 @@ const SubscriptionList = () => {
 
   const handleInputChange = (e, subscriptionId) => {
     const { value } = e.target;
-    // Only allow positive numbers with optional decimal
     if (/^\d*\.?\d*$/.test(value) && !value.startsWith("-")) {
       setPaymentAmounts((prev) => ({
         ...prev,
@@ -176,7 +181,6 @@ const SubscriptionList = () => {
     const amountStr = paymentAmounts[subscription.id] || "";
     const remainingAmount = parseFloat(subscription.remaining_amount);
 
-    // Validate the amount
     if (!amountStr || amountStr === "0" || amountStr === "0.00") {
       alert("الرجاء إدخال مبلغ صالح للدفع");
       return;
@@ -212,7 +216,12 @@ const SubscriptionList = () => {
           ...prev,
           [subscription.id]: "",
         }));
-        dispatch(fetchSubscriptions()); // Refresh the list
+        dispatch(
+          fetchSubscriptions({
+            page: currentPage,
+            pageSize: itemsPerPage,
+          })
+        );
       })
       .catch((error) => {
         console.error(error);
@@ -235,8 +244,13 @@ const SubscriptionList = () => {
   };
 
   useEffect(() => {
-    dispatch(fetchSubscriptions());
-  }, [dispatch]);
+    dispatch(
+      fetchSubscriptions({
+        page: currentPage,
+        pageSize: itemsPerPage,
+      })
+    );
+  }, [dispatch, currentPage]);
 
   const openModal = (subscription) => {
     setSelectedSubscription(subscription);
@@ -262,22 +276,34 @@ const SubscriptionList = () => {
     ).then(() => {
       if (updateStatus === "succeeded") {
         closeModal();
-        dispatch(fetchSubscriptions());
+        dispatch(
+          fetchSubscriptions({
+            page: currentPage,
+            pageSize: itemsPerPage,
+          })
+        );
       }
     });
   };
 
   const handleRenew = (subscriptionId) => {
-    dispatch(renewSubscription({ subscriptionId }));
+    dispatch(renewSubscription({ subscriptionId })).then(() => {
+      dispatch(
+        fetchSubscriptions({
+          page: currentPage,
+          pageSize: itemsPerPage,
+        })
+      );
+    });
   };
 
   if (status === "loading") {
-    return <div className="text-center text-xl text-gray-500">Loading...</div>;
+    return <div className="text-center text-xl text-gray-500">جاري التحميل...</div>;
   }
 
   if (status === "failed") {
     return (
-      <div className="text-center text-xl text-red-500">Error: {error}</div>
+      <div className="text-center text-xl text-red-500">خطأ: {error}</div>
     );
   }
 
@@ -291,14 +317,18 @@ const SubscriptionList = () => {
             قائمة الاشتراكات
           </h2>
         </div>
-        <button onClick={() => setCreateModalOpen(true)} className="btn">
-          إضافة اشتراك
-        </button>
+        {canAddSubscription && (
+          <button
+            onClick={() => setCreateModalOpen(true)}
+            className="btn bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+          >
+            إضافة اشتراك
+          </button>
+        )}
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-4 my-6 px-4" dir="rtl">
-        {/* Member Name Filter */}
         <div className="flex flex-col w-56">
           <label className="text-sm font-medium text-gray-700 mb-1 text-right">
             اسم العضو
@@ -312,8 +342,6 @@ const SubscriptionList = () => {
             className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
           />
         </div>
-
-        {/* Start Date Filter */}
         <div className="flex flex-col w-56">
           <label className="text-sm font-medium text-gray-700 mb-1 text-right">
             تاريخ البدء
@@ -326,8 +354,6 @@ const SubscriptionList = () => {
             className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm transition-all duration-200 ease-in-out"
           />
         </div>
-
-        {/* End Date Filter */}
         <div className="flex flex-col w-56">
           <label className="text-sm font-medium text-gray-700 mb-1 text-right">
             تاريخ الانتهاء
@@ -340,8 +366,6 @@ const SubscriptionList = () => {
             className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm transition-all duration-200 ease-in-out"
           />
         </div>
-
-        {/* Club Name Filter */}
         <div className="flex flex-col w-56">
           <label className="text-sm font-medium text-gray-700 mb-1 text-right">
             اسم النادي
@@ -355,8 +379,6 @@ const SubscriptionList = () => {
             className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
           />
         </div>
-
-        {/* Attendance Days Filter */}
         <div className="flex flex-col w-56">
           <label className="text-sm font-medium text-gray-700 mb-1 text-right">
             عدد الإدخالات
@@ -371,8 +393,6 @@ const SubscriptionList = () => {
             className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
           />
         </div>
-
-        {/* Status Filter */}
         <div className="flex flex-col w-56">
           <label className="text-sm font-medium text-gray-700 mb-1 text-right">
             الحالة
@@ -389,10 +409,11 @@ const SubscriptionList = () => {
             <option value="Upcoming">قادمة</option>
           </select>
         </div>
-
-        {/* Reset Filters Button */}
         <div className="flex items-end">
-          <button onClick={resetFilters} className="btn">
+          <button
+            onClick={resetFilters}
+            className="btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
+          >
             <FaArrowRotateLeft />
           </button>
         </div>
@@ -424,123 +445,135 @@ const SubscriptionList = () => {
               </tr>
             </thead>
             <tbody>
-              {currentSubscriptions.map((subscription) => (
-                <tr
-                  key={subscription.id}
-                  className="border-b hover:bg-gray-50 transition"
-                >
-                  <td className="py-1 px-2 text-sm">
-                    <Link
-                      to={`/member-subscriptions/${subscription.member_details.id}`}
-                      className="text-blue-600 hover:underline"
-                    >
-                      {subscription.member_details.name}
-                    </Link>
-                  </td>
-                  <td className="py-1 px-2 text-sm">
-                    {subscription.club_details.name}
-                  </td>
-                  <td className="py-1 px-2 text-sm">
-                    {subscription.start_date}
-                  </td>
-                  <td className="py-1 px-2 text-sm">{subscription.end_date}</td>
-                  <td className="py-1 px-2 text-sm">
-                    {subscription.entry_count}
-                  </td>
-                  <td className="py-1 px-2 text-sm">
-                    {subscription.type_details.max_entries -
-                      subscription.entry_count}
-                  </td>
-                  <td className="py-1 px-2 text-sm">
-                    ${subscription.paid_amount}
-                  </td>
-                  <td className="py-1 px-2 text-sm">
-                    ${subscription.remaining_amount}
-                  </td>
-                  <td className="py-1 px-2 text-sm">
-                    <span
-                      className={`px-1 py-0.5 rounded text-xs font-medium
-                        ${
-                          subscription.status === "Active"
-                            ? "bg-green-100 text-green-600"
-                            : subscription.status === "Expired"
-                            ? "bg-red-100 text-red-600"
-                            : subscription.status === "Upcoming"
-                            ? "bg-blue-100 text-blue-600"
-                            : ""
-                        }`}
-                    >
-                      {subscription.status}
-                    </span>
-                  </td>
-                  <td className="py-1 px-2 flex items-center">
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      pattern="[0-9]*\.?[0-9]*"
-                      placeholder="0.00"
-                      value={paymentAmounts[subscription.id] || ""}
-                      onChange={(e) => handleInputChange(e, subscription.id)}
-                      className="border p-0.5 rounded w-12 text-sm"
-                    />
-                    <button
-                      onClick={() => handlePayment(subscription)}
-                      className="btn text-sm px-2 py-0.5 ml-1"
-                      disabled={updateStatus === "loading"}
-                    >
-                      {updateStatus === "loading" ? "جاري الدفع..." : "دفع"}
-                    </button>
-                  </td>
-                  <td className="py-1 px-2">
-                    <div className="flex items-center gap-1">
-                      <DropdownMenu dir="rtl">
-                        <DropdownMenuTrigger asChild>
-                          <button className="bg-gray-200 text-gray-700 px-0.5 py-0.5 rounded-md hover:bg-gray-300 transition-colors">
-                            <MoreVertical className="h-4 w-4" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          className="w-32 text-sm"
-                        >
-                          <DropdownMenuItem
-                            onClick={() => openModal(subscription)}
-                            className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+              {currentSubscriptions.map((subscription) => {
+                const displayStatus = normalizeStatus(subscription.status);
+                return (
+                  <tr
+                    key={subscription.id}
+                    className="border-b hover:bg-gray-50 transition"
+                  >
+                    <td className="py-1 px-2 text-sm">
+                      <Link
+                        to={`/member-subscriptions/${subscription.member_details.id}`}
+                        className="text-blue-600 hover:underline"
+                      >
+                        {subscription.member_details.name}
+                      </Link>
+                    </td>
+                    <td className="py-1 px-2 text-sm">
+                      {subscription.club_details.name}
+                    </td>
+                    <td className="py-1 px-2 text-sm">
+                      {subscription.start_date}
+                    </td>
+                    <td className="py-1 px-2 text-sm">{subscription.end_date}</td>
+                    <td className="py-1 px-2 text-sm">
+                      {subscription.entry_count}
+                    </td>
+                    <td className="py-1 px-2 text-sm">
+                      {subscription.type_details.max_entries -
+                        subscription.entry_count}
+                    </td>
+                    <td className="py-1 px-2 text-sm">
+                      ${subscription.paid_amount}
+                    </td>
+                    <td className="py-1 px-2 text-sm">
+                      ${subscription.remaining_amount}
+                    </td>
+                    <td className="py-1 px-2 text-sm">
+                      <span
+                        className={`px-1 py-0.5 rounded text-xs font-medium
+                          ${
+                            displayStatus === "Active"
+                              ? "bg-green-100 text-green-600"
+                              : displayStatus === "Expired"
+                              ? "bg-red-100 text-red-600"
+                              : displayStatus === "Upcoming"
+                              ? "bg-blue-100 text-blue-600"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
+                      >
+                        {displayStatus === "Active"
+                          ? "نشط"
+                          : displayStatus === "Expired"
+                          ? "منتهي"
+                          : displayStatus === "Upcoming"
+                          ? "قادمة"
+                          : "غير معروف"}
+                      </span>
+                    </td>
+                    <td className="py-1 px-2 flex items-center">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        pattern="[0-9]*\.?[0-9]*"
+                        placeholder="0.00"
+                        value={paymentAmounts[subscription.id] || ""}
+                        onChange={(e) => handleInputChange(e, subscription.id)}
+                        className="border p-0.5 rounded w-12 text-sm"
+                      />
+                      <button
+                        onClick={() => handlePayment(subscription)}
+                        className="btn bg-blue-500 text-white px-2 py-0.5 ml-1 rounded-lg hover:bg-blue-600"
+                        disabled={updateStatus === "loading"}
+                      >
+                        {updateStatus === "loading" ? "جاري الدفع..." : "دفع"}
+                      </button>
+                    </td>
+                    <td className="py-1 px-2">
+                      <div className="flex items-center gap-1">
+                        <DropdownMenu dir="rtl">
+                          <DropdownMenuTrigger asChild>
+                            <button className="bg-gray-200 text-gray-700 px-0.5 py-0.5 rounded-md hover:bg-gray-300 transition-colors">
+                              <MoreVertical className="h-4 w-4" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-32 text-sm"
                           >
-                            تعديل
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => openDetailModal(subscription.id)}
-                            className="cursor-pointer text-green-600 hover:bg-yellow-50"
-                          >
-                            عرض
-                          </DropdownMenuItem>
-                          {subscription.status === "Expired" && (
+                            {canUpdateSubscription && (
+                              <DropdownMenuItem
+                                onClick={() => openModal(subscription)}
+                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                              >
+                                تعديل
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem
-                              onClick={() => handleRenew(subscription.id)}
-                              className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                              onClick={() => openDetailModal(subscription.id)}
+                              className="cursor-pointer text-green-600 hover:bg-yellow-50"
                             >
-                              تجديد
+                              عرض
                             </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            onClick={() => openDeleteModal(subscription)}
-                            className="cursor-pointer text-red-600 hover:bg-red-50"
-                          >
-                            حذف
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                            {subscription.status === "Expired" && (
+                              <DropdownMenuItem
+                                onClick={() => handleRenew(subscription.id)}
+                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                              >
+                                تجديد
+                              </DropdownMenuItem>
+                            )}
+                            {canDeleteSubscription && (
+                              <DropdownMenuItem
+                                onClick={() => openDeleteModal(subscription)}
+                                className="cursor-pointer text-red-600 hover:bg-red-50"
+                              >
+                                حذف
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
 
-      {/* Pagination */}
       {/* Pagination */}
       {totalItems === 0 && (
         <div className="text-center text-sm text-gray-600 mt-6">
@@ -548,79 +581,67 @@ const SubscriptionList = () => {
         </div>
       )}
       {totalItems > 0 && (
-        <div
-          className="flex justify-center items-center mt-6 space-x-2"
-          dir="rtl"
-        >
-          {/* First Page Button */}
+        <div className="flex justify-center items-center mt-6 space-x-2" dir="rtl">
           <button
             onClick={goToFirstPage}
-            disabled={currentPage === 1 || totalItems === 0}
+            disabled={currentPage === 1}
             className={`px-3 py-2 rounded-lg ${
-              currentPage === 1 || totalItems === 0
+              currentPage === 1
                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                 : "bg-blue-500 text-white hover:bg-blue-600"
             } transition`}
           >
             الأول
           </button>
-
-          {/* Previous Page Button */}
           <button
             onClick={() => handlePageChange(currentPage - 1)}
-            disabled={currentPage === 1 || totalItems === 0}
+            disabled={currentPage === 1}
             className={`px-3 py-2 rounded-lg ${
-              currentPage === 1 || totalItems === 0
+              currentPage === 1
                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                 : "bg-blue-500 text-white hover:bg-blue-600"
             } transition`}
           >
             السابق
           </button>
-
-          {/* Page Number Buttons */}
           {getPaginationRange().map((page) => (
             <button
               key={page}
               onClick={() => handlePageChange(page)}
-              disabled={totalItems === 0}
               className={`px-3 py-2 rounded-lg ${
-                currentPage === page && totalItems > 0
+                currentPage === page
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-              } ${totalItems === 0 ? "cursor-not-allowed" : ""} transition`}
+              } transition`}
             >
               {page}
             </button>
           ))}
-
-          {/* Next Page Button */}
           <button
-            onClick={() => handlePageChange(currentPage + 1)}
-            disabled={currentPage === totalPages || totalItems === 0}
+            onClick={() => {
+              console.log("Next button clicked, going to page:", currentPage + 1);
+              handlePageChange(currentPage + 1);
+            }}
+            disabled={currentPage === totalPages}
             className={`px-3 py-2 rounded-lg ${
-              currentPage === totalPages || totalItems === 0
+              currentPage === totalPages
                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                 : "bg-blue-500 text-white hover:bg-blue-600"
             } transition`}
           >
             التالي
           </button>
-
-          {/* Last Page Button */}
           <button
             onClick={goToLastPage}
-            disabled={currentPage === totalPages || totalItems === 0}
+            disabled={currentPage === totalPages}
             className={`px-3 py-2 rounded-lg ${
-              currentPage === totalPages || totalItems === 0
+              currentPage === totalPages
                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                 : "bg-blue-500 text-white hover:bg-blue-600"
             } transition`}
           >
             الأخير
           </button>
-
-          {/* Page Info */}
           <span className="text-sm text-gray-600 mx-2">
             صفحة {currentPage} من {totalPages} (إجمالي: {totalItems} اشتراك)
           </span>
@@ -654,11 +675,13 @@ const SubscriptionList = () => {
         />
       )}
 
-      {canDeleteSubscription && <DeleteSubscriptionModal
-        isOpen={deleteModalOpen}
-        onClose={() => setDeleteModalOpen(false)}
-        subscription={selectedSubscription}
-      />}
+      {canDeleteSubscription && (
+        <DeleteSubscriptionModal
+          isOpen={deleteModalOpen}
+          onClose={() => setDeleteModalOpen(false)}
+          subscription={selectedSubscription}
+        />
+      )}
 
       {detailModalOpen && detailSubscription && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
@@ -666,7 +689,6 @@ const SubscriptionList = () => {
             <h3 className="text-2xl font-semibold mb-4 text-gray-800">
               تفاصيل الاشتراك
             </h3>
-
             <div className="space-y-3 mb-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -677,23 +699,21 @@ const SubscriptionList = () => {
                 </div>
                 <div>
                   <p className="text-gray-600 font-medium">رقم العضوية:</p>
-                  <p className="text-gray-800">250515009</p>
+                  <p className="text-gray-800">
+                    {detailSubscription.member_details.membership_number || "غير متوفر"}
+                  </p>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-600 font-medium">تاريخ البدء:</p>
-                  <p className="text-gray-800">
-                    {detailSubscription.start_date}
-                  </p>
+                  <p className="text-gray-800">{detailSubscription.start_date}</p>
                 </div>
                 <div>
                   <p className="text-gray-600 font-medium">تاريخ الانتهاء:</p>
                   <p className="text-gray-800">{detailSubscription.end_date}</p>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-600 font-medium">المبلغ المدفوع:</p>
@@ -708,13 +728,10 @@ const SubscriptionList = () => {
                   </p>
                 </div>
               </div>
-
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-600 font-medium">عدد الإدخالات:</p>
-                  <p className="text-gray-800">
-                    {detailSubscription.entry_count}
-                  </p>
+                  <p className="text-gray-800">{detailSubscription.entry_count}</p>
                 </div>
                 <div>
                   <p className="text-gray-600 font-medium">اسم النادي:</p>
@@ -724,45 +741,6 @@ const SubscriptionList = () => {
                 </div>
               </div>
             </div>
-
-            <div className="border-t pt-4">
-              <h4 className="text-lg font-semibold mb-2 text-gray-800">
-                معلومات إضافية
-              </h4>
-              <div className="space-y-2">
-                <p>
-                  <span className="text-gray-600 font-medium">رقم الهوية:</span>{" "}
-                  87356596775325
-                </p>
-                <p>
-                  <span className="text-gray-600 font-medium">
-                    تاريخ الميلاد:
-                  </span>{" "}
-                  1969-09-04
-                </p>
-                <p>
-                  <span className="text-gray-600 font-medium">الهاتف:</span>{" "}
-                  222222222222
-                </p>
-                <p>
-                  <span className="text-gray-600 font-medium">هاتف إضافي:</span>{" "}
-                  3333333333333
-                </p>
-                <p>
-                  <span className="text-gray-600 font-medium">المهنة:</span>{" "}
-                  Telecommunications researcher
-                </p>
-                <p>
-                  <span className="text-gray-600 font-medium">العنوان:</span>{" "}
-                  97646 Whitaker Manors, New Matthew, AS 18521
-                </p>
-                <p>
-                  <span className="text-gray-600 font-medium">ملاحظات:</span>{" "}
-                  Guess despite again network.
-                </p>
-              </div>
-            </div>
-
             <button
               onClick={() => setDetailModalOpen(false)}
               className="mt-6 w-full px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"

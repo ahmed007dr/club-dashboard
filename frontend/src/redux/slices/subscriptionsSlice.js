@@ -487,45 +487,31 @@ export const fetchSubscriptions = createAsyncThunk(
         },
       };
 
-      // Ensure params is an object
-      const safeParams =
-        typeof params === "object" && params !== null ? params : {};
-
+      const safeParams = typeof params === "object" && params !== null ? params : {};
       const query = new URLSearchParams({
         page: Number(safeParams.page) || 1,
-        ...(safeParams.member_name && { member_name: safeParams.member_name }),
+        page_size: safeParams.pageSize || 20, // Add page_size parameter
+        ...(safeParams.memberName && { member_name: safeParams.memberName }),
         ...(safeParams.status && { status: safeParams.status }),
-        ...(safeParams.start_date && { start_date: safeParams.start_date }),
-        ...(safeParams.end_date && { end_date: safeParams.end_date }),
-        ...(safeParams.club_name && { club_name: safeParams.club_name }),
-        ...(safeParams.attendance_days && {
-          attendance_days: safeParams.attendance_days,
-        }),
+        ...(safeParams.startDate && { start_date: safeParams.startDate }),
+        ...(safeParams.endDate && { end_date: safeParams.endDate }),
+        ...(safeParams.clubName && { club_name: safeParams.clubName }),
+        ...(safeParams.entryCount && { attendance_days: safeParams.entryCount }),
         ...(safeParams.sort && { sort: safeParams.sort }),
       }).toString();
 
       const [allRes, activeRes, upcomingRes, expiredRes] = await Promise.all([
-        axios.get(
-          `${BASE_URL}/subscriptions/api/subscriptions/?${query}`,
-          config
-        ),
-        axios.get(
-          `${BASE_URL}/subscriptions/api/subscriptions/active/`,
-          config
-        ),
-        axios.get(
-          `${BASE_URL}/subscriptions/api/subscriptions/upcoming/`,
-          config
-        ),
-        axios.get(
-          `${BASE_URL}/subscriptions/api/subscriptions/expired/`,
-          config
-        ),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/?${query}`, config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/active/`, config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/upcoming/`, config),
+        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/expired/`, config),
       ]);
 
-      console.log("activeRes.data:", activeRes.data);
-      console.log("upcomingRes.data:", upcomingRes.data);
-      console.log("expiredRes.data:", expiredRes.data);
+      console.log("API Response:", {
+        count: allRes.data.count,
+        resultsLength: allRes.data.results.length,
+        next: allRes.data.next,
+      });
 
       const getArray = (res) =>
         Array.isArray(res.data)
@@ -559,7 +545,6 @@ export const fetchSubscriptions = createAsyncThunk(
         count: allRes.data.count,
         next: allRes.data.next,
         previous: allRes.data.previous,
-        results: allRes.data.results,
       };
     } catch (error) {
       console.error("Error fetching subscriptions:", {
@@ -567,9 +552,7 @@ export const fetchSubscriptions = createAsyncThunk(
         response: error.response?.data,
         stack: error.stack,
       });
-      return rejectWithValue(
-        error.response?.data || "Error fetching subscriptions"
-      );
+      return rejectWithValue(error.response?.data || "Error fetching subscriptions");
     }
   }
 );
@@ -619,7 +602,7 @@ const subscriptionsSlice = createSlice({
     memberSubscriptions: [],
     upcomingSubscriptions: [],
     attendances: [],
-    pagination: {
+ pagination: {
       page: 1,
       count: 0,
       next: null,
@@ -717,7 +700,7 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(fetchSubscriptions.pending, (state) => {
+ .addCase(fetchSubscriptions.pending, (state) => {
         state.status = "loading";
       })
       .addCase(fetchSubscriptions.fulfilled, (state, action) => {

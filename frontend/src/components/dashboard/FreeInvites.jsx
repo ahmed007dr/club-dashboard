@@ -11,6 +11,7 @@ import {
 import { RiVipCrown2Line } from "react-icons/ri";
 import BASE_URL from '../../config/api';
 import { toast } from 'react-hot-toast';
+import usePermission from "@/hooks/usePermission";
 
 const InviteList = () => {
   const dispatch = useDispatch();
@@ -27,6 +28,12 @@ const InviteList = () => {
   
   const [userClub, setUserClub] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
+
+   // Permission checks
+  const canViewInvites = usePermission("view_freeinvite");
+  const canAddInvites = usePermission("add_freeinvite");
+  const canDeleteInvites = usePermission("delete_freeinvite");
+  const canEditInvites = usePermission("change_freeinvite"); // Assuming this is the correct permission name
 
   // Modal states
   const [showAddModal, setShowAddModal] = useState(false);
@@ -91,6 +98,7 @@ const InviteList = () => {
 
   // Fetch invites with pagination
   useEffect(() => {
+     if (!canViewInvites) return;
     if (userClub?.id) {
       const params = {
         page: currentPage,
@@ -362,7 +370,7 @@ const InviteList = () => {
   if (!userClub) {
     return (
       <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
-        لا يمكن تحميل بيانات النادي. يرجى التحقق من اتصالك بالإنترنت أو إعادة تسجيل الدخول.
+        لا يمكن تحميل بيانات النادي. إما أنك لا تملك الصلاحية اللازمة أو هناك مشكلة في تحميل البيانات.
       </div>
     );
   }
@@ -378,10 +386,27 @@ const InviteList = () => {
   // Calculate total pages based on backend count
   const totalPages = Math.ceil(totalItems / itemsPerPage);
 
+    // Early return if user doesn't have view permission
+  if (!canViewInvites) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen text-center p-4" dir="rtl">
+        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+          <RiForbidLine className="text-red-600 text-2xl" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-700 mb-2">لا يوجد صلاحية</h2>
+        <p className="text-gray-500 max-w-md">
+          ليس لديك الصلاحيات اللازمة لعرض الدعوات المجانية. يرجى التواصل مع المسؤول.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8" dir="rtl">
       <div className="flex items-start justify-between">
+        {canAddInvites && (
         <div className="flex justify-between items-center mb-8">
+
           <button
             onClick={() => setShowAddModal(true)}
             className="btn flex items-center bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
@@ -403,6 +428,7 @@ const InviteList = () => {
             </svg>
           </button>
         </div>
+        )}
         <div className="flex items-start space-x-3">
           <h1 className="text-2xl font-bold">الدعوات المجانية</h1>
           <RiVipCrown2Line className="text-blue-600 w-9 h-9 text-2xl" />
@@ -481,6 +507,7 @@ const InviteList = () => {
               </div>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700 px-6 py-3 flex justify-end space-x-2">
+               {canEditInvites && (
               <button
                 onClick={() => openEditModal(invite.id)}
                 className="text-blue-600 hover:text-blue-800 p-2 rounded-full hover:bg-blue-50"
@@ -499,6 +526,7 @@ const InviteList = () => {
                   />
                 </svg>
               </button>
+              )}
               <button
                 onClick={() => openMarkUsedModal(invite.id)}
                 disabled={invite.status === "used"}
@@ -523,6 +551,7 @@ const InviteList = () => {
                   />
                 </svg>
               </button>
+              {canDeleteInvites && (
               <button
                 onClick={() => openDeleteModal(invite.id)}
                 className="text-red-600 hover:text-red-800 p-2 rounded-full hover:bg-red-50"
@@ -541,6 +570,7 @@ const InviteList = () => {
                   />
                 </svg>
               </button>
+              )}
             </div>
           </div>
         ))}

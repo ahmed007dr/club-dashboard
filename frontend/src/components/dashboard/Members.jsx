@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import AddMember from "../modals/AddMember";
 import { Link } from "react-router-dom";
 import { CiTrash, CiEdit } from "react-icons/ci";
-import { RiGroupLine } from "react-icons/ri";
 import { useSelector, useDispatch } from "react-redux";
 import {
   deleteMember,
@@ -12,7 +11,8 @@ import {
 } from "../../redux/slices/memberSlice";
 import { IoAddOutline } from "react-icons/io5";
 import toast from 'react-hot-toast';
-
+import usePermission from "@/hooks/usePermission"; 
+import { RiGroupLine, RiForbidLine } from "react-icons/ri";
 const Members = () => {
   const [data, setData] = useState([
     {
@@ -39,6 +39,12 @@ const Members = () => {
   const [searchResult, setSearchResult] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20; // Matches backend configuration
+
+    // Permission checks
+  const canViewMembers = usePermission("view_member");
+  const canAddMembers = usePermission("add_member");
+  const canEditMembers = usePermission("change_member");
+  const canDeleteMembers = usePermission("delete_member");
 
   // Updated selectors
   const members = useSelector((state) => state.member.items); // Now an array (results)
@@ -151,6 +157,21 @@ const Members = () => {
     }
   };
 
+    // Conditional rendering for no permission
+  if (!canViewMembers) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen text-center p-4" dir="rtl">
+        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
+          <RiForbidLine className="text-red-600 text-2xl" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-700 mb-2">لا يوجد صلاحية</h2>
+        <p className="text-gray-500 max-w-md">
+          ليس لديك الصلاحيات اللازمة لعرض الأعضاء. يرجى التواصل مع المسؤول.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 overflow-x-auto" dir="rtl">
       <div className="flex items-start space-x-3">
@@ -165,15 +186,18 @@ const Members = () => {
         placeholder="ابحث بالاسم، رقم العضوية، أو الرقم القومي"
         className="border p-2 rounded-md mb-4 w-full"
       />
-      <div className="flex justify-end mb-4">
-        <button
-          onClick={openAddModal}
-          className="flex justify-end text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2"
-        >
-          <IoAddOutline className="flex inline-block text-xl" />
-          إضافة عضو
-        </button>
-      </div>
+           {/* Only show add button if user has permission */}
+      {canAddMembers && (
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={openAddModal}
+            className="flex justify-end text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2"
+          >
+            <IoAddOutline className="flex inline-block text-xl" />
+            إضافة عضو
+          </button>
+        </div>
+      )}
 
       <table className="min-w-full border border-gray-200">
         <thead className="text-right">
@@ -198,15 +222,17 @@ const Members = () => {
                 </td>
                 <td className="p-3 border-b">
                   <Link to={`/member/${member.id}`}>
-                    <img
-                      src={
-                        member.photo
-                          ? member.photo
-                          : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"
-                      }
-                      alt="member"
-                      className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
-                    />
+                          
+            <img
+              src={
+                member.photo
+                  ? member.photo
+                  : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"
+              }
+              alt="member"
+              className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
+            />
+        
                   </Link>
                 </td>
                 <td className="p-3 border-b">{member.name}</td>
@@ -217,20 +243,25 @@ const Members = () => {
                 <td className="p-3 border-b">{member.club_name}</td>
                 <td className="p-3 border-b">
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditClick(member)}
-                      className="text-green-700 text-xl"
-                      title="Edit"
-                    >
-                      <CiEdit />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(member)}
-                      className="text-red-500 text-xl"
-                      title="Delete"
-                    >
-                      <CiTrash />
-                    </button>
+                         {canEditMembers && (
+                      <button
+                        onClick={() => handleEditClick(member)}
+                        className="text-green-700 text-xl"
+                        title="Edit"
+                      >
+                        <CiEdit />
+                      </button>
+                    )}
+                      {/* Only show delete button if user has permission */}
+                    {canDeleteMembers && (
+                      <button
+                        onClick={() => handleDeleteClick(member)}
+                        className="text-red-500 text-xl"
+                        title="Delete"
+                      >
+                        <CiTrash />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

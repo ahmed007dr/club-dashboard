@@ -5,7 +5,9 @@ import { fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';
 
 const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) => {
   const dispatch = useDispatch();
-  const { subscriptionTypes } = useSelector((state) => state.subscriptions);
+  const { subscriptionTypes, status: typesStatus, error: typesError } = useSelector(
+    (state) => state.subscriptions
+  );
 
   const [formData, setFormData] = useState({
     club: '',
@@ -112,11 +114,37 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
 
   if (!isOpen) return null;
 
+  if (typesStatus === 'loading') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
+          <p>جاري تحميل أنواع الاشتراك...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (typesError) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+        <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
+          <p className="text-red-500">خطأ: {typesError}</p>
+          <button
+            className="mt-4 px-4 py-2 bg-gray-200 rounded"
+            onClick={onClose}
+          >
+            إغلاق
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
         <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
-          <p>Loading...</p>
+          <p>جاري تحميل...</p>
         </div>
       </div>
     );
@@ -131,7 +159,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
             className="mt-4 px-4 py-2 bg-gray-200 rounded"
             onClick={onClose}
           >
-            Close
+            إغلاق
           </button>
         </div>
       </div>
@@ -198,11 +226,15 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
               required
             >
               <option value="">اختر نوع الاشتراك</option>
-              {subscriptionTypes?.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
+              {subscriptionTypes?.results?.length > 0 ? (
+                subscriptionTypes.results.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))
+              ) : (
+                <option disabled>لا توجد أنواع اشتراك متاحة</option>
+              )}
             </select>
           </div>
 
