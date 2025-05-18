@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { BsPersonBoundingBox } from 'react-icons/bs';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
+import usePermission from "@/hooks/usePermission";
 
 const Profile = () => {
   const [data, setData] = useState(null);
+  const canViewClubs = usePermission("view_club")
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -44,7 +46,11 @@ const Profile = () => {
           <ProfileItem label="الدور" value={capitalize(data.role)} />
           <ProfileItem label="الاسم الأول" value={data.first_name || '-'} />
           <ProfileItem label="اسم العائلة" value={data.last_name || '-'} />
-          <ProfileItem label="النادي" value={data.club.name || '-'} />
+           {canViewClubs ? (
+              <ProfileItem label="النادي" value={data.club?.name || '-'} />
+            ) : (
+              <ProfileItem label="النادي" value="لا يوجد إذن لعرض النادي" />
+            )}
           <ProfileItem
             label="نشط؟"
             value={
