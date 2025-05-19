@@ -52,12 +52,6 @@ def add_ticket_api(request):
     
     if serializer.is_valid():
         club = serializer.validated_data.get('club')
-        if not IsOwnerOrRelatedToClub().has_permission(request, None) or \
-           (club and not IsOwnerOrRelatedToClub().has_object_permission(request, None, club)):
-            return Response(
-                {'error': 'You do not have permission to create a ticket for this club'},
-                status=status.HTTP_403_FORBIDDEN
-            )
 
         identifier = request.data.get('identifier')
         used_by = None
@@ -126,13 +120,45 @@ def ticket_detail_api(request, ticket_id):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def edit_ticket_api(request, ticket_id):
     ticket = get_object_or_404(Ticket, id=ticket_id)
+    
+    identifier = request.data.get('identifier')
+    used_by = None
+    club = ticket.club  
 
+    if identifier:
+        try:
+            members = Member.objects.filter(
+                Q(club=club) & 
+                (
+                    Q(rfid_code=identifier) |
+                    Q(phone=identifier) |
+                    Q(name__iexact=identifier)
+                )
+            )
+            if not members.exists():
+                return Response(
+                    {'error': 'No member found with the provided identifier'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            if members.count() > 1:
+                return Response(
+                    {'error': 'Multiple members found with the provided identifier. Please use a unique RFID or phone.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            used_by = members.first()
+        except Exception as e:
+            return Response(
+                {'error': f'Error processing identifier: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
     serializer = TicketSerializer(ticket, data=request.data)
     if serializer.is_valid():
+
+        if used_by:
+            serializer.validated_data['used_by'] = used_by
+        
         updated_ticket = serializer.save()
 
-        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, updated_ticket):
-            return Response({'error': 'You do not have permission to update this ticket to this club'}, status=status.HTTP_403_FORBIDDEN)
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
