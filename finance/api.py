@@ -5,19 +5,21 @@ from django.shortcuts import get_object_or_404
 from .models import Expense, Income, ExpenseCategory, IncomeSource
 from .serializers import (
     ExpenseSerializer, IncomeSerializer,
-    ExpenseCategorySerializer, IncomeSourceSerializer
+    ExpenseCategorySerializer, IncomeSourceSerializer,ExpenseDetailSerializer ,IncomeDetailSerializer
 )
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub  
 from rest_framework.pagination import PageNumberPagination
 from datetime import datetime, timedelta
 from core.models import Club
-
+from staff.serializers import StaffAttendance 
+from django.db.models import Sum
+from accounts.models import User
 
 class StandardPagination(PageNumberPagination):
-    page_size = 50
+    page_size = 20
     page_size_query_param = 'page_size'
-    max_page_size = 100
+    max_page_size = 20
 
 # Expense Category Views
 @api_view(['GET', 'POST'])
@@ -53,11 +55,21 @@ def expense_api(request):
             expenses = Expense.objects.select_related('category', 'paid_by').all().order_by('-date')
         else:
             today = datetime.now().date()
-            two_days_ago = today - timedelta(days=2)
-            expenses = Expense.objects.select_related('category', 'paid_by').filter(
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
                 club=request.user.club,
-                date__gte=two_days_ago
-            ).order_by('-date')
+                check_in__date=today
+            ).order_by('-check_in').first()
+            
+            if attendance:
+                expenses = Expense.objects.select_related('category', 'paid_by').filter(
+                    club=request.user.club,
+                    paid_by=request.user,  # الموظف بس اللي أدخل المصروف
+                    date__gte=attendance.check_in,
+                    date__lte=attendance.check_out if attendance.check_out else datetime.now()
+                ).order_by('-date')
+            else:
+                expenses = Expense.objects.none()
         
         paginator = StandardPagination()
         page = paginator.paginate_queryset(expenses, request)
@@ -71,15 +83,13 @@ def expense_api(request):
         club_id = data.get('club')
         if club_id:
             club = get_object_or_404(Club, id=club_id)
-            # if not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
-            #     return Response({'error': 'You do not have permission to create an expense for this club'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = ExpenseSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             expense = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
 # Income Source Views
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -113,12 +123,23 @@ def income_api(request):
         if request.user.role in ['owner', 'admin']:
             incomes = Income.objects.select_related('source', 'received_by').all().order_by('-date')
         else:
+            # جيب آخر سجل حضور مفتوح أو مغلق اليوم
             today = datetime.now().date()
-            two_days_ago = today - timedelta(days=2)
-            incomes = Income.objects.select_related('source', 'received_by').filter(
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
                 club=request.user.club,
-                date__gte=two_days_ago
-            ).order_by('-date')
+                check_in__date=today
+            ).order_by('-check_in').first()
+            
+            if attendance:
+                incomes = Income.objects.select_related('source', 'received_by').filter(
+                    club=request.user.club,
+                    received_by=request.user, 
+                    date__gte=attendance.check_in,
+                    date__lte=attendance.check_out if attendance.check_out else datetime.now()
+                ).order_by('-date')
+            else:
+                incomes = Income.objects.none()
         
         paginator = StandardPagination()
         page = paginator.paginate_queryset(incomes, request)
@@ -132,16 +153,14 @@ def income_api(request):
         club_id = data.get('club')
         if club_id:
             club = get_object_or_404(Club, id=club_id)
-            # if not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
-            #     return Response({'error': 'You do not have permission to create an income for this club'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = IncomeSerializer(data=data)
         if serializer.is_valid():
             income = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-# Detail Views
+    
+    # Detail Views
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_detail_api(request, pk):
@@ -185,3 +204,103 @@ def income_detail_api(request, pk):
     elif request.method == 'DELETE':
         income.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+import datetime as dt
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def daily_summary_api(request):
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'Only owners and admins can view daily summaries'}, status=status.HTTP_403_FORBIDDEN)
+    
+    date_str = request.query_params.get('date')  
+    month_str = request.query_params.get('month')  
+    username = request.query_params.get('username')  
+    
+    if date_str:
+        try:
+            filter_date = dt.datetime.strptime(date_str, '%Y-%m-%d').date()
+            date_filter = {'check_in__date': filter_date}
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+    elif month_str:
+        try:
+            year, month = map(int, month_str.split('-'))
+            date_filter = {'check_in__year': year, 'check_in__month': month}
+        except ValueError:
+            return Response({'error': 'Invalid month format. Use YYYY-MM.'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        filter_date = datetime.now().date()
+        date_filter = {'check_in__date': filter_date}
+    
+    if username:
+        employees = User.objects.filter(club=request.user.club, username=username)
+        if not employees.exists():
+            return Response({'error': 'Employee with this username not found or not in this club.'}, status=status.HTTP_404_NOT_FOUND)
+    else:
+        employees = User.objects.filter(club=request.user.club)
+    
+    summary = []
+    
+    for employee in employees:
+        attendances = StaffAttendance.objects.filter(
+            staff=employee,
+            club=request.user.club,
+            **date_filter
+        )
+        
+        employee_summary = {
+            'employee_id': employee.id,
+            'employee_name': employee.username,
+            'attendance_periods': [],
+            'total_expenses': 0,
+            'total_incomes': 0,
+            'net': 0
+        }
+        
+        for attendance in attendances:
+            expenses = Expense.objects.filter(
+                club=request.user.club,
+                paid_by=employee,
+                date__gte=attendance.check_in,
+                date__lte=attendance.check_out if attendance.check_out else datetime.now()
+            )
+            
+            incomes = Income.objects.filter(
+                club=request.user.club,
+                received_by=employee,
+                date__gte=attendance.check_in,
+                date__lte=attendance.check_out if attendance.check_out else datetime.now()
+            )
+            
+            total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or 0
+            total_incomes = incomes.aggregate(total=Sum('amount'))['total'] or 0
+            
+            expense_details = ExpenseDetailSerializer(expenses, many=True).data
+            income_details = IncomeDetailSerializer(incomes, many=True).data
+            
+            attendance_summary = {
+                'attendance_id': attendance.id,
+                'check_in': attendance.check_in,
+                'check_out': attendance.check_out,
+                'duration_hours': attendance.duration_hours(),
+                'expenses': expense_details,
+                'incomes': income_details,
+                'total_expenses': total_expenses,
+                'total_incomes': total_incomes,
+                'net': total_incomes - total_expenses
+            }
+            
+            employee_summary['attendance_periods'].append(attendance_summary)
+            employee_summary['total_expenses'] += total_expenses
+            employee_summary['total_incomes'] += total_incomes
+        
+        employee_summary['net'] = employee_summary['total_incomes'] - employee_summary['total_expenses']
+        if employee_summary['attendance_periods']:  
+            summary.append(employee_summary)
+
+
+    paginator = StandardPagination()
+    page = paginator.paginate_queryset(summary, request)
+    return paginator.get_paginated_response(page)

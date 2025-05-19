@@ -33,10 +33,41 @@ def shift_list_api(request):
     if request.user.role != 'owner':
         shifts = shifts.filter(club=request.user.club)
 
+    # Apply filters
+    if 'club_name' in request.GET:
+        club_name = request.GET['club_name']
+        shifts = shifts.filter(club__name=club_name)
+    
+    if 'staff_username' in request.GET:
+        staff_username = request.GET['staff_username']
+        shifts = shifts.filter(staff__username=staff_username)
+    
+    if 'date' in request.GET:
+        try:
+            date = datetime.strptime(request.GET['date'], '%Y-%m-%d').date()
+            shifts = shifts.filter(date=date)
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if 'date_min' in request.GET:
+        try:
+            date_min = datetime.strptime(request.GET['date_min'], '%Y-%m-%d').date()
+            shifts = shifts.filter(date__gte=date_min)
+        except ValueError:
+            return Response({'error': 'Invalid date_min format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if 'date_max' in request.GET:
+        try:
+            date_max = datetime.strptime(request.GET['date_max'], '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid date_max format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+        shifts = shifts.filter(date__lte=date_max)
+
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(shifts, request)
     serializer = ShiftSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

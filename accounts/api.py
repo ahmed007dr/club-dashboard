@@ -7,6 +7,7 @@ from django.contrib.auth import authenticate
 from .serializers import UserProfileSerializer, LoginSerializer, RFIDLoginSerializer
 from utils.permissions import IsOwnerOrRelatedToClub
 from .models import User
+from rest_framework.pagination import PageNumberPagination
 
 
 @api_view(['POST'])
@@ -57,9 +58,6 @@ def api_logout(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_profile(request):
-    """
-    Return the profile of the authenticated user, including permissions and groups.
-    """
     user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=request.user.id)
     serializer = UserProfileSerializer(user)
     return Response(serializer.data)
@@ -68,16 +66,15 @@ def api_user_profile(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_list(request):
-    """
-    Return a list of users, filtered by club for non-owners, including permissions and groups.
-    """
     if request.user.role == 'owner':
         users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').all()
     else:
         users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').filter(club=request.user.club)
 
-    serializer = UserProfileSerializer(users, many=True)
-    return Response(serializer.data)
+    paginator = PageNumberPagination()
+    result_page = paginator.paginate_queryset(users, request)
+    serializer = UserProfileSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 
 @api_view(['POST'])
