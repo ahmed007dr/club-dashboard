@@ -12,6 +12,7 @@ from utils.permissions import IsOwnerOrRelatedToClub
 from decimal import Decimal
 from finance.models import Income, IncomeSource
 from rest_framework.pagination import PageNumberPagination
+from members.models import Member
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -42,7 +43,7 @@ def subscription_type_list(request):
             subscription_type = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
@@ -50,11 +51,9 @@ def subscription_list(request):
         search_term = request.GET.get('identifier', '')
 
         if request.user.role == 'owner':
-            subscriptions = Subscription.objects.select_related('member', 'type', 'club').all().order_by('-start_date')
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club').all()
         else:
-            subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club).order_by('-start_date')
-
-        # Apply search filter
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
         if search_term:
             subscriptions = subscriptions.filter(
                 Q(member__name__icontains=search_term) |
@@ -62,7 +61,6 @@ def subscription_list(request):
                 Q(member__rfid_code__icontains=search_term)
             )
 
-        # Apply existing filters
         member_id = request.query_params.get('member')
         type_id = request.query_params.get('type')
         club_id = request.query_params.get('club')
@@ -81,13 +79,40 @@ def subscription_list(request):
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
-        serializer = SubscriptionSerializer(data=request.data, context={'request': request})
+        identifier = request.data.get('identifier', '')
+
+        if identifier:
+            try:
+                member = Member.objects.filter(
+                    Q(phone=identifier) |
+                    Q(rfid_code=identifier) |
+                    Q(name__iexact=identifier)
+                ).first()
+                if not member:
+                    return Response(
+                        {'error': 'No member found with the provided identifier'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                mutable_data = request.data.copy()
+                mutable_data['member'] = member.id
+            except Member.DoesNotExist:
+                return Response(
+                    {'error': 'Invalid identifier provided'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            mutable_data = request.data
+
+        serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
         if serializer.is_valid():
             subscription = serializer.save()
             
             if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
                 subscription.delete()
-                return Response({'error': 'You do not have permission to create a subscription for this club'}, status=status.HTTP_403_FORBIDDEN)
+                return Response(
+                    {'error': 'You do not have permission to create a subscription for this club'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
             
             if subscription.paid_amount > 0:
                 source, created = IncomeSource.objects.get_or_create(
@@ -99,7 +124,7 @@ def subscription_list(request):
                     club=subscription.club,
                     source=source,
                     amount=subscription.paid_amount,
-                    description=f"ايراد اشتراك عن اللاعب  {subscription.member.name}",
+                    description=f"ايراد اشتراك عن اللاعب {subscription.member.name}",
                     date=timezone.now().date(),
                     received_by=request.user
                 )
