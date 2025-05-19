@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from .models import Ticket
-from members.serializers import MemberSerializer  # Assuming you have a MemberSerializer
+from members.serializers import MemberSerializer 
 
 class TicketSerializer(serializers.ModelSerializer):
     club_name = serializers.CharField(source='club.name', read_only=True)

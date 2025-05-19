@@ -9,9 +9,10 @@ from utils.permissions import IsOwnerOrRelatedToClub
 from finance.serializers import IncomeSerializer
 from finance.models import Income
 from django.utils import timezone
-from django.forms.models import model_to_dict
 from finance.models import Income,IncomeSource
 from rest_framework.pagination import PageNumberPagination
+from members.models import Member
+from django.db.models import Q
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -111,20 +112,59 @@ def delete_ticket_api(request, ticket_id):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def mark_ticket_used_api(request, ticket_id):
     ticket = get_object_or_404(Ticket, id=ticket_id)
+    if not IsOwnerOrRelatedToClub().has_object_permission(request, None, ticket):
+        return Response(
+            {'error': 'You do not have permission to mark this ticket as used'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    identifier = request.data.get('identifier')
     
-    used_by_id = request.data.get('used_by') 
-    
-    if used_by_id:
-        from members.models import Member
-        if not Member.objects.filter(id=used_by_id).exists():
-            return Response(
-                {"error": "Invalid used_by ID"},
-                status=status.HTTP_400_BAD_REQUEST
+    if not identifier:
+        return Response(
+            {'error': 'Identifier (rfid, phone, or name) is required'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    try:
+        members = Member.objects.filter(
+            Q(club=ticket.club) & 
+            (
+                Q(rfid_code=identifier) |
+                Q(phone=identifier) |
+                Q(phone2=identifier) |
+                Q(name__iexact=identifier)
             )
+        )
+
+        if not members.exists():
+            return Response(
+                {'error': 'No member found with the provided identifier'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        if members.count() > 1:
+            if members.filter(name__iexact=identifier).exists():
+                return Response(
+                    {'error': 'Multiple members found with the same name. Please use RFID or phone for precision.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            else:
+                return Response(
+                    {'error': 'Multiple members found with the provided identifier'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        member = members.first()
+        
+        ticket.used = True
+        ticket.used_by = member
+        ticket.save()
+        
+        serializer = TicketSerializer(ticket)
+        return Response(serializer.data, status=status.HTTP_200_OK)
     
-    ticket.used = True
-    ticket.used_by_id = used_by_id if used_by_id else None
-    ticket.save()
-    
-    serializer = TicketSerializer(ticket)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response(
+            {'error': f'Error processing request: {str(e)}'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
