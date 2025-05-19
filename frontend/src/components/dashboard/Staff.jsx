@@ -77,7 +77,8 @@ const Staff = () => {
         );
 
         const clubsMap = {};
-        usersResponse.data.forEach((user) => {
+        console.log('usersResponse.data', usersResponse);
+        usersResponse.data.results.forEach((user) => {
           if (!user.club) return;
           if (!clubsMap[user.club.id]) {
             clubsMap[user.club.id] = {
