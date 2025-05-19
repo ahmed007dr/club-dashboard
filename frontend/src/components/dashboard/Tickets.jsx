@@ -22,6 +22,10 @@ import { useDebounce } from "@/hooks/useDebounce";
 import usePermission from "@/hooks/usePermission";
 import { RiForbidLine } from "react-icons/ri";
 
+
+
+
+
 const Tickets = () => {
   const dispatch = useDispatch();
   // Permission checks
@@ -101,15 +105,14 @@ const Tickets = () => {
         page: currentPage,
         page_size: itemsPerPage,
         ticket_type: filterTicketType,
-        used:
-          filterUsedStatus === "used"
-            ? "true"
-            : filterUsedStatus === "unused"
-            ? "false"
-            : "",
         issue_date: debouncedIssueDate,
         buyer_name: debouncedBuyerName,
       };
+      if (filterUsedStatus === "used") {
+        params.used = "true";
+      } else if (filterUsedStatus === "unused") {
+        params.used = "false";
+      }
       dispatch(fetchTickets(params));
     }
   }, [
@@ -280,9 +283,14 @@ const Tickets = () => {
             page: currentPage,
             page_size: itemsPerPage,
             ticket_type: filterTicketType,
-            used: filterUsedStatus,
             issue_date: filterIssueDate,
+            buyer_name: filterBuyerName,
           };
+          if (filterUsedStatus === "used") {
+            params.used = "true";
+          } else if (filterUsedStatus === "unused") {
+            params.used = "false";
+          }
           dispatch(fetchTickets(params));
           toast.success("تم تعديل التذكرة بنجاح!");
           closeAllModals();
@@ -305,9 +313,14 @@ const Tickets = () => {
             page: currentPage,
             page_size: itemsPerPage,
             ticket_type: filterTicketType,
-            used: filterUsedStatus,
             issue_date: filterIssueDate,
+            buyer_name: filterBuyerName,
           };
+          if (filterUsedStatus === "used") {
+            params.used = "true";
+          } else if (filterUsedStatus === "unused") {
+            params.used = "false";
+          }
           dispatch(fetchTickets(params));
           toast.success("تم حذف التذكرة بنجاح!");
           closeAllModals();
@@ -333,9 +346,14 @@ const Tickets = () => {
             page: currentPage,
             page_size: itemsPerPage,
             ticket_type: filterTicketType,
-            used: filterUsedStatus,
             issue_date: filterIssueDate,
+            buyer_name: filterBuyerName,
           };
+          if (filterUsedStatus === "used") {
+            params.used = "true";
+          } else if (filterUsedStatus === "unused") {
+            params.used = "false";
+          }
           dispatch(fetchTickets(params));
           toast.success("تم تحديد التذكرة كمستخدمة بنجاح!");
           closeAllModals();
@@ -389,6 +407,7 @@ const Tickets = () => {
       club: userClub.id,
       buyer_name: formData.buyer_name,
       ticket_type: formData.ticket_type,
+     price: Number(formData.price),
       price: Number(formData.price),
       used: formData.used,
       used_by: formData.used ? Number(formData.used_by) || null : null,
@@ -397,12 +416,13 @@ const Tickets = () => {
     dispatch(addTicket(ticketData))
       .unwrap()
       .then(() => {
+        setFilterUsedStatus(""); // Reset used filter to show all tickets
         const params = {
           page: 1,
           page_size: itemsPerPage,
           ticket_type: filterTicketType,
-          used: filterUsedStatus,
           issue_date: filterIssueDate,
+          buyer_name: filterBuyerName,
         };
         dispatch(fetchTickets(params));
         toast.success("تم إضافة التذكرة بنجاح!");
@@ -447,6 +467,9 @@ const Tickets = () => {
     );
   }
 
+  // Sort tickets by ID in descending order
+  const sortedTickets = [...tickets].sort((a, b) => b.id - a.id);
+
   return (
     <div className="container mx-auto p-4 sm:p-6" dir="rtl">
       {/* Header and Create Button */}
@@ -468,57 +491,75 @@ const Tickets = () => {
       </div>
 
       {/* Filters */}
-      <div className="mb-6 grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1">اسم المشتري</label>
-          <input
-            type="text"
-            placeholder="ابحث باسم المشتري"
-            className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-            value={filterBuyerName}
-            onChange={(e) => setFilterBuyerName(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">نوع التذكرة</label>
-          <select
-            className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-            value={filterTicketType}
-            onChange={(e) => setFilterTicketType(e.target.value)}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-sm font-medium">تصفية التذاكر</h3>
+          <button
+            onClick={() => {
+              setFilterBuyerName("");
+              setFilterTicketType("");
+              setFilterUsedStatus("");
+              setFilterIssueDate("");
+              setCurrentPage(1);
+            }}
+            className="text-sm text-blue-600 hover:underline"
           >
-            <option value="">كل الأنواع</option>
-            <option value="session">جلسة</option>
-            <option value="day_pass">تصريح يومي</option>
-          </select>
+            إعادة التصفية
+          </button>
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">الحالة</label>
-          <select
-            className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-            value={filterUsedStatus}
-            onChange={(e) => setFilterUsedStatus(e.target.value)}
-          >
-            <option value="">كل الحالات</option>
-            <option value="used">مستخدمة</option>
-            <option value="unused">متاحة</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">
-            تاريخ الإصدار
-          </label>
-          <input
-            type="date"
-            className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
-            value={filterIssueDate}
-            onChange={(e) => setFilterIssueDate(e.target.value)}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">اسم المشتري</label>
+            <input
+              type="text"
+              placeholder="ابحث باسم المشتري"
+              className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+              value={filterBuyerName}
+              onChange={(e) => setFilterBuyerName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">نوع التذكرة</label>
+            <select
+              className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+              value={filterTicketType}
+              onChange={(e) => setFilterTicketType(e.target.value)}
+            >
+              <option value="">كل الأنواع</option>
+              <option value="session">جلسة</option>
+              <option value="day_pass">تصريح يومي</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">الحالة</label>
+            <select
+              className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+              value={filterUsedStatus}
+              onChange={(e) => setFilterUsedStatus(e.target.value)}
+            >
+              <option value="">كل الحالات</option>
+              <option value="used">مستخدمة</option>
+              <option value="unused">متاحة</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              تاريخ الإصدار
+            </label>
+            <input
+              type="date"
+              className="w-full border px-3 py-2 rounded-md text-sm focus:outline-none focus:ring focus:ring-green-200"
+              value={filterIssueDate}
+              onChange={(e) => setFilterIssueDate(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
       {/* Tickets Table */}
       <div className="overflow-x-auto">
-        {Array.isArray(tickets) && tickets.length > 0 ? (
+        {console.log("Tickets to render:", sortedTickets)}
+        {Array.isArray(sortedTickets) && sortedTickets.length > 0 ? (
           <>
             {/* Table for Small Screens and Above */}
             <table className="min-w-full bg-white shadow rounded hidden sm:table">
@@ -545,7 +586,7 @@ const Tickets = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {tickets.map((ticket) => (
+                {sortedTickets.map((ticket) => (
                   <tr key={ticket.id} className="hover:bg-gray-50">
                     <td className="py-2 px-4 border-b text-center text-sm">
                       {ticket.buyer_name}
@@ -627,7 +668,7 @@ const Tickets = () => {
 
             {/* Card Layout for Mobile */}
             <div className="sm:hidden space-y-4">
-              {tickets.map((ticket) => (
+              {sortedTickets.map((ticket) => (
                 <div
                   key={ticket.id}
                   className="border rounded-md p-4 bg-white shadow-sm"
@@ -1146,7 +1187,7 @@ const Tickets = () => {
                 >
                   تأكيد
                 </button>
-                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -11,6 +11,8 @@ from utils.permissions import IsOwnerOrRelatedToClub
 from accounts.models import User
 from django.db.models.functions import TruncDate
 from rest_framework.pagination import PageNumberPagination
+from django.db.models import Q
+from django.db.models.functions import Concat
 
 # Shift Management APIs
 @api_view(['GET'])
@@ -38,9 +40,44 @@ def shift_list_api(request):
         club_name = request.GET['club_name']
         shifts = shifts.filter(club__name=club_name)
     
-    if 'staff_username' in request.GET:
-        staff_username = request.GET['staff_username']
-        shifts = shifts.filter(staff__username=staff_username)
+    if 'staff_search' in request.GET:
+        search_term = request.GET['staff_search'].strip()
+        if search_term:
+            # Split search term in case it contains first+last name
+            name_parts = search_term.split()
+            
+            # Base query for individual fields
+            base_query = (
+                Q(staff__username__icontains=search_term) |
+                Q(staff__first_name__icontains=search_term) |
+                Q(staff__last_name__icontains=search_term)
+            )
+            
+            # Add combined name search if search term has multiple words
+            if len(name_parts) > 1:
+                # Search for "first last" combination
+                first_last = Q(
+                    staff__first_name__icontains=name_parts[0],
+                    staff__last_name__icontains=name_parts[1]
+                )
+                
+                # Search for "last first" combination
+                last_first = Q(
+                    staff__first_name__icontains=name_parts[1],
+                    staff__last_name__icontains=name_parts[0]
+                )
+                
+                # Also search concatenated full name
+                full_name_query = Q(
+                    staff__full_name__icontains=search_term
+                ) if hasattr(Shift.staff.field.related_model, 'full_name') else Q()
+                
+                # Combine all conditions
+                shifts = shifts.filter(
+                    base_query | first_last | last_first | full_name_query
+                )
+            else:
+                shifts = shifts.filter(base_query)
     
     if 'date' in request.GET:
         try:
