@@ -2,26 +2,37 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import BASE_URL from '../../config/api';
 
 // Fetch staff
-export const fetchStaff = createAsyncThunk('staff/fetchStaff', async () => {
-    const token = localStorage.getItem('token');
-    const res = await fetch(`${BASE_URL}/staff/api/shifts/`, {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-        },
-    });
-    if (!res.ok) {
-        if (res.status === 401) {
-            throw new Error("Unauthorized. Please log in again.");
-        } else if (res.status === 500) {
-            throw new Error("Internal Server Error. Please try again later.");
-        }
-        throw new Error("Failed to fetch staff.");
+export const fetchStaff = createAsyncThunk(
+  "staff/fetchStaff",
+  async (
+    { page = 1, club = "", staff = "", date_min = "", date_max = "" },
+    { rejectWithValue }
+  ) => {
+    const token = localStorage.getItem("token");
+    if (!token) return rejectWithValue("Authentication token missing");
+
+    try {
+      const url = new URL(`${BASE_URL}/staff/api/shifts/`);
+      url.searchParams.append("page", page);
+      if (club) url.searchParams.append("club_name", club); 
+      if (staff) url.searchParams.append("staff_search", staff); 
+      if (date_min) url.searchParams.append("date_min", date_min);
+      if (date_max) url.searchParams.append("date_max", date_max);
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        return rejectWithValue(errorData.message || "Failed to fetch shifts");
+      }
+      return await res.json();
+    } catch (error) {
+      return rejectWithValue(error.message);
     }
-    const data = await res.json();
-    return data.results;
-});
+  }
+);
 
 // Add staff
 export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff, { rejectWithValue }) => {
@@ -120,58 +131,62 @@ export const getStaffById = createAsyncThunk('staff/getStaffById', async (id) =>
 
 // Staff slice
 const staffSlice = createSlice({
-    name: 'staffslice',
-    initialState: {
-        items: [],
-        user: null,
-        isloading: false,
-        error: null,
-    },
-    reducers: {},
-    extraReducers: (builder) => {
-        builder
-            // fetchStaff
-            .addCase(fetchStaff.pending, (state) => {
-                state.isloading = true;
-                state.error = null;
-            })
-            .addCase(fetchStaff.fulfilled, (state, action) => {
-                state.items = action.payload;
-                state.isloading = false;
-            })
-            .addCase(fetchStaff.rejected, (state, action) => {
-                state.isloading = false;
-                state.error = action.error.message;
-            })
+  name: "staff",
+  initialState: {
+    items: [],
+    loading: false,
+    error: null,
+    pagination: { count: 0, next: null, previous: null },
+  },
+  reducers: {},
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchStaff.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchStaff.fulfilled, (state, action) => {
+        state.loading = false;
+        state.items = action.payload.results;
+        state.pagination = {
+          count: action.payload.count,
+          next: action.payload.next,
+          previous: action.payload.previous,
+        };
+      })
+      .addCase(fetchStaff.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
-            // addStaff
-            .addCase(addStaff.fulfilled, (state, action) => {
-                state.items.push(action.payload);
-            })
+      // addStaff
+      .addCase(addStaff.fulfilled, (state, action) => {
+        state.items.push(action.payload);
+      })
 
-            // editStaff
-            .addCase(editStaff.fulfilled, (state, action) => {
-                const { id, updatedStaff } = action.payload;
-                const index = state.items.findIndex(staff => staff.id === id);
-                if (index !== -1) {
-                    state.items[index] = { ...state.items[index], ...updatedStaff };
-                }
-            })
+      // editStaff
+      .addCase(editStaff.fulfilled, (state, action) => {
+        const { id, updatedStaff } = action.payload;
+        const index = state.items.findIndex((staff) => staff.id === id);
+        if (index !== -1) {
+          state.items[index] = { ...state.items[index], ...updatedStaff };
+        }
+      })
 
-            // deleteStaff
-            .addCase(deleteStaff.fulfilled, (state, action) => {
-                const id = action.payload;
-                state.items = state.items.filter(staff => staff.id !== id);
-            })
+      // deleteStaff
+      .addCase(deleteStaff.fulfilled, (state, action) => {
+        const id = action.payload;
+        state.items = state.items.filter((staff) => staff.id !== id);
+      })
 
-            .addCase(getStaffById.fulfilled, (state, action) => {
-                console.log("Staff data fetched successfully:", action.payload); // Log the payload here
-                state.user = action.payload;
-              })
-              .addCase(getStaffById.rejected, (state, action) => {
-                console.log("Error fetching staff data:", action.error); // Log if there's an error
-              });
-    },
+      .addCase(getStaffById.fulfilled, (state, action) => {
+        console.log("Staff data fetched successfully:", action.payload); // Log the payload here
+        state.user = action.payload;
+      })
+      .addCase(getStaffById.rejected, (state, action) => {
+        console.log("Error fetching staff data:", action.error); // Log if there's an error
+      });
+  },
 });
 
 export default staffSlice;

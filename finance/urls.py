@@ -20,4 +20,5 @@ urlpatterns = [
     path('api/income-sources/', api.income_source_api, name='api-income-source'),
     path('api/incomes/', api.income_api, name='api-income'),
     path('api/incomes/<int:pk>/', api.income_detail_api, name='api-income-detail'),
+    path('api/daily-summary/', api.daily_summary_api, name='api_daily_summary'),
 ]

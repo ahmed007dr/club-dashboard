@@ -2,10 +2,12 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 
-// Async thunk for login
 export const loginUser = createAsyncThunk(
-  'auth/login',
-  async ({ username, password, rfidCode, useRfid }, { rejectWithValue }) => {
+  "auth/login",
+  async (
+    { username, password, rfidCode, useRfid },
+    { rejectWithValue, dispatch }
+  ) => {
     try {
       const endpoint = useRfid
         ? `${BASE_URL}/accounts/api/login/rfid/`
@@ -16,53 +18,68 @@ export const loginUser = createAsyncThunk(
         : { username, password };
 
       const response = await axios.post(endpoint, payload);
-
       const { access, refresh, user } = response.data;
 
-      // Extract permissions from user object if not provided directly
+      // Store tokens and user data in localStorage
+      localStorage.setItem("token", access);
+      localStorage.setItem("refreshToken", refresh);
+      localStorage.setItem("user", JSON.stringify(user));
       const permissions = user?.permissions || [];
+      localStorage.setItem("permissions", JSON.stringify(permissions));
 
-      return { access, refresh, user, permissions };
+      // Refresh token before expiration (assuming backend provides expires_in)
+      const expiresIn = 60 * 60 * 1000; // Fallback to 60 minutes
+      const refreshInterval = setInterval(async () => {
+        try {
+          await dispatch(refreshAccessToken()).unwrap();
+        } catch (error) {
+          console.error("Error refreshing access token:", error);
+          clearInterval(refreshInterval);
+        }
+      }, expiresIn - 60 * 1000); // Refresh 1 minute before expiration
+
+      // Store interval ID or handle cleanup elsewhere (e.g., logout action)
+      return { access, refresh, user, permissions, refreshInterval };
     } catch (error) {
       return rejectWithValue(error.response?.data?.error || error.message);
     }
   }
 );
 
-// Async thunk for refreshing the access token
 export const refreshAccessToken = createAsyncThunk(
-  'auth/refreshToken',
+  "auth/refreshToken",
   async (_, { rejectWithValue }) => {
     try {
-      const refresh = localStorage.getItem('refreshToken');
+      const refresh = localStorage.getItem("refreshToken");
       if (!refresh) {
-        throw new Error('No refresh token available');
+        throw new Error("No refresh token available");
       }
 
-      const response = await axios.post(`${BASE_URL}/api/token/refresh/`, {
-        refresh,
-      });
-
-      const { access } = response.data;
-
-      // Retrieve existing data from localStorage
-      const user = JSON.parse(localStorage.getItem('user') || 'null');
-      const permissions = JSON.parse(localStorage.getItem('permissions') || '[]');
+      const response = await axios.post(
+        `${BASE_URL}/accounts/api/token/refresh/`,
+        { refresh }
+      );
+      const { access, refresh: newRefresh } = response.data;
 
       // Update localStorage
-      localStorage.setItem('token', access);
-      if (response.data.refresh) {
-        localStorage.setItem('refreshToken', response.data.refresh);
+      localStorage.setItem("token", access);
+      if (newRefresh) {
+        localStorage.setItem("refreshToken", newRefresh);
       }
-      if (user) localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('permissions', JSON.stringify(permissions));
+
+      // Retrieve existing user and permissions
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      const permissions = JSON.parse(
+        localStorage.getItem("permissions") || "[]"
+      );
 
       return { access, user, permissions };
     } catch (error) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('user');
-      localStorage.removeItem('permissions');
+      // Clear auth data on failure
+      localStorage.removeItem("token");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("user");
+      localStorage.removeItem("permissions");
       return rejectWithValue(error.response?.data?.error || error.message);
     }
   }

@@ -58,3 +58,19 @@ class IncomeSummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = Income
         fields = ['id', 'amount', 'date', 'source', 'received_by']
+
+
+class ExpenseDetailSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    
+    class Meta:
+        model = Expense
+        fields = ['id', 'amount', 'date', 'category_name']
+
+
+class IncomeDetailSerializer(serializers.ModelSerializer):
+    source_name = serializers.CharField(source='source.name', read_only=True)
+    
+    class Meta:
+        model = Income
+        fields = ['id', 'amount', 'date', 'source_name']
