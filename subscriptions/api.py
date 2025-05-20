@@ -47,13 +47,50 @@ def subscription_type_list(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
+    """
+    Handle GET requests to retrieve a filtered list of subscriptions and POST requests to create a new subscription.
+    """
     if request.method == 'GET':
-        search_term = request.GET.get('identifier', '')
-
+        # Base queryset based on user role
+        # Explanation: If the user is an 'owner', they can see all subscriptions. Otherwise, they only see subscriptions for their club.
         if request.user.role == 'owner':
             subscriptions = Subscription.objects.select_related('member', 'type', 'club').all()
         else:
             subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
+
+        # Define filterable fields
+        # Explanation: A dictionary maps query parameters to model fields, allowing dynamic filtering on fields like member_id, type_id, etc.
+        filterable_fields = {
+            'member_id': 'member_id',
+            'type_id': 'type_id',
+            'club_id': 'club_id',
+            'club_name': 'club__name__iexact',  
+            'start_date': 'start_date',
+            'end_date': 'end_date',
+            'paid_amount': 'paid_amount',
+            'remaining_amount': 'remaining_amount',
+            'entry_count': 'entry_count',
+        }
+
+        # Build filter dictionary from query parameters
+        # Explanation: Collects exact-match filters (e.g., member_id=123) from query parameters.
+        filters = {}
+        for param, field in filterable_fields.items():
+            if param in request.query_params:
+                filters[field] = request.query_params[param]
+
+        # Handle range filters (e.g., start_date_gte, paid_amount_lte)
+        # Explanation: Collects range filters (e.g., start_date__gte=2023-01-01) for flexible querying.
+        range_filters = {}
+        for param in request.query_params:
+            if param.endswith('_gte') or param.endswith('_lte'):
+                field_name = param.rsplit('__', 1)[0]
+                if field_name in filterable_fields.values():
+                    range_filters[param] = request.query_params[param]
+
+        # Apply search term filter
+        # Explanation: Allows searching by member name, phone, or RFID code using a case-insensitive search.
+        search_term = request.query_params.get('search_term', '')
         if search_term:
             subscriptions = subscriptions.filter(
                 Q(member__name__icontains=search_term) |
@@ -61,24 +98,33 @@ def subscription_list(request):
                 Q(member__rfid_code__icontains=search_term)
             )
 
-        member_id = request.query_params.get('member')
-        type_id = request.query_params.get('type')
-        club_id = request.query_params.get('club')
-        
-        if member_id:
-            subscriptions = subscriptions.filter(member_id=member_id)
-        if type_id:
-            subscriptions = subscriptions.filter(type_id=type_id)
-        if club_id:
-            subscriptions = subscriptions.filter(club_id=club_id)
-            
+        # Apply exact filters
+        # Explanation: Applies exact-match filters and handles invalid values by returning a 400 error.
+        try:
+            subscriptions = subscriptions.filter(**filters)
+        except ValueError as e:
+            return Response({'error': f'Invalid filter value: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Apply range filters
+        # Explanation: Applies range filters and handles invalid values similarly.
+        try:
+            subscriptions = subscriptions.filter(**range_filters)
+        except ValueError as e:
+            return Response({'error': f'Invalid range filter value: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Order by start_date (descending)
+        # Explanation: Sorts subscriptions by start_date in descending order (newest first).
         subscriptions = subscriptions.order_by('-start_date')
+
+        # Paginate results
+        # Explanation: Uses Django REST Framework's pagination to split results into pages.
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
-    
+
     elif request.method == 'POST':
+        # Explanation: Handles creation of a new subscription. Accepts an 'identifier' (name, phone, or RFID) to find the member.
         identifier = request.data.get('identifier', '')
 
         if identifier:
@@ -103,10 +149,12 @@ def subscription_list(request):
         else:
             mutable_data = request.data
 
+        # Explanation: Validates and saves the subscription using the serializer.
         serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
         if serializer.is_valid():
             subscription = serializer.save()
             
+            # Explanation: Ensures the user has permission to create a subscription for the club.
             if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
                 subscription.delete()
                 return Response(
@@ -114,6 +162,7 @@ def subscription_list(request):
                     status=status.HTTP_403_FORBIDDEN
                 )
             
+            # Explanation: If there's a paid amount, create an Income record for the club.
             if subscription.paid_amount > 0:
                 source, created = IncomeSource.objects.get_or_create(
                     club=subscription.club,
@@ -130,6 +179,7 @@ def subscription_list(request):
                 )
                 income.save()
 
+            # Explanation: Calculate and save the remaining amount (type price - paid amount).
             subscription.remaining_amount = subscription.type.price - subscription.paid_amount
             subscription.save()
 
