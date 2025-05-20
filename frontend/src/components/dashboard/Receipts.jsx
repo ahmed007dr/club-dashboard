@@ -10,7 +10,7 @@ import { CiTrash, CiEdit } from "react-icons/ci";
 import { HiOutlineDocumentReport } from "react-icons/hi";
 import AddReceiptForm from "./AddReceiptForm";
 import { Button } from "../ui/button";
-import { toast } from 'react-hot-toast';
+import { toast } from "react-hot-toast";
 import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
 import usePermission from "@/hooks/usePermission";
 
@@ -19,8 +19,9 @@ function Receipts() {
   const { receipts, status, error, message, currentReceipt, pagination } = useSelector(
     (state) => state.receipts
   );
-  const { subscriptions } = useSelector((state) => state.subscriptions);
-
+  const { subscriptions, pagination: subscriptionsPagination } = useSelector(
+    (state) => state.subscriptions
+  );
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchField, setSearchField] = useState("invoice_number");
@@ -30,6 +31,7 @@ function Receipts() {
   const [editData, setEditData] = useState({
     id: "",
     club: "",
+    identifier: "",
     member: "",
     subscription: "",
     amount: "",
@@ -37,13 +39,13 @@ function Receipts() {
     note: "",
     invoice_number: "",
   });
-
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [receiptToDelete, setReceiptToDelete] = useState(null);
   const [filteredReceipts, setFilteredReceipts] = useState(receipts);
   const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
-  
+  const [allSubscriptions, setAllSubscriptions] = useState([]);
+
   const canViewReceipts = usePermission("view_receipt");
   const canEditReceipts = usePermission("change_receipt");
   const canDeleteReceipts = usePermission("delete_receipt");
@@ -51,7 +53,7 @@ function Receipts() {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(pagination.currentPage || 1);
-  const itemsPerPage = 20; // Fixed to 20 items per page
+  const itemsPerPage = 20;
   const totalPages = Math.ceil(pagination.count / itemsPerPage);
 
   // Search fields configuration
@@ -64,16 +66,61 @@ function Receipts() {
     { value: "member_name", label: "اسم العضو" },
   ];
 
+  // Fetch all subscriptions across all pages
+  const fetchAllSubscriptions = async () => {
+    try {
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await dispatch(fetchSubscriptions({ page: currentPage })).unwrap();
+        console.log(`Fetched subscriptions page ${currentPage} response:`, response);
+
+        // Handle different response structures
+        const results = Array.isArray(response)
+          ? response
+          : response.results || response.data || response.subscriptions || [];
+        if (!Array.isArray(results)) {
+          console.error(`Invalid results for subscriptions page ${currentPage}:`, results);
+          throw new Error("Subscriptions results is not an array");
+        }
+
+        allResults = [...allResults, ...results];
+        hasMore = !!response.next;
+        currentPage += 1;
+      }
+
+      console.log("Total subscriptions fetched:", allResults.length);
+      return allResults;
+    } catch (error) {
+      console.error("Failed to fetch all subscriptions:", error.message);
+      throw error;
+    }
+  };
+
   // Fetch data on mount and when currentPage changes
   useEffect(() => {
-    dispatch(fetchReceipts(currentPage));
-    dispatch(fetchSubscriptions());
+    const fetchData = async () => {
+      try {
+        await Promise.all([
+          dispatch(fetchReceipts(currentPage)).unwrap(),
+          fetchAllSubscriptions().then((subscriptions) => {
+            setAllSubscriptions(subscriptions);
+          }),
+        ]);
+      } catch (error) {
+        console.error("Failed to fetch data:", error.message);
+        toast.error("فشل في تحميل البيانات");
+      }
+    };
+    fetchData();
   }, [dispatch, currentPage]);
 
   // Data filtering helpers
   const uniqueClubs = Array.from(
     new Map(
-      subscriptions.map((sub) => [
+      allSubscriptions.map((sub) => [
         sub.club,
         {
           id: sub.club,
@@ -85,8 +132,8 @@ function Receipts() {
 
   const getFilteredMembers = (clubId) => {
     return clubId
-      ? subscriptions.filter((sub) => sub.club === parseInt(clubId))
-      : subscriptions;
+      ? allSubscriptions.filter((sub) => sub.club === parseInt(clubId))
+      : allSubscriptions;
   };
 
   const getUniqueMembers = (clubId) => {
@@ -97,8 +144,9 @@ function Receipts() {
           sub.member,
           {
             id: sub.member,
-            name:
-              sub.member_details?.name || sub.member_name || "Unknown Member",
+            name: sub.member_details?.name || sub.member_name || "Unknown Member",
+            phone: sub.member_details?.phone || "",
+            rfid_code: sub.member_details?.rfid_code || "",
           },
         ])
       ).values()
@@ -107,9 +155,34 @@ function Receipts() {
 
   const getFilteredSubscriptions = (memberId) => {
     return memberId
-      ? subscriptions.filter((sub) => sub.member === parseInt(memberId))
+      ? allSubscriptions.filter((sub) => sub.member === parseInt(memberId))
       : [];
   };
+
+  // Resolve identifier to member ID
+  const resolveIdentifierToMember = (identifier, clubId) => {
+    if (!identifier || !clubId) return null;
+    const members = getUniqueMembers(clubId);
+    const identifierLower = identifier.trim().toLowerCase();
+    const member = members.find(
+      (m) =>
+        (m.name && m.name.toLowerCase().includes(identifierLower)) ||
+        (m.phone && m.phone.toLowerCase().includes(identifierLower)) ||
+        (m.rfid_code && m.rfid_code.toLowerCase().includes(identifierLower))
+    );
+    console.log("Resolved member for identifier:", identifier, member);
+    return member ? member.id : null;
+  };
+
+  // Update member ID when identifier or club changes
+  useEffect(() => {
+    const memberId = resolveIdentifierToMember(editData.identifier, editData.club);
+    setEditData((prev) => ({
+      ...prev,
+      member: memberId ? memberId.toString() : "",
+      subscription: memberId ? prev.subscription : "", // Keep subscription if member is valid
+    }));
+  }, [editData.identifier, editData.club]);
 
   // Format and validate invoice number
   const formatInvoiceNumber = (value) => {
@@ -134,7 +207,6 @@ function Receipts() {
     setSearchTerm(value);
     setSearchError("");
 
-    // Special formatting for invoice number if that's the selected field
     if (searchField === "invoice_number") {
       const formattedValue = formatInvoiceNumber(value);
       setSearchTerm(formattedValue);
@@ -167,7 +239,6 @@ function Receipts() {
     setInputError("");
 
     if (!searchTerm.trim()) {
-      // Reset to sorted receipts
       const sortedReceipts = [...receipts].sort((a, b) =>
         new Date(b.date) - new Date(a.date)
       );
@@ -180,7 +251,6 @@ function Receipts() {
 
     const filtered = receipts
       .filter((receipt) => {
-        // Handle different search fields
         switch (searchField) {
           case "invoice_number":
             return receipt.invoice_number?.toLowerCase().includes(searchTermLower);
@@ -206,7 +276,7 @@ function Receipts() {
             return true;
         }
       })
-      .sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort search results
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
 
     setFilteredReceipts(filtered);
     setCurrentPage(1);
@@ -217,6 +287,8 @@ function Receipts() {
     setEditData((prev) => ({
       ...prev,
       [name]: value,
+      ...(name === "club" && { identifier: "", member: "", subscription: "" }),
+      ...(name === "identifier" && { subscription: "" }), // Reset subscription when identifier changes
     }));
   };
 
@@ -224,9 +296,16 @@ function Receipts() {
     e.preventDefault();
     setIsUpdating(true);
 
-    const { id, ...receiptData } = editData;
+    const memberId = resolveIdentifierToMember(editData.identifier, editData.club);
+    if (!memberId) {
+      toast.error("لم يتم العثور على عضو مطابق لهذا المعرف");
+      setIsUpdating(false);
+      return;
+    }
+
+    const { id, identifier, ...receiptData } = editData;
     receiptData.club = parseInt(receiptData.club) || null;
-    receiptData.member = parseInt(receiptData.member) || null;
+    receiptData.member = memberId;
     receiptData.subscription = parseInt(receiptData.subscription) || null;
     receiptData.amount = parseFloat(receiptData.amount) || 0;
 
@@ -237,7 +316,6 @@ function Receipts() {
           receiptData,
         })
       ).unwrap();
-
       await dispatch(fetchReceipts(currentPage));
       toast.success("تم تحديث الإيصال بنجاح");
     } catch (error) {
@@ -283,6 +361,7 @@ function Receipts() {
       setEditData({
         id: currentReceipt.id,
         club: currentReceipt.club?.toString() || "",
+        identifier: currentReceipt.member_details?.name || "",
         member: currentReceipt.member?.toString() || "",
         subscription: currentReceipt.subscription?.toString() || "",
         amount: currentReceipt.amount || "",
@@ -294,7 +373,6 @@ function Receipts() {
   }, [currentReceipt]);
 
   useEffect(() => {
-    // Sort receipts by date in descending order (newest first)
     const sortedReceipts = [...receipts].sort((a, b) =>
       new Date(b.date) - new Date(a.date)
     );
@@ -326,7 +404,7 @@ function Receipts() {
       <div className="text-red-500 text-center p-4 text-sm sm:text-base">
         ليس لديك صلاحية لاظهار الإيصالات
       </div>
-    )
+    );
   }
 
   return (
@@ -337,25 +415,27 @@ function Receipts() {
           <HiOutlineDocumentReport className="text-blue-600 w-6 h-6 sm:w-8 sm:h-8" />
           <h2 className="text-xl sm:text-2xl font-bold">الإيصالات</h2>
         </div>
-        <Button
-          onClick={() => setShowForm(true)}
-          className="flex items-center w-full sm:w-auto btn"
-        >
-          إضافة إيصال
-          <svg
-            className="w-4 h-4 sm:w-5 sm:h-5 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+        {canAddReceipts && (
+          <Button
+            onClick={() => setShowForm(true)}
+            className="flex items-center w-full sm:w-auto btn"
           >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-            />
-          </svg>
-        </Button>
+            إضافة إيصال
+            <svg
+              className="w-4 h-4 sm:w-5 sm:h-5 mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              />
+            </svg>
+          </Button>
+        )}
       </div>
 
       {/* Search Form */}
@@ -451,20 +531,24 @@ function Receipts() {
                 {filteredReceipts.map((receipt) => (
                   <tr key={receipt.id}>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm flex gap-2">
-                      <button
-                        onClick={() => handleEdit(receipt.id)}
-                        className="text-indigo-600 hover:text-indigo-900"
-                        aria-label="تعديل الإيصال"
-                      >
-                        <CiEdit className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(receipt.id)}
-                        className="text-red-600 hover:text-red-900"
-                        aria-label="حذف الإيصال"
-                      >
-                        <CiTrash className="w-5 h-5" />
-                      </button>
+                      {canEditReceipts && (
+                        <button
+                          onClick={() => handleEdit(receipt.id)}
+                          className="text-indigo-600 hover:text-indigo-900"
+                          aria-label="تعديل الإيصال"
+                        >
+                          <CiEdit className="w-5 h-5" />
+                        </button>
+                      )}
+                      {canDeleteReceipts && (
+                        <button
+                          onClick={() => handleDelete(receipt.id)}
+                          className="text-red-600 hover:text-red-900"
+                          aria-label="حذف الإيصال"
+                        >
+                          <CiTrash className="w-5 h-5" />
+                        </button>
+                      )}
                     </td>
                     <td className="px-4 sm:px-6 py-4 text-sm">
                       {receipt.amount}
@@ -507,20 +591,24 @@ function Receipts() {
                       رقم الفاتورة: {receipt.invoice_number}
                     </span>
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEdit(receipt.id)}
-                        className="text-indigo-600 hover:text-indigo-900"
-                        aria-label="تعديل الإيصال"
-                      >
-                        <CiEdit className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(receipt.id)}
-                        className="text-red-600 hover:text-red-900"
-                        aria-label="حذف الإيصال"
-                      >
-                        <CiTrash className="w-5 h-5" />
-                      </button>
+                      {canEditReceipts && (
+                        <button
+                          onClick={() => handleEdit(receipt.id)}
+                          className="text-indigo-600 hover:text-indigo-900"
+                          aria-label="تعديل الإيصال"
+                        >
+                          <CiEdit className="w-5 h-5" />
+                        </button>
+                      )}
+                      {canDeleteReceipts && (
+                        <button
+                          onClick={() => handleDelete(receipt.id)}
+                          className="text-red-600 hover:text-red-900"
+                          aria-label="حذف الإيصال"
+                        >
+                          <CiTrash className="w-5 h-5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   <p className="text-sm">
@@ -590,7 +678,6 @@ function Receipts() {
       )}
 
       {/* Pagination Controls */}
-      {/* Pagination Controls */}
       <div className="flex justify-between items-center mt-4" dir="rtl">
         {pagination.count === 0 && (
           <div className="text-sm text-gray-600">لا توجد إيصالات لعرضها</div>
@@ -603,7 +690,6 @@ function Receipts() {
               {pagination.count} إيصال
             </div>
             <div className="flex gap-2">
-              {/* First Page Button */}
               <button
                 onClick={() => paginate(1)}
                 disabled={currentPage === 1 || pagination.count === 0}
@@ -615,8 +701,6 @@ function Receipts() {
               >
                 الأول
               </button>
-
-              {/* Previous Page Button */}
               <button
                 onClick={() => paginate(currentPage - 1)}
                 disabled={!pagination.previous || pagination.count === 0}
@@ -628,8 +712,6 @@ function Receipts() {
               >
                 السابق
               </button>
-
-              {/* Page Number Buttons */}
               {(() => {
                 const maxButtons = 5;
                 const sideButtons = Math.floor(maxButtons / 2);
@@ -666,8 +748,6 @@ function Receipts() {
                   </button>
                 ));
               })()}
-
-              {/* Next Page Button */}
               <button
                 onClick={() => paginate(currentPage + 1)}
                 disabled={!pagination.next || pagination.count === 0}
@@ -679,8 +759,6 @@ function Receipts() {
               >
                 التالي
               </button>
-
-              {/* Last Page Button */}
               <button
                 onClick={() => paginate(totalPages)}
                 disabled={currentPage === totalPages || pagination.count === 0}
@@ -708,7 +786,7 @@ function Receipts() {
               <AddReceiptForm
                 onClose={() => setShowForm(false)}
                 clubs={uniqueClubs}
-                subscriptions={subscriptions}
+                subscriptions={allSubscriptions}
               />
             </div>
           </div>
@@ -747,11 +825,7 @@ function Receipts() {
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 sm:p-6">
-              <h3
-                className="text-lg sm:text-xl font-medium
-
- leading-6 text-gray-900 mb-4"
-              >
+              <h3 className="text-lg sm:text-xl font-medium leading-6 text-gray-900 mb-4">
                 تعديل الإيصال
               </h3>
               <form onSubmit={handleEditSubmit} className="space-y-4">
@@ -763,16 +837,10 @@ function Receipts() {
                   <select
                     name="club"
                     value={editData.club}
-                    onChange={(e) => {
-                      handleEditInputChange(e);
-                      setEditData((prev) => ({
-                        ...prev,
-                        member: "",
-                        subscription: "",
-                      }));
-                    }}
+                    onChange={handleEditInputChange}
                     className="w-full border px-3 py-2 rounded-md text-sm sm:text-base"
                     required
+                    disabled={isUpdating}
                   >
                     <option value="">-- اختر النادي --</option>
                     {uniqueClubs.map((club) => (
@@ -783,30 +851,26 @@ function Receipts() {
                   </select>
                 </div>
 
-                {/* Member Dropdown */}
+                {/* Member Identifier Input */}
                 <div>
                   <label className="block mb-1 font-medium text-gray-700">
-                    اختر العضو
+                    المعرف (اسم العضو، رقم الهاتف، أو RFID)
                   </label>
-                  <select
-                    name="member"
-                    value={editData.member}
-                    onChange={(e) => {
-                      handleEditInputChange(e);
-                      setEditData((prev) => ({ ...prev, subscription: "" }));
-                    }}
+                  <input
+                    type="text"
+                    name="identifier"
+                    value={editData.identifier}
+                    onChange={handleEditInputChange}
                     className="w-full border px-3 py-2 rounded-md text-sm sm:text-base"
+                    placeholder="أدخل اسم العضو، رقم الهاتف، أو RFID"
                     required
-                    disabled={!editData.club}
-                  >
-                    <option value="">-- اختر العضو --</option>
-                    {editData.club &&
-                      getUniqueMembers(editData.club).map((member) => (
-                        <option key={member.id} value={member.id}>
-                          {member.name}
-                        </option>
-                      ))}
-                  </select>
+                    disabled={!editData.club || isUpdating}
+                  />
+                  {editData.identifier && !editData.member && (
+                    <p className="mt-1 text-xs text-red-500">
+                      لا يوجد عضو متطابق مع هذا المعرف
+                    </p>
+                  )}
                 </div>
 
                 {/* Subscription Dropdown */}
@@ -819,10 +883,13 @@ function Receipts() {
                     value={editData.subscription}
                     onChange={handleEditInputChange}
                     className="w-full border px-3 py-2 rounded-md text-sm sm:text-base"
-                    required
-                    disabled={!editData.member}
+                    disabled={
+                      !editData.member ||
+                      isUpdating ||
+                      !getFilteredSubscriptions(editData.member).length
+                    }
                   >
-                    <option value="">-- اختر الاشتراك --</option>
+                    <option value="">-- اختر الاشتراك (اختياري) --</option>
                     {editData.member &&
                       getFilteredSubscriptions(editData.member).map((sub) => (
                         <option key={sub.id} value={sub.id}>
@@ -831,6 +898,12 @@ function Receipts() {
                         </option>
                       ))}
                   </select>
+                  {editData.member &&
+                    getFilteredSubscriptions(editData.member).length === 0 && (
+                      <p className="mt-1 text-xs text-red-500">
+                        لا توجد اشتراكات متاحة لهذا العضو
+                      </p>
+                    )}
                 </div>
 
                 {/* Amount Input */}
@@ -847,6 +920,7 @@ function Receipts() {
                     required
                     step="0.01"
                     min="0"
+                    disabled={isUpdating}
                   />
                 </div>
 
@@ -860,6 +934,7 @@ function Receipts() {
                     value={editData.payment_method}
                     onChange={handleEditInputChange}
                     className="w-full border px-3 py-2 rounded-md text-sm sm:text-base"
+                    disabled={isUpdating}
                   >
                     <option value="cash">نقدي</option>
                     <option value="bank">تحويل بنكي</option>
@@ -894,6 +969,7 @@ function Receipts() {
                     onChange={handleEditInputChange}
                     rows={3}
                     className="w-full border px-3 py-2 rounded-md text-sm sm:text-base"
+                    disabled={isUpdating}
                   />
                 </div>
 
@@ -903,17 +979,18 @@ function Receipts() {
                     type="button"
                     onClick={() => setShowEditModal(false)}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 text-sm sm:text-base"
+                    disabled={isUpdating}
                   >
                     إلغاء
                   </button>
                   <button
                     type="submit"
-                    className="btn sm:text-base"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 text-sm sm:text-base"
                     disabled={
                       isUpdating ||
                       !editData.club ||
+                      !editData.identifier ||
                       !editData.member ||
-                      !editData.subscription ||
                       !editData.amount
                     }
                   >

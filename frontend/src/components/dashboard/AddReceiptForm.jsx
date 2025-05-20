@@ -1,34 +1,23 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { addReceipt, fetchReceipts } from "../../redux/slices/receiptsSlice";
 import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
 import { fetchUsers } from "../../redux/slices/memberSlice";
 import { toast } from "react-hot-toast";
-import {
-  Command,
-  CommandInput,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 function AddReceiptForm({ onClose }) {
   const dispatch = useDispatch();
-  const { subscriptions } = useSelector((state) => state.subscriptions);
+  const { subscriptions, pagination: subscriptionsPagination, status: subscriptionsStatus, error: subscriptionsError } = useSelector(
+    (state) => state.subscriptions
+  );
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Form state
   const [formData, setFormData] = useState({
     club: "",
-    member: "",
+    identifier: "",
     subscription: "",
     amount: "",
     payment_method: "cash",
@@ -36,111 +25,190 @@ function AddReceiptForm({ onClose }) {
   });
 
   // Data state
-  const [allMembers, setAllMembers] = useState([]);
+  const [allMembers, setAllMembers] = useState({ results: [] });
+  const [allSubscriptions, setAllSubscriptions] = useState([]);
   const [clubs, setClubs] = useState([]);
 
-  // Member search and pagination
-  const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const itemsPerPage = 10;
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  // Fetch all members across all pages
+  const fetchAllUsers = async () => {
+    try {
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
 
-  
+      while (hasMore) {
+        const response = await dispatch(fetchUsers({ page: currentPage })).unwrap();
+        console.log(`Fetched members page ${currentPage} response:`, response);
+
+        // Handle different response structures
+        const results = Array.isArray(response)
+          ? response
+          : response.results || response.data || response.members || [];
+        if (!Array.isArray(results)) {
+          console.error(`Invalid results for members page ${currentPage}:`, results);
+          throw new Error("Members results is not an array");
+        }
+
+        allResults = [...allResults, ...results];
+        hasMore = !!response.next;
+        currentPage += 1;
+      }
+
+      console.log("Total members fetched:", allResults.length);
+      return { results: allResults };
+    } catch (error) {
+      console.error("Failed to fetch all users:", error.message);
+      throw error;
+    }
+  };
+
+  // Fetch all subscriptions across all pages
+  const fetchAllSubscriptions = async () => {
+    try {
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await dispatch(fetchSubscriptions({ page: currentPage })).unwrap();
+        console.log(`Fetched subscriptions page ${currentPage} response:`, response);
+
+        // Handle different response structures
+        const results = Array.isArray(response)
+          ? response
+          : response.results || response.data || response.subscriptions || [];
+        if (!Array.isArray(results)) {
+          console.error(`Invalid results for subscriptions page ${currentPage}:`, results);
+          throw new Error("Subscriptions results is not an array");
+        }
+
+        allResults = [...allResults, ...results];
+        hasMore = !!response.next;
+        currentPage += 1;
+      }
+
+      console.log("Total subscriptions fetched:", allResults.length);
+      return allResults;
+    } catch (error) {
+      console.error("Failed to fetch all subscriptions:", error.message);
+      throw error;
+    }
+  };
 
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        await dispatch(fetchSubscriptions()).unwrap();
-        const membersResult = await dispatch(fetchUsers()).unwrap();
+        setLoading(true);
+        setError(null);
+        const [subscriptionsResult, membersResult] = await Promise.all([
+          fetchAllSubscriptions(),
+          fetchAllUsers(),
+        ]);
         setAllMembers(membersResult);
+        setAllSubscriptions(subscriptionsResult);
+
+        // Debug: Log all fetched data
+        console.log("Fetched members:", membersResult.results);
+        console.log("Fetched subscriptions:", subscriptionsResult);
+        // Debug: Log member with name "matthew gonzalez"
+        const targetMember = membersResult.results.find(
+          (m) => m.name && m.name.toLowerCase().includes("matthew gonzalez")
+        );
+        console.log("Member search for 'matthew gonzalez':", targetMember);
 
         // Extract unique clubs
         const uniqueClubs = Array.from(
           new Map(
-            membersResult.results.map((m) => [
+            membersResult.results?.map((m) => [
               m.club,
               { club_id: m.club, club_name: m.club_name },
-            ])
+            ]) || []
           ).values()
         );
         setClubs(uniqueClubs);
+        console.log("Clubs:", uniqueClubs);
       } catch (error) {
         console.error("Failed to fetch initial data:", error.message);
+        setError("Failed to fetch data. Please try again later: " + error.message);
+        toast.error("فشل في تحميل البيانات الأولية");
       } finally {
-        setIsInitialLoad(false);
+        setLoading(false);
       }
     };
 
     fetchInitialData();
   }, [dispatch]);
 
-  // Filtered and paginated members
-  const { filteredMembers, hasMore } = useMemo(() => {
-    if (!formData.club) return { filteredMembers: [], hasMore: false };
+  // Filter subscriptions based on selected member (by identifier)
+  const filteredSubscriptions = React.useMemo(() => {
+    if (!formData.identifier || !allSubscriptions || !allMembers.results) return [];
 
-    const filtered = allMembers.results.filter(
+    const identifier = formData.identifier.trim().toLowerCase();
+    const selectedMember = allMembers.results.find(
       (member) =>
-        member.club === parseInt(formData.club) &&
-        (member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (member.rfid_code &&
-            member.rfid_code.toLowerCase().includes(searchQuery.toLowerCase())))
+        (member.name && member.name.toLowerCase().includes(identifier)) ||
+        (member.rfid_code && member.rfid_code.toLowerCase().includes(identifier)) ||
+        (member.phone && member.phone.toLowerCase().includes(identifier))
     );
 
-    return {
-      filteredMembers: filtered.slice(0, page * itemsPerPage),
-      hasMore: filtered.length > page * itemsPerPage,
-    };
-  }, [allMembers, formData.club, searchQuery, page]);
-
-  // Debounced search
-  const debouncedSearch = useCallback(
-    () =>
-      debounce((query) => {
-        setSearchQuery(query);
-        setPage(1);
-      }, 300),
-    []
-  );
-
-  // Handle infinite scroll
-  const handleScroll = (e) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.target;
-    const bottomThreshold = 50;
-
-    if (
-      scrollHeight - (scrollTop + clientHeight) < bottomThreshold &&
-      hasMore
-    ) {
-      setPage((prev) => prev + 1);
+    if (!selectedMember) {
+      // Debug: Log when no member is found
+      console.log("No member found for identifier:", identifier);
+      console.log(
+        "Available members:",
+        allMembers.results.map((m) => ({
+          id: m.id,
+          name: m.name,
+          rfid_code: m.rfid_code,
+          phone: m.phone,
+          club: m.club,
+        }))
+      );
+      return [];
     }
-  };
 
-  // Filter subscriptions based on selected member
-  const filteredSubscriptions = formData.member
-    ? subscriptions.filter((sub) => sub.member === parseInt(formData.member))
-    : [];
+    const memberSubscriptions = allSubscriptions.filter(
+      (sub) => sub.member === selectedMember.id
+    );
+    // Debug: Log selected member and subscriptions
+    console.log("Selected member:", {
+      id: selectedMember.id,
+      name: selectedMember.name,
+      rfid_code: selectedMember.rfid_code,
+      phone: selectedMember.phone,
+      club: selectedMember.club,
+    });
+    console.log(
+      "Filtered subscriptions for member",
+      selectedMember.id,
+      ":",
+      memberSubscriptions
+    );
+    return memberSubscriptions;
+  }, [allSubscriptions, formData.identifier, allMembers]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
     const receiptData = {
       ...formData,
       club: parseInt(formData.club),
-      member: parseInt(formData.member),
-      subscription: parseInt(formData.subscription),
       amount: parseFloat(formData.amount),
+      subscription: formData.subscription || null,
     };
 
     try {
       await dispatch(addReceipt(receiptData)).unwrap();
       await dispatch(fetchReceipts());
-
       toast.success("تمت إضافة الإيصال بنجاح!");
       onClose();
     } catch (error) {
       console.error("Error adding receipt:", error);
-      toast.error("حدث خطأ أثناء إضافة الإيصال");
+      toast.error(error.message || "حدث خطأ أثناء إضافة الإيصال");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -149,22 +217,26 @@ function AddReceiptForm({ onClose }) {
       onSubmit={handleSubmit}
       className="space-y-4 p-6 bg-white rounded-lg shadow-md"
     >
-      {/* Club Selection */}
+      {/* Error Display */}
+      {error && <div className="mb-4 text-red-500">{error}</div>}
+
+      {/* Club Selection (kept for receiptData) */}
       <div>
         <label className="block mb-1 font-medium">النادي</label>
         <select
           name="club"
           value={formData.club}
-          onChange={(e) => {
+          onChange={(e) =>
             setFormData({
               ...formData,
               club: e.target.value,
-              member: "",
+              identifier: "",
               subscription: "",
-            });
-          }}
+            })
+          }
           className="w-full border px-3 py-2 rounded-md"
           required
+          disabled={isSubmitting || loading}
         >
           <option value="">-- اختر النادي --</option>
           {clubs.map((club) => (
@@ -177,79 +249,36 @@ function AddReceiptForm({ onClose }) {
 
       {/* Member Selection */}
       <div>
-        <label className="block mb-1 font-medium">العضو</label>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              className="w-full justify-between"
-              disabled={!formData.club}
-            >
-              {formData.member
-                ? allMembers.results.find((m) => m.id === formData.member)?.name
-                : "اختر العضو..."}
-              <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-full p-0" align="start">
-            <Command onScroll={handleScroll}>
-              <CommandInput
-                placeholder="ابحث عن عضو بالاسم أو رقم RFID..."
-                onValueChange={debouncedSearch}
-              />
-              <CommandList className="max-h-[300px]">
-                <CommandGroup>
-                  {filteredMembers.map((member) => (
-                    <CommandItem
-                      key={member.id}
-                      value={member.id}
-                      onSelect={() => {
-                        setFormData((prev) => ({
-                          ...prev,
-                          member: member.id === prev.member ? "" : member.id,
-                          subscription: "",
-                        }));
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          formData.member === member.id
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
-                      <div>
-                        <div>{member.name}</div>
-                        {member.rfid_code && (
-                          <div className="text-xs text-gray-500">
-                            RFID: {member.rfid_code}
-                          </div>
-                        )}
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-
-                {!filteredMembers.length && !isInitialLoad && (
-                  <CommandEmpty>لا يوجد أعضاء</CommandEmpty>
-                )}
-
-                {hasMore && (
-                  <CommandItem className="justify-center text-sm text-gray-500">
-                    جاري تحميل المزيد...
-                  </CommandItem>
-                )}
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
+        <label className="block text-sm font-medium mb-2">
+          RFID أو الاسم أو رقم الهاتف
+        </label>
+        <input
+          type="text"
+          value={formData.identifier}
+          onChange={(e) =>
+            setFormData({
+              ...formData,
+              identifier: e.target.value,
+              subscription: "",
+            })
+          }
+          className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+          placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
+          disabled={isSubmitting || loading}
+        />
+        {loading && (
+          <div className="mt-1 text-xs text-gray-500">جاري تحميل الأعضاء...</div>
+        )}
+        {formData.identifier && !filteredSubscriptions.length && !loading && (
+          <div className="mt-1 text-xs text-red-500">
+            لا يوجد عضو متطابق مع هذا المعرف
+          </div>
+        )}
       </div>
 
       {/* Subscription Selection */}
       <div>
-        <label className="block mb-1 font-medium">الاشتراك</label>
+        <label className="block mb-1 font-medium">نوع الاشتراك (اختياري)</label>
         <select
           name="subscription"
           value={formData.subscription}
@@ -257,19 +286,28 @@ function AddReceiptForm({ onClose }) {
             setFormData({ ...formData, subscription: e.target.value })
           }
           className="w-full border px-3 py-2 rounded-md"
-          required
-          disabled={!formData.member}
+          disabled={
+            !formData.identifier ||
+            isSubmitting ||
+            filteredSubscriptions.length === 0 ||
+            loading
+          }
         >
-          <option value="">-- اختر الاشتراك --</option>
+          <option value="">-- اختر نوع الاشتراك (اختياري) --</option>
           {filteredSubscriptions.map((sub) => (
             <option key={sub.id} value={sub.id}>
-              {sub.type_details?.name || "نوع غير معروف"}
+              {sub.type_details?.name || "غير محدد"}
             </option>
           ))}
         </select>
+        {formData.identifier && filteredSubscriptions.length === 0 && !loading && (
+          <div className="mt-1 text-xs text-red-500">
+            لا توجد اشتراكات متاحة لهذا العضو
+          </div>
+        )}
       </div>
 
-      {/* Rest of the form remains the same */}
+      {/* Amount */}
       <div>
         <label className="block mb-1 font-medium">المبلغ</label>
         <input
@@ -281,9 +319,11 @@ function AddReceiptForm({ onClose }) {
           required
           step="0.01"
           min="0"
+          disabled={isSubmitting}
         />
       </div>
 
+      {/* Payment Method */}
       <div>
         <label className="block mb-1 font-medium">طريقة الدفع</label>
         <select
@@ -293,6 +333,7 @@ function AddReceiptForm({ onClose }) {
             setFormData({ ...formData, payment_method: e.target.value })
           }
           className="w-full border px-3 py-2 rounded-md"
+          disabled={isSubmitting}
         >
           <option value="cash">نقدي</option>
           <option value="bank">تحويل بنكي</option>
@@ -300,6 +341,7 @@ function AddReceiptForm({ onClose }) {
         </select>
       </div>
 
+      {/* Notes */}
       <div>
         <label className="block mb-1 font-medium">ملاحظات</label>
         <textarea
@@ -308,28 +350,32 @@ function AddReceiptForm({ onClose }) {
           onChange={(e) => setFormData({ ...formData, note: e.target.value })}
           rows={3}
           className="w-full border px-3 py-2 rounded-md"
+          disabled={isSubmitting}
         />
       </div>
 
+      {/* Form Actions */}
       <div className="flex justify-end space-x-3 space-x-reverse">
         <button
           type="button"
           onClick={onClose}
           className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100"
+          disabled={isSubmitting}
         >
           إلغاء
         </button>
         <button
           type="submit"
-          className="btn"
+          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400"
           disabled={
+            isSubmitting ||
             !formData.club ||
-            !formData.member ||
-            !formData.subscription ||
-            !formData.amount
+            !formData.identifier ||
+            !formData.amount ||
+            loading
           }
         >
-          إضافة إيصال
+          {isSubmitting ? "جاري الإضافة..." : "إضافة إيصال"}
         </button>
       </div>
     </form>
@@ -337,15 +383,3 @@ function AddReceiptForm({ onClose }) {
 }
 
 export default AddReceiptForm;
-
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}

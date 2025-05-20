@@ -70,6 +70,7 @@ export const fetchTicketById = createAsyncThunk(
           },
         }
       );
+      console.log(response.data)
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -121,23 +122,36 @@ export const editTicketById = createAsyncThunk(
 );
 
 export const markTicketAsUsed = createAsyncThunk(
-  'tickets/markTicketAsUsed',
-  async ({ ticketId, used_by }, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
+  "tickets/markAsUsed",
+  async ({ ticketId, used, identifier }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(
-        `${BASE_URL}/tickets/api/tickets/${ticketId}/mark-used/`,
-        { used_by },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+      const url = `${BASE_URL}/tickets/api/tickets/${ticketId}/mark-used/`;
+      console.log("Sending API request:", { url, payload: { used, identifier } });
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ used, identifier }),
+      });
+      console.log("Response status:", response.status, "OK:", response.ok);
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Backend response:", text.substring(0, 200)); // Log first 200 chars
+        try {
+          const errorData = JSON.parse(text);
+          return rejectWithValue(errorData);
+        } catch (e) {
+          return rejectWithValue({ error: `Invalid response: ${text.substring(0, 100)}` });
         }
-      );
-      return response.data;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      }
+      const data = await response.json();
+      console.log("Response data:", data);
+      return data;
+    } catch (err) {
+      console.error("Network error:", err);
+      return rejectWithValue({ error: err.message });
     }
   }
 );

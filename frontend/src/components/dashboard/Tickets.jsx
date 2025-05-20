@@ -25,7 +25,6 @@ import { RiForbidLine } from "react-icons/ri";
 
 
 
-
 const Tickets = () => {
   const dispatch = useDispatch();
   // Permission checks
@@ -43,8 +42,9 @@ const Tickets = () => {
     },
     loading,
     error,
+    currentTicket
   } = useSelector((state) => state.tickets);
-
+console.log(currentTicket)
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -138,7 +138,7 @@ const Tickets = () => {
     ticket_type: "",
     price: "",
     used: false,
-    used_by: "",
+    identifier: "",
   });
 
   // Generate page numbers (limited range)
@@ -192,7 +192,7 @@ const Tickets = () => {
       ticket_type: "",
       price: "",
       used: false,
-      used_by: "",
+      identifier: "",
     });
     setFormError(null);
     setShowCreateModal(true);
@@ -205,16 +205,20 @@ const Tickets = () => {
     setShowViewModal(true);
   };
 
-  const openEditModal = (ticket, e) => {
-    if (e) e.stopPropagation();
-    closeAllModals();
-    setSelectedTicket({
-      ...ticket,
-      price: ticket.price || "",
-      used_by: ticket.used_by || "",
-    });
-    setShowEditModal(true);
-  };
+const openEditModal = (ticket, e) => {
+  if (e) e.stopPropagation();
+  closeAllModals();
+  console.log("Opening Edit Modal with ticket:", ticket);
+  setSelectedTicket({
+    ...ticket,
+    buyer_name: ticket.buyer_name || "",
+    ticket_type: ticket.ticket_type || "",
+    price: ticket.price || "",
+    used: ticket.used || false,
+    identifier: ticket.identifier || "", // Ensure identifier is set
+  });
+  setShowEditModal(true);
+};
 
   const openDeleteModal = (ticket, e) => {
     if (e) e.stopPropagation();
@@ -226,7 +230,7 @@ const Tickets = () => {
   const openMarkAsUsedModal = (ticket, e) => {
     if (e) e.stopPropagation();
     closeAllModals();
-    setSelectedTicket({ ...ticket, used_by: ticket.used_by || "" });
+    setSelectedTicket({ ...ticket, identifier: ticket.identifier || "" });
     setShowMarkAsUsedModal(true);
   };
 
@@ -259,50 +263,55 @@ const Tickets = () => {
   }, []);
 
   // Handle save changes for edit modal
-  const handleEditSave = () => {
-    if (selectedTicket && userClub) {
-      const updatedTicketData = {
-        buyer_name: selectedTicket.buyer_name,
-        ticket_type: selectedTicket.ticket_type,
-        price: Number(selectedTicket.price),
-        used: selectedTicket.used,
-        used_by: selectedTicket.used
-          ? Number(selectedTicket.used_by) || null
-          : null,
-      };
+ const handleEditSave = () => {
+  if (!selectedTicket || !userClub) {
+    console.error("Missing selectedTicket or userClub:", { selectedTicket, userClub });
+    setFormError("خطأ: التذكرة أو النادي غير متاح");
+    return;
+  }
 
-      dispatch(
-        editTicketById({
-          ticketId: selectedTicket.id,
-          ticketData: updatedTicketData,
-        })
-      )
-        .unwrap()
-        .then(() => {
-          const params = {
-            page: currentPage,
-            page_size: itemsPerPage,
-            ticket_type: filterTicketType,
-            issue_date: filterIssueDate,
-            buyer_name: filterBuyerName,
-          };
-          if (filterUsedStatus === "used") {
-            params.used = "true";
-          } else if (filterUsedStatus === "unused") {
-            params.used = "false";
-          }
-          dispatch(fetchTickets(params));
-          toast.success("تم تعديل التذكرة بنجاح!");
-          closeAllModals();
-        })
-        .catch((err) => {
-          console.error("Failed to edit ticket:", err);
-          setFormError(
-            "فشل في تعديل التذكرة: " + (err.message || "خطأ غير معروف")
-          );
-        });
-    }
+  const updatedTicketData = {
+    club: userClub.id, // Add club field like in Add Ticket form
+    buyer_name: selectedTicket.buyer_name,
+    ticket_type: selectedTicket.ticket_type,
+    price: Number(selectedTicket.price),
+    used: selectedTicket.used,
+    identifier: selectedTicket.used ? selectedTicket.identifier || "" : "",
   };
+
+  console.log("Editing ticket with payload:", updatedTicketData);
+
+  dispatch(
+    editTicketById({
+      ticketId: selectedTicket.id,
+      ticketData: updatedTicketData,
+    })
+  )
+    .unwrap()
+    .then(() => {
+      const params = {
+        page: currentPage,
+        page_size: itemsPerPage,
+        ticket_type: filterTicketType,
+        issue_date: filterIssueDate,
+        buyer_name: filterBuyerName,
+      };
+      if (filterUsedStatus === "used") {
+        params.used = "true";
+      } else if (filterUsedStatus === "unused") {
+        params.used = "false";
+      }
+      dispatch(fetchTickets(params));
+      toast.success("تم تعديل التذكرة بنجاح!");
+      closeAllModals();
+    })
+    .catch((err) => {
+      console.error("Failed to edit ticket:", err);
+      setFormError(
+        "فشل في تعديل التذكرة: " + (err.message || JSON.stringify(err))
+      );
+    });
+};
 
   const handleDelete = () => {
     if (selectedTicket) {
@@ -332,53 +341,40 @@ const Tickets = () => {
     }
   };
 
-  const handleMarkAsUsed = () => {
-    if (selectedTicket) {
-      dispatch(
-        markTicketAsUsed({
-          ticketId: selectedTicket.id,
-          used_by: Number(selectedTicket.used_by) || null,
-        })
-      )
-        .unwrap()
-        .then(() => {
-          const params = {
-            page: currentPage,
-            page_size: itemsPerPage,
-            ticket_type: filterTicketType,
-            issue_date: filterIssueDate,
-            buyer_name: filterBuyerName,
-          };
-          if (filterUsedStatus === "used") {
-            params.used = "true";
-          } else if (filterUsedStatus === "unused") {
-            params.used = "false";
-          }
-          dispatch(fetchTickets(params));
-          toast.success("تم تحديد التذكرة كمستخدمة بنجاح!");
-          closeAllModals();
-        })
-        .catch((err) => {
-          console.error("Failed to mark ticket as used:", err);
-          toast.error("فشل في تحديد التذكرة كمستخدمة");
-        });
-    }
+const handleMarkAsUsed = () => {
+  console.log("Selected Ticket:", selectedTicket);
+  if (!selectedTicket || !selectedTicket.identifier?.trim()) {
+    console.warn("No identifier");
+    toast.error("يرجى إدخال RFID أو الاسم أو رقم الهاتف");
+    return;
+  }
+  const payload = {
+    ticketId: selectedTicket.id,
+    used: true,
+    identifier: selectedTicket.identifier.trim(),
   };
+  console.log("Dispatching markTicketAsUsed:", payload);
+  dispatch(markTicketAsUsed(payload))
+    .unwrap()
+    .then(() => {
+      toast.success("تم تحديد التذكرة كمستخدمة!");
+      closeAllModals();
+      dispatch(fetchTickets({ page: currentPage, page_size: itemsPerPage }));
+    })
+    .catch((err) => {
+      console.error("Mark as used error:", err);
+      toast.error(err.error || "فشل في تحديد التذكرة كمستخدمة");
+    });
+};
 
-  const handleInputChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setSelectedTicket((prev) => ({
-      ...prev,
-      [name]:
-        type === "checkbox"
-          ? checked
-          : name === "used_by" || name === "price"
-          ? value === ""
-            ? ""
-            : Number(value)
-          : value,
-    }));
-  };
+const handleInputChange = (e) => {
+  const { name, value, type, checked } = e.target;
+  console.log(`Input: ${name}=${value}`);
+  setSelectedTicket((prev) => ({
+    ...prev,
+    [name]: type === "checkbox" ? checked : value,
+  }));
+};
 
   const handleFormChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -387,10 +383,10 @@ const Tickets = () => {
       [name]:
         type === "checkbox"
           ? checked
-          : name === "price" || name === "used_by"
+          : name === "price" || name === "identifier"
           ? value === ""
             ? ""
-            : Number(value)
+            : value
           : value,
     }));
   };
@@ -407,10 +403,9 @@ const Tickets = () => {
       club: userClub.id,
       buyer_name: formData.buyer_name,
       ticket_type: formData.ticket_type,
-     price: Number(formData.price),
       price: Number(formData.price),
       used: formData.used,
-      used_by: formData.used ? Number(formData.used_by) || null : null,
+      identifier: formData.used ? formData.identifier || "" : "",
     };
 
     dispatch(addTicket(ticketData))
@@ -581,6 +576,10 @@ const Tickets = () => {
                     الحالة
                   </th>
                   <th className="py-2 px-4 border-b text-center text-sm font-medium text-gray-700">
+  اسم المستخدم
+</th>
+
+                  <th className="py-2 px-4 border-b text-center text-sm font-medium text-gray-700">
                     إجراءات
                   </th>
                 </tr>
@@ -615,6 +614,10 @@ const Tickets = () => {
                         {ticket.used ? "مستخدمة" : "متاحة"}
                       </span>
                     </td>
+                    <td className="py-2 px-4 border-b text-center text-sm">
+  {ticket.used_by_details?.name ? ticket.used_by_details.name : "—"}
+</td>
+
                     <td className="py-2 px-4 border-b text-center">
                       <div
                         ref={actionButtonsRef}
@@ -943,15 +946,15 @@ const Tickets = () => {
                 {formData.used && (
                   <div>
                     <label className="block text-sm font-medium mb-1 text-right">
-                      معرف العضو
+                      RFID أو الاسم أو رقم الهاتف
                     </label>
                     <input
-                      type="number"
-                      name="used_by"
-                      value={formData.used_by}
+                      type="text"
+                      name="identifier"
+                      value={formData.identifier}
                       onChange={handleFormChange}
                       className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                      placeholder="أدخل معرف العضو"
+                      placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
                     />
                   </div>
                 )}
@@ -978,120 +981,126 @@ const Tickets = () => {
       )}
 
       {/* Edit Modal */}
-      {showEditModal && selectedTicket && (
-        <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4"
+    {showEditModal && selectedTicket && (
+  <div
+    className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4"
+    onClick={closeAllModals}
+  >
+    <div
+      className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto modal-container"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex justify-between items-center border-b p-4">
+        <h2 className="text-lg sm:text-xl font-semibold">
+          تعديل التذكرة
+        </h2>
+        <button
           onClick={closeAllModals}
+          className="text-gray-500 hover:text-gray-700 text-lg"
         >
-          <div
-            className="bg-white rounded-lg shadow-xl w-full max-w-md max-h-[80vh] overflow-y-auto modal-container"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-center border-b p-4">
-              <h2 className="text-lg sm:text-xl font-semibold">
-                تعديل التذكرة
-              </h2>
-              <button
-                onClick={closeAllModals}
-                className="text-gray-500 hover:text-gray-700 text-lg"
-              >
-                ✕
-              </button>
+          ✕
+        </button>
+      </div>
+      <div className="p-4 sm:p-6">
+        {formError && (
+          <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
+            {formError}
+          </div>
+        )}
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1 text-right">
+              اسم المشتري
+            </label>
+            <input
+              type="text"
+              name="buyer_name"
+              value={selectedTicket.buyer_name || ""}
+              onChange={handleInputChange}
+              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-right">
+              نوع التذكرة
+            </label>
+            <select
+              name="ticket_type"
+              value={selectedTicket.ticket_type || ""}
+              onChange={handleInputChange}
+              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
+              required
+            >
+              <option value="">اختر نوع التذكرة</option>
+              <option value="session">جلسة</option>
+              <option value="day_pass">تصريح يومي</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1 text-right">
+              السعر (جنيه)
+            </label>
+            <input
+              type="number"
+              name="price"
+              value={selectedTicket.price || ""}
+              onChange={handleInputChange}
+              className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
+              min="0"
+              required
+            />
+          </div>
+          <div className="flex items-center space-x-2 space-x-reverse">
+            <input
+              type="checkbox"
+              name="used"
+              checked={selectedTicket.used || false}
+              onChange={handleInputChange}
+              className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+            />
+            <label className="text-sm font-medium">مستخدمة</label>
+          </div>
+          {selectedTicket.used && (
+            <div>
+              <label className="block text-sm font-medium mb-1 text-right">
+                RFID أو الاسم أو رقم الهاتف
+              </label>
+              <input
+                type="text"
+                name="identifier"
+                value={selectedTicket.identifier || ""}
+                onChange={(e) => {
+                  console.log("Identifier input:", e.target.value);
+                  handleInputChange(e);
+                }}
+                className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
+                placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
+              />
             </div>
-            <div className="p-4 sm:p-6">
-              {formError && (
-                <div className="bg-red-100 text-red-700 p-2 rounded mb-4 text-right text-sm">
-                  {formError}
-                </div>
-              )}
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-right">
-                    اسم المشتري
-                  </label>
-                  <input
-                    type="text"
-                    name="buyer_name"
-                    value={selectedTicket.buyer_name || ""}
-                    onChange={handleInputChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-right">
-                    نوع التذكرة
-                  </label>
-                  <select
-                    name="ticket_type"
-                    value={selectedTicket.ticket_type || ""}
-                    onChange={handleInputChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    required
-                  >
-                    <option value="">اختر نوع التذكرة</option>
-                    <option value="session">جلسة</option>
-                    <option value="day_pass">تصريح يومي</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-right">
-                    السعر (جنيه)
-                  </label>
-                  <input
-                    type="number"
-                    name="price"
-                    value={selectedTicket.price || ""}
-                    onChange={handleInputChange}
-                    className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                    min="0"
-                    required
-                  />
-                </div>
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <input
-                    type="checkbox"
-                    name="used"
-                    checked={selectedTicket.used || false}
-                    onChange={handleInputChange}
-                    className="h-4 w-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                  />
-                  <label className="text-sm font-medium">مستخدمة</label>
-                </div>
-                {selectedTicket.used && (
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-right">
-                      معرف العضو
-                    </label>
-                    <input
-                      type="number"
-                      name="used_by"
-                      value={selectedTicket.used_by || ""}
-                      onChange={handleInputChange}
-                      className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                      placeholder="أدخل معرف العضو"
-                    />
-                  </div>
-                )}
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={closeAllModals}
-                    className="px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400 transition"
-                  >
-                    إلغاء
-                  </button>
-                  <button
-                    onClick={handleEditSave}
-                    className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition"
-                  >
-                    حفظ
-                  </button>
-                </div>
-              </div>
-            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={closeAllModals}
+              className="px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400 transition"
+            >
+              إلغاء
+            </button>
+            <button
+              onClick={() => {
+                console.log("Saving edit, selectedTicket:", selectedTicket);
+                handleEditSave();
+              }}
+              className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition"
+            >
+              حفظ
+            </button>
           </div>
         </div>
-      )}
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Delete Modal */}
       {showDeleteModal && selectedTicket && (
@@ -1136,62 +1145,83 @@ const Tickets = () => {
       )}
 
       {/* Mark as Used Modal */}
-      {showMarkAsUsedModal && selectedTicket && (
-        <div
-          className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4"
+{showMarkAsUsedModal && selectedTicket && (
+  <div
+    className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50 p-4"
+    onClick={closeAllModals}
+  >
+    <div
+      className="bg-white rounded-lg shadow-xl w-full max-w-sm modal-container"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="flex justify-between items-center border-b p-4">
+        <h2 className="text-lg sm:text-xl font-semibold">
+          تحديد التذكرة كمستخدمة
+        </h2>
+        <button
           onClick={closeAllModals}
+          className="text-gray-500 hover:text-gray-700 text-lg"
         >
-          <div
-            className="bg-white rounded-lg shadow-xl w-full max-w-sm modal-container"
-            onClick={(e) => e.stopPropagation()}
+          ✕
+        </button>
+      </div>
+      <div className="p-4 sm:p-6">
+        <div className="mb-4">
+          <label
+            htmlFor="identifier"
+            className="block text-sm font-medium mb-1 text-right"
           >
-            <div className="flex justify-between items-center border-b p-4">
-              <h2 className="text-lg sm:text-xl font-semibold">
-                تحديد التذكرة كمستخدمة
-              </h2>
-              <button
-                onClick={closeAllModals}
-                className="text-gray-500 hover:text-gray-700 text-lg"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-4 sm:p-6">
-              <div className="mb-4">
-                <label
-                  htmlFor="usedBy"
-                  className="block text-sm font-medium mb-1 text-right"
-                >
-                  معرف العضو
-                </label>
-                <input
-                  type="number"
-                  name="used_by"
-                  value={selectedTicket.used_by || ""}
-                  onChange={handleInputChange}
-                  placeholder="أدخل معرف العضو"
-                  className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring focus:ring-green-200 text-right"
-                  id="usedBy"
-                />
-              </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={closeAllModals}
-                  className="px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400 transition"
-                >
-                  إلغاء
-                </button>
-                <button
-                  onClick={handleMarkAsUsed}
-                  className="px-4 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600 transition"
-                >
-                  تأكيد
-                </button>
-              </div>
-            </div>
-          </div>
+            RFID أو الاسم أو رقم الهاتف <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            name="identifier"
+            value={selectedTicket?.identifier || ""}
+            onChange={(e) => {
+              console.log("Typing:", e.target.value);
+              handleInputChange(e);
+            }}
+            placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
+            className={`w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring ${
+              !selectedTicket?.identifier || selectedTicket.identifier.trim() === ""
+                ? "border-red-500"
+                : "border-gray-300 focus:ring-green-200"
+            } text-right`}
+            id="identifier"
+            required
+          />
+          {!selectedTicket?.identifier || selectedTicket.identifier.trim() === "" ? (
+            <p className="text-red-500 text-xs mt-1 text-right">
+              هذا الحقل مطلوب
+            </p>
+          ) : null}
         </div>
-      )}
+        <div className="flex justify-end gap-2">
+          <button
+            onClick={closeAllModals}
+            className="px-4 py-2 bg-gray-300 rounded text-sm hover:bg-gray-400 transition"
+          >
+            إلغاء
+          </button>
+          <button
+            onClick={() => {
+              console.log("Confirm clicked, identifier:", selectedTicket?.identifier);
+              handleMarkAsUsed();
+            }}
+            className={`px-4 py-2 rounded text-sm transition ${
+              !selectedTicket?.identifier || selectedTicket.identifier.trim() === ""
+                ? "bg-gray-300 cursor-not-allowed"
+                : "bg-green-500 text-white hover:bg-green-600"
+            }`}
+            disabled={!selectedTicket?.identifier || selectedTicket.identifier.trim() === ""}
+          >
+            تأكيد
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* View Modal */}
       {showViewModal && selectedTicket && (
@@ -1204,9 +1234,7 @@ const Tickets = () => {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b p-4">
-              <h2 className="text-lg sm:text-xl font-semibold">
-                تفاصيل التذكرة
-              </h2>
+              <h2 className="text-lg sm:text-xl font-semibold">تفاصيل التذكرة</h2>
               <button
                 onClick={closeAllModals}
                 className="text-gray-500 hover:text-gray-700 text-lg"
@@ -1222,8 +1250,7 @@ const Tickets = () => {
                 <strong>السعر:</strong> {selectedTicket.price} جنيه
               </p>
               <p className="text-sm sm:text-base mb-2">
-                <strong>نوع التذكرة:</strong>{" "}
-                {selectedTicket.ticket_type_display}
+                <strong>نوع التذكرة:</strong> {selectedTicket.ticket_type_display}
               </p>
               <p className="text-sm sm:text-base mb-2">
                 <strong>الحالة:</strong>{" "}
@@ -1237,6 +1264,12 @@ const Tickets = () => {
                   {selectedTicket.used ? "مستخدمة" : "متاحة"}
                 </span>
               </p>
+              
+              {selectedTicket.used && selectedTicket.identifier && (
+                <p className="text-sm sm:text-base mb-2">
+                  <strong>RFID أو الاسم أو رقم الهاتف:</strong> {selectedTicket.identifier}
+                </p>
+              )}
               <div className="flex justify-end gap-2 mt-4">
                 <button
                   onClick={closeAllModals}

@@ -1,23 +1,8 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchSubscriptionTypes, postSubscription } from "../../redux/slices/subscriptionsSlice";
 import { fetchUsers } from "../../redux/slices/memberSlice";
-import {
-  Command,
-  CommandInput,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { Check, ChevronsUpDown } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
@@ -26,20 +11,14 @@ const CreateSubscription = ({ onClose }) => {
   // Form state
   const [formData, setFormData] = useState({
     club: "",
-    member: "",
+    identifier: "",
     type: "",
     start_date: "",
     paid_amount: "",
   });
 
   // Data state
-  const [allMembers, setAllMembers] = useState([]);
   const [clubs, setClubs] = useState([]);
-
-  // Member search and pagination
-  const [searchQuery, setSearchQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const itemsPerPage = 10;
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // UI state
@@ -53,7 +32,6 @@ const CreateSubscription = ({ onClose }) => {
       try {
         await dispatch(fetchSubscriptionTypes()).unwrap();
         const membersResult = await dispatch(fetchUsers()).unwrap();
-        setAllMembers(membersResult);
 
         // Extract unique clubs
         const uniqueClubs = Array.from(
@@ -75,59 +53,20 @@ const CreateSubscription = ({ onClose }) => {
     fetchInitialData();
   }, [dispatch]);
 
-  // Filtered and paginated members
-  const { filteredMembers, hasMore } = useMemo(() => {
-    if (!formData.club) return { filteredMembers: [], hasMore: false };
-
-    const filtered = allMembers.results.filter(
-      (member) =>
-        member.club === parseInt(formData.club) &&
-        (member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (member.rfid_code &&
-            member.rfid_code.toLowerCase().includes(searchQuery.toLowerCase())))
-    );
-
-    return {
-      filteredMembers: filtered.slice(0, page * itemsPerPage),
-      hasMore: filtered.length > page * itemsPerPage,
-    };
-  }, [allMembers, formData.club, searchQuery, page]);
-
-  // Debounced search
-  const debouncedSearch = useCallback(() =>
-    debounce((query) => {
-      setSearchQuery(query);
-      setPage(1);
-    }, 300),
-    []
-  );
-
-  // Handle infinite scroll
-  const handleScroll = (e) => {
-    const { scrollTop, scrollHeight, clientHeight } = e.target;
-    const bottomThreshold = 50;
-
-    if (
-      scrollHeight - (scrollTop + clientHeight) < bottomThreshold &&
-      hasMore
-    ) {
-      setPage((prev) => prev + 1);
-    }
-  };
-
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { club, member, type, start_date, paid_amount } = formData;
+    const { club, identifier, type, start_date, paid_amount } = formData;
 
     // Client-side validation
-    if (!club || !member || !type || !start_date || !paid_amount) {
-      setErrorMessage("Please fill in all required fields");
+    if (!club || !identifier || !type || !start_date || !paid_amount) {
+      setErrorMessage("يرجى ملء جميع الحقول المطلوبة");
       setIsModalOpen(true);
       return;
     }
 
     if (isNaN(parseFloat(paid_amount)) || parseFloat(paid_amount) <= 0) {
-      setErrorMessage("Paid amount must be a positive number");
+      setErrorMessage("المبلغ المدفوع يجب أن يكون رقمًا إيجابيًا");
       setIsModalOpen(true);
       return;
     }
@@ -136,7 +75,7 @@ const CreateSubscription = ({ onClose }) => {
 
     const payload = {
       club: parseInt(club),
-      member: parseInt(member),
+      identifier,
       type: parseInt(type),
       start_date,
       paid_amount: parseFloat(paid_amount),
@@ -146,34 +85,24 @@ const CreateSubscription = ({ onClose }) => {
       await dispatch(postSubscription(payload)).unwrap();
       setFormData({
         club: "",
-        member: "",
+        identifier: "",
         type: "",
         start_date: "",
         paid_amount: "",
       });
       if (onClose) onClose();
     } catch (error) {
-      console.log("Full error object:", JSON.stringify(error, null, 2)); // Debug entire error
-      console.log("Error payload:", JSON.stringify(error.payload, null, 2)); // Debug payload
-      console.log("Error data:", JSON.stringify(error.data, null, 2)); // Debug data (if exists)
-      console.log("Error response:", JSON.stringify(error.response, null, 2)); // Debug response (if exists)
-
-      // Try multiple possible error locations
+      console.log("Full error object:", JSON.stringify(error, null, 2));
       let errorData = error.payload || error.data || error.response || error;
-
-      console.log("Final errorData:", JSON.stringify(errorData, null, 2)); // Debug final errorData
-
       if (
         errorData?.non_field_errors &&
         Array.isArray(errorData.non_field_errors)
       ) {
-        console.log("Handling non_field_errors:", errorData.non_field_errors); // Debug
-        setErrorMessage(errorData.non_field_errors[0]); // Use raw error message
+        setErrorMessage(errorData.non_field_errors[0]);
         setIsModalOpen(true);
       } else {
-        console.log("Fallback error:", errorData); // Debug fallback
         setErrorMessage(
-          errorData?.message || error.message || "An unexpected error occurred"
+          errorData?.message || error.message || "حدث خطأ غير متوقع"
         );
         setIsModalOpen(true);
       }
@@ -222,7 +151,7 @@ const CreateSubscription = ({ onClose }) => {
               setFormData({
                 ...formData,
                 club: e.target.value,
-                member: "", // Reset member on club change
+                identifier: "", // Reset identifier on club change
               })
             }
             className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
@@ -237,76 +166,19 @@ const CreateSubscription = ({ onClose }) => {
           </select>
         </div>
 
-        {/* Member Selection */}
+        {/* Identifier Input */}
         <div>
-          <label className="block text-sm font-medium mb-2">العضو</label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                className="w-full justify-between"
-                disabled={!formData.club || isSubmitting}
-              >
-                {formData.member
-                  ? allMembers.results.find((m) => m.id === formData.member)
-                      ?.name
-                  : "اختر العضو..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
-              <Command onScroll={handleScroll}>
-                <CommandInput
-                  placeholder="ابحث عن عضو بالاسم أو رقم RFID..."
-                  onValueChange={debouncedSearch}
-                />
-                <CommandList className="max-h-[300px]">
-                  <CommandGroup>
-                    {filteredMembers.map((member) => (
-                      <CommandItem
-                        key={member.id}
-                        value={member.id}
-                        onSelect={() => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            member: member.id === prev.member ? "" : member.id,
-                          }));
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            formData.member === member.id
-                              ? "opacity-100"
-                              : "opacity-0"
-                          )}
-                        />
-                        <div>
-                          <div>{member.name}</div>
-                          {member.rfid_code && (
-                            <div className="text-xs text-gray-500">
-                              RFID: {member.rfid_code}
-                            </div>
-                          )}
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-
-                  {!filteredMembers.length && !isInitialLoad && (
-                    <CommandEmpty>لا يوجد أعضاء</CommandEmpty>
-                  )}
-
-                  {hasMore && (
-                    <CommandItem className="justify-center text-sm text-gray-500">
-                      جاري تحميل المزيد...
-                    </CommandItem>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <label className="block text-sm font-medium mb-2">RFID أو الاسم أو رقم الهاتف</label>
+          <input
+            type="text"
+            value={formData.identifier}
+            onChange={(e) =>
+              setFormData({ ...formData, identifier: e.target.value })
+            }
+            className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+            placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
+            disabled={!formData.club || isSubmitting}
+          />
         </div>
 
         {/* Subscription Type */}
@@ -398,15 +270,3 @@ const CreateSubscription = ({ onClose }) => {
 };
 
 export default CreateSubscription;
-
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}

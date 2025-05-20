@@ -51,8 +51,9 @@ def subscription_list(request):
     Handle GET requests to retrieve a filtered list of subscriptions and POST requests to create a new subscription.
     """
     if request.method == 'GET':
-        # Base queryset based on user role
-        # Explanation: If the user is an 'owner', they can see all subscriptions. Otherwise, they only see subscriptions for their club.
+        # Get the identifier from query parameters
+        search_term = request.GET.get('identifier', '')
+
         if request.user.role == 'owner':
             subscriptions = Subscription.objects.select_related('member', 'type', 'club').all()
         else:
