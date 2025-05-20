@@ -11,16 +11,28 @@ from utils.permissions import IsOwnerOrRelatedToClub
 from finance.models import Income , IncomeSource
 from django.utils.timezone import now
 from rest_framework.pagination import PageNumberPagination
-
+from django.db.models import Q
+from django.utils import timezone
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def receipt_list_api(request):
+    identifier = request.query_params.get('identifier', None)
+    
     if request.user.role == 'owner':
-        receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').all().order_by('-date')
+        receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').all()
     else:
-        receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').filter(club=request.user.club).order_by('-date')
+        receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').filter(club=request.user.club)
 
+    if identifier:
+        receipts = receipts.filter(
+            member__in=Member.objects.filter(
+                Q(name__icontains=identifier) |
+                Q(phone__icontains=identifier) |
+                Q(rfid_code__icontains=identifier)
+            )
+        )
+    receipts = receipts.order_by('-date')
     paginator = PageNumberPagination()
     paginated_receipts = paginator.paginate_queryset(receipts, request)
     serializer = ReceiptSerializer(paginated_receipts, many=True)
@@ -28,24 +40,32 @@ def receipt_list_api(request):
 
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_receipt_api(request):
     data = request.data.copy()
-    data['issued_by'] = request.user.id  
-    
+    data['issued_by'] = request.user.id
+
+    identifier = data.get('identifier')
+
+    if identifier:
+        try:
+            member = Member.objects.filter(
+                Q(name__icontains=identifier) |
+                Q(phone__icontains=identifier) |
+                Q(rfid_code__icontains=identifier)
+            ).first()  
+            if not member:
+                return Response({'error': 'No member found matching the provided identifier'}, status=status.HTTP_400_BAD_REQUEST)
+            data['member'] = member.id  
+        except Member.DoesNotExist:
+            return Response({'error': 'No member found matching the provided identifier'}, status=status.HTTP_400_BAD_REQUEST)
+
     serializer = ReceiptSerializer(data=data)
-    # add_receipt_api
     if serializer.is_valid():
         receipt = serializer.save()
-    
-        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, receipt):
-            receipt.delete()
-            return Response({'error': 'You do not have permission to create a receipt for this club'}, status=status.HTTP_403_FORBIDDEN)
-    
-        # signal
+
         source_name = 'Subscription Payment' if receipt.subscription else 'General Payment'
         source, _ = IncomeSource.objects.get_or_create(club=receipt.club, name=source_name)
-    
+
         Income.objects.create(
             club=receipt.club,
             source=source,
@@ -54,15 +74,16 @@ def add_receipt_api(request):
             received_by=receipt.issued_by,
             related_receipt=receipt
         )
-    
+
         if not receipt.invoice_number:
-            today_str = now().strftime('%Y%m%d')
+            today_str = timezone.now().strftime('%Y%m%d')
             invoice_id = f"INV{today_str}-{receipt.id:04d}"
             receipt.invoice_number = invoice_id
             receipt.save(update_fields=['invoice_number'])
-    
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
