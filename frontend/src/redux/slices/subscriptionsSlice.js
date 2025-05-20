@@ -487,64 +487,73 @@ export const fetchSubscriptions = createAsyncThunk(
         },
       };
 
-      const safeParams = typeof params === "object" && params !== null ? params : {};
-      const query = new URLSearchParams({
-        page: Number(safeParams.page) || 1,
-        page_size: safeParams.pageSize || 20, // Add page_size parameter
-        ...(safeParams.memberName && { member_name: safeParams.memberName }),
-        ...(safeParams.status && { status: safeParams.status }),
-        ...(safeParams.startDate && { start_date: safeParams.startDate }),
-        ...(safeParams.endDate && { end_date: safeParams.endDate }),
-        ...(safeParams.clubName && { club_name: safeParams.clubName }),
-        ...(safeParams.entryCount && { attendance_days: safeParams.entryCount }),
-        ...(safeParams.sort && { sort: safeParams.sort }),
-      }).toString();
+      // Map frontend params to backend query parameters
+      const queryParams = {
+        page: Number(params.page) || 1,
+        page_size: params.pageSize || 20,
+        ...(params.searchTerm && { search_term: params.searchTerm }),
+        ...(params.memberId && { member_id: params.memberId }),
+        ...(params.typeId && { type_id: params.typeId }),
+        ...(params.clubId && { club_id: params.clubId }),
+        ...(params.clubName && { club_name: params.clubName }),
+        ...(params.startDate && { start_date: params.startDate }),
+        ...(params.endDate && { end_date: params.endDate }),
+        ...(params.paidAmount && { paid_amount: params.paidAmount }),
+        ...(params.remainingAmount && {
+          remaining_amount: params.remainingAmount,
+        }),
+        ...(params.status && { status: params.status }),
+        ...(params.entryCount && { entry_count: params.entryCount }),
+        ...(params.sort && { ordering: params.sort }),
+      };
 
-      const [allRes, activeRes, upcomingRes, expiredRes] = await Promise.all([
-        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/?${query}`, config),
-        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/active/`, config),
-        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/upcoming/`, config),
-        axios.get(`${BASE_URL}/subscriptions/api/subscriptions/expired/`, config),
-      ]);
+      // Handle date range filters
+      if (params.startDateGte) {
+        queryParams.start_date_gte = params.startDateGte;
+      }
+      if (params.startDateLte) {
+        queryParams.start_date_lte = params.startDateLte;
+      }
+      if (params.endDateGte) {
+        queryParams.end_date_gte = params.endDateGte;
+      }
+      if (params.endDateLte) {
+        queryParams.end_date_lte = params.endDateLte;
+      }
 
-      console.log("API Response:", {
-        count: allRes.data.count,
-        resultsLength: allRes.data.results.length,
-        next: allRes.data.next,
-      });
+      // Handle amount range filters
+      if (params.paidAmountGte) {
+        queryParams.paid_amount_gte = params.paidAmountGte;
+      }
+      if (params.paidAmountLte) {
+        queryParams.paid_amount_lte = params.paidAmountLte;
+      }
 
-      const getArray = (res) =>
-        Array.isArray(res.data)
-          ? res.data
-          : Array.isArray(res.data?.results)
-          ? res.data.results
-          : [];
+      const queryString = new URLSearchParams(queryParams).toString();
+      const response = await axios.get(
+        `${BASE_URL}/subscriptions/api/subscriptions/?${queryString}`,
+        config
+      );
 
-      const activeArray = getArray(activeRes);
-      const upcomingArray = getArray(upcomingRes);
-      const expiredArray = getArray(expiredRes);
+      // Since your endpoint doesn't have separate active/upcoming/expired endpoints,
+      // we'll determine status on the client side based on dates
+      const currentDate = new Date().toISOString().split("T")[0];
 
-      const activeIds = new Set(activeArray.map((sub) => sub.id));
-      const upcomingIds = new Set(upcomingArray.map((sub) => sub.id));
-      const expiredIds = new Set(expiredArray.map((sub) => sub.id));
-
-      const subscriptionsWithStatus = allRes.data.results.map((sub) => {
-        if (activeIds.has(sub.id)) {
-          return { ...sub, status: "Active" };
-        } else if (upcomingIds.has(sub.id)) {
-          return { ...sub, status: "Upcoming" };
-        } else if (expiredIds.has(sub.id)) {
+      const subscriptionsWithStatus = response.data.results.map((sub) => {
+        if (sub.end_date < currentDate) {
           return { ...sub, status: "Expired" };
+        } else if (sub.start_date > currentDate) {
+          return { ...sub, status: "Upcoming" };
         } else {
-          return { ...sub, status: "Unknown" };
+          return { ...sub, status: "Active" };
         }
       });
 
       return {
         subscriptions: subscriptionsWithStatus,
-        count: allRes.data.count,
-        next: allRes.data.next,
-        previous: allRes.data.previous,
+        count: response.data.count,
+        next: response.data.next,
+        previous: response.data.previous,
       };
     } catch (error) {
       console.error("Error fetching subscriptions:", {
@@ -552,7 +561,9 @@ export const fetchSubscriptions = createAsyncThunk(
         response: error.response?.data,
         stack: error.stack,
       });
-      return rejectWithValue(error.response?.data || "Error fetching subscriptions");
+      return rejectWithValue(
+        error.response?.data || "Error fetching subscriptions"
+      );
     }
   }
 );

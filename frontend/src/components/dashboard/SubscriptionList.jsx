@@ -25,11 +25,8 @@ import usePermission from "@/hooks/usePermission";
 
 const SubscriptionList = () => {
   const dispatch = useDispatch();
-  const { subscriptions, pagination, status, error, updateStatus } = useSelector(
-    (state) => state.subscriptions
-  );
-  console.log("Subscriptions data:", subscriptions);
-  console.log("Pagination:", pagination);
+  const { subscriptions, pagination, status, error, updateStatus } =
+    useSelector((state) => state.subscriptions);
 
   const canAddSubscription = usePermission("add_subscription");
   const canUpdateSubscription = usePermission("change_subscription");
@@ -45,14 +42,13 @@ const SubscriptionList = () => {
   const [detailSubscription, setDetailSubscription] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
   const [filters, setFilters] = useState({
     memberName: "",
-    status: "",
     startDate: "",
     endDate: "",
     clubName: "",
     entryCount: "",
+    status: "",
   });
 
   // Normalize status values
@@ -66,55 +62,10 @@ const SubscriptionList = () => {
     return statusMap[status.toLowerCase()] || "غير معروف";
   };
 
-  // Sort subscriptions by id (newest first - descending)
-  const sortedSubscriptions = [...subscriptions].sort((a, b) => b.id - a.id);
-
-  // Apply filters to the sorted array (client-side filtering)
-  const filteredSubscriptions = sortedSubscriptions.filter((subscription) => {
-    const matchesMember = filters.memberName
-      ? subscription.member_details.name
-          .toLowerCase()
-          .includes(filters.memberName.toLowerCase())
-      : true;
-    const matchesStatus = filters.status
-      ? normalizeStatus(subscription.status) === filters.status
-      : true;
-    const subscriptionStartDate = new Date(subscription.start_date);
-    const subscriptionEndDate = new Date(subscription.end_date);
-    const filterStartDate = filters.startDate
-      ? new Date(filters.startDate)
-      : null;
-    const filterEndDate = filters.endDate ? new Date(filters.endDate) : null;
-    const matchesStartDate = filterStartDate
-      ? subscriptionStartDate.setHours(0, 0, 0, 0) ===
-        filterStartDate.setHours(0, 0, 0, 0)
-      : true;
-    const matchesEndDate = filterEndDate
-      ? subscriptionEndDate.setHours(0, 0, 0, 0) ===
-        filterEndDate.setHours(0, 0, 0, 0)
-      : true;
-    const matchesClubName = filters.clubName
-      ? subscription.club_details.name
-          .toLowerCase()
-          .includes(filters.clubName.toLowerCase())
-      : true;
-    const matchesEntryCount = filters.entryCount
-      ? subscription.entry_count === parseInt(filters.entryCount)
-      : true;
-    return (
-      matchesMember &&
-      matchesStatus &&
-      matchesStartDate &&
-      matchesEndDate &&
-      matchesClubName &&
-      matchesEntryCount
-    );
-  });
-
   // Pagination configuration
   const totalItems = pagination.count || 0;
+  const itemsPerPage = pagination.page_size || 20;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-  const currentSubscriptions = filteredSubscriptions;
 
   // Generate pagination range
   const getPaginationRange = () => {
@@ -158,7 +109,6 @@ const SubscriptionList = () => {
   const resetFilters = () => {
     setFilters({
       memberName: "",
-      status: "",
       startDate: "",
       endDate: "",
       clubName: "",
@@ -220,6 +170,7 @@ const SubscriptionList = () => {
           fetchSubscriptions({
             page: currentPage,
             pageSize: itemsPerPage,
+            ...filters,
           })
         );
       })
@@ -248,9 +199,15 @@ const SubscriptionList = () => {
       fetchSubscriptions({
         page: currentPage,
         pageSize: itemsPerPage,
+        searchTerm: filters.memberName,
+        clubName: filters.clubName,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        entryCount: filters.entryCount,
+        status: filters.status,
       })
     );
-  }, [dispatch, currentPage]);
+  }, [dispatch, currentPage, itemsPerPage, filters]);
 
   const openModal = (subscription) => {
     setSelectedSubscription(subscription);
@@ -280,6 +237,7 @@ const SubscriptionList = () => {
           fetchSubscriptions({
             page: currentPage,
             pageSize: itemsPerPage,
+            ...filters,
           })
         );
       }
@@ -292,19 +250,20 @@ const SubscriptionList = () => {
         fetchSubscriptions({
           page: currentPage,
           pageSize: itemsPerPage,
+          ...filters,
         })
       );
     });
   };
 
   if (status === "loading") {
-    return <div className="text-center text-xl text-gray-500">جاري التحميل...</div>;
+    return (
+      <div className="text-center text-xl text-gray-500">جاري التحميل...</div>
+    );
   }
 
   if (status === "failed") {
-    return (
-      <div className="text-center text-xl text-red-500">خطأ: {error}</div>
-    );
+    return <div className="text-center text-xl text-red-500">خطأ: {error}</div>;
   }
 
   return (
@@ -404,9 +363,9 @@ const SubscriptionList = () => {
             className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm transition-all duration-200 ease-in-out"
           >
             <option value="">كل الحالات</option>
-            <option value="Active">نشط</option>
-            <option value="Expired">منتهي</option>
-            <option value="Upcoming">قادمة</option>
+            <option value="active">نشط</option>
+            <option value="expired">منتهي</option>
+            <option value="upcoming">قادمة</option>
           </select>
         </div>
         <div className="flex items-end">
@@ -421,7 +380,7 @@ const SubscriptionList = () => {
 
       {/* Subscriptions Table */}
       <div className="overflow-x-auto">
-        {currentSubscriptions.length === 0 ? (
+        {subscriptions.length === 0 ? (
           <p className="text-center text-lg text-gray-500">
             لا توجد اشتراكات متاحة.
           </p>
@@ -445,7 +404,7 @@ const SubscriptionList = () => {
               </tr>
             </thead>
             <tbody>
-              {currentSubscriptions.map((subscription) => {
+              {subscriptions.map((subscription) => {
                 const displayStatus = normalizeStatus(subscription.status);
                 return (
                   <tr
@@ -466,7 +425,9 @@ const SubscriptionList = () => {
                     <td className="py-1 px-2 text-sm">
                       {subscription.start_date}
                     </td>
-                    <td className="py-1 px-2 text-sm">{subscription.end_date}</td>
+                    <td className="py-1 px-2 text-sm">
+                      {subscription.end_date}
+                    </td>
                     <td className="py-1 px-2 text-sm">
                       {subscription.entry_count}
                     </td>
@@ -581,7 +542,10 @@ const SubscriptionList = () => {
         </div>
       )}
       {totalItems > 0 && (
-        <div className="flex justify-center items-center mt-6 space-x-2" dir="rtl">
+        <div
+          className="flex justify-center items-center mt-6 space-x-2"
+          dir="rtl"
+        >
           <button
             onClick={goToFirstPage}
             disabled={currentPage === 1}
@@ -618,10 +582,7 @@ const SubscriptionList = () => {
             </button>
           ))}
           <button
-            onClick={() => {
-              console.log("Next button clicked, going to page:", currentPage + 1);
-              handlePageChange(currentPage + 1);
-            }}
+            onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
             className={`px-3 py-2 rounded-lg ${
               currentPage === totalPages
@@ -700,14 +661,17 @@ const SubscriptionList = () => {
                 <div>
                   <p className="text-gray-600 font-medium">رقم العضوية:</p>
                   <p className="text-gray-800">
-                    {detailSubscription.member_details.membership_number || "غير متوفر"}
+                    {detailSubscription.member_details.membership_number ||
+                      "غير متوفر"}
                   </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-600 font-medium">تاريخ البدء:</p>
-                  <p className="text-gray-800">{detailSubscription.start_date}</p>
+                  <p className="text-gray-800">
+                    {detailSubscription.start_date}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-600 font-medium">تاريخ الانتهاء:</p>
@@ -731,7 +695,9 @@ const SubscriptionList = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-gray-600 font-medium">عدد الإدخالات:</p>
-                  <p className="text-gray-800">{detailSubscription.entry_count}</p>
+                  <p className="text-gray-800">
+                    {detailSubscription.entry_count}
+                  </p>
                 </div>
                 <div>
                   <p className="text-gray-600 font-medium">اسم النادي:</p>

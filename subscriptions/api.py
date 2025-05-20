@@ -117,6 +117,26 @@ def subscription_list(request):
         # Explanation: Sorts subscriptions by start_date in descending order (newest first).
         subscriptions = subscriptions.order_by('-start_date')
 
+        # Handle status filter
+        status = request.query_params.get('status', '').lower()
+        today = timezone.now().date()
+        
+        status_filters = {
+            'active': {
+                'start_date__lte': today,
+                'end_date__gte': today
+            },
+            'expired': {
+                'end_date__lt': today
+            },
+            'upcoming': {
+                'start_date__gt': today
+            }
+        }
+        
+        if status in status_filters:
+            subscriptions = subscriptions.filter(**status_filters[status])
+
         # Paginate results
         # Explanation: Uses Django REST Framework's pagination to split results into pages.
         paginator = PageNumberPagination()
