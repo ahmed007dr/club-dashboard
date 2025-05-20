@@ -228,7 +228,6 @@ def active_subscription_types(request):
     page = paginator.paginate_queryset(types, request)
     serializer = SubscriptionTypeSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
-
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_detail(request, pk):
@@ -242,10 +241,54 @@ def subscription_detail(request, pk):
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        serializer = SubscriptionSerializer(subscription, data=request.data, partial=True, context={'request': request})
+        identifier = request.GET.get('identifier', '')  
+        mutable_data = request.data.copy()  
+
+        if identifier:
+            try:
+                member = Member.objects.filter(
+                    Q(phone=identifier) |
+                    Q(rfid_code=identifier) |
+                    Q(name__iexact=identifier)
+                ).first()
+                if not member:
+                    return Response(
+                        {'error': 'No member found with the provided identifier'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                mutable_data['member'] = member.id  
+            except Member.DoesNotExist:
+                return Response(
+                    {'error': 'Invalid identifier provided'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        # Update the subscription
+        serializer = SubscriptionSerializer(subscription, data=mutable_data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated_subscription = serializer.save()
+            
+            # Recalculate remaining_amount
             updated_subscription.remaining_amount = updated_subscription.type.price - updated_subscription.paid_amount
+            
+            # Create Income record if paid_amount is updated
+            if 'paid_amount' in mutable_data and updated_subscription.paid_amount > subscription.paid_amount:
+                additional_amount = updated_subscription.paid_amount - subscription.paid_amount
+                source, created = IncomeSource.objects.get_or_create(
+                    club=updated_subscription.club,
+                    name='Subscription',
+                    defaults={'description': 'ايراد عن اشتراك'}
+                )
+                income = Income(
+                    club=updated_subscription.club,
+                    source=source,
+                    amount=additional_amount,
+                    description=f"ايراد اضافي عن اشتراك اللاعب {updated_subscription.member.name}",
+                    date=timezone.now().date(),
+                    received_by=request.user
+                )
+                income.save()
+
             updated_subscription.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
