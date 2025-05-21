@@ -58,12 +58,8 @@ const Income = () => {
   const [sortOrder, setSortOrder] = useState("desc");
   const [incomeFilters, setIncomeFilters] = useState({
     source: "",
-    amountMin: "",
-    amountMax: "",
-    dateFrom: "",
-    dateTo: "",
-    received_by: "",
-    club: "",
+    amount: "",
+    description: "",
   });
   const [incomePage, setIncomePage] = useState(1);
   const [incomeSourcesPage, setIncomeSourcesPage] = useState(1);
@@ -94,10 +90,17 @@ const Income = () => {
       });
   }, []);
 
+
   useEffect(() => {
-    dispatch(fetchIncomes({ page: incomePage }));
-    dispatch(fetchIncomeSources());
-  }, [dispatch, incomePage]);
+  dispatch(fetchIncomes({ 
+    page: incomePage,
+    club: userClub?.id,
+    source: incomeFilters.source, 
+    amount: incomeFilters.amount,
+    description: incomeFilters.description
+  }));
+  dispatch(fetchIncomeSources());
+}, [dispatch, incomePage, incomeFilters, userClub]);
 
   const filteredIncomes = useMemo(() => {
     const incomeArray = Array.isArray(incomes) ? incomes : [];
@@ -106,35 +109,13 @@ const Income = () => {
     }
 
     return incomeArray
-      .filter((income) => {
-        return (
-          income.club_details?.id === userClub?.id &&
-          (!incomeFilters.club ||
-            income.club_details?.id.toString() === incomeFilters.club) &&
-          (!incomeFilters.source ||
-            income.source_details?.name
-              ?.toLowerCase()
-              .includes(incomeFilters.source.toLowerCase())) &&
-          (!incomeFilters.amountMin ||
-            income.amount >= parseFloat(incomeFilters.amountMin)) &&
-          (!incomeFilters.amountMax ||
-            income.amount <= parseFloat(incomeFilters.amountMax)) &&
-          (!incomeFilters.dateFrom ||
-            new Date(income.date) >= new Date(incomeFilters.dateFrom)) &&
-          (!incomeFilters.dateTo ||
-            new Date(income.date) <= new Date(incomeFilters.dateTo)) &&
-          (!incomeFilters.received_by ||
-            income.received_by_details?.username
-              ?.toLowerCase()
-              .includes(incomeFilters.received_by.toLowerCase()))
-        );
-      })
+      .filter((income) => income.club_details?.id === userClub?.id)
       .sort((a, b) => {
         const dateA = a.date ? new Date(a.date) : new Date(0);
         const dateB = b.date ? new Date(b.date) : new Date(0);
         return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
       });
-  }, [incomes, incomeFilters, userClub, sortOrder]);
+  }, [incomes, userClub, sortOrder]);
 
   const incomePageCount = Math.ceil(incomesPagination.count / 20);
   const incomeSourcePageCount = Math.ceil(incomeSources.length / 20);
@@ -337,49 +318,26 @@ const Income = () => {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {["club", "source", "amountMin", "amountMax", "dateFrom", "dateTo", "received_by"].map(
+                {["source", "amount", "description"].map(
                   (field) => (
                     <div key={field}>
                       <label className="block text-sm font-medium mb-1 text-right">
-                        {labelMapping[field] || field.replace(/([A-Z])/g, " $1")}
+                        {labelMapping[field] || field}
                       </label>
-                      {field === "club" ? (
-                        <select
-                          name="club"
-                          value={incomeFilters.club}
-                          onChange={handleIncomeFilterChange}
-                          className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                        >
-                          {userClub ? (
-                            <option value={userClub.id}>{userClub.name}</option>
-                          ) : (
-                            <option value="">جاري التحميل...</option>
-                          )}
-                        </select>
-                      ) : (
-                        <input
-                          type={
-                            field.includes("date")
-                              ? "date"
-                              : field.includes("amount")
-                              ? "number"
-                              : "text"
-                          }
-                          name={field}
-                          value={incomeFilters[field]}
-                          onChange={handleIncomeFilterChange}
-                          className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                          placeholder={`ابحث بـ ${
-                            labelMapping[field] || field.replace(/([A-Z])/g, " $1")
-                          }`}
-                        />
-                      )}
+                      <input
+                        type={field === "amount" ? "number" : "text"}
+                        name={field}
+                        value={incomeFilters[field]}
+                        onChange={handleIncomeFilterChange}
+                        className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                        placeholder={`ابحث بـ ${labelMapping[field] || field}`}
+                      />
                     </div>
                   )
                 )}
               </div>
 
-             {canAddIncome && <AddIncomeForm />}
+              {canAddIncome && <AddIncomeForm />}
 
               {loading && (
                 <p className="text-lg text-gray-600 text-right">
@@ -419,7 +377,7 @@ const Income = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-background">
-                    {filteredIncomes?.map((income) => (
+                    {incomes?.map((income) => (
                       <tr
                         key={income.id}
                         className="hover:bg-gray-100 transition"
