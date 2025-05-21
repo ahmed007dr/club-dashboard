@@ -1,31 +1,42 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import BASE_URL from '../../config/api';
+import axios from 'axios';
 
 
 // Async thunk for fetching entry logs
 export const fetchEntryLogs = createAsyncThunk(
-  'entryLogs/fetchEntryLogs',
-  async (_, { rejectWithValue }) => {
+  "entryLogs/fetchEntryLogs",
+  async ({ page, pageSize, ...filters }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${BASE_URL}/attendance/api/entry-logs/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          params: {
+            page,
+            page_size: pageSize,
+            club: filters.club, 
+            rfid: filters.rfid, 
+            member: filters.member, 
+            timestamp: filters.timestamp, 
+          },
+        }
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to fetch entry logs.');
-      }
-
-      const data = await response.json();
-      console.log('Fetched entry logs:', data);
-      return data;
+      return {
+        data: response.data.results,
+        count: response.data.count,
+        page,
+        pageSize,
+      };
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch entry logs."
+      );
     }
   }
 );
@@ -33,30 +44,26 @@ export const fetchEntryLogs = createAsyncThunk(
 
 // Async thunk for adding entry log
 export const addEntryLog = createAsyncThunk(
-  'entryLogs/addEntryLog',
+  "entryLogs/addEntryLog",
   async (newEntryLog, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // Retrieve token
-      const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/add/`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newEntryLog),
-      });
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to add entry log.');
-      }
-      return newEntryLog; // Return the added entry log for optimistic updates
+      const token = localStorage.getItem("token");
+      const response = await axios.post(
+        `${BASE_URL}/attendance/api/entry-logs/add/`,
+        newEntryLog,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      return response.data; // Use response data instead of input
     } catch (error) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
-
-// Slice definition
 
 // Slice definition
 const entryLogsSlice = createSlice({
@@ -79,10 +86,10 @@ const entryLogsSlice = createSlice({
       })
       .addCase(fetchEntryLogs.fulfilled, (state, action) => {
         state.loading = false;
-        state.items = action.payload.results; // Store just the results
+        state.data = action.payload.data; // Changed from results to data
         state.count = action.payload.count;
-        state.next = action.payload.next;
-        state.previous = action.payload.previous;
+        state.page = action.payload.page;
+        state.pageSize = action.payload.pageSize;
       })
       .addCase(fetchEntryLogs.rejected, (state, action) => {
         state.loading = false;
@@ -95,7 +102,7 @@ const entryLogsSlice = createSlice({
       })
       .addCase(addEntryLog.fulfilled, (state, action) => {
         state.loading = false;
-        state.items.unshift(action.payload); // Add new log at beginning
+        state.data.unshift(action.payload);
         state.count += 1;
       })
       .addCase(addEntryLog.rejected, (state, action) => {

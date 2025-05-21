@@ -28,7 +28,7 @@ export const loginUser = createAsyncThunk(
       localStorage.setItem("permissions", JSON.stringify(permissions));
 
       // Refresh token before expiration (assuming backend provides expires_in)
-      const expiresIn = 60 * 60 * 1000; // Fallback to 60 minutes
+      const expiresIn = 30 * 60 * 1000; // Fallback to 30 minutes
       const refreshInterval = setInterval(async () => {
         try {
           await dispatch(refreshAccessToken()).unwrap();
