@@ -10,25 +10,48 @@ const getToken = () => {
 // Async thunk for fetching attendances
 export const fetchAttendances = createAsyncThunk(
   'attendance/fetchAttendances',
-  async (_, { rejectWithValue }) => {
+  async ({ page = 1, perPage = 20 }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
       const response = await axios.get(`${BASE_URL}/attendance/api/attendances/`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
-        }
+        },
+        params: {
+          page,
+          per_page: perPage,
+        },
       });
 
+      // Handle API response
+      const data = response.data.results || response.data || [];
+      if (!Array.isArray(data)) {
+        throw new Error('Unexpected response format: Expected an array of attendances');
+      }
+
       // Sort by attendance_date (newest first)
-      console.log('Response data:', response.data);
-      const sortedData = [...response.data.results].sort((a, b) => 
-        new Date(b.attendance_date) - new Date(a.attendance_date)
-      );
-      
-      return sortedData;
+      const sortedData = [...data].sort((a, b) => {
+        const dateA = new Date(a.attendance_date);
+        const dateB = new Date(b.attendance_date);
+        return isNaN(dateA) ? 1 : isNaN(dateB) ? -1 : dateB - dateA;
+      });
+
+      return {
+        attendances: sortedData,
+        count: response.data.count || data.length,
+        next: response.data.next || null, // API-provided next page URL
+        previous: response.data.previous || null, // API-provided previous page URL
+        page,
+        perPage,
+      };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch attendances.');
+      console.error('Fetch attendances error:', error);
+      return rejectWithValue(error.response?.data?.message || error.message || 'Failed to fetch attendances.');
     }
   }
 );
@@ -190,6 +213,13 @@ const attendanceSlice = createSlice({
     reportData: null,
     loading: false,
     error: null,
+    pagination: {
+      count: 0,
+      next: null,
+      previous: null,
+      page: 1,
+      perPage: 20,
+    },
   },
   reducers: {},
   extraReducers: (builder) => {
@@ -199,9 +229,16 @@ const attendanceSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchAttendances.fulfilled, (state, action) => {
+     .addCase(fetchAttendances.fulfilled, (state, action) => {
         state.loading = false;
-        state.attendances = action.payload;
+        state.attendances = action.payload.attendances;
+        state.pagination = {
+          count: action.payload.count,
+          next: action.payload.next,
+          previous: action.payload.previous,
+          page: action.payload.page,
+          perPage: action.payload.perPage,
+        };
       })
       .addCase(fetchAttendances.rejected, (state, action) => {
         state.loading = false;
