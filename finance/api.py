@@ -1,3 +1,4 @@
+import logging
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
@@ -15,22 +16,37 @@ from core.models import Club
 from staff.serializers import StaffAttendance 
 from django.db.models import Sum
 from accounts.models import User
+from django.utils.dateparse import parse_date
+# Configure logging
+logger = logging.getLogger(__name__)
 
 class StandardPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
     max_page_size = 20
 
-# Expense Category Views
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_category_api(request):
     if request.method == 'GET':
+        # Initialize queryset based on user role
         if request.user.role == 'owner':
-            categories = ExpenseCategory.objects.all().order_by('id')
+            categories = ExpenseCategory.objects.all()
         else:
-            categories = ExpenseCategory.objects.filter(club=request.user.club).order_by('id')
+            categories = ExpenseCategory.objects.filter(club=request.user.club)
 
+        # Apply filters if provided
+        name = request.query_params.get('name', '')
+        description = request.query_params.get('description', '')
+        if name:
+            categories = categories.filter(name__icontains=name)
+        if description:
+            categories = categories.filter(description__icontains=description)
+
+        # Order by ID (descending)
+        categories = categories.order_by('-id')
+
+        # Apply pagination
         paginator = StandardPagination()
         page = paginator.paginate_queryset(categories, request)
         serializer = ExpenseCategorySerializer(page, many=True)
@@ -40,9 +56,6 @@ def expense_category_api(request):
         serializer = ExpenseCategorySerializer(data=request.data)
         if serializer.is_valid():
             category = serializer.save()
-            # if not IsOwnerOrRelatedToClub().has_object_permission(request, None, category):
-            #     category.delete()
-            #     return Response({'error': 'You do not have permission to create an expense category for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -52,7 +65,7 @@ def expense_category_api(request):
 def expense_api(request):
     if request.method == 'GET':
         if request.user.role in ['owner', 'admin']:
-            expenses = Expense.objects.select_related('category', 'paid_by').all().order_by('-date')
+            expenses = Expense.objects.select_related('category', 'paid_by').all().order_by('-id')
         else:
             today = datetime.now().date()
             attendance = StaffAttendance.objects.filter(
@@ -90,15 +103,23 @@ def expense_api(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-# Income Source Views
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_source_api(request):
     if request.method == 'GET':
         if request.user.role == 'owner':
-            sources = IncomeSource.objects.all().order_by('id')
+            sources = IncomeSource.objects.all().order_by('-id')
         else:
-            sources = IncomeSource.objects.filter(club=request.user.club).order_by('id')
+            sources = IncomeSource.objects.filter(club=request.user.club).order_by('-id')
+
+        # Add filtering by name and description
+        name = request.query_params.get('name', None)
+        description = request.query_params.get('description', None)
+        
+        if name:
+            sources = sources.filter(name__icontains=name)
+        if description:
+            sources = sources.filter(description__icontains=description)
 
         paginator = StandardPagination()
         page = paginator.paginate_queryset(sources, request)
@@ -109,9 +130,6 @@ def income_source_api(request):
         serializer = IncomeSourceSerializer(data=request.data)
         if serializer.is_valid():
             source = serializer.save()
-            # if not IsOwnerOrRelatedToClub().has_object_permission(request, None, source):
-            #     source.delete()
-            #     return Response({'error': 'You do not have permission to create an income source for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -121,7 +139,7 @@ def income_source_api(request):
 def income_api(request):
     if request.method == 'GET':
         if request.user.role in ['owner', 'admin']:
-            incomes = Income.objects.select_related('source', 'received_by').all().order_by('-date')
+            incomes = Income.objects.select_related('source', 'received_by').all()
         else:
             # جيب آخر سجل حضور مفتوح أو مغلق اليوم
             today = datetime.now().date()
@@ -129,7 +147,7 @@ def income_api(request):
                 staff=request.user,
                 club=request.user.club,
                 check_in__date=today
-            ).order_by('-check_in').first()
+            ).order_by('-id').first()
             
             if attendance:
                 incomes = Income.objects.select_related('source', 'received_by').filter(
@@ -137,9 +155,29 @@ def income_api(request):
                     received_by=request.user, 
                     date__gte=attendance.check_in,
                     date__lte=attendance.check_out if attendance.check_out else datetime.now()
-                ).order_by('-date')
+                )
             else:
                 incomes = Income.objects.none()
+
+        # Apply filters based on query parameters
+        source = request.query_params.get('source')
+        amount = request.query_params.get('amount')
+        description = request.query_params.get('description')
+
+        if source:
+            # Validate source name exists
+            if not IncomeSource.objects.filter(name__icontains=source).exists():
+                return Response({"error": "No income source found with this name"}, status=status.HTTP_400_BAD_REQUEST)
+            incomes = incomes.filter(source__name__icontains=source)  # Filter by IncomeSource name
+        if amount:
+            try:
+                incomes = incomes.filter(amount=float(amount))
+            except ValueError:
+                return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
+        if description:
+            incomes = incomes.filter(description__icontains=description)
+
+        incomes = incomes.order_by('-id')
         
         paginator = StandardPagination()
         page = paginator.paginate_queryset(incomes, request)

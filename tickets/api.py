@@ -37,7 +37,7 @@ def ticket_list_api(request):
     if buyer_name:
         tickets = tickets.filter(buyer_name__icontains=buyer_name)
 
-    tickets = tickets.order_by('-issue_date')
+    tickets = tickets.order_by('-id')
 
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(tickets, request)
