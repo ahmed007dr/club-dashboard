@@ -16,6 +16,8 @@ from members.models import Member
 from rest_framework import status
 
 
+
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_type_list(request):
@@ -50,6 +52,144 @@ def subscription_type_list(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
+    """
+    Handle GET requests to retrieve a filtered list of subscriptions and POST requests to create a new subscription.
+    """
+    if request.method == 'GET':
+        # Get the identifier from query parameters
+        search_term = request.GET.get('identifier', '')
+
+        if request.user.role == 'owner':
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club').all()
+        else:
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
+
+        filterable_fields = {
+            'member_id': 'member_id',
+            'type_id': 'type_id',
+            'club_id': 'club_id',
+            'club_name': 'club__name__iexact',  
+            'start_date': 'start_date',
+            'end_date': 'end_date',
+            'paid_amount': 'paid_amount',
+            'remaining_amount': 'remaining_amount',
+            'entry_count': 'entry_count',
+        }
+
+        filters = {}
+        for param, field in filterable_fields.items():
+            if param in request.query_params:
+                filters[field] = request.query_params[param]
+
+        range_filters = {}
+        for param in request.query_params:
+            if param.endswith('_gte') or param.endswith('_lte'):
+                field_name = param.rsplit('__', 1)[0]
+                if field_name in filterable_fields.values():
+                    range_filters[param] = request.query_params[param]
+
+        search_term = request.query_params.get('search_term', '')
+        if search_term:
+            subscriptions = subscriptions.filter(
+                Q(member__name__icontains=search_term) |
+                Q(member__phone__icontains=search_term) |
+                Q(member__rfid_code__icontains=search_term)
+            )
+
+        try:
+            subscriptions = subscriptions.filter(**filters)
+        except ValueError as e:
+            return Response({'error': f'Invalid filter value: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            subscriptions = subscriptions.filter(**range_filters)
+        except ValueError as e:
+            return Response({'error': f'Invalid range filter value: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        subscriptions = subscriptions.order_by('-start_date')
+
+        # Handle status filter - renamed variable to status_filter
+        status_filter = request.query_params.get('status', '').lower()
+        today = timezone.now().date()
+        
+        status_filters = {
+            'active': {
+                'start_date__lte': today,
+                'end_date__gte': today
+            },
+            'expired': {
+                'end_date__lt': today
+            },
+            'upcoming': {
+                'start_date__gt': today
+            }
+        }
+        
+        if status_filter in status_filters:
+            subscriptions = subscriptions.filter(**status_filters[status_filter])
+
+        paginator = PageNumberPagination()
+        page = paginator.paginate_queryset(subscriptions, request)
+        serializer = SubscriptionSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
+    elif request.method == 'POST':
+        identifier = request.data.get('identifier', '')
+
+        if identifier:
+            try:
+                member = Member.objects.filter(
+                    Q(phone=identifier) |
+                    Q(rfid_code=identifier) |
+                    Q(name__iexact=identifier)
+                ).first()
+                if not member:
+                    return Response(
+                        {'error': 'No member found with the provided identifier'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                mutable_data = request.data.copy()
+                mutable_data['member'] = member.id
+            except Member.DoesNotExist:
+                return Response(
+                    {'error': 'Invalid identifier provided'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            mutable_data = request.data
+
+        serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
+        if serializer.is_valid():
+            subscription = serializer.save()
+            
+            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
+                subscription.delete()
+                return Response(
+                    {'error': 'You do not have permission to create a subscription for this club'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            if subscription.paid_amount > 0:
+                source, created = IncomeSource.objects.get_or_create(
+                    club=subscription.club,
+                    name='Subscription',
+                    defaults={'description': 'ايراد عن اشتراك'}
+                )
+                income = Income(
+                    club=subscription.club,
+                    source=source,
+                    amount=subscription.paid_amount,
+                    description=f"ايراد اشتراك عن اللاعب {subscription.member.name}",
+                    date=timezone.now().date(),
+                    received_by=request.user
+                )
+                income.save()
+
+            subscription.remaining_amount = subscription.type.price - subscription.paid_amount
+            subscription.save()
+
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     """
     Handle GET requests to retrieve a filtered list of subscriptions and POST requests to create a new subscription.
     """
@@ -112,11 +252,10 @@ def subscription_list(request):
 
         # Order by start_date (descending)
         subscriptions = subscriptions.order_by('-start_date')
-
         # Handle status filter
-        subscription_status = request.query_params.get('status', '').lower()  # Renamed to avoid shadowing
+        status_filter = request.query_params.get('status', '').lower()
         today = timezone.now().date()
-        
+
         status_filters = {
             'active': {
                 'start_date__lte': today,
@@ -129,9 +268,9 @@ def subscription_list(request):
                 'start_date__gt': today
             }
         }
-        
-        if subscription_status in status_filters:
-            subscriptions = subscriptions.filter(**status_filters[subscription_status])
+
+        if status_filter in status_filters:
+            subscriptions = subscriptions.filter(**status_filters[status_filter])
 
         # Paginate results
         paginator = PageNumberPagination()
