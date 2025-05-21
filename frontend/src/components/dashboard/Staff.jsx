@@ -25,6 +25,7 @@ import usePermission from "@/hooks/usePermission";
 const Staff = () => {
   const dispatch = useDispatch();
   const staff = useSelector((state) => state.staff.items);
+  console.log(staff)
   const pagination = useSelector((state) => state.staff.pagination);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;

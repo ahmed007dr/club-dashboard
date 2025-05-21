@@ -54,7 +54,6 @@ const IncomeSourcesList = () => {
       setSources(response.data.results || []);
       setTotalItems(response.data.count || 0);
       setTotalPages(Math.ceil(response.data.count / itemsPerPage) || 1);
-      toast.success('تم تحميل مصادر الدخل بنجاح', { id: loadingToast });
     } catch (error) {
       console.error('فشل في جلب مصادر الدخل:', error.response?.data || error.message);
       toast.error('فشل في تحميل البيانات', { id: loadingToast });

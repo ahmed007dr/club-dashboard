@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { fetchExpenseCategories, addExpenseCategory } from "../../redux/slices/financeSlice";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import BASE_URL from "@/config/api";
 import usePermission from "@/hooks/usePermission";
 
@@ -33,12 +33,6 @@ const ExpenseCategory = () => {
   // Calculate total pages from backend count
   const totalPages = Math.ceil(expenseCategoriesPagination.count / itemsPerPage);
 
-  // Client-side filtering
-  const filteredCategories = expenseCategories.filter(category =>
-    category.name.toLowerCase().includes(filters.name.toLowerCase()) &&
-    category.description.toLowerCase().includes(filters.description.toLowerCase())
-  );
-
   // Fetch user profile
   useEffect(() => {
     fetch(`${BASE_URL}/accounts/api/profile/`, {
@@ -55,13 +49,18 @@ const ExpenseCategory = () => {
           name: data.club.name,
         });
         setFormData((prev) => ({ ...prev, club: data.club.id.toString() }));
+      })
+      .catch((error) => {
+        console.error('Profile Fetch Error:', error);
       });
   }, []);
 
-  // Fetch expense categories with pagination
+  // Fetch expense categories with pagination and filters
   useEffect(() => {
-    dispatch(fetchExpenseCategories(currentPage));
-  }, [dispatch, currentPage]);
+    if (userClub) {
+      dispatch(fetchExpenseCategories({ page: currentPage, filters }));
+    }
+  }, [dispatch, currentPage, filters, userClub]);
 
   // Handle form input changes
   const handleChange = (e) => {
@@ -87,9 +86,16 @@ const ExpenseCategory = () => {
       .then(() => {
         setFormData({ club: userClub?.id.toString() || "", name: "", description: "" });
         setShowModal(false);
-        // Refresh the list
-        dispatch(fetchExpenseCategories(currentPage));
+        dispatch(fetchExpenseCategories({ page: currentPage, filters }));
+      })
+      .catch((error) => {
+        console.error('Add Category Error:', error);
       });
+  };
+
+  // Retry fetching categories
+  const handleRetry = () => {
+    dispatch(fetchExpenseCategories({ page: currentPage, filters }));
   };
 
   // Handle page change
@@ -106,7 +112,6 @@ const ExpenseCategory = () => {
     let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
     let endPage = Math.min(totalPages, startPage + maxButtons - 1);
 
-    // Adjust startPage if endPage is at totalPages
     if (endPage - startPage + 1 < maxButtons) {
       startPage = Math.max(1, endPage - maxButtons + 1);
     }
@@ -140,66 +145,77 @@ const ExpenseCategory = () => {
           </CardHeader>
         </Card>
       </div>
-    )
+    );
   }
 
-    return (
-      <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-right text-lg sm:text-xl">
-              جميع فئات المصروفات
-            </CardTitle>
-            <CardDescription className="text-right text-sm sm:text-base">
-              إدارة جميع فئات المصروفات لنادي{" "}
-              {userClub?.name || "جاري التحميل..."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Add Category Button */}
-            <Button
-              onClick={() => setShowModal(true)}
-              className="flex items-center justify-start w-full sm:w-auto text-sm sm:text-base"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              إضافة فئة مصروف
-            </Button>
+  return (
+    <div className="p-4 sm:p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-right text-lg sm:text-xl">
+            جميع فئات المصروفات
+          </CardTitle>
+          <CardDescription className="text-right text-sm sm:text-base">
+            إدارة جميع فئات المصروفات لنادي{" "}
+            {userClub?.name || "جاري التحميل..."}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Add Category Button */}
+          <Button
+            onClick={() => setShowModal(true)}
+            className="flex items-center justify-start w-full sm:w-auto text-sm sm:text-base"
+            disabled={!canAddExpenseCategory}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            إضافة فئة مصروف
+          </Button>
 
-            {/* Filters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-              {[
-                { label: "الاسم", name: "name" },
-                { label: "الوصف", name: "description" },
-              ].map(({ label, name }) => (
-                <div key={name}>
-                  <label className="block text-sm font-medium mb-1 text-right">
-                    تصفية حسب {label}
-                  </label>
-                  <input
-                    type="text"
-                    name={name}
-                    value={filters[name]}
-                    onChange={handleFilterChange}
-                    className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
-                    placeholder={`ابحث عن ${label}`}
-                  />
-                </div>
-              ))}
+          {/* Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+            {[
+              { label: "الاسم", name: "name" },
+              { label: "الوصف", name: "description" },
+            ].map(({ label, name }) => (
+              <div key={name}>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  تصفية حسب {label}
+                </label>
+                <input
+                  type="text"
+                  name={name}
+                  value={filters[name]}
+                  onChange={handleFilterChange}
+                  className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm sm:text-base"
+                  placeholder={`ابحث عن ${label}`}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Loading State */}
+          {loading && (
+            <p className="text-lg text-gray-600 text-right">
+              جاري التحميل...
+            </p>
+          )}
+
+          {/* Error State */}
+          {error && (
+            <div className="text-lg text-red-600 text-right">
+              <p>خطأ: {error}</p>
+              <Button
+                onClick={handleRetry}
+                className="mt-2 flex items-center text-sm"
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                إعادة المحاولة
+              </Button>
             </div>
+          )}
 
-            {/* Loading State */}
-            {loading && (
-              <p className="text-lg text-gray-600 text-right">
-                جاري التحميل...
-              </p>
-            )}
-
-            {/* Error State */}
-            {error && (
-              <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
-            )}
-
-            {/* Table */}
+          {/* Table */}
+          {!loading && !error && (
             <div className="rounded-md border overflow-x-auto">
               <table className="min-w-full divide-y divide-border">
                 <thead>
@@ -216,8 +232,8 @@ const ExpenseCategory = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border bg-background">
-                  {filteredCategories.length > 0 ? (
-                    filteredCategories.map((category, index) => (
+                  {expenseCategories.length > 0 ? (
+                    expenseCategories.map((category, index) => (
                       <tr key={index} className="hover:bg-gray-100 transition">
                         <td className="px-4 py-3 text-xs sm:text-sm">
                           {category.club_details?.name || "غير متاح"}
@@ -240,12 +256,14 @@ const ExpenseCategory = () => {
                 </tbody>
               </table>
             </div>
+          )}
 
-            {/* Pagination */}
+          {/* Pagination */}
+          {!loading && !error && (
             <div className="flex flex-col sm:flex-row justify-between items-center mt-4 gap-4">
               <div className="text-xs sm:text-sm text-gray-600">
-                عرض {Math.min(itemsPerPage, filteredCategories.length)} من{" "}
-                {filteredCategories.length} فئة
+                عرض {Math.min(itemsPerPage, expenseCategories.length)} من{" "}
+                {expenseCategoriesPagination.count} فئة
               </div>
               <div className="flex gap-2">
                 <Button
@@ -265,80 +283,81 @@ const ExpenseCategory = () => {
                 </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Add Modal */}
-        {showModal && canAddExpenseCategory && (
-          <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50">
-            <div
-              className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-xl font-semibold mb-4 text-right">
-                إضافة فئة مصروف
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-right">
-                    النادي
-                  </label>
-                  <select
-                    name="club"
-                    value={formData.club}
-                    onChange={handleChange}
-                    className="w-full border px-3 py-2 rounded-md text-right"
-                    disabled
-                  >
-                    {userClub && (
-                      <option value={userClub.id}>{userClub.name}</option>
-                    )}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-right">
-                    الاسم
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="w-full border px-3 py-2 rounded-md text-right"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1 text-right">
-                    الوصف
-                  </label>
-                  <input
-                    type="text"
-                    name="description"
-                    value={formData.description}
-                    onChange={handleChange}
-                    className="w-full border px-3 py-2 rounded-md text-right"
-                  />
-                </div>
+      {/* Add Modal */}
+      {showModal && canAddExpenseCategory && (
+        <div className="fixed inset-0 z-40 flex justify-center items-center bg-black bg-opacity-50">
+          <div
+            className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-xl font-semibold mb-4 text-right">
+              إضافة فئة مصروف
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  النادي
+                </label>
+                <select
+                  name="club"
+                  value={formData.club}
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md text-right"
+                  disabled
+                >
+                  {userClub && (
+                    <option value={userClub.id}>{userClub.name}</option>
+                  )}
+                </select>
               </div>
-              <div className="mt-6 flex justify-end gap-2">
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
-                >
-                  إلغاء
-                </button>
-                <button
-                  onClick={handleAdd}
-                  className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                >
-                  حفظ
-                </button>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  الاسم
+                </label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md text-right"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1 text-right">
+                  الوصف
+                </label>
+                <input
+                  type="text"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  className="w-full border px-3 py-2 rounded-md text-right"
+                />
               </div>
             </div>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleAdd}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                حفظ
+              </button>
+            </div>
           </div>
-        )}
-      </div>
-    );
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default ExpenseCategory;

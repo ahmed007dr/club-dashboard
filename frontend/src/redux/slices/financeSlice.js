@@ -1,27 +1,28 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import BASE_URL from '../../config/api';
 
-// Async Thunks for Expense Categories
+import axios from 'axios';
+
 export const fetchExpenseCategories = createAsyncThunk(
   'finance/fetchExpenseCategories',
-  async (page = 1, { rejectWithValue }) => {
+  async ({ page, filters }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/finance/api/expense-categories/?page=${page}`, {
-        method: 'GET',
+      const { name, description } = filters;
+      const response = await axios.get(`${BASE_URL}/finance/api/expense-categories/`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
           'Content-Type': 'application/json',
         },
+        params: {
+          page,
+          name,
+          description,
+        },
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to fetch expense categories.');
-      }
-      return await response.json();
+      return response.data; // Expecting { count, results }
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('API Error:', error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.error || 'Failed to fetch expense categories');
     }
   }
 );
@@ -148,21 +149,46 @@ export const deleteExpense = createAsyncThunk(
 // Async Thunks for Income Sources
 export const fetchIncomeSources = createAsyncThunk(
   'finance/fetchIncomeSources',
-  async (_, { rejectWithValue }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
+      const { page = 1, pageSize = 20, name = '', description = '' } = params;
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/finance/api/income-sources/`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      
+      // Construct query string
+      const queryParams = new URLSearchParams({
+        page,
+        page_size: pageSize,
+        ...(name && { name }),
+        ...(description && { description }),
+      }).toString();
+
+      const response = await fetch(
+        `${BASE_URL}/finance/api/income-sources/?${queryParams}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to fetch income sources.');
+        return rejectWithValue(errorData.error || 'Failed to fetch income sources.');
       }
-      return await response.json();
+      
+      const data = await response.json();
+      return {
+        data: data.results,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(data.count / pageSize),
+          totalItems: data.count,
+          pageSize,
+        },
+        filters: { name, description }
+      };
     } catch (error) {
       return rejectWithValue(error.message);
     }

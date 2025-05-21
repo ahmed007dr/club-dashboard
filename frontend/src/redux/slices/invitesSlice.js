@@ -3,25 +3,33 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 
-// Fetch all invites with pagination
+
 export const fetchFreeInvites = createAsyncThunk(
   'invites/fetchFreeInvites',
-  async (params = {}) => {
+  async (params = {}, { rejectWithValue }) => {
     const token = localStorage.getItem('token');
-    const response = await axios.get(
-      `${BASE_URL}/invites/api/free-invites/`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        params: {
-          page: params.page,
-          page_size: params.page_size,
-          used: params.used,
-        },
-      }
-    );
-    return response.data; // Return the full response, not just .results
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/invites/api/free-invites/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          params: {
+            page: params.page || 1,
+            page_size: params.page_size || 20,
+            club: params.club,
+            guest_name: params.guest_name || undefined,
+            status: params.status || undefined,
+            date: params.date || undefined,
+          },
+        }
+      );
+      return response.data; // { results, count, next, previous }
+    } catch (error) {
+      console.error('Failed to fetch invites:', error);
+      return rejectWithValue(error.response?.data || 'Failed to fetch invites');
+    }
   }
 );
 
