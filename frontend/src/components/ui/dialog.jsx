@@ -1,63 +1,131 @@
-import React, { useState } from "react";
+import * as React from "react"
+import * as DialogPrimitive from "@radix-ui/react-dialog"
+import { XIcon } from "lucide-react"
 
-// Dialog Context for managing open/close state
-const DialogContext = React.createContext();
+import { cn } from "@/lib/utils"
 
-// Dialog Provider Component
-export const DialogProvider = ({ children }) => {
-  const [isOpen, setIsOpen] = useState(false);
+function Dialog({
+  ...props
+}) {
+  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
+}
 
-  const openDialog = () => setIsOpen(true);
-  const closeDialog = () => setIsOpen(false);
+function DialogTrigger({
+  ...props
+}) {
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
+}
 
+function DialogPortal({
+  ...props
+}) {
+  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
+}
+
+function DialogClose({
+  ...props
+}) {
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
+}
+
+function DialogOverlay({
+  className,
+  ...props
+}) {
   return (
-    <DialogContext.Provider value={{ isOpen, openDialog, closeDialog }}>
-      {children}
-    </DialogContext.Provider>
+    <DialogPrimitive.Overlay
+      data-slot="dialog-overlay"
+      className={cn(
+        "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
+        className
+      )}
+      {...props} />
   );
-};
+}
 
-// Dialog Component
-export const Dialog = ({ children }) => {
-  const { isOpen } = React.useContext(DialogContext);
-
-  if (!isOpen) return null;
-
+function DialogContent({
+  className,
+  children,
+  ...props
+}) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">{children}</div>
-    </div>
+    <DialogPortal data-slot="dialog-portal">
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        data-slot="dialog-content"
+        className={cn(
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
+          className
+        )}
+        {...props}>
+        {children}
+        <DialogPrimitive.Close
+          className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4">
+          <XIcon />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
   );
-};
+}
 
-// Dialog Trigger Component
-export const DialogTrigger = ({ children }) => {
-  const { openDialog } = React.useContext(DialogContext);
+function DialogHeader({
+  className,
+  ...props
+}) {
+  return (
+    <div
+      data-slot="dialog-header"
+      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+      {...props} />
+  );
+}
 
-  return React.cloneElement(children, { onClick: openDialog });
-};
+function DialogFooter({
+  className,
+  ...props
+}) {
+  return (
+    <div
+      data-slot="dialog-footer"
+      className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
+      {...props} />
+  );
+}
 
-// Dialog Content Component
-export const DialogContent = ({ children }) => {
-  return <div>{children}</div>;
-};
+function DialogTitle({
+  className,
+  ...props
+}) {
+  return (
+    <DialogPrimitive.Title
+      data-slot="dialog-title"
+      className={cn("text-lg leading-none font-semibold", className)}
+      {...props} />
+  );
+}
 
-// Dialog Header Component
-export const DialogHeader = ({ children }) => {
-  return <div className="mb-4">{children}</div>;
-};
+function DialogDescription({
+  className,
+  ...props
+}) {
+  return (
+    <DialogPrimitive.Description
+      data-slot="dialog-description"
+      className={cn("text-muted-foreground text-sm", className)}
+      {...props} />
+  );
+}
 
-// Dialog Title Component
-export const DialogTitle = ({ children }) => {
-  return <h3 className="text-lg font-semibold">{children}</h3>;
-};
-
-// Dialog Description Component
-export const DialogDescription = ({ children }) => {
-  return <p className="text-sm text-gray-500">{children}</p>;
-};
-
-// Dialog Footer Component
-export const DialogFooter = ({ children }) => {
-  return <div className="mt-6 flex justify-end space-x-2">{children}</div>;
-};
+export {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
+}
