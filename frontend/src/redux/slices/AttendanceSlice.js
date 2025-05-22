@@ -13,15 +13,6 @@ export const fetchAttendances = createAsyncThunk(
   async ({ page, pageSize, ...filters }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem("token");
-      if (!token) {
-        return rejectWithValue("No authentication token found.");
-      }
-
-      // Clean filters to remove undefined/null values
-      const cleanFilters = Object.fromEntries(
-        Object.entries(filters).filter(([_, value]) => value != null)
-      );
-
       const response = await axios.get(
         `${BASE_URL}/attendance/api/attendances/`,
         {
@@ -32,15 +23,10 @@ export const fetchAttendances = createAsyncThunk(
           params: {
             page,
             page_size: pageSize,
-            ...cleanFilters,
+            ...filters,
           },
         }
       );
-
-      // Validate response structure
-      if (!response.data?.results || typeof response.data.count !== "number") {
-        return rejectWithValue("Invalid response structure from server.");
-      }
 
       return {
         data: response.data.results,
@@ -49,15 +35,9 @@ export const fetchAttendances = createAsyncThunk(
         pageSize,
       };
     } catch (error) {
-      if (error.response) {
-        return rejectWithValue(
-          error.response.data?.message || "Failed to fetch attendances."
-        );
-      } else if (error.request) {
-        return rejectWithValue("No response received from server.");
-      } else {
-        return rejectWithValue("Error setting up request: " + error.message);
-      }
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch attendances."
+      );
     }
   }
 );
@@ -219,6 +199,13 @@ const attendanceSlice = createSlice({
     reportData: null,
     loading: false,
     error: null,
+    pagination: {
+      count: 0,
+      next: null,
+      previous: null,
+      page: 1,
+      perPage: 20,
+    },
   },
   reducers: {},
   extraReducers: (builder) => {
@@ -228,7 +215,7 @@ const attendanceSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchAttendances.fulfilled, (state, action) => {
+     .addCase(fetchAttendances.fulfilled, (state, action) => {
         state.loading = false;
         state.data = action.payload.data; // Add data structure
         state.count = action.payload.count;

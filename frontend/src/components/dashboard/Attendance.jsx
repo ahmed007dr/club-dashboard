@@ -28,6 +28,7 @@ import { toast } from "react-hot-toast";
 import { FaUser } from "react-icons/fa";
 import usePermission from "@/hooks/usePermission";
 
+
 const Attendance = () => {
   const dispatch = useDispatch();
 
@@ -97,7 +98,6 @@ const Attendance = () => {
   useEffect(() => {
     console.log("Filters changed:", entryLogs, attendances);
   }, [entryLogs, attendances]);
-
   const handleAttendanceInputChange = (e) => {
     const { name, value } = e.target;
     const searchValue = value.trim().toUpperCase();
@@ -120,6 +120,7 @@ const Attendance = () => {
     setSearchLoading(false);
   };
 
+  // Handle add attendance
   const handleAddAttendance = (e) => {
     e.preventDefault();
     if (!foundSubscription) {
@@ -276,9 +277,7 @@ const Attendance = () => {
   if (!canViewAttendance) {
     return (
       <div className="space-y-6" dir="rtl">
-        <h1 className="text-2xl font-bold tracking-tight">
-          ليس لديك صلاحية عرض سجلات الحضور
-        </h1>
+        <h1 className="text-2xl font-bold tracking-tight">ليس لديك صلاحية عرض سجلات الحضور</h1>
       </div>
     );
   }
@@ -478,6 +477,7 @@ const Attendance = () => {
                     placeholder="ابحث بكود RFID"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm mb-1">اسم النادي</label>
                   <input
@@ -591,7 +591,6 @@ const Attendance = () => {
                       </tbody>
                     </table>
                   </div>
-
                   <PaginationControls
                     currentPage={entryLogPage}
                     totalItems={entryLogCount}

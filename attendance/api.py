@@ -10,28 +10,39 @@ from django.db.models import Q
 from django.utils import timezone
 from members.models import Member
 from rest_framework.pagination import PageNumberPagination
+from datetime import datetime
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_list_api(request):    
-    search_term = request.GET.get('q', '')
+    # Get filters from query parameters
+    rfid = request.GET.get('rfid', '')
+    attendance_date = request.GET.get('attendance_date', '')
+    member_name = request.GET.get('member_name', '')
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 20)
 
+    # Base queryset
     if request.user.role == 'owner':
         attendances = Attendance.objects.select_related('subscription', 'subscription__member').all()
     else:
         attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(subscription__club=request.user.club)
 
-    if search_term:
-        attendances = attendances.filter(
-            Q(subscription__member__name__icontains=search_term) |
-            Q(subscription__member__phone__icontains=search_term) |
-            Q(subscription__member__rfid_code__icontains=search_term)
-        )
+    # Apply filters
+    if rfid:
+        attendances = attendances.filter(subscription__member__rfid_code__iexact=rfid)
+    
+    if attendance_date:
+        attendances = attendances.filter(attendance_date=attendance_date)
+    
+    if member_name:
+        attendances = attendances.filter(subscription__member__name__icontains=member_name)
 
+    # Ordering and pagination
     attendances = attendances.order_by('-attendance_date')
-
     paginator = PageNumberPagination()
+    paginator.page_size = page_size
     result_page = paginator.paginate_queryset(attendances, request)
     serializer = AttendanceSerializer(result_page, many=True)
 
@@ -54,25 +65,43 @@ def delete_attendance_api(request, attendance_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def entry_log_list_api(request):    
-    search_term = request.GET.get('q', '')
+    # Get filters from query parameters
+    club = request.GET.get('club', '')
+    rfid = request.GET.get('rfid', '')
+    member = request.GET.get('member', '')
+    timestamp = request.GET.get('timestamp', '')
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 20)
 
+    # Base queryset
     if request.user.role == 'owner':
         logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').all()
     else:
         logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(club=request.user.club)
 
-    if search_term:
-        logs = logs.filter(
-            Q(member__name__icontains=search_term) |
-            Q(member__phone__icontains=search_term) |
-            Q(member__rfid_code__icontains=search_term)
-        )
+    # Apply filters
+    if club:
+        logs = logs.filter(club__name__icontains=club)
+    
+    if rfid:
+        logs = logs.filter(member__rfid_code__iexact=rfid)
+    
+    if member:
+        logs = logs.filter(member__name__icontains=member)
+    
+    if timestamp:
+        try:
+            # Parse date using datetime module
+            date_obj = datetime.strptime(timestamp, '%Y-%m-%d').date()
+            logs = logs.filter(timestamp__date=date_obj)
+        except ValueError:
+            pass
 
+    # Ordering and pagination
     logs = logs.order_by('-timestamp')
-
     paginator = PageNumberPagination()
+    paginator.page_size = page_size
     result_page = paginator.paginate_queryset(logs, request)
-
     serializer = EntryLogSerializer(result_page, many=True)
 
     return paginator.get_paginated_response(serializer.data)
