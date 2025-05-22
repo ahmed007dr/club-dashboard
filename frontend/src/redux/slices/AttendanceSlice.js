@@ -10,70 +10,35 @@ const getToken = () => {
 
 
 export const fetchAttendances = createAsyncThunk(
-  'attendance/fetchAttendances',
-  async (
-    {
-      page = 1,
-      perPage = 20,
-      attendanceDate = '',
-      entryTimeStart = '',
-      entryTimeEnd = '',
-      rfidCode = '',
-      memberName = '',
-    },
-    { rejectWithValue }
-  ) => {
+  "attendance/fetchAttendances",
+  async ({ page, pageSize, ...filters }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
-      // Build query parameters
-      const params = {
-        page,
-        per_page: perPage,
-      };
-
-      // Add filters only if they are provided
-      if (attendanceDate) params.attendance_date = attendanceDate;
-      if (entryTimeStart) params.entry_time_start = entryTimeStart;
-      if (entryTimeEnd) params.entry_time_end = entryTimeEnd;
-      if (rfidCode) params.rfid_code = rfidCode;
-      if (memberName) params.member_name = memberName;
-
-      const response = await axios.get(`${BASE_URL}/attendance/api/attendances/`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        params,
-      });
-
-      // Handle API response
-      const data = response.data.results || response.data || [];
-      if (!Array.isArray(data)) {
-        throw new Error('Unexpected response format: Expected an array of attendances');
-      }
-
-      // Sort by attendance_date (newest first)
-      const sortedData = [...data].sort((a, b) => {
-        const dateA = new Date(a.attendance_date);
-        const dateB = new Date(b.attendance_date);
-        return isNaN(dateA) ? 1 : isNaN(dateB) ? -1 : dateB - dateA;
-      });
+      const token = localStorage.getItem("token");
+      const response = await axios.get(
+        `${BASE_URL}/attendance/api/attendances/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          params: {
+            page,
+            page_size: pageSize,
+            ...filters,
+          },
+        }
+      );
 
       return {
-        attendances: sortedData,
-        count: response.data.count || data.length,
-        next: response.data.next || null, // API-provided next page URL
-        previous: response.data.previous || null, // API-provided previous page URL
+        data: response.data.results,
+        count: response.data.count,
         page,
-        perPage,
+        pageSize,
       };
     } catch (error) {
-      console.error('Fetch attendances error:', error);
-      return rejectWithValue(error.response?.data?.message || error.message || 'Failed to fetch attendances.');
+      return rejectWithValue(
+        error.response?.data?.message || "Failed to fetch attendances."
+      );
     }
   }
 );
@@ -253,14 +218,10 @@ const attendanceSlice = createSlice({
       })
      .addCase(fetchAttendances.fulfilled, (state, action) => {
         state.loading = false;
-        state.attendances = action.payload.attendances;
-        state.pagination = {
-          count: action.payload.count,
-          next: action.payload.next,
-          previous: action.payload.previous,
-          page: action.payload.page,
-          perPage: action.payload.perPage,
-        };
+        state.data = action.payload.data; // Add data structure
+        state.count = action.payload.count;
+        state.page = action.payload.page;
+        state.pageSize = action.payload.pageSize;
       })
       .addCase(fetchAttendances.rejected, (state, action) => {
         state.loading = false;
@@ -287,28 +248,66 @@ const attendanceSlice = createSlice({
       .addCase(deleteAttendance.fulfilled, (state, action) => {
         state.loading = false;
         const deletedId = action.payload;
-        state.attendances = state.attendances.filter((attendance) => attendance.id !== deletedId);
+        state.attendances = state.attendances.filter(
+          (attendance) => attendance.id !== deletedId
+        );
       })
       .addCase(deleteAttendance.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(checkInStaff.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(checkInStaff.fulfilled, (state, action) => { state.loading = false; state.checkInData = action.payload; })
-      .addCase(checkInStaff.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(checkInStaff.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(checkInStaff.fulfilled, (state, action) => {
+        state.loading = false;
+        state.checkInData = action.payload;
+      })
+      .addCase(checkInStaff.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
-      .addCase(checkOutStaff.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(checkOutStaff.fulfilled, (state, action) => { state.loading = false; state.checkOutData = action.payload; })
-      .addCase(checkOutStaff.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(checkOutStaff.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(checkOutStaff.fulfilled, (state, action) => {
+        state.loading = false;
+        state.checkOutData = action.payload;
+      })
+      .addCase(checkOutStaff.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
-      .addCase(analyzeAttendance.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(analyzeAttendance.fulfilled, (state, action) => { state.loading = false; state.analysisData = action.payload; })
-      .addCase(analyzeAttendance.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(analyzeAttendance.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(analyzeAttendance.fulfilled, (state, action) => {
+        state.loading = false;
+        state.analysisData = action.payload;
+      })
+      .addCase(analyzeAttendance.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
-      .addCase(getStaffAttendanceReport.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(getStaffAttendanceReport.fulfilled, (state, action) => { state.loading = false; state.reportData = action.payload; })
-      .addCase(getStaffAttendanceReport.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-     .addCase(fetchShiftAttendances.pending, (state) => {
+      .addCase(getStaffAttendanceReport.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getStaffAttendanceReport.fulfilled, (state, action) => {
+        state.loading = false;
+        state.reportData = action.payload;
+      })
+      .addCase(getStaffAttendanceReport.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchShiftAttendances.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
@@ -320,7 +319,7 @@ const attendanceSlice = createSlice({
       .addCase(fetchShiftAttendances.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
-      })
+      });
   },
 });
 

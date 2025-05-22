@@ -371,7 +371,7 @@ const SubscriptionList = () => {
         <div className="flex items-end">
           <button
             onClick={resetFilters}
-            className="btn bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
+            className="btn bg-gray-200 text-white px-4 py-2 rounded-lg hover:bg-gray-300"
           >
             <FaArrowRotateLeft />
           </button>

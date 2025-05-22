@@ -13,19 +13,17 @@ from rest_framework.pagination import PageNumberPagination
 from datetime import datetime
 
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_list_api(request):    
-    # Get query parameters
-    search_term = request.GET.get('q', '')
+    # Get filters from query parameters
+    rfid = request.GET.get('rfid', '')
     attendance_date = request.GET.get('attendance_date', '')
-    entry_time_start = request.GET.get('entry_time_start', '')
-    entry_time_end = request.GET.get('entry_time_end', '')
-    rfid_code = request.GET.get('rfid_code', '')
     member_name = request.GET.get('member_name', '')
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 20)
 
-    # Base queryset based on user role
+    # Base queryset
     if request.user.role == 'owner':
         attendances = Attendance.objects.select_related('subscription', 'subscription__member').all()
     else:
@@ -34,53 +32,19 @@ def attendance_list_api(request):
         )
 
     # Apply filters
-    if search_term:
-        attendances = attendances.filter(
-            Q(subscription__member__name__icontains=search_term) |
-            Q(subscription__member__phone__icontains=search_term) |
-            Q(subscription__member__rfid_code__icontains=search_term)
-        )
-
+    if rfid:
+        attendances = attendances.filter(subscription__member__rfid_code__iexact=rfid)
+    
     if attendance_date:
-        try:
-            # Assuming attendance_date is in YYYY-MM-DD format
-            parsed_date = datetime.strptime(attendance_date, '%Y-%m-%d').date()
-            attendances = attendances.filter(attendance_date=parsed_date)
-        except ValueError:
-            # Handle invalid date format gracefully (optional)
-            pass
-
-    if entry_time_start and entry_time_end:
-        try:
-            # Assuming entry_time is in HH:MM:SS format
-            attendances = attendances.filter(
-                entry_time__range=(entry_time_start, entry_time_end)
-            )
-        except ValueError:
-            # Handle invalid time format gracefully (optional)
-            pass
-    elif entry_time_start:
-        try:
-            attendances = attendances.filter(entry_time__gte=entry_time_start)
-        except ValueError:
-            pass
-    elif entry_time_end:
-        try:
-            attendances = attendances.filter(entry_time__lte=entry_time_end)
-        except ValueError:
-            pass
-
-    if rfid_code:
-        attendances = attendances.filter(subscription__member__rfid_code__icontains=rfid_code)
-
+        attendances = attendances.filter(attendance_date=attendance_date)
+    
     if member_name:
         attendances = attendances.filter(subscription__member__name__icontains=member_name)
 
-    # Order by attendance_date (descending)
+    # Ordering and pagination
     attendances = attendances.order_by('-attendance_date')
-
-    # Pagination
     paginator = PageNumberPagination()
+    paginator.page_size = page_size
     result_page = paginator.paginate_queryset(attendances, request)
     serializer = AttendanceSerializer(result_page, many=True)
 
@@ -103,25 +67,43 @@ def delete_attendance_api(request, attendance_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def entry_log_list_api(request):    
-    search_term = request.GET.get('q', '')
+    # Get filters from query parameters
+    club = request.GET.get('club', '')
+    rfid = request.GET.get('rfid', '')
+    member = request.GET.get('member', '')
+    timestamp = request.GET.get('timestamp', '')
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 20)
 
+    # Base queryset
     if request.user.role == 'owner':
         logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').all()
     else:
         logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(club=request.user.club)
 
-    if search_term:
-        logs = logs.filter(
-            Q(member__name__icontains=search_term) |
-            Q(member__phone__icontains=search_term) |
-            Q(member__rfid_code__icontains=search_term)
-        )
+    # Apply filters
+    if club:
+        logs = logs.filter(club__name__icontains=club)
+    
+    if rfid:
+        logs = logs.filter(member__rfid_code__iexact=rfid)
+    
+    if member:
+        logs = logs.filter(member__name__icontains=member)
+    
+    if timestamp:
+        try:
+            # Parse date using datetime module
+            date_obj = datetime.strptime(timestamp, '%Y-%m-%d').date()
+            logs = logs.filter(timestamp__date=date_obj)
+        except ValueError:
+            pass
 
+    # Ordering and pagination
     logs = logs.order_by('-timestamp')
-
     paginator = PageNumberPagination()
+    paginator.page_size = page_size
     result_page = paginator.paginate_queryset(logs, request)
-
     serializer = EntryLogSerializer(result_page, many=True)
 
     return paginator.get_paginated_response(serializer.data)
