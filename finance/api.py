@@ -14,7 +14,7 @@ from rest_framework.pagination import PageNumberPagination
 from datetime import datetime, timedelta
 from core.models import Club
 from staff.serializers import StaffAttendance 
-from django.db.models import Sum
+from django.db.models import Sum, Q
 from accounts.models import User
 from django.utils.dateparse import parse_date
 # Configure logging
@@ -199,6 +199,7 @@ def income_api(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     # Detail Views
+
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_detail_api(request, pk):
@@ -342,3 +343,231 @@ def daily_summary_api(request):
     paginator = StandardPagination()
     page = paginator.paginate_queryset(summary, request)
     return paginator.get_paginated_response(page)
+
+
+def get_object_from_id_or_name(model, value, fields=['id', 'name']):
+    """
+    Retrieve an object by ID or name. Returns None if not found or multiple results exist.
+    """
+    try:
+        return model.objects.get(id=int(value))
+    except (ValueError, model.DoesNotExist):
+        q = Q()
+        for field in fields:
+            q |= Q(**{f"{field}__iexact": value})
+        results = model.objects.filter(q)
+        return results.first() if results.count() == 1 else None
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def income_summary(request):
+    """
+    Calculate total income based on filters.
+    Query params:
+    - date: Specific date (YYYY-MM-DD)
+    - start: Start date (YYYY-MM-DD)
+    - end: End date (YYYY-MM-DD)
+    - user: User ID or username
+    - source: Income source ID or name
+    - details: Boolean to include detailed records (true/false)
+    """
+    try:
+        # Initialize queryset based on user role
+        if request.user.role in ['owner', 'admin']:
+            incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
+        else:
+            today = datetime.now().date()
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_in__date=today
+            ).order_by('-check_in').first()
+            if attendance:
+                incomes = Income.objects.select_related('source', 'received_by').filter(
+                    club=request.user.club,
+                    received_by=request.user,
+                    date__gte=attendance.check_in,
+                    date__lte=attendance.check_out if attendance.check_out else datetime.now()
+                )
+            else:
+                incomes = Income.objects.none()
+
+        # Apply filters
+        date = request.query_params.get('date')
+        start = request.query_params.get('start')
+        end = request.query_params.get('end')
+        user_param = request.query_params.get('user')
+        source_param = request.query_params.get('source')
+        details = request.query_params.get('details', 'false').lower() == 'true'
+
+        if date:
+            try:
+                date_obj = datetime.strptime(date, '%Y-%m-%d').date()
+                incomes = incomes.filter(date=date_obj)
+            except ValueError:
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=400)
+
+        if start and end:
+            try:
+                start_obj = datetime.strptime(start, '%Y-%m-%d').date()
+                end_obj = datetime.strptime(end, '%Y-%m-%d').date()
+                incomes = incomes.filter(date__range=[start_obj, end_obj])
+            except ValueError:
+                return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=400)
+        elif start or end:
+            return Response({'error': 'Both start and end dates are required.'}, status=400)
+
+        if user_param:
+            user_obj = get_object_from_id_or_name(User, user_param, ['id', 'username'])
+            if user_obj:
+                incomes = incomes.filter(received_by=user_obj)
+            else:
+                return Response({'error': 'User not found or multiple matches.'}, status=400)
+
+        if source_param:
+            source_obj = get_object_from_id_or_name(IncomeSource, source_param, ['id', 'name'])
+            if source_obj:
+                incomes = incomes.filter(source=source_obj)
+            else:
+                return Response({'error': 'Income source not found or multiple matches.'}, status=400)
+
+        # Calculate total
+        total = incomes.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+        response_data = {'total_income': float(total)}
+
+        # Include details if requested
+        if details:
+            response_data['details'] = IncomeSummarySerializer(incomes, many=True).data
+
+        return Response(response_data, status=200)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def expense_summary(request):
+    """
+    Calculate total expenses based on filters.
+    Query params:
+    - date: Specific date (YYYY-MM-DD)
+    - start: Start date (YYYY-MM-DD)
+    - end: End date (YYYY-MM-DD)
+    - user: User ID or username
+    - category: Expense category ID or name
+    - details: Boolean to include detailed records (true/false)
+    """
+    try:
+        # Initialize queryset based on user role
+        if request.user.role in ['owner', 'admin']:
+            expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)
+        else:
+            today = datetime.now().date()
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_in__date=today
+            ).order_by('-check_in').first()
+            if attendance:
+                expenses = Expense.objects.select_related('category', 'paid_by').filter(
+                    club=request.user.club,
+                    paid_by=request.user,
+                    date__gte=attendance.check_in,
+                    date__lte=attendance.check_out if attendance.check_out else datetime.now()
+                )
+            else:
+                expenses = Expense.objects.none()
+
+        # Apply filters
+        date = request.query_params.get('date')
+        start = request.query_params.get('start')
+        end = request.query_params.get('end')
+        user_param = request.query_params.get('user')
+        category_param = request.query_params.get('category')
+        details = request.query_params.get('details', 'false').lower() == 'true'
+
+        if date:
+            try:
+                date_obj = datetime.strptime(date, '%Y-%m-%d').date()
+                expenses = expenses.filter(date=date_obj)
+            except ValueError:
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=400)
+
+        if start and end:
+            try:
+                start_obj = datetime.strptime(start, '%Y-%m-%d').date()
+                end_obj = datetime.strptime(end, '%Y-%m-%d').date()
+                expenses = expenses.filter(date__range=[start_obj, end_obj])
+            except ValueError:
+                return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=400)
+        elif start or end:
+            return Response({'error': 'Both start and end dates are required.'}, status=400)
+
+        if user_param:
+            user_obj = get_object_from_id_or_name(User, user_param, ['id', 'username'])
+            if user_obj:
+                expenses = expenses.filter(paid_by=user_obj)
+            else:
+                return Response({'error': 'User not found or multiple matches.'}, status=400)
+
+        if category_param:
+            category_obj = get_object_from_id_or_name(ExpenseCategory, category_param, ['id', 'name'])
+            if category_obj:
+                expenses = expenses.filter(category=category_obj)
+            else:
+                return Response({'error': 'Expense category not found or multiple matches.'}, status=400)
+
+        # Calculate total
+        total = expenses.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+        response_data = {'total_expense': float(total)}
+
+        # Include details if requested
+        if details:
+            response_data['details'] = ExpenseDetailSerializer(expenses, many=True).data
+
+        return Response(response_data, status=200)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def finance_overview(request):
+    """
+    Provide an overview of total income, expenses, and net profit.
+    Query params:
+    - start: Start date (YYYY-MM-DD)
+    - end: End date (YYYY-MM-DD)
+    """
+    try:
+        # Initialize querysets
+        income_qs = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
+        expense_qs = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)
+
+        # Apply date range filter
+        start = request.query_params.get('start')
+        end = request.query_params.get('end')
+        if start and end:
+            try:
+                start_obj = datetime.strptime(start, '%Y-%m-%d').date()
+                end_obj = datetime.strptime(end, '%Y-%m-%d').date()
+                income_qs = income_qs.filter(date__range=[start_obj, end_obj])
+                expense_qs = expense_qs.filter(date__range=[start_obj, end_obj])
+            except ValueError:
+                return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=400)
+        elif start or end:
+            return Response({'error': 'Both start and end dates are required.'}, status=400)
+
+        # Calculate totals
+        total_income = income_qs.aggregate(total=Sum('amount'))['total'] or 0
+        total_expense = expense_qs.aggregate(total=Sum('amount'))['total'] or 0
+        net = total_income - total_expense
+
+        return Response({
+            'total_income': float(total_income),
+            'total_expense': float(total_expense),
+            'net_profit': float(net)
+        }, status=200)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)

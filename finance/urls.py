@@ -21,4 +21,7 @@ urlpatterns = [
     path('api/incomes/', api.income_api, name='api-income'),
     path('api/incomes/<int:pk>/', api.income_detail_api, name='api-income-detail'),
     path('api/daily-summary/', api.daily_summary_api, name='api_daily_summary'),
+    path('api/income-summary/', api.income_summary, name='api-income-summary'),
+    path('api/expense-summary/', api.expense_summary, name='api-expense-summary'),
+    path('api/finance-overview/', api.finance_overview, name='api-finance-overview'),
 ]
