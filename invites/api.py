@@ -7,21 +7,36 @@ from .serializers import FreeInviteSerializer
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub 
 from rest_framework.pagination import PageNumberPagination
+from django.db import transaction 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def free_invite_list_api(request):
+    # Base queryset
     if request.user.role == 'owner':
         invites = FreeInvite.objects.select_related('club').all().order_by('-created_at')
     else:
         invites = FreeInvite.objects.select_related('club').filter(club=request.user.club).order_by('-created_at')
 
+    # Apply filters based on query parameters
+    guest_name = request.query_params.get('guest_name', None)
+    status = request.query_params.get('status', None)
+    date = request.query_params.get('date', None)
+    
+    if guest_name:
+        invites = invites.filter(guest_name__icontains=guest_name)
+    
+    if status:
+        invites = invites.filter(status=status.lower())
+    
+    if date:
+        invites = invites.filter(date=date)
+    
+    # Pagination
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(invites, request)
     serializer = FreeInviteSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
-
-from django.db import transaction
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

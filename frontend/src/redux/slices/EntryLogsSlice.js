@@ -74,6 +74,13 @@ const entryLogsSlice = createSlice({
     error: null,
     count: 0,
     next: null,
+    pagination: {
+      count: 0,
+      next: null,
+      previous: null,
+      page: 1,
+      perPage: 20,
+    },
     previous: null
   },
   reducers: {},
@@ -84,7 +91,7 @@ const entryLogsSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchEntryLogs.fulfilled, (state, action) => {
+   .addCase(fetchEntryLogs.fulfilled, (state, action) => {
         state.loading = false;
         state.data = action.payload.data; // Changed from results to data
         state.count = action.payload.count;

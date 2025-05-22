@@ -199,6 +199,13 @@ const attendanceSlice = createSlice({
     reportData: null,
     loading: false,
     error: null,
+    pagination: {
+      count: 0,
+      next: null,
+      previous: null,
+      page: 1,
+      perPage: 20,
+    },
   },
   reducers: {},
   extraReducers: (builder) => {
@@ -208,7 +215,7 @@ const attendanceSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchAttendances.fulfilled, (state, action) => {
+     .addCase(fetchAttendances.fulfilled, (state, action) => {
         state.loading = false;
         state.data = action.payload.data; // Add data structure
         state.count = action.payload.count;

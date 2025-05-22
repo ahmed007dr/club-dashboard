@@ -222,14 +222,20 @@ export const addIncomeSource = createAsyncThunk(
 );
 
 // Async Thunks for Incomes
+
 export const fetchIncomes = createAsyncThunk(
   'finance/fetchIncomes',
-  async ({ page = 1 }, { rejectWithValue }) => {
+  async ({ page = 1, source = '', amount = '', description = '' }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
 
-      const url = `${BASE_URL}/finance/api/incomes/?page=${page}`;
+      const params = new URLSearchParams({ page });
+      if (source) params.append('source', source);
+      if (amount) params.append('amount', amount);
+      if (description) params.append('description', description);
+
+      const url = `${BASE_URL}/finance/api/incomes/?${params.toString()}`;
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
