@@ -9,26 +9,55 @@ const getToken = () => {
 
 // Async thunk for fetching attendances
 export const fetchAttendances = createAsyncThunk(
-  'attendance/fetchAttendances',
-  async (_, { rejectWithValue }) => {
+  "attendance/fetchAttendances",
+  async ({ page, pageSize, ...filters }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${BASE_URL}/attendance/api/attendances/`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        }
-      });
+      const token = localStorage.getItem("token");
+      if (!token) {
+        return rejectWithValue("No authentication token found.");
+      }
 
-      // Sort by attendance_date (newest first)
-      console.log('Response data:', response.data);
-      const sortedData = [...response.data.results].sort((a, b) => 
-        new Date(b.attendance_date) - new Date(a.attendance_date)
+      // Clean filters to remove undefined/null values
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([_, value]) => value != null)
       );
-      
-      return sortedData;
+
+      const response = await axios.get(
+        `${BASE_URL}/attendance/api/attendances/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          params: {
+            page,
+            page_size: pageSize,
+            ...cleanFilters,
+          },
+        }
+      );
+
+      // Validate response structure
+      if (!response.data?.results || typeof response.data.count !== "number") {
+        return rejectWithValue("Invalid response structure from server.");
+      }
+
+      return {
+        data: response.data.results,
+        count: response.data.count,
+        page,
+        pageSize,
+      };
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch attendances.');
+      if (error.response) {
+        return rejectWithValue(
+          error.response.data?.message || "Failed to fetch attendances."
+        );
+      } else if (error.request) {
+        return rejectWithValue("No response received from server.");
+      } else {
+        return rejectWithValue("Error setting up request: " + error.message);
+      }
     }
   }
 );
@@ -201,7 +230,10 @@ const attendanceSlice = createSlice({
       })
       .addCase(fetchAttendances.fulfilled, (state, action) => {
         state.loading = false;
-        state.attendances = action.payload;
+        state.data = action.payload.data; // Add data structure
+        state.count = action.payload.count;
+        state.page = action.payload.page;
+        state.pageSize = action.payload.pageSize;
       })
       .addCase(fetchAttendances.rejected, (state, action) => {
         state.loading = false;
@@ -228,28 +260,66 @@ const attendanceSlice = createSlice({
       .addCase(deleteAttendance.fulfilled, (state, action) => {
         state.loading = false;
         const deletedId = action.payload;
-        state.attendances = state.attendances.filter((attendance) => attendance.id !== deletedId);
+        state.attendances = state.attendances.filter(
+          (attendance) => attendance.id !== deletedId
+        );
       })
       .addCase(deleteAttendance.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(checkInStaff.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(checkInStaff.fulfilled, (state, action) => { state.loading = false; state.checkInData = action.payload; })
-      .addCase(checkInStaff.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(checkInStaff.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(checkInStaff.fulfilled, (state, action) => {
+        state.loading = false;
+        state.checkInData = action.payload;
+      })
+      .addCase(checkInStaff.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
-      .addCase(checkOutStaff.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(checkOutStaff.fulfilled, (state, action) => { state.loading = false; state.checkOutData = action.payload; })
-      .addCase(checkOutStaff.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(checkOutStaff.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(checkOutStaff.fulfilled, (state, action) => {
+        state.loading = false;
+        state.checkOutData = action.payload;
+      })
+      .addCase(checkOutStaff.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
-      .addCase(analyzeAttendance.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(analyzeAttendance.fulfilled, (state, action) => { state.loading = false; state.analysisData = action.payload; })
-      .addCase(analyzeAttendance.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
+      .addCase(analyzeAttendance.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(analyzeAttendance.fulfilled, (state, action) => {
+        state.loading = false;
+        state.analysisData = action.payload;
+      })
+      .addCase(analyzeAttendance.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
 
-      .addCase(getStaffAttendanceReport.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(getStaffAttendanceReport.fulfilled, (state, action) => { state.loading = false; state.reportData = action.payload; })
-      .addCase(getStaffAttendanceReport.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-     .addCase(fetchShiftAttendances.pending, (state) => {
+      .addCase(getStaffAttendanceReport.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getStaffAttendanceReport.fulfilled, (state, action) => {
+        state.loading = false;
+        state.reportData = action.payload;
+      })
+      .addCase(getStaffAttendanceReport.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchShiftAttendances.pending, (state) => {
         state.isLoading = true;
         state.error = null;
       })
@@ -261,7 +331,7 @@ const attendanceSlice = createSlice({
       .addCase(fetchShiftAttendances.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
-      })
+      });
   },
 });
 
