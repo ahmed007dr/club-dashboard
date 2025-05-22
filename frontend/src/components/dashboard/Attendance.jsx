@@ -60,9 +60,10 @@ const Attendance = () => {
 
   // Filters and Pagination
   const [attendanceFilters, setAttendanceFilters] = useState({
-    subscription: "",
-    rfid: "",
     attendance_date: "",
+    entry_time_start: "",
+    entry_time_end: "",
+    rfid_code: "",
     member_name: "",
   });
   const [entryLogFilters, setEntryLogFilters] = useState({
@@ -282,6 +283,8 @@ const Attendance = () => {
     );
   }
 
+  
+
   return (
     <div className="space-y-6" dir="rtl">
       <h1 className="text-2xl font-bold tracking-tight">
@@ -350,6 +353,36 @@ const Attendance = () => {
                     }}
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم العضو"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">وقت الدخول (من)</label>
+                  <input
+                    type="time"
+                    name="entry_time_start"
+                    value={attendanceFilters.entry_time_start}
+                    onChange={(e) =>
+                      setAttendanceFilters({
+                        ...attendanceFilters,
+                        entry_time_start: e.target.value,
+                      })
+                    }
+                    className="border px-3 py-2 rounded w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">وقت الدخول (إلى)</label>
+                  <input
+                    type="time"
+                    name="entry_time_end"
+                    value={attendanceFilters.entry_time_end}
+                    onChange={(e) =>
+                      setAttendanceFilters({
+                        ...attendanceFilters,
+                        entry_time_end: e.target.value,
+                      })
+                    }
+                    className="border px-3 py-2 rounded w-full"
                   />
                 </div>
               </div>

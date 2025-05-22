@@ -7,7 +7,8 @@ const getToken = () => {
   return token ? `Bearer ${token}` : '';
 };
 
-// Async thunk for fetching attendances
+
+
 export const fetchAttendances = createAsyncThunk(
   "attendance/fetchAttendances",
   async ({ page, pageSize, ...filters }, { rejectWithValue }) => {

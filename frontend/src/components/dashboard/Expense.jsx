@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { CiEdit, CiTrash } from "react-icons/ci";
 import {
   Card,
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, MoreVertical } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
+  fetchExpenseSummary,
   fetchExpenses,
   updateExpense,
   addExpense,
@@ -26,6 +27,7 @@ import {
 import BASE_URL from "@/config/api";
 import { fetchExpenseCategories } from "../../redux/slices/financeSlice";
 import usePermission from "@/hooks/usePermission";
+
 
 const Expense = () => {
   const dispatch = useDispatch();
@@ -42,18 +44,26 @@ const Expense = () => {
   });
   const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
-  const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [userClub, setUserClub] = useState(null);
   const [errors, setErrors] = useState({});
-  const itemsPerPage = 10;
+  const [summaryFilters, setSummaryFilters] = useState({
+    startDate: "",
+    endDate: "",
+    categoryId: "",
+  });
+  const [isSummaryClicked, setIsSummaryClicked] = useState(false);
+  const itemsPerPage = 20;
 
   const { expenses, loading, error, expensesPagination } = useSelector(
     (state) => state.finance
   );
-  const { expenseCategories } = useSelector((state) => state.finance);
+  const { expenseCategories, totalExpenses, totalExpensesCount } = useSelector(
+    (state) => state.finance
+  );
+  const { user } = useSelector((state) => state.auth);
 
   const canViewExpense = usePermission("view_expense");
   const canAddExpense = usePermission("add_expense");
@@ -86,10 +96,11 @@ const Expense = () => {
       });
   }, []);
 
-  // Fetch expenses with pagination
+  // Fetch expenses with pagination and filters
   useEffect(() => {
-    dispatch(fetchExpenses(currentPage));
-  }, [dispatch, currentPage]);
+    dispatch(fetchExpenses({ page: currentPage, startDate, endDate }));
+    dispatch(fetchExpenseCategories());
+  }, [currentPage, dispatch, endDate, startDate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -101,16 +112,6 @@ const Expense = () => {
       setNewExpense((prev) => ({ ...prev, [name]: updatedValue }));
     }
     setErrors((prev) => ({ ...prev, [name]: "" }));
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (currentExpense) {
-      setCurrentExpense((prev) => ({ ...prev, attachment: file }));
-    } else {
-      setNewExpense((prev) => ({ ...prev, attachment: file }));
-    }
-    setErrors((prev) => ({ ...prev, attachment: "" }));
   };
 
   const validateForm = (data) => {
@@ -162,7 +163,8 @@ const Expense = () => {
           attachment: null,
         });
         setErrors({});
-        dispatch(fetchExpenses(currentPage));
+        setCurrentPage(1);
+        dispatch(fetchExpenses({ page: 1, startDate, endDate }));
       })
       .catch((err) => {
         console.error("فشل في حفظ المصروف:", err);
@@ -180,47 +182,22 @@ const Expense = () => {
       });
   };
 
-  const filteredExpenses = useMemo(() => {
-    if (!Array.isArray(expenses)) {
-      console.warn("Expected 'expenses' to be an array but got:", expenses);
-      return [];
+  const getPageButtons = (currentPage, totalPages) => {
+    const buttons = [];
+    const maxButtons = 5;
+    const half = Math.floor(maxButtons / 2);
+    let startPage = Math.max(1, currentPage - half);
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+    if (endPage - startPage + 1 < maxButtons) {
+      startPage = Math.max(1, endPage - maxButtons + 1);
     }
 
-    const filtered = expenses.filter((expense) => {
-      const expenseDate = new Date(expense.date);
-      const from = startDate ? new Date(startDate) : null;
-      const to = endDate ? new Date(endDate) : null;
-
-      return (
-        expense.club_details?.id === userClub?.id &&
-        (!from || expenseDate >= from) &&
-        (!to || expenseDate <= to)
-      );
-    });
-
-    const sorted = filtered.sort((a, b) => {
-      if (a.created_at && b.created_at) {
-        return new Date(b.created_at) - new Date(a.created_at);
-      }
-      return b.id - a.id;
-    });
-
-    console.log(
-      "Sorted expenses:",
-      sorted.map((exp) => ({
-        id: exp.id,
-        created_at: exp.created_at,
-        date: exp.date,
-      }))
-    );
-
-    return sorted;
-  }, [expenses, startDate, endDate, userClub]);
-
-  const paginatedExpenses = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    return filteredExpenses.slice(startIndex, startIndex + itemsPerPage);
-  }, [filteredExpenses, currentPage]);
+    for (let i = startPage; i <= endPage; i++) {
+      buttons.push(i);
+    }
+    return buttons;
+  };
 
   // Edit expense
   const handleEditClick = (expense) => {
@@ -250,7 +227,7 @@ const Expense = () => {
         .then(() => {
           setConfirmDeleteModal(false);
           setExpenseToDelete(null);
-          dispatch(fetchExpenses(currentPage));
+          dispatch(fetchExpenses({ page: currentPage, startDate, endDate }));
         })
         .catch((err) => {
           console.error("فشل في حذف المصروف:", err);
@@ -258,9 +235,29 @@ const Expense = () => {
     }
   };
 
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setSummaryFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
   const totalPages = expensesPagination?.count
     ? Math.ceil(expensesPagination.count / itemsPerPage)
     : 1;
+
+  const handleTotalCalculation = async () => {
+    await dispatch(
+      fetchExpenseSummary({
+        start:
+          summaryFilters.startDate !== "" ? summaryFilters.startDate : null,
+        end: summaryFilters.endDate !== "" ? summaryFilters.endDate : null,
+        details: true,
+        userId: user.id,
+        category:
+          summaryFilters.categoryId !== "" ? summaryFilters.categoryId : null,
+      })
+    );
+    setIsSummaryClicked(true);
+  };
 
   if (!canViewExpense) {
     return (
@@ -300,7 +297,10 @@ const Expense = () => {
                     <input
                       type="date"
                       value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      onChange={(e) => {
+                        setStartDate(e.target.value);
+                        setCurrentPage(1);
+                      }}
                       className="border px-2 py-1 rounded text-sm sm:text-base"
                     />
                   </div>
@@ -309,7 +309,10 @@ const Expense = () => {
                     <input
                       type="date"
                       value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
+                      onChange={(e) => {
+                        setEndDate(e.target.value);
+                        setCurrentPage(1);
+                      }}
                       className="border px-2 py-1 rounded text-sm sm:text-base"
                     />
                   </div>
@@ -356,8 +359,8 @@ const Expense = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-background">
-                    {filteredExpenses.length > 0 ? (
-                      filteredExpenses.map((expense, index) => (
+                    {expenses?.length > 0 ? (
+                      expenses.map((expense, index) => (
                         <tr
                           key={index}
                           className="hover:bg-gray-100 transition"
@@ -421,55 +424,92 @@ const Expense = () => {
                 </table>
               </div>
 
-              <div className="flex justify-between items-center mt-4">
-                <button
+              <div className="flex items-center justify-between mt-4">
+                <Button
                   onClick={() =>
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   disabled={currentPage === 1}
-                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm disabled:opacity-50"
+                  className="px-3 py-1"
                 >
                   السابق
-                </button>
-                <span className="text-sm">
-                  صفحة {currentPage} من {totalPages}
-                </span>
-                <button
+                </Button>
+
+                <div className="flex gap-1">
+                  {getPageButtons(currentPage, totalPages).map((page) => (
+                    <Button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      variant={currentPage === page ? "default" : "outline"}
+                      className="px-3 py-1"
+                    >
+                      {page}
+                    </Button>
+                  ))}
+                </div>
+
+                <Button
                   onClick={() => setCurrentPage((prev) => prev + 1)}
                   disabled={
                     currentPage === totalPages || !expensesPagination?.next
                   }
-                  className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm disabled:opacity-50"
+                  className="px-3 py-1"
                 >
                   التالي
-                </button>
+                </Button>
               </div>
 
-              <div className="flex justify-end mt-4">
+              <div className="flex justify-end gap-4 items-center border-t pt-4">
+                {(user.role === "admin" || user.role === "owner") && (
+                  <div className="flex gap-2 items-center">
+                    <label className="text-sm font-medium">من:</label>
+                    <input
+                      type="date"
+                      name="startDate"
+                      value={summaryFilters.startDate}
+                      onChange={handleFilterChange}
+                      className="border rounded-md px-2 py-1"
+                      pattern="\d{4}-\d{2}-\d{2}"
+                    />
+                    <label className="text-sm font-medium">إلى:</label>
+                    <input
+                      type="date"
+                      name="endDate"
+                      value={summaryFilters.endDate}
+                      onChange={handleFilterChange}
+                      className="border rounded-md px-2 py-1"
+                      pattern="\d{4}-\d{2}-\d{2}"
+                    />
+                    <select
+                      name="categoryId"
+                      value={summaryFilters.categoryId}
+                      onChange={handleFilterChange}
+                      className="border rounded-md px-2 py-1"
+                    >
+                      <option value="">الكل</option>
+                      {expenseCategories.map((source) => (
+                        <option key={source.id} value={source.id}>
+                          {source.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <Button
-                  onClick={() =>
-                    setTotalInfo({
-                      count: filteredExpenses.length,
-                      total: filteredExpenses.reduce(
-                        (acc, expense) =>
-                          acc + (parseFloat(expense.amount) || 0),
-                        0
-                      ),
-                    })
-                  }
+                  onClick={handleTotalCalculation}
                   className="bg-primary text-white px-4 sm:px-6 text-sm sm:text-base"
                 >
                   حساب الإجمالي
                 </Button>
               </div>
 
-              {totalInfo.count > 0 && (
+              {totalExpensesCount > 0 && isSummaryClicked && (
                 <div className="mt-4 bg-gray-50 border rounded-md p-4 text-right space-y-1">
                   <p className="text-sm font-semibold text-gray-700">
-                    عدد المصروفات: {totalInfo.count}
+                    عدد المصروفات: {totalExpensesCount}
                   </p>
                   <p className="text-sm font-semibold text-gray-700">
-                    إجمالي المصروفات: {totalInfo.total} جنيه
+                    إجمالي المصروفات: {totalExpenses} جنيه
                   </p>
                 </div>
               )}

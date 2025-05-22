@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { CiEdit, CiTrash } from "react-icons/ci";
+import React, { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -9,17 +8,17 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus, MoreVertical } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import {
+  fetchIncomeSummary,
   fetchIncomeSources,
-  addIncomeSource,
   fetchIncomes,
   addIncome,
   updateIncome,
   deleteIncome,
 } from "../../redux/slices/financeSlice";
-import BASE_URL from '../../config/api';
+import BASE_URL from "../../config/api";
 import AddIncomeForm from "./AddIncomeForm";
 import {
   DropdownMenu,
@@ -27,7 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
-import IncomeSourcesList from './IncomeSourcesList';
+import IncomeSourcesList from "./IncomeSourcesList";
 import usePermission from "@/hooks/usePermission";
 
 const labelMapping = {
@@ -44,6 +43,7 @@ const Income = () => {
   const dispatch = useDispatch();
   const canAddIncome = usePermission("add_income");
   const [showModal, setShowModal] = useState(false);
+  // Remove sortOrder state
   const [currentItem, setCurrentItem] = useState(null);
   const [newItem, setNewItem] = useState({
     club: "",
@@ -53,9 +53,7 @@ const Income = () => {
     date: "",
     received_by: "",
   });
-  const [totalInfo, setTotalInfo] = useState({ total: 0, count: 0 });
   const [userClub, setUserClub] = useState(null);
-  const [sortOrder, setSortOrder] = useState("desc");
   const [incomeFilters, setIncomeFilters] = useState({
     source: "",
     amount: "",
@@ -63,11 +61,25 @@ const Income = () => {
   });
   const [incomePage, setIncomePage] = useState(1);
   const [incomeSourcesPage, setIncomeSourcesPage] = useState(1);
+  const [summaryFilters, setSummaryFilters] = useState({
+    startDate: "",
+    endDate: "",
+    sourceId: "",
+  });
+  const [isSummaryClicked, setIsSummaryClicked] = useState(false);
+
   const maxButtons = 5;
 
-  const { incomes, incomeSources, loading, error, incomesPagination } = useSelector(
-    (state) => state.finance
-  );
+  const {
+    incomes,
+    incomeSources,
+    loading,
+    error,
+    incomesPagination,
+    totalIncome,
+    totalIncomeCount,
+  } = useSelector((state) => state.finance);
+  const { user } = useSelector((state) => state.auth);
 
   useEffect(() => {
     fetch(`${BASE_URL}/accounts/api/profile/`, {
@@ -90,32 +102,19 @@ const Income = () => {
       });
   }, []);
 
-
   useEffect(() => {
-  dispatch(fetchIncomes({ 
-    page: incomePage,
-    club: userClub?.id,
-    source: incomeFilters.source, 
-    amount: incomeFilters.amount,
-    description: incomeFilters.description
-  }));
-  dispatch(fetchIncomeSources());
-}, [dispatch, incomePage, incomeFilters, userClub]);
-
-  const filteredIncomes = useMemo(() => {
-    const incomeArray = Array.isArray(incomes) ? incomes : [];
-    if (!Array.isArray(incomes)) {
-      console.warn("Expected incomes to be an array but got:", incomes);
-    }
-
-    return incomeArray
-      .filter((income) => income.club_details?.id === userClub?.id)
-      .sort((a, b) => {
-        const dateA = a.date ? new Date(a.date) : new Date(0);
-        const dateB = b.date ? new Date(b.date) : new Date(0);
-        return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
-      });
-  }, [incomes, userClub, sortOrder]);
+    dispatch(
+      fetchIncomes({
+        page: incomePage,
+        filters: {
+          source: incomeFilters.source,
+          amount: incomeFilters.amount,
+          description: incomeFilters.description,
+        },
+      })
+    );
+    dispatch(fetchIncomeSources());
+  }, [dispatch, incomeFilters, incomePage, summaryFilters, user.id]);
 
   const incomePageCount = Math.ceil(incomesPagination.count / 20);
   const incomeSourcePageCount = Math.ceil(incomeSources.length / 20);
@@ -186,10 +185,7 @@ const Income = () => {
         setShowModal(false);
       })
       .catch((err) => {
-        console.error(
-          `فشل في ${currentItem ? "تحديث" : "إضافة"} دخل`,
-          err
-        );
+        console.error(`فشل في ${currentItem ? "تحديث" : "إضافة"} دخل`, err);
       });
   };
 
@@ -204,11 +200,6 @@ const Income = () => {
       received_by: item.received_by?.toString() || "",
     };
     setCurrentItem(sanitizedItem);
-    setShowModal(true);
-  };
-
-  const handleAddClick = () => {
-    setCurrentItem(null);
     setShowModal(true);
   };
 
@@ -238,6 +229,27 @@ const Income = () => {
     const { name, value } = e.target;
     setIncomeFilters((prev) => ({ ...prev, [name]: value }));
     setIncomePage(1);
+  };
+
+  // filter handler
+  const handleFilterChange = (e) => {
+    const { name, value } = e.target;
+    setSummaryFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  // total calculation handler
+  const handleTotalCalculation = async () => {
+    await dispatch(
+      fetchIncomeSummary({
+        start:
+          summaryFilters.startDate !== "" ? summaryFilters.startDate : null,
+        end: summaryFilters.endDate !== "" ? summaryFilters.endDate : null,
+        details: true,
+        userId: user.id,
+        source: summaryFilters.sourceId !== "" ? summaryFilters.sourceId : null,
+      })
+    );
+    setIsSummaryClicked(true);
   };
 
   const PaginationControls = ({ currentPage, setPage, pageCount }) => (
@@ -285,7 +297,8 @@ const Income = () => {
             <CardHeader className="pb-3">
               <CardTitle className="text-right">مصادر الايرادات</CardTitle>
               <CardDescription className="text-right">
-                إدارة مصادر الايرادات لنادي {userClub?.name || "جاري التحميل..."}
+                إدارة مصادر الايرادات لنادي{" "}
+                {userClub?.name || "جاري التحميل..."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -308,33 +321,22 @@ const Income = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex justify-end">
-                <Button
-                  onClick={() => setSortOrder(sortOrder === "desc" ? "asc" : "desc")}
-                  className="mb-4 bg-primary text-white"
-                >
-                  {sortOrder === "desc" ? "فرز من الأقدم إلى الأحدث" : "فرز من الأحدث إلى الأقدم"}
-                </Button>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                {["source", "amount", "description"].map(
-                  (field) => (
-                    <div key={field}>
-                      <label className="block text-sm font-medium mb-1 text-right">
-                        {labelMapping[field] || field}
-                      </label>
-                      <input
-                        type={field === "amount" ? "number" : "text"}
-                        name={field}
-                        value={incomeFilters[field]}
-                        onChange={handleIncomeFilterChange}
-                        className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
-                        placeholder={`ابحث بـ ${labelMapping[field] || field}`}
-                      />
-                    </div>
-                  )
-                )}
+                {["source", "amount", "description"].map((field) => (
+                  <div key={field}>
+                    <label className="block text-sm font-medium mb-1 text-right">
+                      {labelMapping[field] || field}
+                    </label>
+                    <input
+                      type={field === "amount" ? "number" : "text"}
+                      name={field}
+                      value={incomeFilters[field]}
+                      onChange={handleIncomeFilterChange}
+                      className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
+                      placeholder={`ابحث بـ ${labelMapping[field] || field}`}
+                    />
+                  </div>
+                ))}
               </div>
 
               {canAddIncome && <AddIncomeForm />}
@@ -431,32 +433,71 @@ const Income = () => {
                 setPage={setIncomePage}
                 pageCount={incomePageCount}
               />
-              <div className="flex justify-end mt-4">
+              <div className="flex justify-end gap-4 items-center border-t pt-4">
+                {(user.role === "admin" || user.role === "owner") && (
+                  <div className="flex gap-2 items-center">
+                    <label className="text-sm font-medium">من:</label>
+                    <input
+                      type="date"
+                      name="startDate"
+                      value={summaryFilters.startDate}
+                      onChange={handleFilterChange}
+                      className="border rounded-md px-2 py-1"
+                      pattern="\d{4}-\d{2}-\d{2}"
+                    />
+                    <label className="text-sm font-medium">الى:</label>
+                    <input
+                      type="date"
+                      name="endDate"
+                      value={summaryFilters.endDate}
+                      onChange={handleFilterChange}
+                      className="border rounded-md px-2 py-1"
+                      pattern="\d{4}-\d{2}-\d{2}"
+                    />
+                    <select
+                      name="sourceId"
+                      value={summaryFilters.sourceId}
+                      onChange={handleFilterChange}
+                      className="border rounded-md px-2 py-1"
+                    >
+                      <option value="">الكل</option>
+                      {incomeSources.map((source) => (
+                        <option key={source.id} value={source.id}>
+                          {source.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <Button
-                  onClick={() =>
-                    setTotalInfo({
-                      count: filteredIncomes.length,
-                      total: filteredIncomes.reduce(
-                        (acc, income) => acc + (parseFloat(income.amount) || 0),
-                        0
-                      ),
-                    })
-                  }
+                  onClick={handleTotalCalculation}
                   className="bg-primary text-white px-6"
                 >
                   حساب الإجمالي
                 </Button>
               </div>
 
-              {totalInfo.count > 0 && (
+              {totalIncome > 0 ? (
                 <div className="mt-4 bg-gray-50 border rounded-md p-4 text-right space-y-1">
                   <p className="text-sm font-semibold text-gray-700">
-                    عدد الدخل: {totalInfo.count}
+                    عدد الدخل: {totalIncomeCount}
                   </p>
                   <p className="text-sm font-semibold text-gray-700">
-                    إجمالي الدخل: {totalInfo.total} جنيه
+                    إجمالي الدخل: {totalIncome} جنيه
                   </p>
+                  {summaryFilters.startDate && summaryFilters.endDate && (
+                    <p className="text-xs text-gray-500">
+                      للفترة من {summaryFilters.startDate} إلى{" "}
+                      {summaryFilters.endDate}
+                    </p>
+                  )}
                 </div>
+              ) : (
+                isSummaryClicked && (
+                  <p className="text-sm font-semibold text-red-700">
+                    لا يوجد دخل
+                  </p>
+                )
               )}
             </CardContent>
           </Card>
@@ -522,7 +563,11 @@ const Income = () => {
                 <input
                   type="number"
                   name="amount"
-                  value={currentItem ? currentItem.amount || "" : newItem.amount || ""}
+                  value={
+                    currentItem
+                      ? currentItem.amount || ""
+                      : newItem.amount || ""
+                  }
                   onChange={handleChange}
                   className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
                   min="0"
@@ -536,7 +581,11 @@ const Income = () => {
                 </label>
                 <textarea
                   name="description"
-                  value={currentItem ? currentItem.description || "" : newItem.description || ""}
+                  value={
+                    currentItem
+                      ? currentItem.description || ""
+                      : newItem.description || ""
+                  }
                   onChange={handleChange}
                   className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
                   rows={3}
@@ -550,11 +599,13 @@ const Income = () => {
                 <input
                   type="date"
                   name="date"
-                  value={currentItem
-                    ? currentItem.date
-                      ? new Date(currentItem.date).toISOString().split('T')[0]
-                      : ""
-                    : newItem.date || ""}
+                  value={
+                    currentItem
+                      ? currentItem.date
+                        ? new Date(currentItem.date).toISOString().split("T")[0]
+                        : ""
+                      : newItem.date || ""
+                  }
                   onChange={handleChange}
                   className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
                 />
@@ -567,7 +618,11 @@ const Income = () => {
                 <input
                   type="text"
                   name="received_by"
-                  value={currentItem ? currentItem.received_by || "" : newItem.received_by || ""}
+                  value={
+                    currentItem
+                      ? currentItem.received_by || ""
+                      : newItem.received_by || ""
+                  }
                   onChange={handleChange}
                   className="w-full border px-3 py-2 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right"
                   placeholder="اسم المستلم"

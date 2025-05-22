@@ -1,28 +1,74 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import BASE_URL from '../../config/api';
+import toast from 'react-hot-toast';
 
-import axios from 'axios';
+export const fetchExpenseSummary = createAsyncThunk(
+  "finance/fetchExpenseSummary",
+  async (params, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem("token");
+      
+      const urlParams = new URLSearchParams();
+      // Add only defined parameters
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          urlParams.append(key, value);
+        }
+      });
 
+      const response = await fetch(
+        `${BASE_URL}/finance/api/expense-summary/?${urlParams.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(
+          errorData.message || "Failed to fetch expense summary."
+        );
+      }
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      toast.error(error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// Async Thunks for Expense Categories
 export const fetchExpenseCategories = createAsyncThunk(
   'finance/fetchExpenseCategories',
-  async ({ page, filters }, { rejectWithValue }) => {
+  async ({page} = {}, { rejectWithValue }) => {
     try {
-      const { name, description } = filters;
-      const response = await axios.get(`${BASE_URL}/finance/api/expense-categories/`, {
+      const token = localStorage.getItem('token');
+      const url = `${BASE_URL}/finance/api/expense-categories/`;
+      const params = new URLSearchParams();
+      if (page) {
+        params.append('page', page);
+      }
+      const response = await fetch(`${url}?${params.toString()}`, {
+        method: 'GET',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        params: {
-          page,
-          name,
-          description,
-        },
       });
-      return response.data; // Expecting { count, results }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.message || 'Failed to fetch expense categories.');
+      }
+      
+      return await response.json();
     } catch (error) {
-      console.error('API Error:', error.response?.data || error.message);
-      return rejectWithValue(error.response?.data?.error || 'Failed to fetch expense categories');
+      return rejectWithValue(error.message);
     }
   }
 );
@@ -53,20 +99,31 @@ export const addExpenseCategory = createAsyncThunk(
 
 // Async Thunks for Expenses
 export const fetchExpenses = createAsyncThunk(
-  'finance/fetchExpenses',
-  async (page = 1, { rejectWithValue }) => {
+  "finance/fetchExpenses",
+  async ({ page = 1, startDate, endDate }, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}/finance/api/expenses/?page=${page}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+      const token = localStorage.getItem("token");
+      const params = new URLSearchParams({
+        page: page,
+        ...(startDate && { start_date: startDate }),
+        ...(endDate && { end_date: endDate }),
       });
+
+      const response = await fetch(
+        `${BASE_URL}/finance/api/expenses/?${params}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to fetch expenses.');
+        return rejectWithValue(
+          errorData.message || "Failed to fetch expenses."
+        );
       }
       return await response.json();
     } catch (error) {
@@ -146,49 +203,64 @@ export const deleteExpense = createAsyncThunk(
   }
 );
 
-// Async Thunks for Income Sources
-export const fetchIncomeSources = createAsyncThunk(
-  'finance/fetchIncomeSources',
-  async (params = {}, { rejectWithValue }) => {
+export const fetchIncomeSummary = createAsyncThunk(
+  "finance/fetchIncomeSummary",
+  async (params, { rejectWithValue }) => {
     try {
-      const { page = 1, pageSize = 20, name = '', description = '' } = params;
-      const token = localStorage.getItem('token');
-      
-      // Construct query string
-      const queryParams = new URLSearchParams({
-        page,
-        page_size: pageSize,
-        ...(name && { name }),
-        ...(description && { description }),
-      }).toString();
+      const token = localStorage.getItem("token");
+      const urlParams = new URLSearchParams();
+
+      // Add only defined parameters
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== null && value !== undefined) {
+          urlParams.append(key, value);
+        }
+      });
 
       const response = await fetch(
-        `${BASE_URL}/finance/api/income-sources/?${queryParams}`,
+        `${BASE_URL}/finance/api/income-summary/?${urlParams.toString()}`,
         {
-          method: 'GET',
+          method: "GET",
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
           },
         }
       );
 
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.error || 'Failed to fetch income sources.');
+        return rejectWithValue(
+          errorData.message || "Failed to fetch income summary."
+        );
       }
-      
       const data = await response.json();
-      return {
-        data: data.results,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(data.count / pageSize),
-          totalItems: data.count,
-          pageSize,
+      return data;
+    } catch (error) {
+      toast.error(error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+// Async Thunks for Income Sources
+export const fetchIncomeSources = createAsyncThunk(
+  'finance/fetchIncomeSources',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/finance/api/income-sources/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        filters: { name, description }
-      };
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.message || 'Failed to fetch income sources.');
+      }
+      return await response.json();
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -196,7 +268,7 @@ export const fetchIncomeSources = createAsyncThunk(
 );
 
 export const addIncomeSource = createAsyncThunk(
-  'finance/add SpitIncomeSource',
+  'finance/addIncomeSource',
   async (newSource, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
@@ -222,36 +294,41 @@ export const addIncomeSource = createAsyncThunk(
 );
 
 // Async Thunks for Incomes
-
 export const fetchIncomes = createAsyncThunk(
-  'finance/fetchIncomes',
-  async ({ page = 1, source = '', amount = '', description = '' }, { rejectWithValue }) => {
+  "finance/fetchIncomes",
+  async ({ page = 1, filters = {} } = {}, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No token found');
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("No token found");
 
-      const params = new URLSearchParams({ page });
-      if (source) params.append('source', source);
-      if (amount) params.append('amount', amount);
-      if (description) params.append('description', description);
+      // Construct query parameters matching the API expectations
+      const params = new URLSearchParams({
+        page: page,
+        source: filters.source || "",
+        amount: filters.amount || "",
+        description: filters.description || "",
+      });
 
       const url = `${BASE_URL}/finance/api/incomes/?${params.toString()}`;
+
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
         },
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        return rejectWithValue(errorData.message || `HTTP error! status: ${response.status}`);
+        return rejectWithValue(
+          errorData.message || `HTTP error! status: ${response.status}`
+        );
       }
 
       const data = await response.json();
-      return data; // Expect { results, count, next, previous }
+      return data;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch incomes');
+      return rejectWithValue(error.message || "Failed to fetch incomes");
     }
   }
 );
@@ -340,6 +417,10 @@ const financeSlice = createSlice({
     incomeSources: [],
     incomes: [],
     incomesPagination: { count: 0, next: null, previous: null },
+    totalIncome: 0,
+    totalCount: 0,
+    totalExpenses: 0,
+    totalExpensesCount: 0,
     loading: false,
     error: null,
   },
@@ -532,6 +613,36 @@ const financeSlice = createSlice({
       state.incomes = state.incomes.filter((income) => income.id !== deletedId);
     });
     builder.addCase(deleteIncome.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload;
+    });
+
+    // Total Income
+    builder.addCase(fetchIncomeSummary.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchIncomeSummary.fulfilled, (state, action) => {
+      state.loading = false;
+      state.totalIncome = action.payload.total_income;
+      state.totalCount = action.payload.details.length;
+    });
+    builder.addCase(fetchIncomeSummary.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload;
+    });
+
+    // Total Expenses
+    builder.addCase(fetchExpenseSummary.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchExpenseSummary.fulfilled, (state, action) => {
+      state.loading = false;
+      state.totalExpenses = action.payload.total_expense;
+      state.totalExpensesCount = action.payload.details.length;
+    });
+    builder.addCase(fetchExpenseSummary.rejected, (state, action) => {
       state.loading = false;
       state.error = action.payload;
     });

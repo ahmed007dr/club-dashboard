@@ -27,7 +27,9 @@ def attendance_list_api(request):
     if request.user.role == 'owner':
         attendances = Attendance.objects.select_related('subscription', 'subscription__member').all()
     else:
-        attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(subscription__club=request.user.club)
+        attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(
+            subscription__club=request.user.club
+        )
 
     # Apply filters
     if rfid:
