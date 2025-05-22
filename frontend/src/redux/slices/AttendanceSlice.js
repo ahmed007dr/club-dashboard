@@ -7,25 +7,47 @@ const getToken = () => {
   return token ? `Bearer ${token}` : '';
 };
 
-// Async thunk for fetching attendances
+
+
 export const fetchAttendances = createAsyncThunk(
   'attendance/fetchAttendances',
-  async ({ page = 1, perPage = 20 }, { rejectWithValue }) => {
+  async (
+    {
+      page = 1,
+      perPage = 20,
+      attendanceDate = '',
+      entryTimeStart = '',
+      entryTimeEnd = '',
+      rfidCode = '',
+      memberName = '',
+    },
+    { rejectWithValue }
+  ) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
         throw new Error('No authentication token found');
       }
 
+      // Build query parameters
+      const params = {
+        page,
+        per_page: perPage,
+      };
+
+      // Add filters only if they are provided
+      if (attendanceDate) params.attendance_date = attendanceDate;
+      if (entryTimeStart) params.entry_time_start = entryTimeStart;
+      if (entryTimeEnd) params.entry_time_end = entryTimeEnd;
+      if (rfidCode) params.rfid_code = rfidCode;
+      if (memberName) params.member_name = memberName;
+
       const response = await axios.get(`${BASE_URL}/attendance/api/attendances/`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        params: {
-          page,
-          per_page: perPage,
-        },
+        params,
       });
 
       // Handle API response

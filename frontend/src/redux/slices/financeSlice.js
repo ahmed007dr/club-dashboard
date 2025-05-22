@@ -1,28 +1,27 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import BASE_URL from '../../config/api';
 
-import axios from 'axios';
-
+// Async Thunks for Expense Categories
 export const fetchExpenseCategories = createAsyncThunk(
   'finance/fetchExpenseCategories',
-  async ({ page, filters }, { rejectWithValue }) => {
+  async (page = 1, { rejectWithValue }) => {
     try {
-      const { name, description } = filters;
-      const response = await axios.get(`${BASE_URL}/finance/api/expense-categories/`, {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}/finance/api/expense-categories/?page=${page}`, {
+        method: 'GET',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        params: {
-          page,
-          name,
-          description,
-        },
       });
-      return response.data; // Expecting { count, results }
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.message || 'Failed to fetch expense categories.');
+      }
+      return await response.json();
     } catch (error) {
-      console.error('API Error:', error.response?.data || error.message);
-      return rejectWithValue(error.response?.data?.error || 'Failed to fetch expense categories');
+      return rejectWithValue(error.message);
     }
   }
 );
@@ -149,46 +148,21 @@ export const deleteExpense = createAsyncThunk(
 // Async Thunks for Income Sources
 export const fetchIncomeSources = createAsyncThunk(
   'finance/fetchIncomeSources',
-  async (params = {}, { rejectWithValue }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      const { page = 1, pageSize = 20, name = '', description = '' } = params;
       const token = localStorage.getItem('token');
-      
-      // Construct query string
-      const queryParams = new URLSearchParams({
-        page,
-        page_size: pageSize,
-        ...(name && { name }),
-        ...(description && { description }),
-      }).toString();
-
-      const response = await fetch(
-        `${BASE_URL}/finance/api/income-sources/?${queryParams}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-
+      const response = await fetch(`${BASE_URL}/finance/api/income-sources/`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.error || 'Failed to fetch income sources.');
+        return rejectWithValue(errorData.message || 'Failed to fetch income sources.');
       }
-      
-      const data = await response.json();
-      return {
-        data: data.results,
-        pagination: {
-          currentPage: page,
-          totalPages: Math.ceil(data.count / pageSize),
-          totalItems: data.count,
-          pageSize,
-        },
-        filters: { name, description }
-      };
+      return await response.json();
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -222,20 +196,14 @@ export const addIncomeSource = createAsyncThunk(
 );
 
 // Async Thunks for Incomes
-
 export const fetchIncomes = createAsyncThunk(
   'finance/fetchIncomes',
-  async ({ page = 1, source = '', amount = '', description = '' }, { rejectWithValue }) => {
+  async ({ page = 1 }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No token found');
 
-      const params = new URLSearchParams({ page });
-      if (source) params.append('source', source);
-      if (amount) params.append('amount', amount);
-      if (description) params.append('description', description);
-
-      const url = `${BASE_URL}/finance/api/incomes/?${params.toString()}`;
+      const url = `${BASE_URL}/finance/api/incomes/?page=${page}`;
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,

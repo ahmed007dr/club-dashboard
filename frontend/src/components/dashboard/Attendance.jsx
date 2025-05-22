@@ -54,9 +54,10 @@ const Attendance = () => {
 
   // Filters
   const [attendanceFilters, setAttendanceFilters] = useState({
-    subscription: "",
-    rfid: "",
     attendance_date: "",
+    entry_time_start: "",
+    entry_time_end: "",
+    rfid_code: "",
     member_name: "",
   });
   const [entryLogFilters, setEntryLogFilters] = useState({
@@ -66,12 +67,20 @@ const Attendance = () => {
     timestamp: "",
   });
 
-  // Fetch data with pagination
+  // Fetch data with pagination and filters
   useEffect(() => {
-    dispatch(fetchAttendances({ page: attendancePage, perPage: attendanceItemsPerPage }));
+    dispatch(fetchAttendances({
+      page: attendancePage,
+      perPage: attendanceItemsPerPage,
+      attendanceDate: attendanceFilters.attendance_date,
+      entryTimeStart: attendanceFilters.entry_time_start,
+      entryTimeEnd: attendanceFilters.entry_time_end,
+      rfidCode: attendanceFilters.rfid_code,
+      memberName: attendanceFilters.member_name,
+    }));
     dispatch(fetchEntryLogs({ page: entryLogPage, perPage: entryLogItemsPerPage }));
     dispatch(fetchSubscriptions());
-  }, [dispatch, attendancePage, attendanceItemsPerPage, entryLogPage, entryLogItemsPerPage]);
+  }, [dispatch, attendancePage, attendanceItemsPerPage, attendanceFilters, entryLogPage, entryLogItemsPerPage]);
 
   // Handle items per page change for attendance
   const handleAttendanceItemsPerPageChange = (e) => {
@@ -79,7 +88,15 @@ const Attendance = () => {
     setAttendanceItemsPerPage(newPerPage);
     setAttendancePage(1); // Reset to first page
     dispatch(setPerPage(newPerPage));
-    dispatch(fetchAttendances({ page: 1, perPage: newPerPage }));
+    dispatch(fetchAttendances({
+      page: 1,
+      perPage: newPerPage,
+      attendanceDate: attendanceFilters.attendance_date,
+      entryTimeStart: attendanceFilters.entry_time_start,
+      entryTimeEnd: attendanceFilters.entry_time_end,
+      rfidCode: attendanceFilters.rfid_code,
+      memberName: attendanceFilters.member_name,
+    }));
   };
 
   // Handle items per page change for entry logs
@@ -93,7 +110,15 @@ const Attendance = () => {
   // Paginate functions
   const paginateAttendance = (pageNumber) => {
     setAttendancePage(pageNumber);
-    dispatch(fetchAttendances({ page: pageNumber, perPage: attendanceItemsPerPage }));
+    dispatch(fetchAttendances({
+      page: pageNumber,
+      perPage: attendanceItemsPerPage,
+      attendanceDate: attendanceFilters.attendance_date,
+      entryTimeStart: attendanceFilters.entry_time_start,
+      entryTimeEnd: attendanceFilters.entry_time_end,
+      rfidCode: attendanceFilters.rfid_code,
+      member_name: attendanceFilters.member_name,
+    }));
   };
 
   const paginateEntryLogs = (pageNumber) => {
@@ -155,7 +180,15 @@ const Attendance = () => {
         setNewAttendance({ identifier: "" });
         setFoundSubscription(null);
         setIsAttendanceDialogOpen(false);
-        dispatch(fetchAttendances({ page: attendancePage, perPage: attendanceItemsPerPage }));
+        dispatch(fetchAttendances({
+          page: attendancePage,
+          perPage: attendanceItemsPerPage,
+          attendanceDate: attendanceFilters.attendance_date,
+          entryTimeStart: attendanceFilters.entry_time_start,
+          entryTimeEnd: attendanceFilters.entry_time_end,
+          rfidCode: attendanceFilters.rfid_code,
+          memberName: attendanceFilters.member_name,
+        }));
         dispatch(fetchSubscriptions());
       })
       .catch((err) => {
@@ -163,40 +196,19 @@ const Attendance = () => {
       });
   };
 
-  // Filtered data (client-side filtering as fallback)
-  const filteredAttendances = attendances
-    .filter((attendance) => {
-      const subscriptionText = attendance.subscription?.name || "";
-      return (
-        subscriptionText.toLowerCase().includes(attendanceFilters.subscription.toLowerCase()) &&
-        attendance.attendance_date.includes(attendanceFilters.attendance_date) &&
-        (attendance.rfid_code?.toUpperCase().includes(attendanceFilters.rfid.toUpperCase()) || !attendanceFilters.rfid)
-      );
-    })
-    .sort((a, b) => b.id - a.id);
-
-  const filteredEntryLogs = entryLogs
-    .filter((log) => {
-      return (
-        (log.club_details?.name?.toLowerCase().includes(entryLogFilters.club.toLowerCase()) || !entryLogFilters.club) &&
-        (log.member_details?.name?.toLowerCase().includes(entryLogFilters.member.toLowerCase()) || !entryLogFilters.member) &&
-        (log.rfid_code?.toUpperCase().includes(entryLogFilters.rfid.toUpperCase()) || !entryLogFilters.rfid) &&
-        log.timestamp.includes(entryLogFilters.timestamp)
-      );
-    })
-    .sort((a, b) => b.id - a.id);
-
   // Pagination calculations
   const totalAttendancePages = Math.ceil((attendancePagination.count || 0) / attendanceItemsPerPage);
-  const paginatedAttendances = filteredAttendances; // Server-side pagination handles slicing
+
+  // Use server-side filtered data directly
+  const paginatedAttendances = attendances;
 
   // Fallback to client-side pagination for entry logs if server-side fails
   const totalEntryLogPages = entryLogsPagination.count
     ? Math.ceil(entryLogsPagination.count / entryLogItemsPerPage)
-    : Math.ceil(filteredEntryLogs.length / entryLogItemsPerPage);
+    : Math.ceil(entryLogs.length / entryLogItemsPerPage);
   const paginatedEntryLogs = entryLogsPagination.count
-    ? filteredEntryLogs
-    : filteredEntryLogs.slice(
+    ? entryLogs
+    : entryLogs.slice(
         (entryLogPage - 1) * entryLogItemsPerPage,
         entryLogPage * entryLogItemsPerPage
       );
@@ -208,6 +220,8 @@ const Attendance = () => {
       </div>
     );
   }
+
+  
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -231,12 +245,12 @@ const Attendance = () => {
                   <label className="block text-sm mb-1">كود RFID</label>
                   <input
                     type="text"
-                    name="rfid"
-                    value={attendanceFilters.rfid}
+                    name="rfid_code"
+                    value={attendanceFilters.rfid_code}
                     onChange={(e) =>
                       setAttendanceFilters({
                         ...attendanceFilters,
-                        rfid: e.target.value.toUpperCase(),
+                        rfid_code: e.target.value.toUpperCase(),
                       })
                     }
                     className="border px-3 py-2 rounded w-full uppercase"
@@ -272,6 +286,36 @@ const Attendance = () => {
                     }
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم العضو"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">وقت الدخول (من)</label>
+                  <input
+                    type="time"
+                    name="entry_time_start"
+                    value={attendanceFilters.entry_time_start}
+                    onChange={(e) =>
+                      setAttendanceFilters({
+                        ...attendanceFilters,
+                        entry_time_start: e.target.value,
+                      })
+                    }
+                    className="border px-3 py-2 rounded w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">وقت الدخول (إلى)</label>
+                  <input
+                    type="time"
+                    name="entry_time_end"
+                    value={attendanceFilters.entry_time_end}
+                    onChange={(e) =>
+                      setAttendanceFilters({
+                        ...attendanceFilters,
+                        entry_time_end: e.target.value,
+                      })
+                    }
+                    className="border px-3 py-2 rounded w-full"
                   />
                 </div>
               </div>
@@ -350,7 +394,8 @@ const Attendance = () => {
                           <select
                             value={attendanceItemsPerPage}
                             onChange={handleAttendanceItemsPerPageChange}
-                            className="border px-2 py-1 rounded"
+                            className="border px-2 py-1 rounded之类的
+                            rounded"
                           >
                             <option value={10}>10</option>
                             <option value={20}>20</option>
@@ -562,17 +607,17 @@ const Attendance = () => {
 
                   {/* Entry Logs Pagination */}
                   <div className="flex justify-between items-center mt-4" dir="rtl">
-                    {(entryLogsPagination.count || filteredEntryLogs.length) === 0 && (
+                    {(entryLogsPagination.count || entryLogs.length) === 0 && (
                       <div className="text-sm text-gray-600">لا توجد سجلات دخول لعرضها</div>
                     )}
-                    {(entryLogsPagination.count || filteredEntryLogs.length) > 0 && (
+                    {(entryLogsPagination.count || entryLogs.length) > 0 && (
                       <>
                         <div className="text-sm text-gray-600">
                           عرض {(entryLogPage - 1) * entryLogItemsPerPage + 1} إلى{" "}
                           {Math.min(
                             entryLogPage * entryLogItemsPerPage,
-                            entryLogsPagination.count || filteredEntryLogs.length
-                          )} من {entryLogsPagination.count || filteredEntryLogs.length}
+                            entryLogsPagination.count || entryLogs.length
+                          )} من {entryLogsPagination.count || entryLogs.length}
                         </div>
                         <div className="flex gap-2 items-center">
                           <select
@@ -587,9 +632,9 @@ const Attendance = () => {
                           </select>
                           <button
                             onClick={() => paginateEntryLogs(1)}
-                            disabled={entryLogPage === 1 || (entryLogsPagination.count || filteredEntryLogs.length) === 0}
+                            disabled={entryLogPage === 1 || (entryLogsPagination.count || entryLogs.length) === 0}
                             className={`px-3 py-1 rounded ${
-                              entryLogPage === 1 || (entryLogsPagination.count || filteredEntryLogs.length) === 0
+                              entryLogPage === 1 || (entryLogsPagination.count || entryLogs.length) === 0
                                 ? "bg-gray-200 opacity-50 cursor-not-allowed"
                                 : "bg-blue-700 text-white hover:bg-blue-800"
                             }`}
@@ -598,9 +643,9 @@ const Attendance = () => {
                           </button>
                           <button
                             onClick={() => paginateEntryLogs(entryLogPage - 1)}
-                            disabled={(!entryLogsPagination.previous && entryLogsPagination.count) || entryLogPage === 1 || (entryLogsPagination.count || filteredEntryLogs.length) === 0}
+                            disabled={(!entryLogsPagination.previous && entryLogsPagination.count) || entryLogPage === 1 || (entryLogsPagination.count || entryLogs.length) === 0}
                             className={`px-3 py-1 rounded ${
-                              (!entryLogsPagination.previous && entryLogsPagination.count) || entryLogPage === 1 || (entryLogsPagination.count || filteredEntryLogs.length) === 0
+                              (!entryLogsPagination.previous && entryLogsPagination.count) || entryLogPage === 1 || (entryLogsPagination.count || entryLogs.length) === 0
                                 ? "bg-gray-200 opacity-50 cursor-not-allowed"
                                 : "bg-blue-700 text-white hover:bg-blue-800"
                             }`}
@@ -628,12 +673,12 @@ const Attendance = () => {
                               <button
                                 key={page}
                                 onClick={() => paginateEntryLogs(page)}
-                                disabled={(entryLogsPagination.count || filteredEntryLogs.length) === 0}
+                                disabled={(entryLogsPagination.count || entryLogs.length) === 0}
                                 className={`px-3 py-1 rounded ${
-                                  entryLogPage === page && (entryLogsPagination.count || filteredEntryLogs.length) > 0
+                                  entryLogPage === page && (entryLogsPagination.count || entryLogs.length) > 0
                                     ? "bg-blue-700 text-white"
                                     : "bg-gray-200 hover:bg-gray-300"
-                                } ${(entryLogsPagination.count || filteredEntryLogs.length) === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                                } ${(entryLogsPagination.count || entryLogs.length) === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
                               >
                                 {page}
                               </button>
@@ -641,9 +686,9 @@ const Attendance = () => {
                           })()}
                           <button
                             onClick={() => paginateEntryLogs(entryLogPage + 1)}
-                            disabled={(!entryLogsPagination.next && entryLogsPagination.count) || entryLogPage === totalEntryLogPages || (entryLogsPagination.count || filteredEntryLogs.length) === 0}
+                            disabled={(!entryLogsPagination.next && entryLogsPagination.count) || entryLogPage === totalEntryLogPages || (entryLogsPagination.count || entryLogs.length) === 0}
                             className={`px-3 py-1 rounded ${
-                              (!entryLogsPagination.next && entryLogsPagination.count) || entryLogPage === totalEntryLogPages || (entryLogsPagination.count || filteredEntryLogs.length) === 0
+                              (!entryLogsPagination.next && entryLogsPagination.count) || entryLogPage === totalEntryLogPages || (entryLogsPagination.count || entryLogs.length) === 0
                                 ? "bg-gray-200 opacity-50 cursor-not-allowed"
                                 : "bg-blue-700 text-white hover:bg-blue-800"
                             }`}
@@ -652,9 +697,9 @@ const Attendance = () => {
                           </button>
                           <button
                             onClick={() => paginateEntryLogs(totalEntryLogPages)}
-                            disabled={entryLogPage === totalEntryLogPages || (entryLogsPagination.count || filteredEntryLogs.length) === 0}
+                            disabled={entryLogPage === totalEntryLogPages || (entryLogsPagination.count || entryLogs.length) === 0}
                             className={`px-3 py-1 rounded ${
-                              entryLogPage === totalEntryLogPages || (entryLogsPagination.count || filteredEntryLogs.length) === 0
+                              entryLogPage === totalEntryLogPages || (entryLogsPagination.count || entryLogs.length) === 0
                                 ? "bg-gray-200 opacity-50 cursor-not-allowed"
                                 : "bg-blue-700 text-white hover:bg-blue-800"
                             }`}

@@ -50,7 +50,8 @@ const Members = () => {
   const members = useSelector((state) => state.member.items); // Now an array (results)
   const pagination = useSelector((state) => state.member.pagination); // { count, next, previous }
   const dispatch = useDispatch();
-
+console.log("Members:", members);
+console.log("Pagination:", pagination);
   useEffect(() => {
     const fetchData = async () => {
       try {

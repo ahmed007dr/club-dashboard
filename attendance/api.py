@@ -10,18 +10,30 @@ from django.db.models import Q
 from django.utils import timezone
 from members.models import Member
 from rest_framework.pagination import PageNumberPagination
+from datetime import datetime
+
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_list_api(request):    
+    # Get query parameters
     search_term = request.GET.get('q', '')
+    attendance_date = request.GET.get('attendance_date', '')
+    entry_time_start = request.GET.get('entry_time_start', '')
+    entry_time_end = request.GET.get('entry_time_end', '')
+    rfid_code = request.GET.get('rfid_code', '')
+    member_name = request.GET.get('member_name', '')
 
+    # Base queryset based on user role
     if request.user.role == 'owner':
         attendances = Attendance.objects.select_related('subscription', 'subscription__member').all()
     else:
-        attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(subscription__club=request.user.club)
+        attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(
+            subscription__club=request.user.club
+        )
 
+    # Apply filters
     if search_term:
         attendances = attendances.filter(
             Q(subscription__member__name__icontains=search_term) |
@@ -29,8 +41,45 @@ def attendance_list_api(request):
             Q(subscription__member__rfid_code__icontains=search_term)
         )
 
+    if attendance_date:
+        try:
+            # Assuming attendance_date is in YYYY-MM-DD format
+            parsed_date = datetime.strptime(attendance_date, '%Y-%m-%d').date()
+            attendances = attendances.filter(attendance_date=parsed_date)
+        except ValueError:
+            # Handle invalid date format gracefully (optional)
+            pass
+
+    if entry_time_start and entry_time_end:
+        try:
+            # Assuming entry_time is in HH:MM:SS format
+            attendances = attendances.filter(
+                entry_time__range=(entry_time_start, entry_time_end)
+            )
+        except ValueError:
+            # Handle invalid time format gracefully (optional)
+            pass
+    elif entry_time_start:
+        try:
+            attendances = attendances.filter(entry_time__gte=entry_time_start)
+        except ValueError:
+            pass
+    elif entry_time_end:
+        try:
+            attendances = attendances.filter(entry_time__lte=entry_time_end)
+        except ValueError:
+            pass
+
+    if rfid_code:
+        attendances = attendances.filter(subscription__member__rfid_code__icontains=rfid_code)
+
+    if member_name:
+        attendances = attendances.filter(subscription__member__name__icontains=member_name)
+
+    # Order by attendance_date (descending)
     attendances = attendances.order_by('-attendance_date')
 
+    # Pagination
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(attendances, request)
     serializer = AttendanceSerializer(result_page, many=True)
