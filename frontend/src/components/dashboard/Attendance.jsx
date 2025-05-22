@@ -24,7 +24,7 @@ import {
 } from "../ui/DropdownMenu";
 import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
 import EntryForm from "./EntryForm";
-import { toast } from 'react-hot-toast';
+import { toast } from "react-hot-toast";
 import { FaUser } from "react-icons/fa";
 import usePermission from "@/hooks/usePermission";
 
@@ -33,9 +33,19 @@ const Attendance = () => {
   const dispatch = useDispatch();
 
   // Redux state
-  const { attendances, loading: attendanceLoading, error: attendanceError, pagination: attendancePagination = {} } = useSelector((state) => state.attendance);
+  const {
+    data: attendances,
+    count: attendanceCount,
+    loading: attendanceLoading,
+    error: attendanceError,
+  } = useSelector((state) => state.attendance);
   const { subscriptions } = useSelector((state) => state.subscriptions);
-  const { items: entryLogs, loading: entryLogsLoading, error: entryLogsError, pagination: entryLogsPagination = {} } = useSelector((state) => state.entryLogs);
+  const {
+    data: entryLogs,
+    count: entryLogCount,
+    loading: entryLogsLoading,
+    error: entryLogsError,
+  } = useSelector((state) => state.entryLogs);
 
   const canViewAttendance = usePermission("view_attendance");
   const canAddAttendance = usePermission("add_attendance");
@@ -47,12 +57,8 @@ const Attendance = () => {
   const [newAttendance, setNewAttendance] = useState({ identifier: "" });
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [isEntryLogDialogOpen, setIsEntryLogDialogOpen] = useState(false);
-  const [attendancePage, setAttendancePage] = useState(1);
-  const [attendanceItemsPerPage, setAttendanceItemsPerPage] = useState(attendancePagination.perPage || 20);
-  const [entryLogPage, setEntryLogPage] = useState(1);
-  const [entryLogItemsPerPage, setEntryLogItemsPerPage] = useState(entryLogsPagination.perPage || 20);
 
-  // Filters
+  // Filters and Pagination
   const [attendanceFilters, setAttendanceFilters] = useState({
     subscription: "",
     rfid: "",
@@ -66,42 +72,32 @@ const Attendance = () => {
     timestamp: "",
   });
 
-  // Fetch data with pagination
+  const [attendancePage, setAttendancePage] = useState(1);
+  const [attendanceItemsPerPage] = useState(20);
+  const [entryLogPage, setEntryLogPage] = useState(1);
+  const [entryLogItemsPerPage] = useState(20);
+
   useEffect(() => {
-    dispatch(fetchAttendances({ page: attendancePage, perPage: attendanceItemsPerPage }));
-    dispatch(fetchEntryLogs({ page: entryLogPage, perPage: entryLogItemsPerPage }));
+    dispatch(
+      fetchAttendances({
+        page: attendancePage,
+        pageSize: attendanceItemsPerPage,
+        ...attendanceFilters,
+      })
+    );
+    dispatch(
+      fetchEntryLogs({
+        page: entryLogPage,
+        pageSize: entryLogItemsPerPage,
+        ...entryLogFilters,
+      })
+    );
     dispatch(fetchSubscriptions());
-  }, [dispatch, attendancePage, attendanceItemsPerPage, entryLogPage, entryLogItemsPerPage]);
+  }, [dispatch, attendancePage, attendanceFilters, entryLogPage, entryLogFilters, attendanceItemsPerPage, entryLogItemsPerPage]);
 
-  // Handle items per page change for attendance
-  const handleAttendanceItemsPerPageChange = (e) => {
-    const newPerPage = parseInt(e.target.value, 10);
-    setAttendanceItemsPerPage(newPerPage);
-    setAttendancePage(1); // Reset to first page
-    dispatch(setPerPage(newPerPage));
-    dispatch(fetchAttendances({ page: 1, perPage: newPerPage }));
-  };
-
-  // Handle items per page change for entry logs
-  const handleEntryLogItemsPerPageChange = (e) => {
-    const newPerPage = parseInt(e.target.value, 10);
-    setEntryLogItemsPerPage(newPerPage);
-    setEntryLogPage(1); // Reset to first page
-    dispatch(fetchEntryLogs({ page: 1, perPage: newPerPage }));
-  };
-
-  // Paginate functions
-  const paginateAttendance = (pageNumber) => {
-    setAttendancePage(pageNumber);
-    dispatch(fetchAttendances({ page: pageNumber, perPage: attendanceItemsPerPage }));
-  };
-
-  const paginateEntryLogs = (pageNumber) => {
-    setEntryLogPage(pageNumber);
-    dispatch(fetchEntryLogs({ page: pageNumber, perPage: entryLogItemsPerPage }));
-  };
-
-  // Handle attendance input change
+  useEffect(() => {
+    console.log("Filters changed:", entryLogs, attendances);
+  }, [entryLogs, attendances]);
   const handleAttendanceInputChange = (e) => {
     const { name, value } = e.target;
     const searchValue = value.trim().toUpperCase();
@@ -135,7 +131,11 @@ const Attendance = () => {
       toast.error("لا يمكن تسجيل الحضور لاشتراك غير نشط");
       return;
     }
-    if (foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0) {
+    if (
+      foundSubscription.type_details.max_entries -
+        foundSubscription.entry_count <=
+      0
+    ) {
       toast.error("لا توجد إدخالات متبقية في هذا الاشتراك");
       return;
     }
@@ -155,7 +155,13 @@ const Attendance = () => {
         setNewAttendance({ identifier: "" });
         setFoundSubscription(null);
         setIsAttendanceDialogOpen(false);
-        dispatch(fetchAttendances({ page: attendancePage, perPage: attendanceItemsPerPage }));
+        dispatch(
+          fetchAttendances({
+            page: attendancePage,
+            pageSize: attendanceItemsPerPage,
+            ...attendanceFilters,
+          })
+        );
         dispatch(fetchSubscriptions());
       })
       .catch((err) => {
@@ -163,43 +169,110 @@ const Attendance = () => {
       });
   };
 
-  // Filtered data (client-side filtering as fallback)
-  const filteredAttendances = attendances
-    .filter((attendance) => {
-      const subscriptionText = attendance.subscription?.name || "";
-      return (
-        subscriptionText.toLowerCase().includes(attendanceFilters.subscription.toLowerCase()) &&
-        attendance.attendance_date.includes(attendanceFilters.attendance_date) &&
-        (attendance.rfid_code?.toUpperCase().includes(attendanceFilters.rfid.toUpperCase()) || !attendanceFilters.rfid)
-      );
-    })
-    .sort((a, b) => b.id - a.id);
+  const PaginationControls = ({
+    currentPage,
+    totalItems,
+    itemsPerPage,
+    onPageChange,
+    type,
+  }) => {
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const maxButtons = 5;
+    const sideButtons = Math.floor(maxButtons / 2);
+    let start = Math.max(1, currentPage - sideButtons);
+    let end = Math.min(totalPages, currentPage + sideButtons);
 
-  const filteredEntryLogs = entryLogs
-    .filter((log) => {
-      return (
-        (log.club_details?.name?.toLowerCase().includes(entryLogFilters.club.toLowerCase()) || !entryLogFilters.club) &&
-        (log.member_details?.name?.toLowerCase().includes(entryLogFilters.member.toLowerCase()) || !entryLogFilters.member) &&
-        (log.rfid_code?.toUpperCase().includes(entryLogFilters.rfid.toUpperCase()) || !entryLogFilters.rfid) &&
-        log.timestamp.includes(entryLogFilters.timestamp)
-      );
-    })
-    .sort((a, b) => b.id - a.id);
+    if (end - start + 1 < maxButtons) {
+      if (currentPage <= sideButtons) {
+        end = Math.min(totalPages, maxButtons);
+      } else {
+        start = Math.max(1, totalPages - maxButtons + 1);
+      }
+    }
 
-  // Pagination calculations
-  const totalAttendancePages = Math.ceil((attendancePagination.count || 0) / attendanceItemsPerPage);
-  const paginatedAttendances = filteredAttendances; // Server-side pagination handles slicing
+    return (
+      <div className="flex justify-between items-center mt-4" dir="rtl">
+        {totalItems === 0 ? (
+          <div className="text-sm text-gray-600">
+            {type === "attendance"
+              ? "لا توجد سجلات حضور لعرضها"
+              : "لا توجد سجلات دخول لعرضها"}
+          </div>
+        ) : (
+          <>
+            <div className="text-sm text-gray-600">
+              عرض {(currentPage - 1) * itemsPerPage + 1} إلى{" "}
+              {Math.min(currentPage * itemsPerPage, totalItems)} من {totalItems}{" "}
+              سجل
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => onPageChange(1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded ${
+                  currentPage === 1
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
+                }`}
+              >
+                الأول
+              </button>
+              <button
+                onClick={() => onPageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className={`px-3 py-1 rounded ${
+                  currentPage === 1
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
+                }`}
+              >
+                السابق
+              </button>
 
-  // Fallback to client-side pagination for entry logs if server-side fails
-  const totalEntryLogPages = entryLogsPagination.count
-    ? Math.ceil(entryLogsPagination.count / entryLogItemsPerPage)
-    : Math.ceil(filteredEntryLogs.length / entryLogItemsPerPage);
-  const paginatedEntryLogs = entryLogsPagination.count
-    ? filteredEntryLogs
-    : filteredEntryLogs.slice(
-        (entryLogPage - 1) * entryLogItemsPerPage,
-        entryLogPage * entryLogItemsPerPage
-      );
+              {Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
+                (page) => (
+                  <button
+                    key={page}
+                    onClick={() => onPageChange(page)}
+                    className={`px-3 py-1 rounded ${
+                      currentPage === page
+                        ? "bg-blue-700 text-white"
+                        : "bg-gray-200 hover:bg-gray-300"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                )
+              )}
+
+              <button
+                onClick={() => onPageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 rounded ${
+                  currentPage === totalPages
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
+                }`}
+              >
+                التالي
+              </button>
+              <button
+                onClick={() => onPageChange(totalPages)}
+                disabled={currentPage === totalPages}
+                className={`px-3 py-1 rounded ${
+                  currentPage === totalPages
+                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                    : "bg-blue-700 text-white hover:bg-blue-800"
+                }`}
+              >
+                الأخير
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
 
   if (!canViewAttendance) {
     return (
@@ -211,7 +284,9 @@ const Attendance = () => {
 
   return (
     <div className="space-y-6" dir="rtl">
-      <h1 className="text-2xl font-bold tracking-tight">إدارة الحضور و الدخول</h1>
+      <h1 className="text-2xl font-bold tracking-tight">
+        إدارة الحضور و الدخول
+      </h1>
       <Tabs defaultValue="attendance" dir="rtl">
         <TabsList dir="rtl">
           <TabsTrigger value="attendance">سجلات الحضور</TabsTrigger>
@@ -233,12 +308,13 @@ const Attendance = () => {
                     type="text"
                     name="rfid"
                     value={attendanceFilters.rfid}
-                    onChange={(e) =>
-                      setAttendanceFilters({
-                        ...attendanceFilters,
+                    onChange={(e) => {
+                      setAttendanceFilters((prev) => ({
+                        ...prev,
                         rfid: e.target.value.toUpperCase(),
-                      })
-                    }
+                      }));
+                      setAttendancePage(1);
+                    }}
                     className="border px-3 py-2 rounded w-full uppercase"
                     placeholder="ابحث بكود RFID"
                   />
@@ -249,12 +325,13 @@ const Attendance = () => {
                     type="date"
                     name="attendance_date"
                     value={attendanceFilters.attendance_date}
-                    onChange={(e) =>
-                      setAttendanceFilters({
-                        ...attendanceFilters,
+                    onChange={(e) => {
+                      setAttendanceFilters((prev) => ({
+                        ...prev,
                         attendance_date: e.target.value,
-                      })
-                    }
+                      }));
+                      setAttendancePage(1);
+                    }}
                     className="border px-3 py-2 rounded w-full"
                   />
                 </div>
@@ -264,12 +341,13 @@ const Attendance = () => {
                     type="text"
                     name="member_name"
                     value={attendanceFilters.member_name}
-                    onChange={(e) =>
-                      setAttendanceFilters({
-                        ...attendanceFilters,
+                    onChange={(e) => {
+                      setAttendanceFilters((prev) => ({
+                        ...prev,
                         member_name: e.target.value,
-                      })
-                    }
+                      }));
+                      setAttendancePage(1);
+                    }}
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم العضو"
                   />
@@ -282,7 +360,9 @@ const Attendance = () => {
               </Button>
 
               {attendanceLoading && <p>جاري تحميل بيانات الحضور...</p>}
-              {attendanceError && <p className="text-red-500">خطأ: {attendanceError}</p>}
+              {attendanceError && (
+                <p className="text-red-500">خطأ: {attendanceError}</p>
+              )}
 
               {!attendanceLoading && !attendanceError && (
                 <>
@@ -290,18 +370,35 @@ const Attendance = () => {
                     <table className="min-w-full divide-y divide-border">
                       <thead>
                         <tr className="bg-muted/50">
-                          <th className="px-4 py-3 text-right text-sm font-medium">RFID</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">تاريخ الحضور</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">اسم العضو</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">الإجراءات</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            RFID
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            تاريخ الحضور
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            اسم العضو
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            الإجراءات
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border bg-background">
-                        {paginatedAttendances.map((attendance) => (
-                          <tr key={attendance.id} className="hover:bg-gray-100 transition">
-                            <td className="px-4 py-3 text-sm">{attendance.rfid_code || "غير متاح"}</td>
+                        {attendances?.map((attendance) => (
+                          <tr
+                            key={attendance.id}
+                            className="hover:bg-gray-100 transition"
+                          >
                             <td className="px-4 py-3 text-sm">
-                              {new Date(`${attendance.attendance_date}T${attendance.entry_time}`).toLocaleString("en-US", {
+                              {attendance.rfid_code || "غير متاح"}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {new Date(
+                                attendance.attendance_date +
+                                  "T" +
+                                  attendance.entry_time
+                              ).toLocaleString("en-US", {
                                 year: "numeric",
                                 month: "2-digit",
                                 day: "2-digit",
@@ -310,7 +407,9 @@ const Attendance = () => {
                                 second: "2-digit",
                               })}
                             </td>
-                            <td className="px-4 py-3 text-sm">{attendance.member_name || "غير متاح"}</td>
+                            <td className="px-4 py-3 text-sm">
+                              {attendance.member_name || "غير متاح"}
+                            </td>
                             <td className="px-4 py-3 text-sm">
                               <DropdownMenu dir="rtl">
                                 <DropdownMenuTrigger asChild>
@@ -318,9 +417,14 @@ const Attendance = () => {
                                     <MoreVertical className="h-5 w-5" />
                                   </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-40">
+                                <DropdownMenuContent
+                                  align="end"
+                                  className="w-40"
+                                >
                                   <DropdownMenuItem
-                                    onClick={() => dispatch(deleteAttendance(attendance.id))}
+                                    onClick={() =>
+                                      dispatch(deleteAttendance(attendance.id))
+                                    }
                                     className="cursor-pointer text-red-600 hover:bg-red-50"
                                   >
                                     حذف
@@ -334,109 +438,13 @@ const Attendance = () => {
                     </table>
                   </div>
 
-                  {/* Attendance Pagination */}
-                  <div className="flex justify-between items-center mt-4" dir="rtl">
-                    {attendancePagination.count === 0 && (
-                      <div className="text-sm text-gray-600">لا توجد سجلات حضور لعرضها</div>
-                    )}
-                    {attendancePagination.count > 0 && (
-                      <>
-                        <div className="text-sm text-gray-600">
-                          عرض {(attendancePage - 1) * attendanceItemsPerPage + 1} إلى{" "}
-                          {Math.min(attendancePage * attendanceItemsPerPage, attendancePagination.count)} من{" "}
-                          {attendancePagination.count}
-                        </div>
-                        <div className="flex gap-2 items-center">
-                          <select
-                            value={attendanceItemsPerPage}
-                            onChange={handleAttendanceItemsPerPageChange}
-                            className="border px-2 py-1 rounded"
-                          >
-                            <option value={10}>10</option>
-                            <option value={20}>20</option>
-                            <option value={50}>50</option>
-                            <option value={100}>100</option>
-                          </select>
-                          <button
-                            onClick={() => paginateAttendance(1)}
-                            disabled={attendancePage === 1 || attendancePagination.count === 0}
-                            className={`px-3 py-1 rounded ${
-                              attendancePage === 1 || attendancePagination.count === 0
-                                ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                                : "bg-blue-700 text-white hover:bg-blue-800"
-                            }`}
-                          >
-                            الأول
-                          </button>
-                          <button
-                            onClick={() => paginateAttendance(attendancePage - 1)}
-                            disabled={!attendancePagination.previous || attendancePagination.count === 0}
-                            className={`px-3 py-1 rounded ${
-                              !attendancePagination.previous || attendancePagination.count === 0
-                                ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                                : "bg-blue-700 text-white hover:bg-blue-800"
-                            }`}
-                          >
-                            السابق
-                          </button>
-                          {(() => {
-                            const maxButtons = 5;
-                            const sideButtons = Math.floor(maxButtons / 2);
-                            let start = Math.max(1, attendancePage - sideButtons);
-                            let end = Math.min(totalAttendancePages, attendancePage + sideButtons);
-
-                            if (end - start + 1 < maxButtons) {
-                              if (attendancePage <= sideButtons) {
-                                end = Math.min(totalAttendancePages, maxButtons);
-                              } else {
-                                start = Math.max(1, totalAttendancePages - maxButtons + 1);
-                              }
-                            }
-
-                            return Array.from(
-                              { length: end - start + 1 },
-                              (_, i) => start + i
-                            ).map((page) => (
-                              <button
-                                key={page}
-                                onClick={() => paginateAttendance(page)}
-                                disabled={attendancePagination.count === 0}
-                                className={`px-3 py-1 rounded ${
-                                  attendancePage === page && attendancePagination.count > 0
-                                    ? "bg-blue-700 text-white"
-                                    : "bg-gray-200 hover:bg-gray-300"
-                                } ${attendancePagination.count === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
-                              >
-                                {page}
-                              </button>
-                            ));
-                          })()}
-                          <button
-                            onClick={() => paginateAttendance(attendancePage + 1)}
-                            disabled={!attendancePagination.next || attendancePagination.count === 0}
-                            className={`px-3 py-1 rounded ${
-                              !attendancePagination.next || attendancePagination.count === 0
-                                ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                                : "bg-blue-700 text-white hover:bg-blue-800"
-                            }`}
-                          >
-                            التالي
-                          </button>
-                          <button
-                            onClick={() => paginateAttendance(totalAttendancePages)}
-                            disabled={attendancePage === totalAttendancePages || attendancePagination.count === 0}
-                            className={`px-3 py-1 rounded ${
-                              attendancePage === totalAttendancePages || attendancePagination.count === 0
-                                ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                                : "bg-blue-700 text-white hover:bg-blue-800"
-                            }`}
-                          >
-                            الأخير
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <PaginationControls
+                    currentPage={attendancePage}
+                    totalItems={attendanceCount}
+                    itemsPerPage={attendanceItemsPerPage}
+                    onPageChange={setAttendancePage}
+                    type="attendance"
+                  />
                 </>
               )}
             </CardContent>
@@ -458,28 +466,31 @@ const Attendance = () => {
                     type="text"
                     name="rfid"
                     value={entryLogFilters.rfid}
-                    onChange={(e) =>
-                      setEntryLogFilters({
-                        ...entryLogFilters,
+                    onChange={(e) => {
+                      setEntryLogFilters((prev) => ({
+                        ...prev,
                         rfid: e.target.value.toUpperCase(),
-                      })
-                    }
+                      }));
+                      setEntryLogPage(1);
+                    }}
                     className="border px-3 py-2 rounded w-full uppercase"
                     placeholder="ابحث بكود RFID"
                   />
                 </div>
+
                 <div>
                   <label className="block text-sm mb-1">اسم النادي</label>
                   <input
                     type="text"
                     name="club"
                     value={entryLogFilters.club}
-                    onChange={(e) =>
-                      setEntryLogFilters({
-                        ...entryLogFilters,
+                    onChange={(e) => {
+                      setEntryLogFilters((prev) => ({
+                        ...prev,
                         club: e.target.value,
-                      })
-                    }
+                      }));
+                      setEntryLogPage(1);
+                    }}
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم النادي"
                   />
@@ -490,12 +501,13 @@ const Attendance = () => {
                     type="text"
                     name="member"
                     value={entryLogFilters.member}
-                    onChange={(e) =>
-                      setEntryLogFilters({
-                        ...entryLogFilters,
+                    onChange={(e) => {
+                      setEntryLogFilters((prev) => ({
+                        ...prev,
                         member: e.target.value,
-                      })
-                    }
+                      }));
+                      setEntryLogPage(1);
+                    }}
                     className="border px-3 py-2 rounded w-full"
                     placeholder="ابحث باسم العضو"
                   />
@@ -503,17 +515,18 @@ const Attendance = () => {
                 <div>
                   <label className="block text-sm mb-1">الوقت والتاريخ</label>
                   <input
-                    type="text"
+                    type="date"
                     name="timestamp"
                     value={entryLogFilters.timestamp}
-                    onChange={(e) =>
-                      setEntryLogFilters({
-                        ...entryLogFilters,
+                    onChange={(e) => {
+                      setEntryLogFilters((prev) => ({
+                        ...prev,
                         timestamp: e.target.value,
-                      })
-                    }
+                      }));
+                      setEntryLogPage(1);
+                    }}
                     className="border px-3 py-2 rounded w-full"
-                    placeholder="ابحث بالتاريخ"
+                    placeholder="اختر تاريخ"
                   />
                 </div>
               </div>
@@ -524,7 +537,9 @@ const Attendance = () => {
               </Button>
 
               {entryLogsLoading && <p>جاري تحميل سجلات الدخول...</p>}
-              {entryLogsError && <p className="text-red-500">خطأ: {entryLogsError}</p>}
+              {entryLogsError && (
+                <p className="text-red-500">خطأ: {entryLogsError}</p>
+              )}
 
               {!entryLogsLoading && !entryLogsError && (
                 <>
@@ -532,18 +547,35 @@ const Attendance = () => {
                     <table className="min-w-full divide-y divide-border">
                       <thead>
                         <tr className="bg-muted/50">
-                          <th className="px-4 py-3 text-right text-sm font-medium">RFID</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">النادي</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">العضو</th>
-                          <th className="px-4 py-3 text-right text-sm font-medium">الوقت والتاريخ</th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            RFID
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            النادي
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            العضو
+                          </th>
+                          <th className="px-4 py-3 text-right text-sm font-medium">
+                            الوقت والتاريخ
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border bg-background">
-                        {paginatedEntryLogs.map((log) => (
-                          <tr key={log.id} className="hover:bg-gray-100 transition">
-                            <td className="px-4 py-3 text-sm">{log.rfid_code}</td>
-                            <td className="px-4 py-3 text-sm">{log.club_details?.name || "غير متاح"}</td>
-                            <td className="px-4 py-3 text-sm">{log.member_name || "غير متاح"}</td>
+                        {entryLogs?.map((log) => (
+                          <tr
+                            key={log.id}
+                            className="hover:bg-gray-100 transition"
+                          >
+                            <td className="px-4 py-3 text-sm">
+                              {log.rfid_code}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {log.club_details?.name || "غير متاح"}
+                            </td>
+                            <td className="px-4 py-3 text-sm">
+                              {log.member_name || "غير متاح"}
+                            </td>
                             <td className="px-4 py-3 text-sm">
                               {new Intl.DateTimeFormat("en-US", {
                                 year: "numeric",
@@ -559,112 +591,13 @@ const Attendance = () => {
                       </tbody>
                     </table>
                   </div>
-
-                  {/* Entry Logs Pagination */}
-                  <div className="flex justify-between items-center mt-4" dir="rtl">
-                    {(entryLogsPagination.count || filteredEntryLogs.length) === 0 && (
-                      <div className="text-sm text-gray-600">لا توجد سجلات دخول لعرضها</div>
-                    )}
-                    {(entryLogsPagination.count || filteredEntryLogs.length) > 0 && (
-                      <>
-                        <div className="text-sm text-gray-600">
-                          عرض {(entryLogPage - 1) * entryLogItemsPerPage + 1} إلى{" "}
-                          {Math.min(
-                            entryLogPage * entryLogItemsPerPage,
-                            entryLogsPagination.count || filteredEntryLogs.length
-                          )} من {entryLogsPagination.count || filteredEntryLogs.length}
-                        </div>
-                        <div className="flex gap-2 items-center">
-                          <select
-                            value={entryLogItemsPerPage}
-                            onChange={handleEntryLogItemsPerPageChange}
-                            className="border px-2 py-1 rounded"
-                          >
-                            <option value={10}>10</option>
-                            <option value={20}>20</option>
-                            <option value={50}>50</option>
-                            <option value={100}>100</option>
-                          </select>
-                          <button
-                            onClick={() => paginateEntryLogs(1)}
-                            disabled={entryLogPage === 1 || (entryLogsPagination.count || filteredEntryLogs.length) === 0}
-                            className={`px-3 py-1 rounded ${
-                              entryLogPage === 1 || (entryLogsPagination.count || filteredEntryLogs.length) === 0
-                                ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                                : "bg-blue-700 text-white hover:bg-blue-800"
-                            }`}
-                          >
-                            الأول
-                          </button>
-                          <button
-                            onClick={() => paginateEntryLogs(entryLogPage - 1)}
-                            disabled={(!entryLogsPagination.previous && entryLogsPagination.count) || entryLogPage === 1 || (entryLogsPagination.count || filteredEntryLogs.length) === 0}
-                            className={`px-3 py-1 rounded ${
-                              (!entryLogsPagination.previous && entryLogsPagination.count) || entryLogPage === 1 || (entryLogsPagination.count || filteredEntryLogs.length) === 0
-                                ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                                : "bg-blue-700 text-white hover:bg-blue-800"
-                            }`}
-                          >
-                            السابق
-                          </button>
-                          {(() => {
-                            const maxButtons = 5;
-                            const sideButtons = Math.floor(maxButtons / 2);
-                            let start = Math.max(1, entryLogPage - sideButtons);
-                            let end = Math.min(totalEntryLogPages, entryLogPage + sideButtons);
-
-                            if (end - start + 1 < maxButtons) {
-                              if (entryLogPage <= sideButtons) {
-                                end = Math.min(totalEntryLogPages, maxButtons);
-                              } else {
-                                start = Math.max(1, totalEntryLogPages - maxButtons + 1);
-                              }
-                            }
-
-                            return Array.from(
-                              { length: end - start + 1 },
-                              (_, i) => start + i
-                            ).map((page) => (
-                              <button
-                                key={page}
-                                onClick={() => paginateEntryLogs(page)}
-                                disabled={(entryLogsPagination.count || filteredEntryLogs.length) === 0}
-                                className={`px-3 py-1 rounded ${
-                                  entryLogPage === page && (entryLogsPagination.count || filteredEntryLogs.length) > 0
-                                    ? "bg-blue-700 text-white"
-                                    : "bg-gray-200 hover:bg-gray-300"
-                                } ${(entryLogsPagination.count || filteredEntryLogs.length) === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
-                              >
-                                {page}
-                              </button>
-                            ));
-                          })()}
-                          <button
-                            onClick={() => paginateEntryLogs(entryLogPage + 1)}
-                            disabled={(!entryLogsPagination.next && entryLogsPagination.count) || entryLogPage === totalEntryLogPages || (entryLogsPagination.count || filteredEntryLogs.length) === 0}
-                            className={`px-3 py-1 rounded ${
-                              (!entryLogsPagination.next && entryLogsPagination.count) || entryLogPage === totalEntryLogPages || (entryLogsPagination.count || filteredEntryLogs.length) === 0
-                                ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                                : "bg-blue-700 text-white hover:bg-blue-800"
-                            }`}
-                          >
-                            التالي
-                          </button>
-                          <button
-                            onClick={() => paginateEntryLogs(totalEntryLogPages)}
-                            disabled={entryLogPage === totalEntryLogPages || (entryLogsPagination.count || filteredEntryLogs.length) === 0}
-                            className={`px-3 py-1 rounded ${
-                              entryLogPage === totalEntryLogPages || (entryLogsPagination.count || filteredEntryLogs.length) === 0
-                                ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                                : "bg-blue-700 text-white hover:bg-blue-800"
-                            }`}
-                          >
-                            الأخير
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <PaginationControls
+                    currentPage={entryLogPage}
+                    totalItems={entryLogCount}
+                    itemsPerPage={entryLogItemsPerPage}
+                    onPageChange={setEntryLogPage}
+                    type="entry-logs"
+                  />
                 </>
               )}
             </CardContent>
@@ -675,7 +608,10 @@ const Attendance = () => {
       {/* Attendance Dialog */}
       {isAttendanceDialogOpen && canAddAttendance && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full relative" dir="rtl">
+          <div
+            className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full relative"
+            dir="rtl"
+          >
             <button
               onClick={() => {
                 setIsAttendanceDialogOpen(false);
@@ -686,7 +622,9 @@ const Attendance = () => {
             >
               ×
             </button>
-            <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">إضافة حضور</h3>
+            <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-2">
+              إضافة حضور
+            </h3>
             <form onSubmit={handleAddAttendance} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -705,12 +643,16 @@ const Attendance = () => {
               </div>
 
               {searchLoading && (
-                <div className="text-center text-sm text-gray-600">جاري البحث...</div>
+                <div className="text-center text-sm text-gray-600">
+                  جاري البحث...
+                </div>
               )}
 
               {foundSubscription && (
                 <div className="border-t pt-5 mt-5 space-y-4">
-                  <h4 className="font-semibold text-gray-700">بيانات الاشتراك:</h4>
+                  <h4 className="font-semibold text-gray-700">
+                    بيانات الاشتراك:
+                  </h4>
                   <div className="flex items-start gap-4">
                     {foundSubscription.member_details?.photo ? (
                       <img
@@ -724,10 +666,16 @@ const Attendance = () => {
                       </div>
                     )}
                     <div className="flex-1 space-y-1">
-                      <p className="font-medium text-gray-800">{foundSubscription.member_details?.name}</p>
-                      <p className="text-sm text-gray-500">#{foundSubscription.member_details?.membership_number}</p>
+                      <p className="font-medium text-gray-800">
+                        {foundSubscription.member_details?.name}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        #{foundSubscription.member_details?.membership_number}
+                      </p>
                       <p className="text-sm text-red-500">
-                        <span className="font-medium text-gray-700">المبلغ المتبقي: </span>
+                        <span className="font-medium text-gray-700">
+                          المبلغ المتبقي:{" "}
+                        </span>
                         {foundSubscription.remaining_amount}
                       </p>
                     </div>
@@ -758,45 +706,59 @@ const Attendance = () => {
                     </p>
                     <p>
                       <span className="font-medium">RFID: </span>
-                      {foundSubscription.member_details?.rfid_code || "غير مسجل"}
+                      {foundSubscription.member_details?.rfid_code ||
+                        "غير مسجل"}
                     </p>
                     <p>
                       <span className="font-medium">تاريخ البدء: </span>
-                      {new Date(foundSubscription.start_date).toLocaleDateString("ar-EG")}
+                      {new Date(
+                        foundSubscription.start_date
+                      ).toLocaleDateString("ar-EG")}
                     </p>
                     <p>
                       <span className="font-medium">تاريخ الانتهاء: </span>
-                      {new Date(foundSubscription.end_date).toLocaleDateString("ar-EG")}
+                      {new Date(foundSubscription.end_date).toLocaleDateString(
+                        "ar-EG"
+                      )}
                     </p>
                     <p className="col-span-2">
                       <span className="font-medium">الإدخالات المتبقية: </span>
                       <span
                         className={`font-bold ${
-                          foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0
+                          foundSubscription.type_details.max_entries -
+                            foundSubscription.entry_count <=
+                          0
                             ? "text-red-600"
                             : "text-green-600"
                         }`}
                       >
-                        {foundSubscription.type_details.max_entries - foundSubscription.entry_count}
+                        {foundSubscription.type_details.max_entries -
+                          foundSubscription.entry_count}
                       </span>
-                      <span className="text-xs text-gray-500">/ {foundSubscription.type_details.max_entries}</span>
+                      <span className="text-xs text-gray-500">
+                        / {foundSubscription.type_details.max_entries}
+                      </span>
                     </p>
                   </div>
                 </div>
               )}
 
-              {!searchLoading && newAttendance.identifier && !foundSubscription && (
-                <p className="text-red-500 text-sm">
-                  {newAttendance.identifier.match(/[a-zA-Z]/)
-                    ? "لا يوجد اشتراك مسجل بهذا الكود RFID"
-                    : "لا يوجد اشتراك مسجل بهذا الرقم"}
-                </p>
-              )}
+              {!searchLoading &&
+                newAttendance.identifier &&
+                !foundSubscription && (
+                  <p className="text-red-500 text-sm">
+                    {newAttendance.identifier.match(/[a-zA-Z]/)
+                      ? "لا يوجد اشتراك مسجل بهذا الكود RFID"
+                      : "لا يوجد اشتراك مسجل بهذا الرقم"}
+                  </p>
+                )}
 
               <button
                 type="submit"
                 className={`w-full py-2 rounded-md text-white font-semibold transition duration-150 ${
-                  foundSubscription ? "bg-green-600 hover:bg-green-700" : "bg-gray-400 cursor-not-allowed"
+                  foundSubscription
+                    ? "bg-green-600 hover:bg-green-700"
+                    : "bg-gray-400 cursor-not-allowed"
                 }`}
                 disabled={!foundSubscription}
               >
