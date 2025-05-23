@@ -134,20 +134,35 @@ export const analyzeAttendance = createAsyncThunk(
     try {
       const response = await axios.get(`${BASE_URL}/staff/api/attendance/${staffId}/analysis/`, {
         headers: {
-          Authorization: getToken(),
+           Authorization: getToken(),  // Added Bearer prefix
           'Content-Type': 'application/json',
-        }
+        },
+        validateStatus: (status) => status < 500  // Consider 4xx statuses as not errors
       });
 
-      console.log('Attendance analysis response:', response.data);
+      // Handle non-2xx status codes that passed validateStatus
+      if (response.status >= 400) {
+        return rejectWithValue(response.data || { 
+          error: response.status === 404 
+            ? 'Attendance record not found' 
+            : 'Request failed'
+        });
+      }
+
       return response.data;
     } catch (error) {
-      console.error('Analysis error:', error.response?.data || 'Analysis failed');
-      return rejectWithValue(error.response?.data || { error: 'Analysis failed' });
+      // Handle network errors or other exceptions
+      const errorPayload = {
+        status: error.response?.status,
+        data: error.response?.data || { error: 'Network error' },
+        originalError: error.message
+      };
+      
+      console.error('Analysis error:', errorPayload);
+      return rejectWithValue(errorPayload.data);
     }
   }
 );
-
 
 // Thunk: Get Staff Attendance Report
 export const getStaffAttendanceReport = createAsyncThunk('attendance/report', async (staffId, { rejectWithValue }) => {
@@ -282,18 +297,22 @@ const attendanceSlice = createSlice({
         state.error = action.payload;
       })
 
-      .addCase(analyzeAttendance.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(analyzeAttendance.fulfilled, (state, action) => {
-        state.loading = false;
-        state.analysisData = action.payload;
-      })
-      .addCase(analyzeAttendance.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
+        .addCase(analyzeAttendance.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    })
+    .addCase(analyzeAttendance.fulfilled, (state, action) => {
+      state.loading = false;
+      state.analysisData = action.payload;
+    })
+    .addCase(analyzeAttendance.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload?.error || 
+                  action.error?.message || 
+                  'Failed to analyze attendance';
+      // Optional: Store full error details for debugging
+      state.errorDetails = action.payload;
+    })
 
       .addCase(getStaffAttendanceReport.pending, (state) => {
         state.loading = true;

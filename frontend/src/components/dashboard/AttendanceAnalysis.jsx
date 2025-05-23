@@ -2,13 +2,25 @@ import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
 import { analyzeAttendance, getStaffAttendanceReport } from "@/redux/slices/AttendanceSlice";
-import { FiUser, FiBarChart2 } from 'react-icons/fi';
+
+
+
+import { FiUser, FiBarChart2, FiAlertTriangle } from 'react-icons/fi';
+
+
+
 
 const AttendanceAnalysis = () => {
   const { staffId } = useParams();
   const dispatch = useDispatch();
 
-  const { analysisData, reportData, loading, error } = useSelector(state => state.attendance);
+  const { 
+    analysisData, 
+    reportData, 
+    loading, 
+    error, 
+    errorDetails 
+  } = useSelector(state => state.attendance);
 
   useEffect(() => {
     if (staffId) {
@@ -17,17 +29,24 @@ const AttendanceAnalysis = () => {
     }
   }, [dispatch, staffId]);
 
-  if (loading) return <div className="text-center py-8 text-blue-600 font-semibold">جارٍ تحميل البيانات...</div>;
-  if (error) return <div className="text-center py-8 text-red-600 font-semibold">حدث خطأ أثناء تحميل البيانات.</div>;
+  // Loading state for initial load
+  if (loading && !reportData && !analysisData) {
+    return (
+      <div className="text-center py-8 text-blue-600 font-semibold">
+        جارٍ تحميل البيانات...
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto p-6 bg-white shadow rounded space-y-8" dir="rtl">
       
-      {/* جدول تقرير الموظف */}
+      {/* Employee Report Table - in Arabic */}
       {reportData && (
         <div>
           <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4 flex items-center gap-2">
-            <FiUser className="text-blue-600 border-2 border-blue-600 p-1 rounded-full" /> تقرير الموظف
+            <FiUser className="text-blue-600 border-2 border-blue-600 p-1 rounded-full" /> 
+            تقرير الموظف
           </h2>
           <table className="w-full border border-gray-300 rounded text-right">
             <tbody className="divide-y divide-gray-200">
@@ -56,12 +75,22 @@ const AttendanceAnalysis = () => {
         </div>
       )}
 
-      {/* جدول تحليل الحضور */}
-      {analysisData && (
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4 flex items-center gap-2">
-            <FiBarChart2 className="text-blue-600 border-2 border-blue-600 p-1 rounded-full" /> تحليل الحضور
-          </h2>
+      {/* Attendance Analysis Section - English errors, Arabic table */}
+      <div>
+        <h2 className="text-xl font-bold text-gray-800 border-b pb-2 mb-4 flex items-center gap-2">
+          <FiBarChart2 className="text-blue-600 border-2 border-blue-600 p-1 rounded-full" /> 
+          تحليل الحضور
+        </h2>
+        
+        {error ? (
+          <div className="flex flex-col items-center justify-center py-8 text-red-600">
+            <FiAlertTriangle className="text-4xl mb-4" />
+            <p className="text-gray-700 mb-4">
+              {errorDetails?.error || error || 'Failed to load analysis data'}
+            </p>
+           
+          </div>
+        ) : analysisData ? (
           <table className="w-full border border-gray-300 rounded text-right">
             <tbody className="divide-y divide-gray-200">
               <tr>
@@ -86,14 +115,16 @@ const AttendanceAnalysis = () => {
               </tr>
             </tbody>
           </table>
-        </div>
-      )}
-
+        ) : (
+          <div className="text-center py-8 text-gray-500">
+            جارٍ تحميل بيانات التحليل...
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
 export default AttendanceAnalysis;
-
 
 

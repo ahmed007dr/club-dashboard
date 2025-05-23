@@ -267,7 +267,7 @@ def staff_attendance_analysis_api(request, attendance_id):
     try:
         attendance = StaffAttendance.objects.get(id=attendance_id)
     except StaffAttendance.DoesNotExist:
-        return Response({'error': 'Attendance record not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'سجل الحضور غير موجود'}, status=status.HTTP_404_NOT_FOUND)
 
     if not attendance.shift:
         return Response({'status': 'no_shift'})
