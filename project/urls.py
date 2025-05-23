@@ -10,7 +10,7 @@ from drf_yasg import openapi
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 def home_view(request):
-    return redirect("http://localhost:5173/login") # cancel for c panel settings
+    return redirect("http://localhost:5173/login") #  c panel settings
 
 schema_view = get_schema_view(
    openapi.Info(
@@ -26,7 +26,7 @@ schema_view = get_schema_view(
 
 urlpatterns = [
     path('', home_view, name='home'),
-    path('long-life-egypt2030/', admin.site.urls),
+    path('sfphkhggi2030/', admin.site.urls),
     
     # API Documentation
     path('api/docs/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
