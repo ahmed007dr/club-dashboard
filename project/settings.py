@@ -6,6 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-k#i%183_hpx5%@pfnvytqg9ssh&(ke-%!a+8(mjgr&k=qv5tux'
 
 DEBUG = True
+#DEBUG = False  # c panel settings
 
 ALLOWED_HOSTS = []
 # ALLOWED_HOSTS = ['club-ft.com','www.club-ft.com'] # setting c panel
@@ -98,7 +99,6 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    # 'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
 
     'PAGE_SIZE': 20,
 }
