@@ -96,6 +96,7 @@ const MemberSubscriptions = () => {
                 <tr>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاشتراك</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النادي</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">rfid code</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التواريخ</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الدفع</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التفاصيل</th>
@@ -125,6 +126,8 @@ const MemberSubscriptions = () => {
                       <td className="px-4 py-4">
                         <div className="text-sm font-medium text-gray-900">{sub.club_details?.name || 'غير معروف'}</div>
                         <div className="text-xs text-gray-500 mt-1 line-clamp-1">{sub.club_details?.location}</div>
+                      </td> <td className="px-4 py-4">
+                        <div className="text-sm font-medium text-gray-900">{sub.member_details?.rfid_code|| 'غير معروف'}</div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="text-sm space-y-1">
