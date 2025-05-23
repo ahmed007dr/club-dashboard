@@ -1,93 +1,127 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchClubs } from '../../redux/slices/clubSlice';
-import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
+import { fetchSubscriptions } from '../../redux/slices/subscriptionsSlice';
 import { FaUser } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 import BASE_URL from '../../config/api';
 
 const EntryForm = ({ onSuccess }) => {
   const dispatch = useDispatch();
-  const { subscriptions } = useSelector((state) => state.subscriptions);
+  const { status, error } = useSelector((state) => state.subscriptions);
 
   const [formData, setFormData] = useState({
     club: '',
     identifier: '',
   });
   const [clubs, setClubs] = useState([]);
+  const [allSubscriptions, setAllSubscriptions] = useState({ results: [] });
   const [foundMember, setFoundMember] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
+  // Fetch all subscriptions across pages
+  const fetchAllSubscriptions = async () => {
+    try {
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await dispatch(fetchSubscriptions({ page: currentPage, pageSize: 20 })).unwrap();
+        const results = response.subscriptions || [];
+        allResults = [...allResults, ...results];
+        hasMore = !!response.next;
+        currentPage += 1;
+      }
+
+      return { results: allResults };
+    } catch (error) {
+      console.error('Failed to fetch all subscriptions:', error);
+      throw error;
+    }
+  };
+
+  // Fetch initial data
   useEffect(() => {
-    const getClubs = async () => {
+    const fetchInitialData = async () => {
       try {
-        const res = await dispatch(fetchClubs()).unwrap();
-        setClubs(res);
+        const [clubsResponse, subscriptionsResponse] = await Promise.all([
+          dispatch(fetchClubs()).unwrap(),
+          fetchAllSubscriptions(),
+        ]);
+
+        setClubs(clubsResponse);
+        setAllSubscriptions(subscriptionsResponse);
       } catch (error) {
-        console.error('خطأ في جلب الأندية:', error);
-        toast.error('فشل في جلب قائمة الأندية');
+        console.error('خطأ في جلب البيانات:', error);
+        toast.error('فشل في جلب قائمة الأندية أو الاشتراكات');
+      } finally {
+        setIsInitialLoad(false);
       }
     };
 
-    dispatch(fetchSubscriptions());
-    getClubs();
+    fetchInitialData();
   }, [dispatch]);
+
+  // Handle search when identifier changes
+  useEffect(() => {
+    if (!formData.identifier || !formData.club) {
+      setFoundMember(null);
+      return;
+    }
+
+    const searchValue = formData.identifier.trim().toUpperCase();
+    setSearchLoading(true);
+
+    // Search through subscriptions of the selected club
+    const subscription = allSubscriptions.results.find((sub) => {
+      const member = sub.member_details || {};
+      return (
+        sub.club_details?.id.toString() === formData.club.toString() &&
+        (member.phone?.trim() === searchValue || member.rfid_code?.toUpperCase() === searchValue)
+      );
+    });
+
+    if (subscription) {
+      setFoundMember({
+        ...subscription.member_details,
+        id: subscription.member_details?.id,
+        name: subscription.member_details?.name,
+        photo: subscription.member_details?.photo,
+        membership_number: subscription.member_details?.membership_number,
+        phone: subscription.member_details?.phone,
+        rfid_code: subscription.member_details?.rfid_code,
+        subscription_id: subscription.id,
+        club_id: subscription.club_details?.id,
+        club_name: subscription.club_details?.name,
+        subscription_status: subscription.status,
+        start_date: subscription.start_date,
+        end_date: subscription.end_date,
+        remaining_amount: subscription.remaining_amount,
+        entry_count: subscription.entry_count,
+        max_entries: subscription.type_details?.max_entries,
+        remaining_entries: subscription.type_details?.max_entries - subscription.entry_count,
+        subscription_type: subscription.type_details?.name,
+        price: subscription.type_details?.price,
+      });
+
+      if (!formData.club && subscription.club_details) {
+        setFormData((prev) => ({
+          ...prev,
+          club: subscription.club_details.id,
+        }));
+      }
+    } else {
+      setFoundMember(null);
+    }
+
+    setSearchLoading(false);
+  }, [formData.identifier, formData.club, allSubscriptions.results]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
-
-    if (name === "identifier") {
-      setFoundMember(null);
-      const searchValue = value.trim().toUpperCase(); // Normalize input
-
-      if (!searchValue) return;
-
-      setSearchLoading(true);
-
-      // Improved search logic
-      const subscription = subscriptions.find((sub) => {
-        const member = sub.member_details || {};
-        return (
-          member.phone?.trim() === searchValue ||
-          member.rfid_code?.toUpperCase() === searchValue
-        );
-      });
-
-      if (subscription) {
-        setFoundMember({
-          ...subscription.member_details,
-          id: subscription.member_details?.id,
-          name: subscription.member_details?.name,
-          photo: subscription.member_details?.photo,
-          membership_number: subscription.member_details?.membership_number,
-          phone: subscription.member_details?.phone,
-          rfid_code: subscription.member_details?.rfid_code,
-          subscription_id: subscription.id,
-          club_id: subscription.club_details?.id,
-          club_name: subscription.club_details?.name,
-          subscription_status: subscription.status,
-          start_date: subscription.start_date,
-          end_date: subscription.end_date,
-          remaining_amount: subscription.remaining_amount,
-          entry_count: subscription.entry_count,
-          max_entries: subscription.type_details?.max_entries,
-          remaining_entries:
-            subscription.type_details?.max_entries - subscription.entry_count,
-          subscription_type: subscription.type_details?.name,
-          price: subscription.type_details?.price,
-        });
-
-        if (!formData.club && subscription.club_details) {
-          setFormData((prev) => ({
-            ...prev,
-            club: subscription.club_details.id,
-          }));
-        }
-      }
-
-      setSearchLoading(false);
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -115,7 +149,7 @@ const EntryForm = ({ onSuccess }) => {
         identifier: formData.identifier,
         subscription_id: foundMember.subscription_id,
         member_id: foundMember.id,
-        club_id: foundMember.club_id
+        club_id: foundMember.club_id,
       };
 
       const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/add/`, {
@@ -130,7 +164,6 @@ const EntryForm = ({ onSuccess }) => {
       const data = await response.json();
 
       if (!response.ok) {
-       iteral: true
         console.error('تفاصيل الخطأ من السيرفر:', data);
         throw new Error(data.message || 'فشل في إضافة سجل الدخول');
       }
@@ -139,7 +172,6 @@ const EntryForm = ({ onSuccess }) => {
       setFormData({ club: '', identifier: '' });
       setFoundMember(null);
       if (onSuccess) onSuccess();
-
     } catch (error) {
       console.error('خطأ أثناء إرسال السجل:', error);
       toast.error(error.message || 'حدث خطأ أثناء إضافة السجل');
@@ -156,6 +188,12 @@ const EntryForm = ({ onSuccess }) => {
         سجل الدخول للنادي
       </h2>
 
+      {isInitialLoad && (
+        <div className="text-center py-2">
+          <p>جاري تحميل البيانات...</p>
+        </div>
+      )}
+
       <div>
         <label className="block text-sm mb-1">النادي</label>
         <select
@@ -164,6 +202,7 @@ const EntryForm = ({ onSuccess }) => {
           onChange={handleChange}
           className="w-full px-4 py-2 border border-gray-300 rounded-md"
           required
+          disabled={isInitialLoad}
         >
           <option value="">اختر ناديًا</option>
           {clubs.map((club) => (
@@ -184,6 +223,7 @@ const EntryForm = ({ onSuccess }) => {
           onChange={handleChange}
           required
           className="w-full border px-3 py-2 rounded"
+          disabled={!formData.club || isInitialLoad}
         />
       </div>
 
@@ -193,12 +233,12 @@ const EntryForm = ({ onSuccess }) => {
         </div>
       )}
 
-      {formData.identifier && !foundMember && !searchLoading && (
+      {formData.identifier && !foundMember && !searchLoading && !isInitialLoad && (
         <div className="text-red-500 text-sm text-center">
           <p>
             {formData.identifier.match(/[A-Za-z]/)
-              ? "لا يوجد اشتراك مسجل بهذا الكود RFID"
-              : "لا يوجد اشتراك مسجل بهذا الرقم"}
+              ? 'لا يوجد اشتراك مسجل بهذا الكود RFID'
+              : 'لا يوجد اشتراك مسجل بهذا الرقم'}
           </p>
         </div>
       )}
@@ -220,16 +260,14 @@ const EntryForm = ({ onSuccess }) => {
             )}
             <div className="flex-1 space-y-1">
               <p className="font-medium text-gray-800">
-                {foundMember.name || "غير متوفر"}
+                {foundMember.name || 'غير متوفر'}
               </p>
               <p className="text-sm text-gray-500">
-                #{foundMember.membership_number || "غير متوفر"}
+                #{foundMember.membership_number || 'غير متوفر'}
               </p>
               <p className="text-sm text-red-500">
-                <span className="font-medium text-gray-700">
-                  المبلغ المتبقي:{" "}
-                </span>
-                {foundMember.remaining_amount || "غير متوفر"}
+                <span className="font-medium text-gray-700">المبلغ المتبقي: </span>
+                {foundMember.remaining_amount || 'غير متوفر'}
               </p>
             </div>
           </div>
@@ -237,41 +275,41 @@ const EntryForm = ({ onSuccess }) => {
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-700">
             <p>
               <span className="font-medium">النادي: </span>
-              {foundMember.club_name || "غير متوفر"}
+              {foundMember.club_name || 'غير متوفر'}
             </p>
             <p>
               <span className="font-medium">الحالة: </span>
               <span
                 className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                  foundMember.subscription_status === "Active"
-                    ? "bg-green-100 text-green-600"
-                    : foundMember.subscription_status === "Expired"
-                    ? "bg-red-100 text-red-600"
-                    : "bg-blue-100 text-blue-600"
+                  foundMember.subscription_status === 'Active'
+                    ? 'bg-green-100 text-green-600'
+                    : foundMember.subscription_status === 'Expired'
+                    ? 'bg-red-100 text-red-600'
+                    : 'bg-blue-100 text-blue-600'
                 }`}
               >
-                {foundMember.subscription_status || "غير متوفر"}
+                {foundMember.subscription_status || 'غير متوفر'}
               </span>
             </p>
             <p>
               <span className="font-medium">الهاتف: </span>
-              {foundMember.phone || "غير متوفر"}
+              {foundMember.phone || 'غير متوفر'}
             </p>
             <p>
               <span className="font-medium">RFID: </span>
-              {foundMember.rfid_code || "غير مسجل"}
+              {foundMember.rfid_code || 'غير مسجل'}
             </p>
             <p>
               <span className="font-medium">تاريخ البدء: </span>
               {foundMember.start_date
-                ? new Date(foundMember.start_date).toLocaleDateString("ar-EG")
-                : "غير متوفر"}
+                ? new Date(foundMember.start_date).toLocaleDateString('ar-EG')
+                : 'غير متوفر'}
             </p>
             <p>
               <span className="font-medium">تاريخ الانتهاء: </span>
               {foundMember.end_date
-                ? new Date(foundMember.end_date).toLocaleDateString("ar-EG")
-                : "غير متوفر"}
+                ? new Date(foundMember.end_date).toLocaleDateString('ar-EG')
+                : 'غير متوفر'}
             </p>
             <p className="col-span-2">
               <span className="font-medium">الإدخالات المتبقية: </span>
@@ -281,8 +319,8 @@ const EntryForm = ({ onSuccess }) => {
                   <span
                     className={`font-bold ${
                       foundMember.remaining_entries <= 0
-                        ? "text-red-600"
-                        : "text-green-600"
+                        ? 'text-red-600'
+                        : 'text-green-600'
                     }`}
                   >
                     {foundMember.remaining_entries}
@@ -292,7 +330,7 @@ const EntryForm = ({ onSuccess }) => {
                   </span>
                 </>
               ) : (
-                "غير متوفر"
+                'غير متوفر'
               )}
             </p>
           </div>
@@ -309,10 +347,10 @@ const EntryForm = ({ onSuccess }) => {
         type="submit"
         className={`w-full py-2 mt-4 rounded-md text-white font-semibold transition duration-150 ${
           foundMember
-            ? "bg-green-600 hover:bg-green-700"
-            : "bg-gray-400 cursor-not-allowed"
+            ? 'bg-green-600 hover:bg-green-700'
+            : 'bg-gray-400 cursor-not-allowed'
         }`}
-        disabled={!foundMember}
+        disabled={!foundMember || isInitialLoad}
       >
         تأكيد الدخول
       </button>
@@ -320,9 +358,6 @@ const EntryForm = ({ onSuccess }) => {
   );
 };
 
-export default EntryForm;
-
-
-
+export default EntryForm; 
 
 

@@ -29,6 +29,11 @@ import { FaUser } from "react-icons/fa";
 import usePermission from "@/hooks/usePermission";
 
 
+
+import { fetchClubs } from '../../redux/slices/clubSlice';
+
+
+
 const Attendance = () => {
   const dispatch = useDispatch();
 
@@ -39,7 +44,6 @@ const Attendance = () => {
     loading: attendanceLoading,
     error: attendanceError,
   } = useSelector((state) => state.attendance);
-  const { subscriptions } = useSelector((state) => state.subscriptions);
   const {
     data: entryLogs,
     count: entryLogCount,
@@ -54,9 +58,12 @@ const Attendance = () => {
   // State variables
   const [foundSubscription, setFoundSubscription] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
-  const [newAttendance, setNewAttendance] = useState({ identifier: "" });
+  const [newAttendance, setNewAttendance] = useState({ club: '', identifier: '' });
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [isEntryLogDialogOpen, setIsEntryLogDialogOpen] = useState(false);
+  const [allSubscriptions, setAllSubscriptions] = useState({ results: [] });
+  const [clubs, setClubs] = useState([]);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Filters and Pagination
   const [attendanceFilters, setAttendanceFilters] = useState({
@@ -78,42 +85,86 @@ const Attendance = () => {
   const [entryLogPage, setEntryLogPage] = useState(1);
   const [entryLogItemsPerPage] = useState(20);
 
+  // Fetch all subscriptions across pages
+  const fetchAllSubscriptions = async () => {
+    try {
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await dispatch(fetchSubscriptions({ page: currentPage, pageSize: 20 })).unwrap();
+        const results = response.subscriptions || [];
+        allResults = [...allResults, ...results];
+        hasMore = !!response.next;
+        currentPage += 1;
+      }
+
+      return { results: allResults };
+    } catch (error) {
+      console.error('Failed to fetch all subscriptions:', error);
+      throw error;
+    }
+  };
+
+  // Fetch initial data
   useEffect(() => {
-    dispatch(
-      fetchAttendances({
-        page: attendancePage,
-        pageSize: attendanceItemsPerPage,
-        ...attendanceFilters,
-      })
-    );
-    dispatch(
-      fetchEntryLogs({
-        page: entryLogPage,
-        pageSize: entryLogItemsPerPage,
-        ...entryLogFilters,
-      })
-    );
-    dispatch(fetchSubscriptions());
+    const fetchInitialData = async () => {
+      try {
+        const [clubsResponse, subscriptionsResponse] = await Promise.all([
+          dispatch(fetchClubs()).unwrap(),
+          fetchAllSubscriptions(),
+        ]);
+
+        setClubs(clubsResponse);
+        setAllSubscriptions(subscriptionsResponse);
+
+        await Promise.all([
+          dispatch(
+            fetchAttendances({
+              page: attendancePage,
+              pageSize: attendanceItemsPerPage,
+              ...attendanceFilters,
+            })
+          ),
+          dispatch(
+            fetchEntryLogs({
+              page: entryLogPage,
+              pageSize: entryLogItemsPerPage,
+              ...entryLogFilters,
+            })
+          ),
+        ]);
+      } catch (error) {
+        console.error('خطأ في جلب البيانات:', error);
+        toast.error('فشل في جلب بيانات الأندية، الاشتراكات، أو الحضور');
+      } finally {
+        setIsInitialLoad(false);
+      }
+    };
+
+    fetchInitialData();
   }, [dispatch, attendancePage, attendanceFilters, entryLogPage, entryLogFilters, attendanceItemsPerPage, entryLogItemsPerPage]);
 
-  useEffect(() => {
-    console.log("Filters changed:", entryLogs, attendances);
-  }, [entryLogs, attendances]);
+  // Handle attendance input change
   const handleAttendanceInputChange = (e) => {
     const { name, value } = e.target;
-    const searchValue = value.trim().toUpperCase();
-    setNewAttendance({ ...newAttendance, [name]: searchValue });
+    const updatedAttendance = { ...newAttendance, [name]: name === 'identifier' ? value.trim().toUpperCase() : value };
+    setNewAttendance(updatedAttendance);
     setFoundSubscription(null);
 
-    if (!searchValue) return;
+    if (!updatedAttendance.identifier || !updatedAttendance.club) {
+      setSearchLoading(false);
+      return;
+    }
 
     setSearchLoading(true);
 
-    const subscription = subscriptions.find((sub) => {
+    const subscription = allSubscriptions.results.find((sub) => {
       const member = sub.member_details || {};
       return (
-        member.phone?.trim() === searchValue ||
-        member.rfid_code?.trim().toUpperCase() === searchValue
+        sub.club_details?.id.toString() === updatedAttendance.club.toString() &&
+        (member.phone?.trim() === updatedAttendance.identifier || member.rfid_code?.toUpperCase() === updatedAttendance.identifier)
       );
     });
 
@@ -153,7 +204,7 @@ const Attendance = () => {
       .unwrap()
       .then(() => {
         toast.success("تم إضافة الحضور بنجاح!");
-        setNewAttendance({ identifier: "" });
+        setNewAttendance({ club: '', identifier: '' });
         setFoundSubscription(null);
         setIsAttendanceDialogOpen(false);
         dispatch(
@@ -163,13 +214,13 @@ const Attendance = () => {
             ...attendanceFilters,
           })
         );
-        dispatch(fetchSubscriptions());
       })
       .catch((err) => {
         toast.error("فشل في إضافة الحضور: " + (err.message || "حدث خطأ"));
       });
   };
 
+  // Pagination Controls Component
   const PaginationControls = ({
     currentPage,
     totalItems,
@@ -229,7 +280,6 @@ const Attendance = () => {
               >
                 السابق
               </button>
-
               {Array.from({ length: end - start + 1 }, (_, i) => start + i).map(
                 (page) => (
                   <button
@@ -245,7 +295,6 @@ const Attendance = () => {
                   </button>
                 )
               )}
-
               <button
                 onClick={() => onPageChange(currentPage + 1)}
                 disabled={currentPage === totalPages}
@@ -283,8 +332,6 @@ const Attendance = () => {
     );
   }
 
-  
-
   return (
     <div className="space-y-6" dir="rtl">
       <h1 className="text-2xl font-bold tracking-tight">
@@ -306,21 +353,7 @@ const Attendance = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-sm mb-1">كود RFID</label>
-                  <input
-                    type="text"
-                    name="rfid"
-                    value={attendanceFilters.rfid}
-                    onChange={(e) => {
-                      setAttendanceFilters((prev) => ({
-                        ...prev,
-                        rfid: e.target.value.toUpperCase(),
-                      }));
-                      setAttendancePage(1);
-                    }}
-                    className="border px-3 py-2 rounded w-full uppercase"
-                    placeholder="ابحث بكود RFID"
-                  />
+             
                 </div>
                 <div>
                   <label className="block text-sm mb-1">تاريخ الحضور</label>
@@ -387,7 +420,7 @@ const Attendance = () => {
                 </div>
               </div>
 
-              <Button onClick={() => setIsAttendanceDialogOpen(true)}>
+              <Button onClick={() => setIsAttendanceDialogOpen(true)} disabled={isInitialLoad}>
                 <Plus className="mr-2 h-4 w-4" />
                 إضافة حضور
               </Button>
@@ -510,7 +543,6 @@ const Attendance = () => {
                     placeholder="ابحث بكود RFID"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm mb-1">اسم النادي</label>
                   <input
@@ -564,7 +596,7 @@ const Attendance = () => {
                 </div>
               </div>
 
-              <Button onClick={() => setIsEntryLogDialogOpen(true)}>
+              <Button onClick={() => setIsEntryLogDialogOpen(true)} disabled={isInitialLoad}>
                 <Plus className="mr-2 h-4 w-4" />
                 إضافة سجل دخول
               </Button>
@@ -641,15 +673,12 @@ const Attendance = () => {
       {/* Attendance Dialog */}
       {isAttendanceDialogOpen && canAddAttendance && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-          <div
-            className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full relative"
-            dir="rtl"
-          >
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full relative" dir="rtl">
             <button
               onClick={() => {
                 setIsAttendanceDialogOpen(false);
                 setFoundSubscription(null);
-                setNewAttendance({ identifier: "" });
+                setNewAttendance({ club: '', identifier: '' });
               }}
               className="absolute top-3 left-3 text-gray-400 hover:text-gray-600 text-2xl"
             >
@@ -659,6 +688,24 @@ const Attendance = () => {
               إضافة حضور
             </h3>
             <form onSubmit={handleAddAttendance} className="space-y-5">
+              <div>
+                <label className="block text-sm mb-1">النادي</label>
+                <select
+                  name="club"
+                  value={newAttendance.club}
+                  onChange={handleAttendanceInputChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md"
+                  required
+                  disabled={isInitialLoad}
+                >
+                  <option value="">اختر ناديًا</option>
+                  {clubs.map((club) => (
+                    <option key={club.id} value={club.id}>
+                      {club.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   رقم الهاتف أو كود RFID
@@ -672,8 +719,15 @@ const Attendance = () => {
                   placeholder="أدخل رقم الهاتف أو كود RFID"
                   required
                   autoFocus
+                  disabled={!newAttendance.club || isInitialLoad}
                 />
               </div>
+
+              {isInitialLoad && (
+                <div className="text-center text-sm text-gray-600">
+                  جاري تحميل بيانات الاشتراكات...
+                </div>
+              )}
 
               {searchLoading && (
                 <div className="text-center text-sm text-gray-600">
@@ -683,9 +737,7 @@ const Attendance = () => {
 
               {foundSubscription && (
                 <div className="border-t pt-5 mt-5 space-y-4">
-                  <h4 className="font-semibold text-gray-700">
-                    بيانات الاشتراك:
-                  </h4>
+                  <h4 className="font-semibold text-gray-700">بيانات الاشتراك:</h4>
                   <div className="flex items-start gap-4">
                     {foundSubscription.member_details?.photo ? (
                       <img
@@ -706,9 +758,7 @@ const Attendance = () => {
                         #{foundSubscription.member_details?.membership_number}
                       </p>
                       <p className="text-sm text-red-500">
-                        <span className="font-medium text-gray-700">
-                          المبلغ المتبقي:{" "}
-                        </span>
+                        <span className="font-medium text-gray-700">المبلغ المتبقي: </span>
                         {foundSubscription.remaining_amount}
                       </p>
                     </div>
@@ -739,20 +789,15 @@ const Attendance = () => {
                     </p>
                     <p>
                       <span className="font-medium">RFID: </span>
-                      {foundSubscription.member_details?.rfid_code ||
-                        "غير مسجل"}
+                      {foundSubscription.member_details?.rfid_code || "غير مسجل"}
                     </p>
                     <p>
                       <span className="font-medium">تاريخ البدء: </span>
-                      {new Date(
-                        foundSubscription.start_date
-                      ).toLocaleDateString("ar-EG")}
+                      {new Date(foundSubscription.start_date).toLocaleDateString("ar-EG")}
                     </p>
                     <p>
                       <span className="font-medium">تاريخ الانتهاء: </span>
-                      {new Date(foundSubscription.end_date).toLocaleDateString(
-                        "ar-EG"
-                      )}
+                      {new Date(foundSubscription.end_date).toLocaleDateString("ar-EG")}
                     </p>
                     <p className="col-span-2">
                       <span className="font-medium">الإدخالات المتبقية: </span>
@@ -778,7 +823,8 @@ const Attendance = () => {
 
               {!searchLoading &&
                 newAttendance.identifier &&
-                !foundSubscription && (
+                !foundSubscription &&
+                !isInitialLoad && (
                   <p className="text-red-500 text-sm">
                     {newAttendance.identifier.match(/[a-zA-Z]/)
                       ? "لا يوجد اشتراك مسجل بهذا الكود RFID"
@@ -793,7 +839,7 @@ const Attendance = () => {
                     ? "bg-green-600 hover:bg-green-700"
                     : "bg-gray-400 cursor-not-allowed"
                 }`}
-                disabled={!foundSubscription}
+                disabled={!foundSubscription || isInitialLoad}
               >
                 تأكيد الحضور
               </button>
@@ -805,7 +851,7 @@ const Attendance = () => {
       {/* Entry Log Dialog */}
       {isEntryLogDialogOpen && canAddEntryLog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative" dir="rtl">
             <button
               onClick={() => setIsEntryLogDialogOpen(false)}
               className="absolute top-2 left-2 text-gray-500 hover:text-gray-700"
