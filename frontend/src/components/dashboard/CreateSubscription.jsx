@@ -5,10 +5,12 @@ import { fetchUsers } from "../../redux/slices/memberSlice";
 import { Button } from "@/components/ui/button";
 import { FaUser } from 'react-icons/fa';
 
+
+
+
 const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
   const { subscriptionTypes } = useSelector((state) => state.subscriptions);
-  const { items: members } = useSelector((state) => state.member);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -21,6 +23,7 @@ const CreateSubscription = ({ onClose }) => {
 
   // Data state
   const [clubs, setClubs] = useState([]);
+  const [allMembers, setAllMembers] = useState({ results: [] });
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [foundMember, setFoundMember] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -30,12 +33,34 @@ const CreateSubscription = ({ onClose }) => {
   const [errorMessage, setErrorMessage] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Fetch all members across pages
+  const fetchAllUsers = async () => {
+    try {
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await dispatch(fetchUsers({ page: currentPage })).unwrap();
+        const results = Array.isArray(response) ? response : response.results || [];
+        allResults = [...allResults, ...results];
+        hasMore = !!response.next;
+        currentPage += 1;
+      }
+
+      return { results: allResults };
+    } catch (error) {
+      console.error("Failed to fetch all users:", error.message);
+      throw error;
+    }
+  };
+
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
         await dispatch(fetchSubscriptionTypes()).unwrap();
-        const membersResult = await dispatch(fetchUsers()).unwrap();
+        const membersResult = await fetchAllUsers();
 
         // Extract unique clubs
         const uniqueClubs = Array.from(
@@ -47,6 +72,7 @@ const CreateSubscription = ({ onClose }) => {
           ).values()
         );
         setClubs(uniqueClubs);
+        setAllMembers(membersResult);
       } catch (error) {
         handleError(error, "Failed to load initial data");
       } finally {
@@ -67,11 +93,13 @@ const CreateSubscription = ({ onClose }) => {
     const searchValue = formData.identifier.trim().toUpperCase();
     setSearchLoading(true);
 
-    // Search through all members (not just the first page)
-    const member = members.find(m => 
-      (m.rfid_code && m.rfid_code.toUpperCase() === searchValue) ||
-      (m.phone && m.phone.trim() === searchValue) ||
-      (m.name && m.name.trim().toUpperCase() === searchValue.toUpperCase())
+    // Search through members of the selected club
+    const member = allMembers.results.find(m => 
+      m.club.toString() === formData.club.toString() && (
+        (m.rfid_code && m.rfid_code.toUpperCase() === searchValue) ||
+        (m.phone && m.phone.trim() === searchValue) ||
+        (m.name && m.name.trim().toUpperCase() === searchValue.toUpperCase())
+      )
     );
 
     if (member) {
@@ -89,18 +117,10 @@ const CreateSubscription = ({ onClose }) => {
         job: member.job,
         national_id: member.national_id
       });
-
-      // Auto-fill club if not already set
-      if (!formData.club && member.club) {
-        setFormData(prev => ({
-          ...prev,
-          club: member.club.toString()
-        }));
-      }
     }
 
     setSearchLoading(false);
-  }, [formData.identifier, formData.club, members]);
+  }, [formData.identifier, formData.club, allMembers.results]);
 
   // Handle form submission
   const handleSubmit = async (e) => {
@@ -114,12 +134,11 @@ const CreateSubscription = ({ onClose }) => {
       return;
     }
 
-  if (isNaN(parseFloat(paid_amount))) {
-  setErrorMessage("المبلغ المدفوع يجب أن يكون رقمًا صحيحًا");
-  setIsModalOpen(true);
-  return;
-}
-
+    if (isNaN(parseFloat(paid_amount))) {
+      setErrorMessage("المبلغ المدفوع يجب أن يكون رقمًا صحيحًا");
+      setIsModalOpen(true);
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -170,12 +189,12 @@ const CreateSubscription = ({ onClose }) => {
   };
 
   return (
-  <div className="container mx-auto p-4" dir="rtl">
+    <div className="container max-w-xl mx-auto p-4" dir="rtl">
       <h2 className="text-xl font-bold mb-6">إنشاء اشتراك جديد</h2>
 
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+        <div className="fixed top-1/4 left-0 right-0 bg-black bg-opacity-50 flex items-start justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full max-h-[70vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">حدث خطأ</h3>
             <p className="text-red-600">{errorMessage}</p>
             <div className="mt-4 flex justify-end">
@@ -239,8 +258,8 @@ const CreateSubscription = ({ onClose }) => {
           <div className="text-red-500 text-sm">
             <p>
               {formData.identifier.match(/[A-Za-z]/)
-                ? "لا يوجد عضو مسجل بهذا الكود RFID"
-                : "لا يوجد عضو مسجل بهذا الرقم أو الاسم"}
+                ? "لا يوجد عضو مسجل بهذا الكود RFID في النادي المحدد"
+                : "لا يوجد عضو مسجل بهذا الرقم أو الاسم في النادي المحدد"}
             </p>
           </div>
         )}
@@ -294,29 +313,27 @@ const CreateSubscription = ({ onClose }) => {
           </div>
         )}
 
-              <div className="w-full ">
-            <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitting || !foundMember}
-            >
-              <option value="">اختر النوع</option>
-              {subscriptionTypes.results
-                ?.filter((type) => type.club_details.id.toString() === formData.club?.toString())
-                .map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name} - {type.price} جنيها
-                  </option>
-                ))}
-            </select>
-          </div>
+        <div className="w-full">
+          <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
+          <select
+            value={formData.type}
+            onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+            className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+            disabled={isSubmitting || !foundMember}
+          >
+            <option value="">اختر النوع</option>
+            {subscriptionTypes.results
+              ?.filter((type) => type.club_details.id.toString() === formData.club?.toString())
+              .map((type) => (
+                <option key={type.id} value={type.id}>
+                  {type.name} - {type.price} جنيها
+                </option>
+              ))}
+          </select>
+        </div>
 
         {/* Subscription Type, Start Date, Paid Amount */}
         <div className="flex flex-col md:flex-row gap-4">
-    
-
           <div className="w-full md:w-1/2">
             <label className="block text-sm font-medium mb-2">تاريخ البدء</label>
             <input
