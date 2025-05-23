@@ -295,15 +295,8 @@ const CreateSubscription = ({ onClose }) => {
                   <p>
                     <span className="font-medium">العنوان:</span> {foundMember.address || "غير متوفر"}
                   </p>
-                  {foundMember.birth_date && (
-                    <p>
-                      <span className="font-medium">تاريخ الميلاد:</span>{" "}
-                      {new Date(foundMember.birth_date).toLocaleDateString("ar-EG")}
-                    </p>
-                  )}
-                  <p>
-                    <span className="font-medium">المهنة:</span> {foundMember.job || "غير متوفر"}
-                  </p>
+                
+                 
                   <p>
                     <span className="font-medium">الرقم القومي:</span> {foundMember.national_id || "غير متوفر"}
                   </p>

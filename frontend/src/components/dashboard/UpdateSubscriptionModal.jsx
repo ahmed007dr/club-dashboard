@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUsers } from '../../redux/slices/memberSlice';
 import { fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';
 import { FaUser } from 'react-icons/fa';
+
+
 
 const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) => {
   const dispatch = useDispatch();
   const { subscriptionTypes, status: typesStatus, error: typesError } = useSelector(
     (state) => state.subscriptions
   );
-  const { items: members } = useSelector((state) => state.member);
 
   const [formData, setFormData] = useState({
     club: '',
@@ -21,6 +22,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
   });
 
   const [clubs, setClubs] = useState([]);
+  const [allMembers, setAllMembers] = useState({ results: [] });
   const [foundMember, setFoundMember] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -28,11 +30,33 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
+  // Fetch all members across pages
+  const fetchAllUsers = async () => {
+    try {
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await dispatch(fetchUsers({ page: currentPage })).unwrap();
+        const results = Array.isArray(response) ? response : response.results || [];
+        allResults = [...allResults, ...results];
+        hasMore = !!response.next;
+        currentPage += 1;
+      }
+
+      return { results: allResults };
+    } catch (error) {
+      console.error("Failed to fetch all users:", error.message);
+      throw error;
+    }
+  };
+
   // Fetch users (members) and clubs on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const membersResult = await dispatch(fetchUsers()).unwrap();
+        const membersResult = await fetchAllUsers();
         
         // Extract unique clubs
         const uniqueClubs = Array.from(
@@ -44,6 +68,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
           ).values()
         );
         setClubs(uniqueClubs);
+        setAllMembers(membersResult);
         setLoading(false);
       } catch (err) {
         console.error("Failed to fetch members:", err);
@@ -97,10 +122,12 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
     const searchValue = formData.identifier.trim().toUpperCase();
     setSearchLoading(true);
 
-    const member = members.find(m => 
-      (m.rfid_code && m.rfid_code.toUpperCase() === searchValue) ||
-      (m.phone && m.phone.trim() === searchValue) ||
-      (m.name && m.name.trim().toUpperCase() === searchValue.toUpperCase())
+    const member = allMembers.results.find(m => 
+      m.club.toString() === formData.club.toString() && (
+        (m.rfid_code && m.rfid_code.toUpperCase() === searchValue) ||
+        (m.phone && m.phone.trim() === searchValue) ||
+        (m.name && m.name.trim().toUpperCase() === searchValue.toUpperCase())
+      )
     );
 
     if (member) {
@@ -118,18 +145,10 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
         job: member.job,
         national_id: member.national_id,
       });
-
-      // Auto-fill club if not already set
-      if (!formData.club && member.club) {
-        setFormData(prev => ({
-          ...prev,
-          club: member.club.toString(),
-        }));
-      }
     }
 
     setSearchLoading(false);
-  }, [formData.identifier, formData.club, members]);
+  }, [formData.identifier, formData.club, allMembers.results]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -279,8 +298,8 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
             <div className="text-red-500 text-sm">
               <p>
                 {formData.identifier.match(/[A-Za-z]/)
-                  ? "لا يوجد عضو مسجل بهذا الكود RFID"
-                  : "لا يوجد عضو مسجل بهذا الرقم أو الاسم"}
+                  ? "لا يوجد عضو مسجل بهذا الكود RFID في النادي المحدد"
+                  : "لا يوجد عضو مسجل بهذا الرقم أو الاسم في النادي المحدد"}
               </p>
             </div>
           )}
