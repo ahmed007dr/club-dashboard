@@ -23,6 +23,7 @@ import {
 import { MoreVertical } from "lucide-react";
 import usePermission from "@/hooks/usePermission";
 
+
 const SubscriptionList = () => {
   const dispatch = useDispatch();
   const { subscriptions, pagination, status, error, updateStatus } =
@@ -49,6 +50,11 @@ const SubscriptionList = () => {
     clubName: "",
     entryCount: "",
     status: "",
+  });
+  // Temporary state for search inputs
+  const [tempFilters, setTempFilters] = useState({
+    memberName: "",
+    clubName: "",
   });
 
   // Normalize status values
@@ -99,9 +105,28 @@ const SubscriptionList = () => {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
+    // Update non-search fields directly
+    if (name !== "memberName" && name !== "clubName") {
+      setFilters((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+      setCurrentPage(1);
+    } else {
+      // Update temporary state for search fields
+      setTempFilters((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
+  };
+
+  const handleSearch = () => {
+    // Apply temporary filters to main filters and reset page
     setFilters((prev) => ({
       ...prev,
-      [name]: value,
+      memberName: tempFilters.memberName,
+      clubName: tempFilters.clubName,
     }));
     setCurrentPage(1);
   };
@@ -113,6 +138,11 @@ const SubscriptionList = () => {
       endDate: "",
       clubName: "",
       entryCount: "",
+      status: "",
+    });
+    setTempFilters({
+      memberName: "",
+      clubName: "",
     });
     setCurrentPage(1);
   };
@@ -295,11 +325,32 @@ const SubscriptionList = () => {
           <input
             type="text"
             name="memberName"
-            value={filters.memberName}
+            value={tempFilters.memberName}
             onChange={handleFilterChange}
             placeholder="بحث باسم العضو"
             className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
           />
+        </div>
+        <div className="flex flex-col w-56">
+          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
+            اسم النادي
+          </label>
+          <input
+            type="text"
+            name="clubName"
+            value={tempFilters.clubName}
+            onChange={handleFilterChange}
+            placeholder="بحث باسم النادي"
+            className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
+          />
+        </div>
+        <div className="flex items-end">
+          <button
+            onClick={handleSearch}
+            className="btn bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
+          >
+            بحث
+          </button>
         </div>
         <div className="flex flex-col w-56">
           <label className="text-sm font-medium text-gray-700 mb-1 text-right">
@@ -323,19 +374,6 @@ const SubscriptionList = () => {
             value={filters.endDate}
             onChange={handleFilterChange}
             className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm transition-all duration-200 ease-in-out"
-          />
-        </div>
-        <div className="flex flex-col w-56">
-          <label className="text-sm font-medium text-gray-700 mb-1 text-right">
-            اسم النادي
-          </label>
-          <input
-            type="text"
-            name="clubName"
-            value={filters.clubName}
-            onChange={handleFilterChange}
-            placeholder="بحث باسم النادي"
-            className="border border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400 transition-all duration-200 ease-in-out"
           />
         </div>
         <div className="flex flex-col w-56">
