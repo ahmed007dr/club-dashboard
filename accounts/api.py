@@ -8,7 +8,7 @@ from .serializers import UserProfileSerializer, LoginSerializer, RFIDLoginSerial
 from utils.permissions import IsOwnerOrRelatedToClub
 from .models import User
 from rest_framework.pagination import PageNumberPagination
-
+from django.db.models import Q
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -66,16 +66,46 @@ def api_user_profile(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_list(request):
-    if request.user.role == 'owner':
-        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').all()
-    else:
-        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').filter(club=request.user.club)
+    # Get the search query from the request
+    search_query = request.query_params.get('search', '').strip()
 
+    # Base queryset based on user role
+    if request.user.role == 'owner':
+        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').all()
+    else:
+        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(club=request.user.club)
+
+    # Apply search filter if a search query is provided
+    if search_query:
+        # Handle boolean status search explicitly
+        is_active_filter = None
+        if search_query.lower() in ['نشط', 'active', 'true', '1']:
+            is_active_filter = True
+        elif search_query.lower() in ['غير نشط', 'inactive', 'false', '0']:
+            is_active_filter = False
+
+        # Build the search query
+        query = (
+            Q(username__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query) |
+            Q(role__icontains=search_query) |
+            Q(rfid_code__icontains=search_query) |
+            Q(club__name__icontains=search_query)
+        )
+
+        if is_active_filter is not None:
+            query &= Q(is_active=is_active_filter)
+
+        users = users.filter(query)
+
+    # Pagination
     paginator = PageNumberPagination()
+    paginator.page_size = 20  # Match frontend expectation of 20 users per page
     result_page = paginator.paginate_queryset(users, request)
     serializer = UserProfileSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
-
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
