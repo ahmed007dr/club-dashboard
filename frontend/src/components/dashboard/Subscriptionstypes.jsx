@@ -13,6 +13,7 @@ import usePermission from '@/hooks/usePermission';
 const SubscriptionsTypes = () => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error } = useSelector((state) => state.subscriptions);
+  console.log(subscriptionTypes);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);

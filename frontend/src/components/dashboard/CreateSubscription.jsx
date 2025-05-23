@@ -5,9 +5,6 @@ import { fetchUsers } from "../../redux/slices/memberSlice";
 import { Button } from "@/components/ui/button";
 import { FaUser } from 'react-icons/fa';
 
-
-
-
 const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
   const { subscriptionTypes } = useSelector((state) => state.subscriptions);
@@ -24,6 +21,7 @@ const CreateSubscription = ({ onClose }) => {
   // Data state
   const [clubs, setClubs] = useState([]);
   const [allMembers, setAllMembers] = useState({ results: [] });
+  const [allSubscriptionTypes, setAllSubscriptionTypes] = useState([]); // New state for all subscription types
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [foundMember, setFoundMember] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -55,12 +53,36 @@ const CreateSubscription = ({ onClose }) => {
     }
   };
 
+  // Fetch all subscription types across pages
+  const fetchAllSubscriptionTypes = async () => {
+    try {
+      let allResults = [];
+      let currentPage = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await dispatch(fetchSubscriptionTypes({ page: currentPage })).unwrap();
+        const results = Array.isArray(response) ? response : response.results || [];
+        allResults = [...allResults, ...results];
+        hasMore = !!response.next;
+        currentPage += 1;
+      }
+
+      return allResults;
+    } catch (error) {
+      console.error("Failed to fetch all subscription types:", error.message);
+      throw error;
+    }
+  };
+
   // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        await dispatch(fetchSubscriptionTypes()).unwrap();
-        const membersResult = await fetchAllUsers();
+        const [membersResult, subscriptionTypesResult] = await Promise.all([
+          fetchAllUsers(),
+          fetchAllSubscriptionTypes(),
+        ]);
 
         // Extract unique clubs
         const uniqueClubs = Array.from(
@@ -71,8 +93,10 @@ const CreateSubscription = ({ onClose }) => {
             ])
           ).values()
         );
+
         setClubs(uniqueClubs);
         setAllMembers(membersResult);
+        setAllSubscriptionTypes(subscriptionTypesResult);
       } catch (error) {
         handleError(error, "Failed to load initial data");
       } finally {
@@ -295,8 +319,6 @@ const CreateSubscription = ({ onClose }) => {
                   <p>
                     <span className="font-medium">العنوان:</span> {foundMember.address || "غير متوفر"}
                   </p>
-                
-                 
                   <p>
                     <span className="font-medium">الرقم القومي:</span> {foundMember.national_id || "غير متوفر"}
                   </p>
@@ -315,8 +337,8 @@ const CreateSubscription = ({ onClose }) => {
             disabled={isSubmitting || !foundMember}
           >
             <option value="">اختر النوع</option>
-            {subscriptionTypes.results
-              ?.filter((type) => type.club_details.id.toString() === formData.club?.toString())
+            {allSubscriptionTypes
+              .filter((type) => type.club_details.id.toString() === formData.club?.toString())
               .map((type) => (
                 <option key={type.id} value={type.id}>
                   {type.name} - {type.price} جنيها
