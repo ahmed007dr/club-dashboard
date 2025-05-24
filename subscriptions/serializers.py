@@ -56,9 +56,9 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         # if request and club and not IsOwnerOrRelatedToClub().has_object_permission(request, None, club):
         #     raise serializers.ValidationError("You do not have permission to create a subscription for this club.")
 
-        # Validate start_date
-        if start_date and start_date < timezone.now().date():
-            raise serializers.ValidationError("تاريخ البداية لا يمكن أن يكون في الماضي.")
+        # # Validate start_date
+        # if start_date and start_date < timezone.now().date():
+        #     raise serializers.ValidationError("تاريخ البداية لا يمكن أن يكون في الماضي.")
 
         if member:
             today = timezone.now().date()
