@@ -13,7 +13,7 @@ from .serializers import (
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub
 from rest_framework.pagination import PageNumberPagination
-from datetime import datetime, timedelta
+from datetime import datetime
 from core.models import Club
 from staff.serializers import StaffAttendance
 from django.db.models import Sum, Q
@@ -32,13 +32,11 @@ class StandardPagination(PageNumberPagination):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_category_api(request):
     if request.method == 'GET':
-        # Owner sees all categories, others see only their club's categories
         if request.user.role == 'owner':
             categories = ExpenseCategory.objects.all()
         else:
             categories = ExpenseCategory.objects.filter(club=request.user.club)
 
-        # Apply filters if provided
         name = request.query_params.get('name', '')
         description = request.query_params.get('description', '')
         if name:
@@ -46,17 +44,13 @@ def expense_category_api(request):
         if description:
             categories = categories.filter(description__icontains=description)
 
-        # Order by ID (descending)
         categories = categories.order_by('-id')
-
-        # Apply pagination
         paginator = StandardPagination()
         page = paginator.paginate_queryset(categories, request)
         serializer = ExpenseCategorySerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
-        # Only owner can create new categories
         if request.user.role != 'owner':
             return Response({'error': 'Only owners can create expense categories'}, status=status.HTTP_403_FORBIDDEN)
         
@@ -71,26 +65,23 @@ def expense_category_api(request):
 def expense_api(request):
     if request.method == 'GET':
         if request.user.role == 'owner':
-            # Owner sees all expenses across all clubs
             expenses = Expense.objects.select_related('category', 'paid_by').all().order_by('-id')
         elif request.user.role == 'admin':
-            # Admins can't see expenses
             return Response({'error': 'Admins cannot view expenses'}, status=status.HTTP_403_FORBIDDEN)
         else:
-            # Staff see only their own expenses during their shift
-            today = datetime.now().date()
+            # Staff see their expenses for their latest open or closed shift
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
-                club=request.user.club,
-                check_in__date=today
+                club=request.user.club
             ).order_by('-check_in').first()
             
             if attendance:
+                check_out = attendance.check_out if attendance.check_out else datetime.now()
                 expenses = Expense.objects.select_related('category', 'paid_by').filter(
                     club=request.user.club,
                     paid_by=request.user,
                     date__gte=attendance.check_in,
-                    date__lte=attendance.check_out if attendance.check_out else datetime.now()
+                    date__lte=check_out
                 ).order_by('-date')
             else:
                 expenses = Expense.objects.none()
@@ -101,7 +92,6 @@ def expense_api(request):
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
-        # Only owner and staff can create expenses
         if request.user.role == 'admin':
             return Response({'error': 'Admins cannot create expenses'}, status=status.HTTP_403_FORBIDDEN)
             
@@ -110,7 +100,6 @@ def expense_api(request):
         
         club_id = data.get('club')
         if club_id and request.user.role != 'owner':
-            # Non-owners can only create expenses for their own club
             if int(club_id) != request.user.club.id:
                 return Response({'error': 'You can only create expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
             club = get_object_or_404(Club, id=club_id)
@@ -125,13 +114,11 @@ def expense_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_source_api(request):
     if request.method == 'GET':
-        # Owner sees all sources, others see only their club's sources
         if request.user.role == 'owner':
             sources = IncomeSource.objects.all().order_by('-id')
         else:
             sources = IncomeSource.objects.filter(club=request.user.club).order_by('-id')
 
-        # Add filtering by name and description
         name = request.query_params.get('name', None)
         description = request.query_params.get('description', None)
         
@@ -146,7 +133,6 @@ def income_source_api(request):
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
-        # Only owner can create new income sources
         if request.user.role != 'owner':
             return Response({'error': 'Only owners can create income sources'}, status=status.HTTP_403_FORBIDDEN)
         
@@ -161,33 +147,29 @@ def income_source_api(request):
 def income_api(request):
     if request.method == 'GET':
         if request.user.role == 'owner':
-            # Owner sees all incomes across all clubs
             incomes = Income.objects.select_related('source', 'received_by').all()
         elif request.user.role == 'admin':
-            # Admins see all incomes for their club
             incomes = Income.objects.select_related('source', 'received_by').filter(
                 club=request.user.club
             )
         else:
-            # Staff see only their own incomes during their shift
-            today = datetime.now().date()
+            # Staff see their incomes for their latest open or closed shift
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
-                club=request.user.club,
-                check_in__date=today
+                club=request.user.club
             ).order_by('-id').first()
             
             if attendance:
+                check_out = attendance.check_out if attendance.check_out else datetime.now()
                 incomes = Income.objects.select_related('source', 'received_by').filter(
                     club=request.user.club,
                     received_by=request.user,
                     date__gte=attendance.check_in,
-                    date__lte=attendance.check_out if attendance.check_out else datetime.now()
+                    date__lte=check_out
                 )
             else:
                 incomes = Income.objects.none()
 
-        # Apply filters based on query parameters
         source = request.query_params.get('source')
         amount = request.query_params.get('amount')
         description = request.query_params.get('description')
@@ -212,7 +194,6 @@ def income_api(request):
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
-        # Only owner and staff can create incomes
         if request.user.role == 'admin':
             return Response({'error': 'Admins cannot create incomes'}, status=status.HTTP_403_FORBIDDEN)
             
@@ -221,7 +202,6 @@ def income_api(request):
         
         club_id = data.get('club')
         if club_id and request.user.role != 'owner':
-            # Non-owners can only create incomes for their own club
             if int(club_id) != request.user.club.id:
                 return Response({'error': 'You can only create incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
             club = get_object_or_404(Club, id=club_id)
@@ -238,7 +218,6 @@ def expense_detail_api(request, pk):
     expense = get_object_or_404(Expense, pk=pk)
     
     if request.method == 'GET':
-        # Owner can see any expense, others only their own club's expenses
         if request.user.role == 'admin':
             return Response({'error': 'Admins cannot view expenses'}, status=status.HTTP_403_FORBIDDEN)
         if request.user.role not in ['owner'] and expense.club != request.user.club:
@@ -247,7 +226,6 @@ def expense_detail_api(request, pk):
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        # Only owner and the staff who created the expense can update
         if request.user.role == 'admin':
             return Response({'error': 'Admins cannot update expenses'}, status=status.HTTP_403_FORBIDDEN)
         if request.user.role not in ['owner'] and expense.paid_by != request.user:
@@ -262,7 +240,6 @@ def expense_detail_api(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
-        # Only owner can delete expenses
         if request.user.role != 'owner':
             return Response({'error': 'Only owners can delete expenses'}, status=status.HTTP_403_FORBIDDEN)
         expense.delete()
@@ -274,7 +251,6 @@ def income_detail_api(request, pk):
     income = get_object_or_404(Income, pk=pk)
     
     if request.method == 'GET':
-        # Owner and admin can see any income for their club, staff only their own
         if request.user.role not in ['owner', 'admin'] and income.received_by != request.user:
             return Response({'error': 'You can only view your own incomes'}, status=status.HTTP_403_FORBIDDEN)
         if request.user.role not in ['owner'] and income.club != request.user.club:
@@ -283,7 +259,6 @@ def income_detail_api(request, pk):
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        # Only owner and the staff who created the income can update
         if request.user.role == 'admin':
             return Response({'error': 'Admins cannot update incomes'}, status=status.HTTP_403_FORBIDDEN)
         if request.user.role not in ['owner'] and income.received_by != request.user:
@@ -298,7 +273,6 @@ def income_detail_api(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
-        # Only owner can delete incomes
         if request.user.role != 'owner':
             return Response({'error': 'Only owners can delete incomes'}, status=status.HTTP_403_FORBIDDEN)
         income.delete()
@@ -307,7 +281,6 @@ def income_detail_api(request, pk):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def daily_summary_api(request):
-    # Only owner and admin can view daily summaries
     if request.user.role not in ['owner', 'admin']:
         return Response({'error': 'Only owners and admins can view daily summaries'}, status=status.HTTP_403_FORBIDDEN)
     
@@ -331,7 +304,6 @@ def daily_summary_api(request):
         filter_date = datetime.now().date()
         date_filter = {'check_in__date': filter_date}
     
-    # Owner can see all clubs, admin only their own
     if request.user.role == 'owner':
         club_filter = {}
     else:
@@ -363,7 +335,6 @@ def daily_summary_api(request):
         }
         
         for attendance in attendances:
-            # Admins only see incomes
             expenses = Expense.objects.none() if request.user.role == 'admin' else Expense.objects.filter(
                 **club_filter,
                 paid_by=employee,
@@ -435,7 +406,6 @@ def income_summary(request):
     - details: Boolean to include detailed records (true/false)
     """
     try:
-        # Owner sees all clubs, others see their own
         if request.user.role == 'owner':
             incomes = Income.objects.select_related('source', 'received_by').all()
         else:
@@ -443,7 +413,6 @@ def income_summary(request):
                 club=request.user.club
             )
 
-        # Apply filters
         date = request.query_params.get('date')
         start = request.query_params.get('start')
         end = request.query_params.get('end')
@@ -482,11 +451,9 @@ def income_summary(request):
             else:
                 return Response({'error': 'Income source not found or multiple matches.'}, status=400)
 
-        # Calculate total
         total = incomes.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         response_data = {'total_income': float(total)}
 
-        # Include details if requested
         if details:
             response_data['details'] = IncomeSummarySerializer(incomes, many=True).data
 
@@ -509,13 +476,11 @@ def expense_summary(request):
     - details: Boolean to include detailed records (true/false)
     """
     try:
-        # Only owner can see expenses
         if request.user.role != 'owner':
             return Response({'error': 'Only owners can view expense summaries'}, status=status.HTTP_403_FORBIDDEN)
             
         expenses = Expense.objects.select_related('category', 'paid_by').all()
 
-        # Apply filters
         date = request.query_params.get('date')
         start = request.query_params.get('start')
         end = request.query_params.get('end')
@@ -554,11 +519,9 @@ def expense_summary(request):
             else:
                 return Response({'error': 'Expense category not found or multiple matches.'}, status=400)
 
-        # Calculate total
         total = expenses.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         response_data = {'total_expense': float(total)}
 
-        # Include details if requested
         if details:
             response_data['details'] = ExpenseDetailSerializer(expenses, many=True).data
 
@@ -577,16 +540,13 @@ def finance_overview(request):
     - end: End date (YYYY-MM-DD)
     """
     try:
-        # Owner sees all clubs, admin only sees incomes for their club
         if request.user.role == 'owner':
             income_qs = Income.objects.select_related('source', 'received_by').all()
             expense_qs = Expense.objects.select_related('category', 'paid_by').all()
         else:
-            # Admins only see incomes for their club
             income_qs = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
             expense_qs = Expense.objects.none()
 
-        # Apply date range filter
         start = request.query_params.get('start')
         end = request.query_params.get('end')
         if start and end:
@@ -600,7 +560,6 @@ def finance_overview(request):
         elif start or end:
             return Response({'error': 'Both start and end dates are required.'}, status=400)
 
-        # Calculate totals
         total_income = income_qs.aggregate(total=Sum('amount'))['total'] or 0
         total_expense = expense_qs.aggregate(total=Sum('amount'))['total'] or 0
         net = total_income - total_expense

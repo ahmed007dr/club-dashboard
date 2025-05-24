@@ -44,6 +44,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     def validate(self, data):
         club = data.get('club')
         subscription_type = data.get('type')
+
+        
         start_date = data.get('start_date')
         member = data.get('member')
 
