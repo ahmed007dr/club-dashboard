@@ -2,7 +2,7 @@ from rest_framework import serializers
 from .models import PayrollPeriod, Payroll, PayrollDeduction, EmployeeContract
 from accounts.models import User
 from members.models import Member
-from subscriptions.models import Subscription
+from subscriptions.models import Subscription,PrivateSubscriptionPayment
 
 class PayrollDeductionSerializer(serializers.ModelSerializer):
     class Meta:
