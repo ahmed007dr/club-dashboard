@@ -16,7 +16,7 @@ class User(AbstractUser):
     rfid_code = models.CharField(max_length=32, unique=True, null=False, blank=False, help_text="RFID tag or card code")
     phone = models.CharField(max_length=15, null=True, blank=True, help_text="Phone number")
     birth_date = models.DateField(null=True, blank=True, help_text="Date of birth")
-    qualifications = models.TextField(blank=True, help_text="Educational qualifications or certifications")
+    qualifications = models.TextField(null=True, blank=True, help_text="Educational qualifications or certifications")
     groups = models.ManyToManyField(
         Group, related_name='custom_user_set', blank=True,
         help_text='The groups this user belongs to.', verbose_name='groups'

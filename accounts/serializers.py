@@ -64,14 +64,19 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         role = data.get('role', self.instance.role if self.instance else None)
+
         if role in ['owner', 'admin', 'reception']:
             if not data.get('username'):
                 raise serializers.ValidationError("Username is required for owner, admin, and reception roles.")
             if not data.get('password') and not self.instance:
                 raise serializers.ValidationError("Password is required for owner, admin, and reception roles.")
+            data['is_active'] = True
         else:
-            data['is_active'] = False  # Non-login roles are inactive
+            data['username'] = None
+            data['is_active'] = False
+
         return data
+
 
     def create(self, validated_data):
         if validated_data.get('password'):

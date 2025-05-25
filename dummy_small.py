@@ -87,19 +87,15 @@ def create_dummy_data():
             weights=[0.1, 0.1, 0.1, 0.35, 0.35], k=1
         )[0]
         is_active = role in roles_active
-        username = None
-        email = None
-        password = None
-        if is_active:
-            while True:
-                username = serial_generator("user", user_counter, 8)[:8]
-                email = serial_generator("user", user_counter, 8) + "@example.com"
-                if username not in unique_usernames and email not in unique_emails and username not in existing_usernames and email not in existing_emails:
-                    unique_usernames.add(username)
-                    unique_emails.add(email)
-                    break
-                user_counter += 1
-            password = 'pbkdf2_sha256$390000$123456789012$12345678901234567890123456789012'  # Hashed '123'
+        # Generate username for all users
+        while True:
+            username = serial_generator("user", user_counter, 8)[:8]
+            email = serial_generator("user", user_counter, 8) + "@example.com"
+            if username not in unique_usernames and email not in unique_emails and username not in existing_usernames and email not in existing_emails:
+                unique_usernames.add(username)
+                unique_emails.add(email)
+                break
+            user_counter += 1
         while True:
             rfid = serial_generator("RFID", rfid_counter, 8)
             if rfid not in unique_rfids and rfid not in existing_rfids:
@@ -109,7 +105,7 @@ def create_dummy_data():
         user = User(
             username=username,
             email=email,
-            password=password,
+            password='pbkdf2_sha256$390000$123456789012$12345678901234567890123456789012',  # Hashed '123'
             role=role,
             first_name=fake.first_name()[:30],
             last_name=fake.last_name()[:30],
@@ -126,6 +122,7 @@ def create_dummy_data():
     User.objects.bulk_create(users_to_create)
     staff_users = User.objects.filter(rfid_code__in=[u.rfid_code for u in users_to_create]).all()
     print(f"Created {len(staff_users)} staff users (30 active, 70 inactive)")
+
 
     # Create Employee Contracts for Coaches and Accountants
     employee_contracts = []
@@ -265,9 +262,14 @@ def create_dummy_data():
 
     # Create Payroll Periods (3 periods per club)
     payroll_periods = []
+    used_start_dates = {club.id: set() for club in clubs}  # Track used start dates per club
     for club in clubs:
         for i in range(3):
-            start_date = fake.date_between(start_date='-3m', end_date='today')
+            while True:
+                start_date = fake.date_between(start_date='-3m', end_date='today')
+                if start_date not in used_start_dates[club.id]:
+                    used_start_dates[club.id].add(start_date)
+                    break
             end_date = start_date + timedelta(days=30)
             period = PayrollPeriod(
                 club=club,
@@ -278,6 +280,7 @@ def create_dummy_data():
             payroll_periods.append(period)
     PayrollPeriod.objects.bulk_create(payroll_periods)
     print("Created payroll periods")
+
 
     # Create Payroll Records (for each staff user in each period)
     payrolls = []

@@ -1,69 +1,144 @@
-import os,django
+import os
+import shutil
+import subprocess
+import logging
+from pathlib import Path
+from django.conf import settings
+import django
 
+# Configure logging with UTF-8 encoding to avoid Unicode issues
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
+# Set up Django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
 django.setup()
 
-import shutil
-import subprocess
-
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
+# Define constants
+BASE_DIR = Path(__file__).resolve().parent
 APPS = [
     "core", "accounts", "attendance", "members", "staff",
-    "subscriptions", "tickets", "invites", "receipts", "finance","devices"
+    "subscriptions", "tickets", "invites", "receipts", "finance",
+    "devices", "payroll"
 ]
+DB_PATH = BASE_DIR / "db.sqlite3"
+STATIC_PATH = BASE_DIR / "static"
 
 def create_static_dir():
-    static_path = os.path.join(BASE_DIR, "static")
-    if not os.path.exists(static_path):
-        os.makedirs(static_path)
-        print("📁 Created static directory.")
+    """Create static directory if it doesn't exist."""
+    try:
+        STATIC_PATH.mkdir(exist_ok=True)
+        logger.info("Created/verified static directory.")
+    except Exception as e:
+        logger.error(f"Failed to create static directory: {e}")
 
 def delete_migrations(app_name):
-    migrations_path = os.path.join(BASE_DIR, app_name, "migrations")
-    if os.path.exists(migrations_path):
-        for filename in os.listdir(migrations_path):
-            file_path = os.path.join(migrations_path, filename)
-            if filename != "__init__.py" and (filename.endswith(".py") or filename.endswith(".pyc")):
-                os.remove(file_path)
-        # Clear __pycache__
-        pycache_path = os.path.join(migrations_path, "__pycache__")
-        if os.path.exists(pycache_path):
-            shutil.rmtree(pycache_path)
+    """Delete migration files and __pycache__ for an app."""
+    migrations_path = BASE_DIR / app_name / "migrations"
+    try:
+        if migrations_path.exists():
+            for item in migrations_path.iterdir():
+                if item.name != "__init__.py" and (item.suffix in [".py", ".pyc"] or item.name == "__pycache__"):
+                    if item.is_file():
+                        item.unlink()
+                    elif item.is_dir():
+                        shutil.rmtree(item)
+            logger.info(f"Cleared migrations for app: {app_name}")
+        else:
+            logger.warning(f"Migrations directory not found for app: {app_name}")
+    except Exception as e:
+        logger.error(f"Failed to clear migrations for {app_name}: {e}")
 
 def delete_sqlite_db():
-    db_path = os.path.join(BASE_DIR, "db.sqlite3")
-    if os.path.exists(db_path):
-        os.remove(db_path)
+    """Delete the SQLite database file."""
+    try:
+        if DB_PATH.exists():
+            DB_PATH.unlink()
+            logger.info("Deleted SQLite database.")
+        else:
+            logger.info("No SQLite database found to delete.")
+    except Exception as e:
+        logger.error(f"Failed to delete SQLite database: {e}")
 
-def run_cmd(cmd):
-    print(f"\n> Running: {cmd}")
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
-    print(result.stdout)
-    print(result.stderr)
-    if result.returncode != 0:
-        print(f"❌ Command failed with exit code {result.returncode}")
+def run_cmd(cmd, check=True):
+    """Run a shell command with error handling."""
+    logger.info(f"Running: {cmd}")
+    try:
+        result = subprocess.run(
+            cmd, shell=True, capture_output=True, text=True, check=check
+        )
+        if result.stdout:
+            logger.info(result.stdout)
+        if result.stderr:
+            logger.warning(result.stderr)
+        return result.returncode
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Command failed with exit code {e.returncode}: {e.stderr}")
+        return e.returncode
+    except Exception as e:
+        logger.error(f"Unexpected error running command: {e}")
+        return 1
+
+def create_superuser():
+    """Create a default superuser."""
+    logger.info("Creating superuser...")
+    shell_cmd = (
+        "from django.contrib.auth import get_user_model; "
+        "User = get_user_model(); "
+        "if not User.objects.filter(username='admin').exists(): "
+        "User.objects.create_superuser("
+        "username='admin', email='admin@example.com', password='admin123');"
+    )
+    result = run_cmd(f"echo \"{shell_cmd}\" | python manage.py shell", check=False)
+    if result == 0:
+        logger.info("Superuser created successfully.")
+    else:
+        logger.warning("Superuser creation may have failed or user already exists.")
+
+def run_dummy_data():
+    """Run the dummy data script."""
+    dummy_data_path = BASE_DIR / "dummy_small.py"
+    if dummy_data_path.exists():
+        logger.info("Running dummy data script...")
+        result = run_cmd("python dummy_small.py")
+        if result == 0:
+            logger.info("Dummy data created successfully.")
+        else:
+            logger.error("Failed to create dummy data. Check logs for details.")
+    else:
+        logger.warning("dummy_small.py not found, skipping data population.")
 
 if __name__ == "__main__":
-    print("🔁 Resetting Django Migrations...")
+    logger.info("Starting Django Migration Reset...")
+
+    # Create static directory
     create_static_dir()
 
+    # Delete migrations for all apps
     for app in APPS:
         delete_migrations(app)
-        print(f"✅ Cleared migrations for app: {app}")
 
+    # Delete SQLite database
     delete_sqlite_db()
-    print("🗑️ Deleted old SQLite database.")
 
-    print("⚙️ Making new migrations...")
-    for app in APPS:
-        print(f"Generating migrations for {app}...")
-        run_cmd(f"python manage.py makemigrations {app}")
+    # Make new migrations
+    logger.info("Generating new migrations...")
+    run_cmd("python manage.py makemigrations")
 
-    print("⚙️ Applying new migrations...")
+    # Apply migrations
+    logger.info("Applying new migrations...")
     run_cmd("python manage.py migrate")
-    #run_cmd("python dummy_data.py")
-    #run_cmd("winpty python manage.py createsuperuser")
 
-    print("\n🎉 Project is clean and ready!")
+    # Run dummy data script
+    run_dummy_data()
+
+    # # Create superuser
+    # create_superuser()
+
+    logger.info("Project is clean and ready!")
