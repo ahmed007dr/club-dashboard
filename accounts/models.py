@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser, Group, Permission
 from django.db import models
 from core.models import Club
+from django.core.exceptions import ValidationError
 
 class User(AbstractUser):
     club = models.ForeignKey(Club, on_delete=models.CASCADE, null=True, blank=True)
