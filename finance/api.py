@@ -19,6 +19,7 @@ from staff.serializers import StaffAttendance
 from django.db.models import Sum, Q
 from accounts.models import User
 from django.utils.dateparse import parse_date
+from payroll.models import Payroll
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -69,7 +70,6 @@ def expense_api(request):
         elif request.user.role == 'admin':
             return Response({'error': 'Admins cannot view expenses'}, status=status.HTTP_403_FORBIDDEN)
         else:
-            # Staff see their expenses for their latest open or closed shift
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club
@@ -153,11 +153,10 @@ def income_api(request):
                 club=request.user.club
             )
         else:
-            # Staff see their incomes for their latest open or closed shift
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club
-            ).order_by('-id').first()
+            ).order_by('-check_in').first()
             
             if attendance:
                 check_out = attendance.check_out if attendance.check_out else datetime.now()
@@ -292,17 +291,20 @@ def daily_summary_api(request):
         try:
             filter_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             date_filter = {'check_in__date': filter_date}
+            payroll_date_filter = {'period__end_date': filter_date, 'is_finalized': True}
         except ValueError:
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
     elif month_str:
         try:
             year, month = map(int, month_str.split('-'))
             date_filter = {'check_in__year': year, 'check_in__month': month}
+            payroll_date_filter = {'period__end_date__year': year, 'period__end_date__month': month, 'is_finalized': True}
         except ValueError:
             return Response({'error': 'Invalid month format. Use YYYY-MM.'}, status=status.HTTP_400_BAD_REQUEST)
     else:
         filter_date = datetime.now().date()
         date_filter = {'check_in__date': filter_date}
+        payroll_date_filter = {'period__end_date': filter_date, 'is_finalized': True}
     
     if request.user.role == 'owner':
         club_filter = {}
@@ -325,12 +327,20 @@ def daily_summary_api(request):
             **date_filter
         )
         
+        payrolls = Payroll.objects.filter(
+            employee=employee,
+            **club_filter,
+            **payroll_date_filter
+        )
+        
         employee_summary = {
             'employee_id': employee.id,
             'employee_name': employee.username,
             'attendance_periods': [],
             'total_expenses': 0,
             'total_incomes': 0,
+            'total_payroll': 0,
+            'total_deductions': 0,
             'net': 0
         }
         
@@ -371,8 +381,14 @@ def daily_summary_api(request):
             employee_summary['total_expenses'] += total_expenses
             employee_summary['total_incomes'] += total_incomes
         
-        employee_summary['net'] = employee_summary['total_incomes'] - employee_summary['total_expenses']
-        if employee_summary['attendance_periods']:
+        for payroll in payrolls:
+            total_payroll = payroll.total_salary
+            total_deductions = payroll.total_deductions
+            employee_summary['total_payroll'] += total_payroll
+            employee_summary['total_deductions'] += total_deductions
+        
+        employee_summary['net'] = employee_summary['total_incomes'] - (employee_summary['total_expenses'] + employee_summary['total_payroll'])
+        if employee_summary['attendance_periods'] or payrolls.exists():
             summary.append(employee_summary)
 
     paginator = StandardPagination()
@@ -380,9 +396,6 @@ def daily_summary_api(request):
     return paginator.get_paginated_response(page)
 
 def get_object_from_id_or_name(model, value, fields=['id', 'name']):
-    """
-    Retrieve an object by ID or name. Returns None if not found or multiple results exist.
-    """
     try:
         return model.objects.get(id=int(value))
     except (ValueError, model.DoesNotExist):
@@ -395,16 +408,6 @@ def get_object_from_id_or_name(model, value, fields=['id', 'name']):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_summary(request):
-    """
-    Calculate total income based on filters.
-    Query params:
-    - date: Specific date (YYYY-MM-DD)
-    - start: Start date (YYYY-MM-DD)
-    - end: End date (YYYY-MM-DD)
-    - user: User ID or username
-    - source: Income source ID or name
-    - details: Boolean to include detailed records (true/false)
-    """
     try:
         if request.user.role == 'owner':
             incomes = Income.objects.select_related('source', 'received_by').all()
@@ -465,21 +468,12 @@ def income_summary(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_summary(request):
-    """
-    Calculate total expenses based on filters.
-    Query params:
-    - date: Specific date (YYYY-MM-DD)
-    - start: Start date (YYYY-MM-DD)
-    - end: End date (YYYY-MM-DD)
-    - user: User ID or username
-    - category: Expense category ID or name
-    - details: Boolean to include detailed records (true/false)
-    """
     try:
         if request.user.role != 'owner':
             return Response({'error': 'Only owners can view expense summaries'}, status=status.HTTP_403_FORBIDDEN)
             
         expenses = Expense.objects.select_related('category', 'paid_by').all()
+        payrolls = Payroll.objects.filter(is_finalized=True)
 
         date = request.query_params.get('date')
         start = request.query_params.get('start')
@@ -492,6 +486,7 @@ def expense_summary(request):
             try:
                 date_obj = datetime.strptime(date, '%Y-%m-%d').date()
                 expenses = expenses.filter(date=date_obj)
+                payrolls = payrolls.filter(period__end_date=date_obj)
             except ValueError:
                 return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=400)
 
@@ -500,6 +495,7 @@ def expense_summary(request):
                 start_obj = datetime.strptime(start, '%Y-%m-%d').date()
                 end_obj = datetime.strptime(end, '%Y-%m-%d').date()
                 expenses = expenses.filter(date__range=[start_obj, end_obj])
+                payrolls = payrolls.filter(period__end_date__range=[start_obj, end_obj])
             except ValueError:
                 return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=400)
         elif start or end:
@@ -509,6 +505,7 @@ def expense_summary(request):
             user_obj = get_object_from_id_or_name(User, user_param, ['id', 'username'])
             if user_obj:
                 expenses = expenses.filter(paid_by=user_obj)
+                payrolls = payrolls.filter(employee=user_obj)
             else:
                 return Response({'error': 'User not found or multiple matches.'}, status=400)
 
@@ -519,11 +516,26 @@ def expense_summary(request):
             else:
                 return Response({'error': 'Expense category not found or multiple matches.'}, status=400)
 
-        total = expenses.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
-        response_data = {'total_expense': float(total)}
+        total_expenses = expenses.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
+        total_payroll = payrolls.aggregate(total_salary=Sum('total_salary'))['total_salary'] or 0
+        total_deductions = payrolls.aggregate(total_deductions=Sum('total_deductions'))['total_deductions'] or 0
+        response_data = {
+            'total_expenses': float(total_expenses),
+            'total_payroll': float(total_payroll),
+            'total_deductions': float(total_deductions),
+            'net_expenses': float(total_expenses + total_payroll)
+        }
 
         if details:
-            response_data['details'] = ExpenseDetailSerializer(expenses, many=True).data
+            response_data['expense_details'] = ExpenseDetailSerializer(expenses, many=True).data
+            response_data['payroll_details'] = [
+                {
+                    'employee': payroll.employee.username,
+                    'total_salary': float(payroll.total_salary),
+                    'total_deductions': float(payroll.total_deductions),
+                    'period': f"{payroll.period.start_date} to {payroll.period.end_date}"
+                } for payroll in payrolls
+            ]
 
         return Response(response_data, status=200)
 
@@ -533,19 +545,15 @@ def expense_summary(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def finance_overview(request):
-    """
-    Provide an overview of total income, expenses, and net profit.
-    Query params:
-    - start: Start date (YYYY-MM-DD)
-    - end: End date (YYYY-MM-DD)
-    """
     try:
         if request.user.role == 'owner':
             income_qs = Income.objects.select_related('source', 'received_by').all()
             expense_qs = Expense.objects.select_related('category', 'paid_by').all()
+            payroll_qs = Payroll.objects.filter(is_finalized=True)
         else:
             income_qs = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
             expense_qs = Expense.objects.none()
+            payroll_qs = Payroll.objects.filter(club=request.user.club, is_finalized=True)
 
         start = request.query_params.get('start')
         end = request.query_params.get('end')
@@ -555,6 +563,7 @@ def finance_overview(request):
                 end_obj = datetime.strptime(end, '%Y-%m-%d').date()
                 income_qs = income_qs.filter(date__range=[start_obj, end_obj])
                 expense_qs = expense_qs.filter(date__range=[start_obj, end_obj])
+                payroll_qs = payroll_qs.filter(period__end_date__range=[start_obj, end_obj])
             except ValueError:
                 return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=400)
         elif start or end:
@@ -562,12 +571,17 @@ def finance_overview(request):
 
         total_income = income_qs.aggregate(total=Sum('amount'))['total'] or 0
         total_expense = expense_qs.aggregate(total=Sum('amount'))['total'] or 0
-        net = total_income - total_expense
+        total_payroll = payroll_qs.aggregate(total_salary=Sum('total_salary'))['total_salary'] or 0
+        total_deductions = payroll_qs.aggregate(total_deductions=Sum('total_deductions'))['total_deductions'] or 0
+
+        net_profit = total_income - (total_expense + total_payroll)
 
         return Response({
             'total_income': float(total_income),
             'total_expense': float(total_expense),
-            'net_profit': float(net)
+            'total_payroll': float(total_payroll),
+            'total_deductions': float(total_deductions),
+            'net_profit': float(net_profit)
         }, status=200)
 
     except Exception as e:

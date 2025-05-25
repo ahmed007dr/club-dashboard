@@ -46,6 +46,7 @@ urlpatterns = [
     path('invites/', include('invites.urls')),
     path('finance/', include('finance.urls')),
     path('attendance/', include('attendance.urls')),
+    path('payroll/', include('payroll.urls')),
     path('core/', include('core.urls')),
 
 ]

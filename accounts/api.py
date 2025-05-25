@@ -27,16 +27,13 @@ def api_login(request):
             user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
             refresh = RefreshToken.for_user(user)
             return Response({
-                'user': UserProfileSerializer(user).data,  # Use UserProfileSerializer
+                'user': UserProfileSerializer(user).data,
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }, status=status.HTTP_200_OK)
         
-        return Response({
-            'error': 'Invalid credentials'
-        }, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -54,7 +51,6 @@ def api_logout(request):
     except Exception:
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_profile(request):
@@ -62,29 +58,26 @@ def api_user_profile(request):
     serializer = UserProfileSerializer(user)
     return Response(serializer.data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_list(request):
-    # Get the search query from the request
+    """
+    List users with search support for new fields (phone) and role-based filtering.
+    """
     search_query = request.query_params.get('search', '').strip()
 
-    # Base queryset based on user role
     if request.user.role == 'owner':
         users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').all()
     else:
         users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(club=request.user.club)
 
-    # Apply search filter if a search query is provided
     if search_query:
-        # Handle boolean status search explicitly
         is_active_filter = None
         if search_query.lower() in ['نشط', 'active', 'true', '1']:
             is_active_filter = True
         elif search_query.lower() in ['غير نشط', 'inactive', 'false', '0']:
             is_active_filter = False
 
-        # Build the search query
         query = (
             Q(username__icontains=search_query) |
             Q(email__icontains=search_query) |
@@ -92,7 +85,8 @@ def api_user_list(request):
             Q(last_name__icontains=search_query) |
             Q(role__icontains=search_query) |
             Q(rfid_code__icontains=search_query) |
-            Q(club__name__icontains=search_query)
+            Q(club__name__icontains=search_query) |
+            Q(phone__icontains=search_query)
         )
 
         if is_active_filter is not None:
@@ -100,12 +94,29 @@ def api_user_list(request):
 
         users = users.filter(query)
 
-    # Pagination
     paginator = PageNumberPagination()
-    paginator.page_size = 20  # Match frontend expectation of 20 users per page
+    paginator.page_size = 20
     result_page = paginator.paginate_queryset(users, request)
     serializer = UserProfileSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def api_add_employee(request):
+    """
+    Add a new employee with role-based validation.
+    """
+    serializer = UserProfileSerializer(data=request.data)
+    if serializer.is_valid():
+        role = serializer.validated_data.get('role')
+        club = serializer.validated_data.get('club')
+
+        if request.user.role != 'owner' and (not request.user.club or request.user.club != club):
+            return Response({'error': 'You can only add employees for your club'}, status=status.HTTP_403_FORBIDDEN)
+
+        user = serializer.save()
+        return Response(UserProfileSerializer(user).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -120,7 +131,7 @@ def api_rfid_login(request):
         user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
         refresh = RefreshToken.for_user(user)
         return Response({
-            'user': UserProfileSerializer(user).data,  # Use UserProfileSerializer
+            'user': UserProfileSerializer(user).data,
             'refresh': str(refresh),
             'access': str(refresh.access_token),
         }, status=status.HTTP_200_OK)

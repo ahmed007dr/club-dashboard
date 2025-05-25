@@ -13,10 +13,7 @@ from decimal import Decimal
 from finance.models import Income, IncomeSource
 from rest_framework.pagination import PageNumberPagination
 from members.models import Member
-from rest_framework import status
-
-
-
+from accounts.models import User
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -29,11 +26,8 @@ def subscription_type_list(request):
         else:
             types = SubscriptionType.objects.filter(club=request.user.club)
 
-        # Apply search filter
         if search_term:
-            types = types.filter(
-                Q(name__icontains=search_term)
-            )
+            types = types.filter(Q(name__icontains=search_term))
 
         types = types.order_by('id')
         paginator = PageNumberPagination()
@@ -48,7 +42,6 @@ def subscription_type_list(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
@@ -56,24 +49,24 @@ def subscription_list(request):
     Handle GET requests to retrieve a filtered list of subscriptions and POST requests to create a new subscription.
     """
     if request.method == 'GET':
-        # Get the identifier from query parameters
         search_term = request.GET.get('identifier', '')
 
         if request.user.role == 'owner':
-            subscriptions = Subscription.objects.select_related('member', 'type', 'club').all()
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club', 'coach').all()
         else:
-            subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club', 'coach').filter(club=request.user.club)
 
         filterable_fields = {
             'member_id': 'member_id',
             'type_id': 'type_id',
             'club_id': 'club_id',
-            'club_name': 'club__name__iexact',  
+            'club_name': 'club__name__iexact',
             'start_date': 'start_date',
             'end_date': 'end_date',
             'paid_amount': 'paid_amount',
             'remaining_amount': 'remaining_amount',
             'entry_count': 'entry_count',
+            'coach_id': 'coach_id',  # Added for filtering by coach
         }
 
         filters = {}
@@ -93,7 +86,8 @@ def subscription_list(request):
             subscriptions = subscriptions.filter(
                 Q(member__name__icontains=search_term) |
                 Q(member__phone__icontains=search_term) |
-                Q(member__rfid_code__icontains=search_term)
+                Q(member__rfid_code__icontains=search_term) |
+                Q(coach__username__icontains=search_term)  # Added for searching by coach
             )
 
         try:
@@ -106,22 +100,15 @@ def subscription_list(request):
         except ValueError as e:
             return Response({'error': f'Invalid range filter value: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        subscriptions = subscriptions.order_by('-id') 
+        subscriptions = subscriptions.order_by('-id')
 
         status_filter = request.query_params.get('status', '').lower()
         today = timezone.now().date()
         
         status_filters = {
-            'active': {
-                'start_date__lte': today,
-                'end_date__gte': today
-            },
-            'expired': {
-                'end_date__lt': today
-            },
-            'upcoming': {
-                'start_date__gt': today
-            }
+            'active': {'start_date__lte': today, 'end_date__gte': today},
+            'expired': {'end_date__lt': today},
+            'upcoming': {'start_date__gt': today}
         }
         
         if status_filter in status_filters:
@@ -135,6 +122,9 @@ def subscription_list(request):
     elif request.method == 'POST':
         identifier = request.data.get('identifier', '')
 
+        mutable_data = request.data.copy()
+
+        # Handle member identification
         if identifier:
             try:
                 member = Member.objects.filter(
@@ -147,27 +137,50 @@ def subscription_list(request):
                         {'error': 'No member found with the provided identifier'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-                mutable_data = request.data.copy()
                 mutable_data['member'] = member.id
             except Member.DoesNotExist:
                 return Response(
                     {'error': 'Invalid identifier provided'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-        else:
-            mutable_data = request.data
 
         serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
         if serializer.is_valid():
             subscription = serializer.save()
-            
+
+            # Validate coach for private subscriptions
+            if subscription.type.is_private:
+                coach_id = mutable_data.get('coach')
+                if not coach_id:
+                    subscription.delete()
+                    return Response(
+                        {'error': 'Coach is required for private subscriptions'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                try:
+                    coach = User.objects.get(id=coach_id, role='coach')
+                    if coach.club != subscription.club:
+                        subscription.delete()
+                        return Response(
+                            {'error': 'Coach must belong to the same club as the subscription'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                except User.DoesNotExist:
+                    subscription.delete()
+                    return Response(
+                        {'error': 'Invalid coach ID provided'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+
+            # Check permission
             if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
                 subscription.delete()
                 return Response(
                     {'error': 'You do not have permission to create a subscription for this club'},
                     status=status.HTTP_403_FORBIDDEN
                 )
-            
+
+            # Create Income record
             if subscription.paid_amount > 0:
                 source, created = IncomeSource.objects.get_or_create(
                     club=subscription.club,
@@ -189,8 +202,8 @@ def subscription_list(request):
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
+# Other endpoints remain unchanged
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_type_detail(request, pk):
@@ -231,6 +244,7 @@ def active_subscription_types(request):
     page = paginator.paginate_queryset(types, request)
     serializer = SubscriptionTypeSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
+
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_detail(request, pk):
@@ -244,8 +258,8 @@ def subscription_detail(request, pk):
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        identifier = request.GET.get('identifier', '')  
-        mutable_data = request.data.copy()  
+        identifier = request.GET.get('identifier', '')
+        mutable_data = request.data.copy()
 
         if identifier:
             try:
@@ -259,22 +273,46 @@ def subscription_detail(request, pk):
                         {'error': 'No member found with the provided identifier'},
                         status=status.HTTP_400_BAD_REQUEST
                     )
-                mutable_data['member'] = member.id  
+                mutable_data['member'] = member.id
             except Member.DoesNotExist:
                 return Response(
                     {'error': 'Invalid identifier provided'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        # Update the subscription
+        # Validate coach for private subscriptions if updated
+        if 'type' in mutable_data:
+            try:
+                subscription_type = SubscriptionType.objects.get(id=mutable_data['type'])
+                if subscription_type.is_private:
+                    coach_id = mutable_data.get('coach')
+                    if not coach_id:
+                        return Response(
+                            {'error': 'Coach is required for private subscriptions'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    try:
+                        coach = User.objects.get(id=coach_id, role='coach')
+                        if coach.club != subscription.club:
+                            return Response(
+                                {'error': 'Coach must belong to the same club as the subscription'},
+                                status=status.HTTP_400_BAD_REQUEST
+                            )
+                    except User.DoesNotExist:
+                        return Response(
+                            {'error': 'Invalid coach ID provided'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+            except SubscriptionType.DoesNotExist:
+                return Response(
+                    {'error': 'Invalid subscription type ID'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
         serializer = SubscriptionSerializer(subscription, data=mutable_data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated_subscription = serializer.save()
             
-            # Recalculate remaining_amount
-            updated_subscription.remaining_amount = updated_subscription.type.price - updated_subscription.paid_amount
-            
-            # Create Income record if paid_amount is updated
             if 'paid_amount' in mutable_data and updated_subscription.paid_amount > subscription.paid_amount:
                 additional_amount = updated_subscription.paid_amount - subscription.paid_amount
                 source, created = IncomeSource.objects.get_or_create(
@@ -292,6 +330,7 @@ def subscription_detail(request, pk):
                 )
                 income.save()
 
+            updated_subscription.remaining_amount = updated_subscription.type.price - updated_subscription.paid_amount
             updated_subscription.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -361,7 +400,7 @@ def renew_subscription(request, pk):
     subscription.end_date = new_end_date
     subscription.paid_amount = subscription.type.price
     subscription.remaining_amount = 0
-    subscription.entry_count = 0  # Reset entry count on renewal
+    subscription.entry_count = 0
     subscription.save()
 
     source, created = IncomeSource.objects.get_or_create(
@@ -373,7 +412,7 @@ def renew_subscription(request, pk):
         club=subscription.club,
         source=source,
         amount=subscription.type.price,
-        description=f"تجديد اشتراك عن المشترك  {subscription.member.name}",
+        description=f"تجديد اشتراك عن المشترك {subscription.member.name}",
         date=timezone.now().date(),
         received_by=request.user
     )
