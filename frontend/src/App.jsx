@@ -1,10 +1,11 @@
+// src/App.jsx
 import React from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-hot-toast';
 import Dashboard from './pages/Dashboard';
 import Login from './pages/auth/Login';
-import Register from './pages/auth/Register'; 
+import Register from './pages/auth/Register';
 import Navbar from './components/common/Navbar';
 import Main from './components/dashboard/Main';
 import Subscriptions from './components/dashboard/Subscriptions';
@@ -19,8 +20,8 @@ import Profile from './components/dashboard/Profile';
 import Staff from './components/dashboard/Staff';
 import Finance from './components/dashboard/Finance';
 import MemberSubscriptions from './components/dashboard/MemberSubscriptions';
-import Member from './pages/member/Member'; 
-import AddMember from './components/modals/AddMember'; 
+import Member from './pages/member/Member';
+import AddMember from './components/modals/AddMember';
 import StaffProfile from './components/dashboard/StaffProfile';
 import CheckInForm from './components/dashboard/CheckInForm';
 import OutForm from './components/dashboard/OutForm';
@@ -33,11 +34,15 @@ import Expense from './components/dashboard/Expense';
 import IncomeSources from './components/dashboard/IncomeSources';
 import useTokenRefresh from './hooks/useTokenRefresh';
 import { Toaster } from 'react-hot-toast';
+import PayrollPeriodsTable from './components/dashboard/payroll/PayrollPeriodsTable';
+import PayrollReportTable from './components/dashboard/payroll/PayrollReportTable';
+import PayrollPeriodForm from './components/dashboard/payroll/PayrollPeriodForm';
+import PayrollForm from './components/dashboard/payroll/PayrollForm';
+import FinalizePayrollModal from './components/dashboard/payroll/FinalizePayrollModal';
+import PayrollDetailsPage from './components/dashboard/payroll/PayrollDetailsPage'; // Add this
 
-// Route protection component
 const ProtectedRoute = ({ element }) => {
-  const accessToken = localStorage.getItem('token');  
-  
+  const accessToken = localStorage.getItem('token');
   if (!accessToken) {
     return <Navigate to="/login" replace />;
   }
@@ -46,13 +51,12 @@ const ProtectedRoute = ({ element }) => {
 
 function App() {
   const navigate = useNavigate();
-  const { error } = useTokenRefresh(); // Use the custom hook to refresh token every 40 minutes
+  const { error } = useTokenRefresh();
   const { token } = useSelector((state) => state.auth);
 
-  // Handle token refresh errors by redirecting to login
   React.useEffect(() => {
     if (error) {
-      toast.error(`جلسة منتهية، يرجى تسجيل الدخول مجدداً: ${error}`);
+      toast.error(`جلسة منتهية، يرجى تسجيل الدخول مجددًا: ${error}`);
       navigate('/login');
     }
   }, [error, navigate]);
@@ -64,8 +68,6 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        
-        {/* Protected Routes */}
         <Route path="/" element={<ProtectedRoute element={<Dashboard />} />}>
           <Route index element={<Main />} />
           <Route path="subscriptions" element={<Subscriptions />} />
@@ -86,11 +88,17 @@ function App() {
           <Route path="attendance-form" element={<AttendanceForm />} />
           <Route path="check-out" element={<OutForm />} />
           <Route path="attendance/:staffId" element={<AttendanceAnalysis />} />
-          <Route path="staff-reports" element={<UserList/>} />
+          <Route path="staff-reports" element={<UserList />} />
           <Route path="/shift-attendance" element={<ShiftAttendanceList />} />
           <Route path="expense-category" element={<ExpenseCategory />} />
           <Route path="expense" element={<Expense />} />
           <Route path="income-sources" element={<IncomeSources />} />
+          <Route path="payroll-periods" element={<PayrollPeriodsTable />} />
+          <Route path="payroll-report" element={<PayrollReportTable />} />
+          <Route path="create-payroll-period" element={<PayrollPeriodForm />} />
+          <Route path="create-payroll" element={<PayrollForm />} />
+          <Route path="finalize-payroll" element={<FinalizePayrollModal />} />
+          <Route path="payroll-details/:id" element={<PayrollDetailsPage />} /> {/* Add this */}
         </Route>
       </Routes>
     </div>

@@ -1,3 +1,4 @@
+// src/pages/Dashboard.jsx
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -21,62 +22,69 @@ import { TbReportAnalytics } from "react-icons/tb";
 import { GiReceiveMoney } from "react-icons/gi";
 import { MdCategory } from "react-icons/md";
 import { GiPayMoney } from "react-icons/gi";
+import { FaMoneyCheckAlt, FaCalendarAlt, FaFileAlt } from 'react-icons/fa'; // Payroll icons
+
 const Dashboard = () => {
   const dispatch = useDispatch();
   const sidebarOpen = useSelector((state) => state.ui.sidebarOpen);
 
-const navItems = [
-  {
-    name: 'لوحة التحكم',
-    icon: <MdOutlineDashboard />,
-    children: [
-      { path: '', name: 'الرئيسية', icon: <IoMdAnalytics /> },
-      { path: 'profile', name: 'الملف الشخصي', icon: <BsPersonBoundingBox /> },
-    ],
-  },
-  {
-    name: 'العضوية',
-    icon: <FiUsers />,
-    children: [
-      { path: 'members', name: 'الأعضاء', icon: <RiGroupLine /> },
-      { path: 'attendance', name: 'الحضور', icon: <AiOutlineSchedule /> },
-      { path: 'free-invites', name: 'الدعوات المجانية', icon: <RiVipCrown2Line /> },
-      { path: 'subscriptions', name: 'الاشتراكات', icon: <MdOutlineSubscriptions /> },
-      { path: 'tickets', name: 'التذاكر', icon: <GiTicket /> },
-
-    ],
-  },
-  {
-    name: 'الإدارة',
-    icon: <FaRegBuilding />,
-    children: [
-      { path: 'staff', name: 'الموظفون', icon: <RiUserLine /> },
-      { path: 'attendance-form', name: 'تسجيل الدخول والخروج', icon: <BiLogIn /> },
-      { path: 'shift-attendance', name: 'حضور موظفي الورديات', icon: <AiOutlineSchedule /> },
-      { path: 'club', name: 'النادي', icon: <HiOutlineDocumentReport /> },
-      { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
-    ],
-  },
-  {
-    name: 'تقارير الموظفين',
-    icon: <TbReportAnalytics />,
-    children: [
-      { path: 'staff-reports', name: 'تقارير الموظفين', icon: <RiUserLine /> },
-    ],
-  },
-  {
-    name: 'المالية',
-    icon: <GiMoneyStack />,
-    children: [
-      { path: 'income-sources', name: 'مصادر الدخل', icon: <GiReceiveMoney /> },
-      { path: 'expense-category', name: 'فئات المصروفات', icon: <MdCategory /> },
-      { path: 'expense', name: 'المصروفات', icon: <GiPayMoney /> },
-    ],
-  },
-];
-
-
-  
+  const navItems = [
+    {
+      name: 'لوحة التحكم',
+      icon: <MdOutlineDashboard />,
+      children: [
+        { path: '', name: 'الرئيسية', icon: <IoMdAnalytics /> },
+        { path: 'profile', name: 'الملف الشخصي', icon: <BsPersonBoundingBox /> },
+      ],
+    },
+    {
+      name: 'العضوية',
+      icon: <FiUsers />,
+      children: [
+        { path: 'members', name: 'الأعضاء', icon: <RiGroupLine /> },
+        { path: 'attendance', name: 'الحضور', icon: <AiOutlineSchedule /> },
+        { path: 'free-invites', name: 'الدعوات المجانية', icon: <RiVipCrown2Line /> },
+        { path: 'subscriptions', name: 'الاشتراكات', icon: <MdOutlineSubscriptions /> },
+        { path: 'tickets', name: 'التذاكر', icon: <GiTicket /> },
+      ],
+    },
+    {
+      name: 'الإدارة',
+      icon: <FaRegBuilding />,
+      children: [
+        { path: 'staff', name: 'الموظفون', icon: <RiUserLine /> },
+        { path: 'attendance-form', name: 'تسجيل الدخول والخروج', icon: <BiLogIn /> },
+        { path: 'shift-attendance', name: 'حضور موظفي الورديات', icon: <AiOutlineSchedule /> },
+        { path: 'club', name: 'النادي', icon: <HiOutlineDocumentReport /> },
+        { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
+      ],
+    },
+    {
+      name: 'تقارير الموظفين',
+      icon: <TbReportAnalytics />,
+      children: [
+        { path: 'staff-reports', name: 'تقارير الموظفين', icon: <RiUserLine /> },
+      ],
+    },
+    {
+      name: 'المالية',
+      icon: <GiMoneyStack />,
+      children: [
+        { path: 'income-sources', name: 'مصادر الدخل', icon: <GiReceiveMoney /> },
+        { path: 'expense-category', name: 'فئات المصروفات', icon: <MdCategory /> },
+        { path: 'expense', name: 'المصروفات', icon: <GiPayMoney /> },
+      ],
+    },
+    {
+      name: 'الرواتب',
+      icon: <FaMoneyCheckAlt />,
+      children: [
+        { path: 'payroll-periods', name: 'فترات الرواتب', icon: <FaCalendarAlt /> },
+        { path: 'payroll-report', name: 'تقرير الرواتب', icon: <FaFileAlt /> },
+        { path: 'create-payroll-period', name: 'إنشاء فترة رواتب', icon: <FaCalendarAlt /> },
+      ],
+    },
+  ];
 
   return (
     <div className="flex h-screen overflow-hidden">

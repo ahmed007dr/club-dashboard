@@ -180,3 +180,13 @@ def finalize_payroll(request):
         payroll.finalize()
 
     return Response({'detail': f'Successfully finalized {payrolls.count()} payrolls'}, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_payroll_details(request, payroll_id):
+    try:
+        payroll = Payroll.objects.get(id=payroll_id)
+        serializer = PayrollSerializer(payroll)
+        return Response(serializer.data)
+    except Payroll.DoesNotExist:
+        return Response({"detail": "Payroll not found"}, status=404)
