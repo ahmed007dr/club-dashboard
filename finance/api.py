@@ -6,17 +6,20 @@ from django.shortcuts import get_object_or_404
 from .models import Expense, Income, ExpenseCategory, IncomeSource
 from .serializers import (
     ExpenseSerializer, IncomeSerializer,
-    ExpenseCategorySerializer, IncomeSourceSerializer,ExpenseDetailSerializer ,IncomeDetailSerializer ,IncomeSummarySerializer
+    ExpenseCategorySerializer, IncomeSourceSerializer,
+    ExpenseDetailSerializer, IncomeDetailSerializer,
+    IncomeSummarySerializer
 )
 from rest_framework.permissions import IsAuthenticated
-from utils.permissions import IsOwnerOrRelatedToClub  
+from utils.permissions import IsOwnerOrRelatedToClub
 from rest_framework.pagination import PageNumberPagination
-from datetime import datetime, timedelta
+from datetime import datetime
 from core.models import Club
-from staff.serializers import StaffAttendance 
+from staff.serializers import StaffAttendance
 from django.db.models import Sum, Q
 from accounts.models import User
 from django.utils.dateparse import parse_date
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -29,13 +32,11 @@ class StandardPagination(PageNumberPagination):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_category_api(request):
     if request.method == 'GET':
-        # Initialize queryset based on user role
         if request.user.role == 'owner':
             categories = ExpenseCategory.objects.all()
         else:
             categories = ExpenseCategory.objects.filter(club=request.user.club)
 
-        # Apply filters if provided
         name = request.query_params.get('name', '')
         description = request.query_params.get('description', '')
         if name:
@@ -43,43 +44,44 @@ def expense_category_api(request):
         if description:
             categories = categories.filter(description__icontains=description)
 
-        # Order by ID (descending)
         categories = categories.order_by('-id')
-
-        # Apply pagination
         paginator = StandardPagination()
         page = paginator.paginate_queryset(categories, request)
         serializer = ExpenseCategorySerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
+        if request.user.role != 'owner':
+            return Response({'error': 'Only owners can create expense categories'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = ExpenseCategorySerializer(data=request.data)
         if serializer.is_valid():
             category = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# Expense Views
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_api(request):
     if request.method == 'GET':
-        if request.user.role in ['owner', 'admin']:
+        if request.user.role == 'owner':
             expenses = Expense.objects.select_related('category', 'paid_by').all().order_by('-id')
+        elif request.user.role == 'admin':
+            return Response({'error': 'Admins cannot view expenses'}, status=status.HTTP_403_FORBIDDEN)
         else:
-            today = datetime.now().date()
+            # Staff see their expenses for their latest open or closed shift
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
-                club=request.user.club,
-                check_in__date=today
+                club=request.user.club
             ).order_by('-check_in').first()
             
             if attendance:
+                check_out = attendance.check_out if attendance.check_out else datetime.now()
                 expenses = Expense.objects.select_related('category', 'paid_by').filter(
                     club=request.user.club,
-                    paid_by=request.user,  # الموظف بس اللي أدخل المصروف
+                    paid_by=request.user,
                     date__gte=attendance.check_in,
-                    date__lte=attendance.check_out if attendance.check_out else datetime.now()
+                    date__lte=check_out
                 ).order_by('-date')
             else:
                 expenses = Expense.objects.none()
@@ -90,11 +92,16 @@ def expense_api(request):
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
+        if request.user.role == 'admin':
+            return Response({'error': 'Admins cannot create expenses'}, status=status.HTTP_403_FORBIDDEN)
+            
         data = request.data.copy()
         data['paid_by'] = request.user.id
         
         club_id = data.get('club')
-        if club_id:
+        if club_id and request.user.role != 'owner':
+            if int(club_id) != request.user.club.id:
+                return Response({'error': 'You can only create expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
             club = get_object_or_404(Club, id=club_id)
         
         serializer = ExpenseSerializer(data=data, context={'request': request})
@@ -102,7 +109,7 @@ def expense_api(request):
             expense = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_source_api(request):
@@ -112,7 +119,6 @@ def income_source_api(request):
         else:
             sources = IncomeSource.objects.filter(club=request.user.club).order_by('-id')
 
-        # Add filtering by name and description
         name = request.query_params.get('name', None)
         description = request.query_params.get('description', None)
         
@@ -127,48 +133,51 @@ def income_source_api(request):
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
+        if request.user.role != 'owner':
+            return Response({'error': 'Only owners can create income sources'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = IncomeSourceSerializer(data=request.data)
         if serializer.is_valid():
             source = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-# Income Views
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_api(request):
     if request.method == 'GET':
-        if request.user.role in ['owner', 'admin']:
+        if request.user.role == 'owner':
             incomes = Income.objects.select_related('source', 'received_by').all()
+        elif request.user.role == 'admin':
+            incomes = Income.objects.select_related('source', 'received_by').filter(
+                club=request.user.club
+            )
         else:
-            # جيب آخر سجل حضور مفتوح أو مغلق اليوم
-            today = datetime.now().date()
+            # Staff see their incomes for their latest open or closed shift
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
-                club=request.user.club,
-                check_in__date=today
+                club=request.user.club
             ).order_by('-id').first()
             
             if attendance:
+                check_out = attendance.check_out if attendance.check_out else datetime.now()
                 incomes = Income.objects.select_related('source', 'received_by').filter(
                     club=request.user.club,
-                    received_by=request.user, 
+                    received_by=request.user,
                     date__gte=attendance.check_in,
-                    date__lte=attendance.check_out if attendance.check_out else datetime.now()
+                    date__lte=check_out
                 )
             else:
                 incomes = Income.objects.none()
 
-        # Apply filters based on query parameters
         source = request.query_params.get('source')
         amount = request.query_params.get('amount')
         description = request.query_params.get('description')
 
         if source:
-            # Validate source name exists
             if not IncomeSource.objects.filter(name__icontains=source).exists():
                 return Response({"error": "No income source found with this name"}, status=status.HTTP_400_BAD_REQUEST)
-            incomes = incomes.filter(source__name__icontains=source)  # Filter by IncomeSource name
+            incomes = incomes.filter(source__name__icontains=source)
         if amount:
             try:
                 incomes = incomes.filter(amount=float(amount))
@@ -185,11 +194,16 @@ def income_api(request):
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
+        if request.user.role == 'admin':
+            return Response({'error': 'Admins cannot create incomes'}, status=status.HTTP_403_FORBIDDEN)
+            
         data = request.data.copy()
         data['received_by'] = request.user.id
         
         club_id = data.get('club')
-        if club_id:
+        if club_id and request.user.role != 'owner':
+            if int(club_id) != request.user.club.id:
+                return Response({'error': 'You can only create incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
             club = get_object_or_404(Club, id=club_id)
         
         serializer = IncomeSerializer(data=data)
@@ -197,8 +211,6 @@ def income_api(request):
             income = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Detail Views
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -206,10 +218,19 @@ def expense_detail_api(request, pk):
     expense = get_object_or_404(Expense, pk=pk)
     
     if request.method == 'GET':
+        if request.user.role == 'admin':
+            return Response({'error': 'Admins cannot view expenses'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role not in ['owner'] and expense.club != request.user.club:
+            return Response({'error': 'You can only view expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
         serializer = ExpenseSerializer(expense, context={'request': request})
         return Response(serializer.data)
     
     elif request.method == 'PUT':
+        if request.user.role == 'admin':
+            return Response({'error': 'Admins cannot update expenses'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role not in ['owner'] and expense.paid_by != request.user:
+            return Response({'error': 'You can only update your own expenses'}, status=status.HTTP_403_FORBIDDEN)
+            
         serializer = ExpenseSerializer(expense, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated_expense = serializer.save()
@@ -219,6 +240,8 @@ def expense_detail_api(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
+        if request.user.role != 'owner':
+            return Response({'error': 'Only owners can delete expenses'}, status=status.HTTP_403_FORBIDDEN)
         expense.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -228,10 +251,19 @@ def income_detail_api(request, pk):
     income = get_object_or_404(Income, pk=pk)
     
     if request.method == 'GET':
+        if request.user.role not in ['owner', 'admin'] and income.received_by != request.user:
+            return Response({'error': 'You can only view your own incomes'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role not in ['owner'] and income.club != request.user.club:
+            return Response({'error': 'You can only view incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
         serializer = IncomeSerializer(income)
         return Response(serializer.data)
     
     elif request.method == 'PUT':
+        if request.user.role == 'admin':
+            return Response({'error': 'Admins cannot update incomes'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role not in ['owner'] and income.received_by != request.user:
+            return Response({'error': 'You can only update your own incomes'}, status=status.HTTP_403_FORBIDDEN)
+            
         serializer = IncomeSerializer(income, data=request.data, partial=True)
         if serializer.is_valid():
             updated_income = serializer.save()
@@ -241,11 +273,10 @@ def income_detail_api(request, pk):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
+        if request.user.role != 'owner':
+            return Response({'error': 'Only owners can delete incomes'}, status=status.HTTP_403_FORBIDDEN)
         income.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
-import datetime as dt
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -253,13 +284,13 @@ def daily_summary_api(request):
     if request.user.role not in ['owner', 'admin']:
         return Response({'error': 'Only owners and admins can view daily summaries'}, status=status.HTTP_403_FORBIDDEN)
     
-    date_str = request.query_params.get('date')  
-    month_str = request.query_params.get('month')  
-    username = request.query_params.get('username')  
+    date_str = request.query_params.get('date')
+    month_str = request.query_params.get('month')
+    username = request.query_params.get('username')
     
     if date_str:
         try:
-            filter_date = dt.datetime.strptime(date_str, '%Y-%m-%d').date()
+            filter_date = datetime.strptime(date_str, '%Y-%m-%d').date()
             date_filter = {'check_in__date': filter_date}
         except ValueError:
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -273,19 +304,24 @@ def daily_summary_api(request):
         filter_date = datetime.now().date()
         date_filter = {'check_in__date': filter_date}
     
+    if request.user.role == 'owner':
+        club_filter = {}
+    else:
+        club_filter = {'club': request.user.club}
+    
     if username:
-        employees = User.objects.filter(club=request.user.club, username=username)
+        employees = User.objects.filter(**club_filter, username=username)
         if not employees.exists():
             return Response({'error': 'Employee with this username not found or not in this club.'}, status=status.HTTP_404_NOT_FOUND)
     else:
-        employees = User.objects.filter(club=request.user.club)
+        employees = User.objects.filter(**club_filter)
     
     summary = []
     
     for employee in employees:
         attendances = StaffAttendance.objects.filter(
             staff=employee,
-            club=request.user.club,
+            **club_filter,
             **date_filter
         )
         
@@ -299,15 +335,15 @@ def daily_summary_api(request):
         }
         
         for attendance in attendances:
-            expenses = Expense.objects.filter(
-                club=request.user.club,
+            expenses = Expense.objects.none() if request.user.role == 'admin' else Expense.objects.filter(
+                **club_filter,
                 paid_by=employee,
                 date__gte=attendance.check_in,
                 date__lte=attendance.check_out if attendance.check_out else datetime.now()
             )
             
             incomes = Income.objects.filter(
-                club=request.user.club,
+                **club_filter,
                 received_by=employee,
                 date__gte=attendance.check_in,
                 date__lte=attendance.check_out if attendance.check_out else datetime.now()
@@ -316,7 +352,7 @@ def daily_summary_api(request):
             total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or 0
             total_incomes = incomes.aggregate(total=Sum('amount'))['total'] or 0
             
-            expense_details = ExpenseDetailSerializer(expenses, many=True).data
+            expense_details = ExpenseDetailSerializer(expenses, many=True).data if request.user.role != 'admin' else []
             income_details = IncomeDetailSerializer(incomes, many=True).data
             
             attendance_summary = {
@@ -336,14 +372,12 @@ def daily_summary_api(request):
             employee_summary['total_incomes'] += total_incomes
         
         employee_summary['net'] = employee_summary['total_incomes'] - employee_summary['total_expenses']
-        if employee_summary['attendance_periods']:  
+        if employee_summary['attendance_periods']:
             summary.append(employee_summary)
-
 
     paginator = StandardPagination()
     page = paginator.paginate_queryset(summary, request)
     return paginator.get_paginated_response(page)
-
 
 def get_object_from_id_or_name(model, value, fields=['id', 'name']):
     """
@@ -372,27 +406,13 @@ def income_summary(request):
     - details: Boolean to include detailed records (true/false)
     """
     try:
-        # Initialize queryset based on user role
-        if request.user.role in ['owner', 'admin']:
-            incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
+        if request.user.role == 'owner':
+            incomes = Income.objects.select_related('source', 'received_by').all()
         else:
-            today = datetime.now().date()
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user,
-                club=request.user.club,
-                check_in__date=today
-            ).order_by('-check_in').first()
-            if attendance:
-                incomes = Income.objects.select_related('source', 'received_by').filter(
-                    club=request.user.club,
-                    received_by=request.user,
-                    date__gte=attendance.check_in,
-                    date__lte=attendance.check_out if attendance.check_out else datetime.now()
-                )
-            else:
-                incomes = Income.objects.none()
+            incomes = Income.objects.select_related('source', 'received_by').filter(
+                club=request.user.club
+            )
 
-        # Apply filters
         date = request.query_params.get('date')
         start = request.query_params.get('start')
         end = request.query_params.get('end')
@@ -431,11 +451,9 @@ def income_summary(request):
             else:
                 return Response({'error': 'Income source not found or multiple matches.'}, status=400)
 
-        # Calculate total
         total = incomes.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         response_data = {'total_income': float(total)}
 
-        # Include details if requested
         if details:
             response_data['details'] = IncomeSummarySerializer(incomes, many=True).data
 
@@ -458,27 +476,11 @@ def expense_summary(request):
     - details: Boolean to include detailed records (true/false)
     """
     try:
-        # Initialize queryset based on user role
-        if request.user.role in ['owner', 'admin']:
-            expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)
-        else:
-            today = datetime.now().date()
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user,
-                club=request.user.club,
-                check_in__date=today
-            ).order_by('-check_in').first()
-            if attendance:
-                expenses = Expense.objects.select_related('category', 'paid_by').filter(
-                    club=request.user.club,
-                    paid_by=request.user,
-                    date__gte=attendance.check_in,
-                    date__lte=attendance.check_out if attendance.check_out else datetime.now()
-                )
-            else:
-                expenses = Expense.objects.none()
+        if request.user.role != 'owner':
+            return Response({'error': 'Only owners can view expense summaries'}, status=status.HTTP_403_FORBIDDEN)
+            
+        expenses = Expense.objects.select_related('category', 'paid_by').all()
 
-        # Apply filters
         date = request.query_params.get('date')
         start = request.query_params.get('start')
         end = request.query_params.get('end')
@@ -517,11 +519,9 @@ def expense_summary(request):
             else:
                 return Response({'error': 'Expense category not found or multiple matches.'}, status=400)
 
-        # Calculate total
         total = expenses.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         response_data = {'total_expense': float(total)}
 
-        # Include details if requested
         if details:
             response_data['details'] = ExpenseDetailSerializer(expenses, many=True).data
 
@@ -540,11 +540,13 @@ def finance_overview(request):
     - end: End date (YYYY-MM-DD)
     """
     try:
-        # Initialize querysets
-        income_qs = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
-        expense_qs = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)
+        if request.user.role == 'owner':
+            income_qs = Income.objects.select_related('source', 'received_by').all()
+            expense_qs = Expense.objects.select_related('category', 'paid_by').all()
+        else:
+            income_qs = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
+            expense_qs = Expense.objects.none()
 
-        # Apply date range filter
         start = request.query_params.get('start')
         end = request.query_params.get('end')
         if start and end:
@@ -558,7 +560,6 @@ def finance_overview(request):
         elif start or end:
             return Response({'error': 'Both start and end dates are required.'}, status=400)
 
-        # Calculate totals
         total_income = income_qs.aggregate(total=Sum('amount'))['total'] or 0
         total_expense = expense_qs.aggregate(total=Sum('amount'))['total'] or 0
         net = total_income - total_expense
