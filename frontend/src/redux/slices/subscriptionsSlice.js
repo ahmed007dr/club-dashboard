@@ -172,6 +172,8 @@ export const deleteSubscriptionById = createAsyncThunk(
       console.log("Subscription deleted successfully:", id);
       return id;
     } catch (error) {
+      console.log(data.error);
+      console.error("Error deleting subscription:", error); // Log full error
       return rejectWithValue(
         error.response?.data?.detail || "Failed to delete subscription"
       );

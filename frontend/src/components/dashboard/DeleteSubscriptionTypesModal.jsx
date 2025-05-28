@@ -17,9 +17,20 @@ const DeleteSubscriptionTypesModal = ({ isOpen, onClose, subscription }) => {
       // Close the modal after successful deletion
       onClose();
     } catch (err) {
-      console.error("Deletion failed:", err);
-      toast.error("فشل في حذف الاشتراك");
-    }
+  console.error("Deletion failed:", err);
+  if (err.response) {
+    console.error("Error response data:", err.response.data);
+    console.error("Error status:", err.response.status);
+    console.error("Error headers:", err.response.headers);
+  } else if (err.request) {
+    console.error("No response received:", err.request);
+  } else {
+    console.error("Error message:", err.message);
+  }
+
+  toast.error("فشل في حذف الاشتراك");
+}
+
   };
 
 

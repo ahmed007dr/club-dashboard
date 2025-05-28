@@ -30,97 +30,93 @@ const Main = () => {
   const [totalInvites, setTotalInvites] = useState(0);
   const [totalReceipts, setTotalReceipts] = useState(0);
 
-  const fetchAll = async () => {
-    setIsLoading(true);
-    try {
-      await Promise.all([
-        dispatch(fetchUsers())
-          .unwrap()
-          .then((res) => {
-            console.log('Users data:', res);
-            setTotalMembers(res?.count || 0);
-          })
-          .catch((err) => {
-            console.error("Error fetching users:", err);
-            setTotalMembers(0);
-          }),
+const fetchAll = async () => {
+  setIsLoading(true);
+  try {
+    await Promise.all([
+      dispatch(fetchUsers())
+        .unwrap()
+        .then((res) => {
+          console.log('Users data:', res);
+          setTotalMembers(res?.count || 0);
+        })
+        .catch((err) => {
+          console.error("Error fetching users:", err);
+          setTotalMembers(0);
+        }),
 
-        dispatch(fetchSubscriptions())
-          .unwrap()
-          .then((res) => {
-            console.log('Subscriptions data:', res);
-            setTotalSubscriptions(res?.count || 0);
-          })
-          .catch((err) => {
-            console.error("Error fetching subscriptions:", err);
-            setTotalSubscriptions(0);
-          }),
+      dispatch(fetchSubscriptions())
+        .unwrap()
+        .then((res) => {
+          setTotalSubscriptions(res?.count || 0);
+        })
+        .catch((err) => {
+          console.error("Error fetching subscriptions:", err);
+          setTotalSubscriptions(0);
+        }),
 
-        dispatch(fetchTickets())
-          .unwrap()
-          .then((res) => {
-            console.log('Tickets data:', res);
-            setTotalTickets(res?.count || res?.results?.length || 0);
-          })
-          .catch((err) => {
-            console.error("Error fetching tickets:", err);
-            setTotalTickets(0);
-          }),
+      dispatch(fetchTickets({ page: 1, page_size: 100 }))
+        .unwrap()
+        .then((res) => {
+          console.log('Tickets data:', res);
+          setTotalTickets(res?.count || (Array.isArray(res) ? res.length : res?.results?.length) || 0);
+        })
+        .catch((err) => {
+          console.error("Error fetching tickets:", err);
+          setTotalTickets(0);
+        }),
 
-        dispatch(fetchAttendances())
-          .unwrap()
-          .then((res) => {
-            console.log('Attendances data:', res);
-            // Handle case where res is the array or res.results contains the array
-            const attendanceCount = Array.isArray(res) ? res.length : (res?.count || res?.results?.length || 0);
-            setTotalAttendances(attendanceCount);
-          })
-          .catch((err) => {
-            console.error("Error fetching attendances:", err);
-            setTotalAttendances(0);
-          }),
+      // Modified fetchAttendances call
+      dispatch(fetchAttendances({ page: 1, pageSize: 100 }))
+        .unwrap()
+        .then((res) => {
+          console.log('Attendances data:', res);
+          setTotalAttendances(res?.count || (Array.isArray(res) ? res.length : res?.results?.length) || 0);
+        })
+        .catch((err) => {
+          console.error("Error fetching attendances:", err);
+          setTotalAttendances(0);
+        }),
 
-        dispatch(fetchStaff())
-          .unwrap()
-          .then((res) => {
-            console.log('Staff data:', res);
-            // Handle case where res is the array or res.results contains the array
-            const staffCount = Array.isArray(res) ? res.length : (res?.count || res?.results?.length || 0);
-            setTotalStaff(staffCount);
-          })
-          .catch((err) => {
-            console.error("Error fetching staff:", err);
-            setTotalStaff(0);
-          }),
+      dispatch(fetchStaff({ page: 1, page_size: 100 }))
+        .unwrap()
+        .then((res) => {
+          console.log('Staff data:', res);
+          setTotalStaff(res?.count || (Array.isArray(res) ? res.length : res?.results?.length) || 0);
+        })
+        .catch((err) => {
+          console.error("Error fetching staff:", err);
+          setTotalStaff(0);
+        }),
 
-        dispatch(fetchFreeInvites())
-          .unwrap()
-          .then((res) => {
-            console.log('Free invites data:', res);
-            setTotalInvites(res?.count || 0);
-          })
-          .catch((err) => {
-            console.error("Error fetching free invites:", err);
-            setTotalInvites(0);
-          }),
+      dispatch(fetchFreeInvites())
+        .unwrap()
+        .then((res) => {
+          console.log('Free invites data:', res);
+          setTotalInvites(res?.count || 0);
+        })
+        .catch((err) => {
+          console.error("Error fetching free invites:", err);
+          setTotalInvites(0);
+        }),
 
-        dispatch(fetchReceipts())
-          .unwrap()
-          .then((res) => {
-            console.log('Receipts data:', res);
-            setTotalReceipts(res?.data?.length || 0);
-          })
-          .catch((err) => {
-            console.error("Error fetching receipts:", err);
-            setTotalReceipts(0);
-          }),
-      ]);
-    } catch (err) {
-      console.error("Error fetching data:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      dispatch(fetchReceipts())
+        .unwrap()
+        .then((res) => {
+          console.log('Receipts data:', res);
+          setTotalReceipts(res?.data?.length || 0);
+        })
+        .catch((err) => {
+          console.error("Error fetching receipts:", err);
+          setTotalReceipts(0);
+        }),
+    ]);
+  } catch (err) {
+    console.error("Error fetching data:", err);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchAll();

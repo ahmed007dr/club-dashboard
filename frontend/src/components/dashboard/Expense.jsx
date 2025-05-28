@@ -29,6 +29,7 @@ import { fetchExpenseCategories } from "../../redux/slices/financeSlice";
 import usePermission from "@/hooks/usePermission";
 
 
+
 const Expense = () => {
   const dispatch = useDispatch();
   const [showModal, setShowModal] = useState(false);
