@@ -14,7 +14,7 @@ from finance.models import Income, IncomeSource
 from rest_framework.pagination import PageNumberPagination
 from members.models import Member
 from rest_framework import status
-
+from django.db.models import Q, Count
 
 
 
@@ -23,24 +23,124 @@ from rest_framework import status
 def subscription_type_list(request):
     if request.method == 'GET':
         search_term = request.GET.get('q', '')
+        status_filter = request.GET.get('status', 'all')
+        duration = request.GET.get('duration', '')
+        includes_gym = request.GET.get('includes_gym', '')
+        includes_pool = request.GET.get('includes_pool', '')
+        includes_classes = request.GET.get('includes_classes', '')
 
         if request.user.role == 'owner':
-            types = SubscriptionType.objects.all().order_by('id')
+            types = SubscriptionType.objects.all().annotate(
+                active_subscriptions_count=Count(
+                    'subscription',
+                    filter=Q(subscription__end_date__gte=timezone.now().date())
+                )
+            )
         else:
-            types = SubscriptionType.objects.filter(club=request.user.club)
+            types = SubscriptionType.objects.filter(club=request.user.club).annotate(
+                active_subscriptions_count=Count(
+                    'subscription',
+                    filter=Q(subscription__end_date__gte=timezone.now().date())
+                )
+            )
+
+        if search_term:
+            types = types.filter(Q(name__icontains=search_term))
+
+        if status_filter != 'all':
+            is_active = status_filter == 'active'
+            types = types.filter(is_active=is_active)
+
+        if duration:
+            try:
+                types = types.filter(duration_days=int(duration))
+            except ValueError:
+                pass
+
+        if includes_gym in ('yes', 'no'):
+            types = types.filter(includes_gym=includes_gym == 'yes')
+
+        if includes_pool in ('yes', 'no'):
+            types = types.filter(includes_pool=includes_pool == 'yes')
+
+        if includes_classes in ('yes', 'no'):
+            types = types.filter(includes_classes=includes_classes == 'yes')
+
+        types = types.order_by('-id')
+
+        paginator = PageNumberPagination()
+        page = paginator.paginate_queryset(types, request)
+        serializer = SubscriptionTypeSerializer(page, many=True, context={'request': request})
+        return paginator.get_paginated_response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = SubscriptionTypeSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            subscription_type = serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if request.method == 'GET':
+        # Get query parameters for filtering
+        search_term = request.GET.get('q', '')
+        status_filter = request.GET.get('status', 'all')
+        duration = request.GET.get('duration', '')
+        includes_gym = request.GET.get('includes_gym', '')
+        includes_pool = request.GET.get('includes_pool', '')
+        includes_classes = request.GET.get('includes_classes', '')
+
+        # Base queryset with subscriptions_count annotation
+        if request.user.role == 'owner':
+            types = SubscriptionType.objects.all().annotate(
+                subscriptions_count=Count(
+                    'subscription',
+                    filter=Q(subscription__end_date__gte=timezone.now().date())
+                )
+            )
+        else:
+            types = SubscriptionType.objects.filter(club=request.user.club).annotate(
+                subscriptions_count=Count(
+                    'subscription',
+                    filter=Q(subscription__end_date__gte=timezone.now().date())
+                )
+            )
 
         # Apply search filter
         if search_term:
-            types = types.filter(
-                Q(name__icontains=search_term)
-            )
+            types = types.filter(Q(name__icontains=search_term))
 
-        types = types.order_by('id')
+        # Apply status filter
+        if status_filter != 'all':
+            is_active = status_filter == 'active'
+            types = types.filter(is_active=is_active)
+
+        # Apply duration filter
+        if duration:
+            try:
+                types = types.filter(duration_days=int(duration))
+            except ValueError:
+                pass  # Ignore invalid duration values
+
+        # Apply includes_gym filter
+        if includes_gym in ('yes', 'no'):
+            types = types.filter(includes_gym=includes_gym == 'yes')
+
+        # Apply includes_pool filter
+        if includes_pool in ('yes', 'no'):
+            types = types.filter(includes_pool=includes_pool == 'yes')
+
+        # Apply includes_classes filter
+        if includes_classes in ('yes', 'no'):
+            types = types.filter(includes_classes=includes_classes == 'yes')
+
+        # Order by ID descending
+        types = types.order_by('-id')
+
+        # Paginate the results
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(types, request)
-        serializer = SubscriptionTypeSerializer(page, many=True)
+        serializer = SubscriptionTypeSerializer(page, many=True, context={'request': request})
         return paginator.get_paginated_response(serializer.data)
-    
+
     elif request.method == 'POST':
         serializer = SubscriptionTypeSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():

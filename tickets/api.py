@@ -18,10 +18,7 @@ from django.db import transaction
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def ticket_list_api(request):
-    if request.user.role == 'owner':
-        tickets = Ticket.objects.select_related('club', 'used_by').all()
-    else:
-        tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club)
+    tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club)
 
     ticket_type = request.query_params.get('ticket_type')
     used = request.query_params.get('used')

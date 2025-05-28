@@ -17,10 +17,7 @@ from django.db import IntegrityError
 def member_list_api(request):
     search_term = request.GET.get('q', '')
     
-    if request.user.role == 'owner':
-        members = Member.objects.all().order_by('-id')
-    else:
-        members = Member.objects.filter(club=request.user.club).order_by('-id')
+    members = Member.objects.filter(club=request.user.club).order_by('-id')
     
     if search_term:
         members = members.filter(
@@ -29,11 +26,10 @@ def member_list_api(request):
             Q(rfid_code__icontains=search_term)
         )
     
-    members = members.order_by('-id')
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(members, request)
     serializer = MemberSerializer(result_page, many=True)
-    return paginator.get_paginated_response(serializer.data)
+    return paginator.get_paginated_response(serializer.data) 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

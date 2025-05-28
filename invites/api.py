@@ -12,11 +12,8 @@ from django.db import transaction
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def free_invite_list_api(request):
-    # Base queryset
-    if request.user.role == 'owner':
-        invites = FreeInvite.objects.select_related('club').all().order_by('-created_at')
-    else:
-        invites = FreeInvite.objects.select_related('club').filter(club=request.user.club).order_by('-created_at')
+    # Base queryset: Only invites for the user's club
+    invites = FreeInvite.objects.select_related('club').filter(club=request.user.club).order_by('-created_at')
 
     # Apply filters based on query parameters
     guest_name = request.query_params.get('guest_name', None)

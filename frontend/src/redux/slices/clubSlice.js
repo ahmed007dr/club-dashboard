@@ -71,15 +71,15 @@ export const switchClub = createAsyncThunk(
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('❌ Failed to switch club:', errorData); // Log error
+        console.error('❌ Failed to switch club:', errorData);
         return rejectWithValue(errorData.message || "Failed to switch club.");
       }
 
       const data = await response.json();
-      console.log('✅ Club switched successfully:', data); // Log success
-      return data;
+      console.log('✅ Club switched successfully:', data);
+      return Array.isArray(data) ? data : [data]; // Normalize to array like fetchClubs
     } catch (error) {
-      console.error('🔴 Error switching club:', error); // Log unexpected errors
+      console.error('🔴 Error switching club:', error);
       return rejectWithValue(error.message || "An unexpected error occurred.");
     }
   }
@@ -158,16 +158,15 @@ const clubSlice = createSlice({
       .addCase(fetchClubList.fulfilled, (state, action) => {
         state.clubList = action.payload;
       })
-      .addCase(switchClub.pending, (state) => {
-        state.isSwitching = true;
+    .addCase(switchClub.pending, (state) => {
+        state.isLoading = true; // Use isLoading to match fetchClubs
       })
       .addCase(switchClub.fulfilled, (state, action) => {
-        state.isSwitching = false;
-        state.currentClub = action.payload;
-    
+        state.isLoading = false; // Reset loading
+        state.items = action.payload; // Update items like fetchClubs
       })
       .addCase(switchClub.rejected, (state, action) => {
-        state.isSwitching = false;
+        state.isLoading = false; // Reset loading
         state.error = action.payload || action.error.message;
       })
   },

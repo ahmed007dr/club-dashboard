@@ -26,4 +26,5 @@ urlpatterns = [
     path('api/subscriptions/<int:pk>/make-payment/', api.make_payment, name='api-make-payment'),
     path('api/subscriptions/member/', api.member_subscriptions, name='api-member-subscriptions'),
     path('api/subscriptions/stats/', api.subscription_stats, name='api-subscription-stats'),
+    
 ]

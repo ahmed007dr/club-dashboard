@@ -3,17 +3,38 @@ import axios from "axios";
 import BASE_URL from "../../config/api";
 
 export const fetchSubscriptionTypes = createAsyncThunk(
-  "subscriptions/fetchSubscriptionTypes",
-  async ({ page = 1 } = {}, { rejectWithValue }) => {
+  'subscriptions/fetchSubscriptionTypes',
+  async (
+    {
+      page = 1,
+      searchQuery = '',
+      statusFilter = 'all',
+      durationFilter = '',
+      includesGym = '',
+      includesPool = '',
+      includesClasses = '',
+    } = {},
+    { rejectWithValue }
+  ) => {
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem('token');
       if (!token) {
-        return rejectWithValue("Authentication token is missing.");
+        return rejectWithValue('Authentication token is missing.');
       }
 
-      // Fetch all subscription types with pagination
-      const allResponse = await axios.get(
-        `${BASE_URL}/subscriptions/api/subscription-types/?page=${page}`,
+      // Build query parameters
+      const params = new URLSearchParams();
+      params.append('page', page);
+      if (searchQuery) params.append('q', searchQuery);
+      if (statusFilter !== 'all') params.append('status', statusFilter);
+      if (durationFilter) params.append('duration', durationFilter);
+      if (includesGym) params.append('includes_gym', includesGym);
+      if (includesPool) params.append('includes_pool', includesPool);
+      if (includesClasses) params.append('includes_classes', includesClasses);
+
+      // Fetch filtered subscription types
+      const response = await axios.get(
+        `${BASE_URL}/subscriptions/api/subscription-types/?${params.toString()}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -21,69 +42,31 @@ export const fetchSubscriptionTypes = createAsyncThunk(
         }
       );
 
-      // Fetch active subscription types
-      const activeResponse = await axios.get(
-        `${BASE_URL}/subscriptions/api/subscription-types/active/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      // Handle paginated response for all subscriptions
-      const allData = allResponse.data;
-      let allSubscriptions = allData.results || [];
-      if (!Array.isArray(allSubscriptions)) {
-        console.warn(
-          "allSubscriptions.results is not an array:",
-          allSubscriptions
-        );
-        allSubscriptions = [];
+      const data = response.data;
+      let subscriptions = data.results || [];
+      if (!Array.isArray(subscriptions)) {
+        console.warn('Response results is not an array:', subscriptions);
+        subscriptions = [];
       }
-
-      // Handle response for active subscriptions
-      let activeSubscriptions = activeResponse.data;
-      if (!Array.isArray(activeSubscriptions)) {
-        if (activeResponse.data && Array.isArray(activeResponse.data.results)) {
-          activeSubscriptions = activeResponse.data.results;
-        } else {
-          console.warn(
-            "activeSubscriptions is not an array:",
-            activeSubscriptions
-          );
-          activeSubscriptions = [];
-        }
-      }
-
-      // Create a Set of active subscription IDs
-      const activeIds = new Set(activeSubscriptions.map((sub) => sub.id));
-
-      // Merge isActive field, prioritizing active endpoint but falling back to is_active
-      const modifiedSubscriptions = allSubscriptions.map((sub) => ({
-        ...sub,
-        isActive: activeIds.has(sub.id) ? true : sub.is_active ?? false,
-      }))
 
       // Return paginated response structure
       return {
-        count: allData.count ?? 0,
-        results: modifiedSubscriptions,
-        next: allData.next ?? null,
-        previous: allData.previous ?? null,
+        count: data.count ?? 0,
+        results: subscriptions,
+        next: data.next ?? null,
+        previous: data.previous ?? null,
       };
     } catch (error) {
-      console.error("Error fetching subscription types:", error);
+      console.error('Error fetching subscription types:', error);
       const errorMessage =
         error.response?.data?.detail ||
         error.response?.data?.message ||
         error.message ||
-        "Failed to fetch subscription types";
+        'Failed to fetch subscription types';
       return rejectWithValue(errorMessage);
     }
   }
 );
-
 export const fetchActiveSubscriptionTypes = createAsyncThunk(
   "activeSubscriptionTypes/fetch",
   async (_, { rejectWithValue }) => {

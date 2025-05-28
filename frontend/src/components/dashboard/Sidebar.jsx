@@ -3,13 +3,14 @@ import { FiX } from 'react-icons/fi';
 import { Link, useLocation } from 'react-router-dom';
 import { IoIosArrowDown, IoIosArrowUp } from 'react-icons/io';
 
+
 const Sidebar = ({ navItems, sidebarOpen, closeSidebar }) => {
   const location = useLocation();
   const [openMenus, setOpenMenus] = useState({});
 
   const toggleMenu = (name) => {
     setOpenMenus((prev) => ({
-      ...prev,
+      // This will automatically close all other menus
       [name]: !prev[name],
     }));
   };
@@ -33,7 +34,6 @@ const Sidebar = ({ navItems, sidebarOpen, closeSidebar }) => {
          <Link to="/" className="flex items-center space-x-2 text-xl font-bold text-blue-600 dark:text-white">
            <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
            <span className="hidden sm:inline text-purple-800">Fitness Time</span>
-         
          </Link>
           <div className="p-4 border-b border-gray-200 flex items-center justify-between sm:hidden">
             <h1 className="text-xl font-semibold">Club</h1>

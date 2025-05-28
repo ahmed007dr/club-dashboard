@@ -273,12 +273,12 @@ const Navbar = ({ hideMenuButton = false }) => {
           )}
 
           {/* Dark Mode Toggle */}
-          <button
+          {/* <button
             onClick={handleToggleDarkMode}
             className="p-2 rounded-full text-gray-500 dark:text-gray-300 hover:text-black dark:hover:text-white"
           >
             {isDarkMode ? <FiSun size={20} /> : <FiMoon size={20} />}
-          </button>
+          </button> */}
         </div>
       </div>
     </header>

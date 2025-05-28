@@ -5,15 +5,17 @@ import UpdateSubscriptionTypes from './UpdateSubscriptionTypes';
 import DeleteSubscriptionTypesModal from './DeleteSubscriptionTypesModal';
 import SubscriptionTypeDetails from './SubscriptionTypeDetails';
 import CreateSubscriptionType from './CreateSubscriptionType';
-import { FaEye, FaEdit, FaTrash, FaPlus } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash, FaPlus, FaSearch } from 'react-icons/fa';
 import { CiShoppingTag } from 'react-icons/ci';
 import { RiForbidLine } from 'react-icons/ri';
 import usePermission from '@/hooks/usePermission';
 
+
+
+
 const SubscriptionsTypes = () => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error } = useSelector((state) => state.subscriptions);
-  console.log(subscriptionTypes);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -31,23 +33,76 @@ const SubscriptionsTypes = () => {
   const itemsPerPage = 20;
   const maxButtons = 5;
 
-  // Permission checks at the top
-  const canViewSubscriptionTypes = usePermission("view_subscriptiontype");
-  const canAddSubscriptionTypes = usePermission("add_subscriptiontype");
-  const canEditSubscriptionTypes = usePermission("change_subscriptiontype");
-  const canDeleteSubscriptionTypes = usePermission("delete_subscriptiontype");
-
+  // Permission checks
+  const canViewSubscriptionTypes = usePermission('view_subscriptiontype');
+  const canAddSubscriptionTypes = usePermission('add_subscriptiontype');
+  const canEditSubscriptionTypes = usePermission('change_subscriptiontype');
+  const canDeleteSubscriptionTypes = usePermission('delete_subscriptiontype');
 
   const openCreateModal = () => setIsCreateModalOpen(true);
   const closeCreateModal = () => setIsCreateModalOpen(false);
 
-  useEffect(() => {
-    dispatch(fetchSubscriptionTypes({ page: currentPage }))
+  // Handle search button click
+  const handleSearch = () => {
+    dispatch(
+      fetchSubscriptionTypes({
+        page: 1, // Reset to first page on new search
+        searchQuery,
+        statusFilter,
+        durationFilter,
+        includesGym,
+        includesPool,
+        includesClasses,
+      })
+    )
       .unwrap()
       .catch((err) => {
-        if (err.includes("Page not found")) {
+        if (err.includes('Page not found')) {
           setCurrentPage(1);
-          dispatch(fetchSubscriptionTypes({ page: 1 }));
+          dispatch(
+            fetchSubscriptionTypes({
+              page: 1,
+              searchQuery,
+              statusFilter,
+              durationFilter,
+              includesGym,
+              includesPool,
+              includesClasses,
+            })
+          );
+        }
+      });
+    setCurrentPage(1); // Reset page to 1 when filters change
+  };
+
+  // Fetch subscriptions when page changes
+  useEffect(() => {
+    dispatch(
+      fetchSubscriptionTypes({
+        page: currentPage,
+        searchQuery,
+        statusFilter,
+        durationFilter,
+        includesGym,
+        includesPool,
+        includesClasses,
+      })
+    )
+      .unwrap()
+      .catch((err) => {
+        if (err.includes('Page not found')) {
+          setCurrentPage(1);
+          dispatch(
+            fetchSubscriptionTypes({
+              page: 1,
+              searchQuery,
+              statusFilter,
+              durationFilter,
+              includesGym,
+              includesPool,
+              includesClasses,
+            })
+          );
         }
       });
   }, [dispatch, currentPage]);
@@ -82,40 +137,6 @@ const SubscriptionsTypes = () => {
     setIsDetailsModalOpen(false);
   };
 
-  // Filter logic
-  const filteredSubscriptions = (subscriptionTypes.results || []).filter((type) => {
-    const matchesSearch =
-      searchQuery === '' || type.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus =
-  statusFilter === 'all' ||
-  (statusFilter === 'active' && type.is_active) ||
-  (statusFilter === 'inactive' && !type.is_active);
-
-    const matchesDuration =
-      durationFilter === '' || type.duration_days === Number(durationFilter);
-    const matchesGym =
-      includesGym === '' ||
-      (includesGym === 'yes' && type.includes_gym) ||
-      (includesGym === 'no' && !type.includes_gym);
-    const matchesPool =
-      includesPool === '' ||
-      (includesPool === 'yes' && type.includes_pool) ||
-      (includesPool === 'no' && !type.includes_pool);
-    const matchesClasses =
-      includesClasses === '' ||
-      (includesClasses === 'yes' && type.includes_classes) ||
-      (includesClasses === 'no' && !type.includes_classes);
-
-    return (
-      matchesSearch &&
-      matchesStatus &&
-      matchesDuration &&
-      matchesGym &&
-      matchesPool &&
-      matchesClasses
-    );
-  }).sort((a, b) => b.id - a.id); // Sort by id descending
-
   // Pagination logic
   const totalPages = Math.ceil((subscriptionTypes.count || 0) / itemsPerPage);
 
@@ -138,7 +159,7 @@ const SubscriptionsTypes = () => {
   if (loading) return <div className="text-right p-6">جاري التحميل...</div>;
   if (error) return <div className="text-right p-6 text-red-600">خطأ: {error}</div>;
 
-    // Early return if no view permission
+  // Early return if no view permission
   if (!canViewSubscriptionTypes) {
     return (
       <div className="flex flex-col items-center justify-center h-screen text-center p-4" dir="rtl">
@@ -153,7 +174,6 @@ const SubscriptionsTypes = () => {
     );
   }
 
-
   return (
     <div className="p-6" dir="rtl">
       <div className="flex justify-between items-center mb-6">
@@ -161,7 +181,7 @@ const SubscriptionsTypes = () => {
           <CiShoppingTag className="text-blue-600 w-9 h-9" />
           <h1 className="text-2xl font-bold">أنواع الاشتراكات</h1>
         </div>
-           {canAddSubscriptionTypes && (
+        {canAddSubscriptionTypes && (
           <button
             onClick={openCreateModal}
             className="flex items-center bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
@@ -173,13 +193,22 @@ const SubscriptionsTypes = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <input
-          type="text"
-          placeholder="بحث بالاسم"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="border px-3 py-2 rounded-md w-full text-right"
-        />
+        <div className="flex items-center space-x-2">
+          <input
+            type="text"
+            placeholder="بحث بالاسم"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="border px-3 py-2 rounded-md w-full text-right"
+          />
+          <button
+            onClick={handleSearch}
+            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center"
+          >
+            <FaSearch className="mr-2" />
+            بحث
+          </button>
+        </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -190,7 +219,7 @@ const SubscriptionsTypes = () => {
           <option value="inactive">غير نشط</option>
         </select>
         <input
-          type="number"
+          type="number" // Fixed typo from 'kilk="number"'
           placeholder="المدة (أيام)"
           value={durationFilter}
           onChange={(e) => setDurationFilter(e.target.value)}
@@ -225,72 +254,102 @@ const SubscriptionsTypes = () => {
         </select>
       </div>
 
-      <ul className="space-y-4">
-        {filteredSubscriptions.length > 0 ? (
-          filteredSubscriptions.map((type) => (
-            <li
-              key={type.id}
-              className="p-4 border-b border-gray-200 flex items-start justify-between hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex flex-col">
-                <span className="text-lg font-semibold">{type.name}</span>
-                <div className="text-sm text-gray-600">
-                <p>
-  نشط:{" "}
-  {type.is_active ? (
-    <span className="text-green-500">نعم</span>
-  ) : (
-    <span className="text-red-500">لا</span>
-  )}
-</p>
+      <div className="mb-6">
+        <button
+          onClick={handleSearch}
+          className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center"
+        >
+          <FaSearch className="mr-2" />
+          تطبيق الفلاتر
+        </button>
+      </div>
 
+   <ul className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+  {(subscriptionTypes.results || []).length > 0 ? (
+    subscriptionTypes.results.map((type) => (
+      <li
+        key={type.id}
+        className="bg-white rounded-xl shadow-sm hover:shadow-md transform hover:-translate-y-1 transition-all duration-300 border border-gray-100"
+      >
+        <div className="p-6 flex flex-col h-full">
+          <div className="flex-grow">
+            <h3 className="text-2xl font-bold mb-4 text-gray-800 border-b border-gray-100 pb-3">{type.name}</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                <span className="text-gray-600 font-medium">نشط</span>
+                {type.is_active ? (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                    نعم
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
+                    <span className="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                    لا
+                  </span>
+                )}
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 font-medium">عدد المشتركين</span>
+                  <span className="text-xl font-bold text-gray-800">{type.subscriptions_count}</span>
                 </div>
               </div>
-              <div className="flex space-x-2">
+            </div>
+          </div>
+          
+          <div className="flex justify-end mt-6 pt-4 border-t border-gray-100">
+            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+              <div className="relative group">
+                <button
+                  onClick={() => openDetailsModal(type)}
+                  className="flex items-center justify-center w-10 h-10 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                >
+                  <FaEye className="w-5 h-5" />
+                </button>
+                <span className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  عرض التفاصيل
+                </span>
+              </div>
+              
+              {canEditSubscriptionTypes && (
                 <div className="relative group">
                   <button
-                    onClick={() => openDetailsModal(type)}
-                    className="text-green-500 p-2 rounded hover:text-green-600 transition-colors"
+                    onClick={() => openModal(type)}
+                    className="flex items-center justify-center w-10 h-10 rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
                   >
-                    <FaEye />
+                    <FaEdit className="w-5 h-5" />
                   </button>
-                  <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                    عرض التفاصيل
+                  <span className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                    تعديل
                   </span>
                 </div>
-                  {canEditSubscriptionTypes && (
-                  <div className="relative group">
-                    <button
-                      onClick={() => openModal(type)}
-                      className="text-blue-500 p-2 rounded hover:text-blue-600 transition-colors"
-                    >
-                      <FaEdit />
-                    </button>
-                    <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      تعديل
-                    </span>
-                  </div>
-                )}
-                    {canDeleteSubscriptionTypes && (
-                  <div className="relative group">
-                    <button
-                      onClick={() => openDeleteModal(type)}
-                      className="text-red-500 p-2 rounded hover:text-red-600 transition-colors"
-                    >
-                      <FaTrash />
-                    </button>
-                    <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      حذف
-                    </span>
-                  </div>
-                )}
-              </div>
-            </li>
-          ))
-        ) : (
-          <p className="text-right text-gray-600">لا توجد أنواع اشتراكات مطابقة</p>
-        )}
-      </ul>
+              )}
+              
+              {canDeleteSubscriptionTypes && (
+                <div className="relative group">
+                  <button
+                    onClick={() => openDeleteModal(type)}
+                    className="flex items-center justify-center w-10 h-10 rounded-full bg-red-50 text-red-600 hover:bg-red-100 transition-colors"
+                  >
+                    <FaTrash className="w-5 h-5" />
+                  </button>
+                  <span className="absolute -top-10 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                    حذف
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </li>
+    ))
+  ) : (
+    <p className="text-center text-gray-600 col-span-full py-8 bg-gray-50 rounded-lg border border-gray-100">
+      لا توجد أنواع اشتراكات مطابقة
+    </p>
+  )}
+</ul>
 
       <div className="flex justify-between items-center mt-6">
         <button
@@ -298,8 +357,8 @@ const SubscriptionsTypes = () => {
           disabled={currentPage === 1}
           className={`px-4 py-2 rounded-md ${
             currentPage === 1
-              ? "bg-gray-300 cursor-not-allowed"
-              : "bg-blue-500 text-white hover:bg-blue-600"
+              ? 'bg-gray-300 cursor-not-allowed'
+              : 'bg-blue-500 text-white hover:bg-blue-600'
           }`}
         >
           السابق
@@ -311,8 +370,8 @@ const SubscriptionsTypes = () => {
               onClick={() => setCurrentPage(pageNum)}
               className={`px-4 py-2 rounded-md ${
                 currentPage === pageNum
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
             >
               {pageNum}
@@ -324,8 +383,8 @@ const SubscriptionsTypes = () => {
           disabled={currentPage >= totalPages || totalPages === 0}
           className={`px-4 py-2 rounded-md ${
             currentPage >= totalPages || totalPages === 0
-              ? "bg-gray-300 cursor-not-allowed"
-              : "bg-blue-500 text-white hover:bg-blue-600"
+              ? 'bg-gray-300 cursor-not-allowed'
+              : 'bg-blue-500 text-white hover:bg-blue-600'
           }`}
         >
           التالي

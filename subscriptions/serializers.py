@@ -15,7 +15,7 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'club', 'club_details', 'name', 'duration_days', 'price',
             'includes_gym', 'includes_pool', 'includes_classes', 'is_active',
-            'max_entries'
+            'max_entries' , 'subscriptions_count'
         ]
         extra_kwargs = {
             'club': {'required': True}

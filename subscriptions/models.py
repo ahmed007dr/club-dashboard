@@ -2,6 +2,10 @@ from django.db import models
 from datetime import timedelta
 from core.models import Club
 
+from django.db import models
+from django.utils import timezone
+from core.models import Club
+
 class SubscriptionType(models.Model):
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='subscription_types')
     name = models.CharField(max_length=100)
@@ -16,14 +20,24 @@ class SubscriptionType(models.Model):
     def __str__(self):
         return f"{self.name} ({self.club.name})"
 
+    @property
+    def subscriptions_count(self):
+        """
+        Returns the count of active subscriptions for this subscription type.
+        Active subscriptions have an end_date >= today.
+        """
+        return self.subscription_set.filter(end_date__gte=timezone.now().date()).count()
+
     class Meta:
         unique_together = ['club', 'name']
         indexes = [
-            models.Index(fields=['club']),    # For filtering by club
-            models.Index(fields=['name']),    # For searching by name
-            models.Index(fields=['is_active']),  # For filtering active types
+            models.Index(fields=['club']),      # For filtering by club
+            models.Index(fields=['name']),      # For searching by name
+            models.Index(fields=['is_active']), # For filtering active types
+            models.Index(fields=['id']),        # For reverse relation queries (e.g., subscription_set)
         ]
 
+        
 class Subscription(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     member = models.ForeignKey('members.Member', on_delete=models.CASCADE)
