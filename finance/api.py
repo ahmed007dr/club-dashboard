@@ -17,8 +17,14 @@ from datetime import datetime
 from core.models import Club
 from staff.serializers import StaffAttendance
 from django.db.models import Sum, Q
+from django.utils import timezone
 from accounts.models import User
-from django.utils.dateparse import parse_date
+from django.http import FileResponse
+from jinja2 import Template
+import logging
+import os
+import subprocess
+from utils.reports import get_employee_report_data
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -572,3 +578,103 @@ def finance_overview(request):
 
     except Exception as e:
         return Response({'error': str(e)}, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def employee_daily_report_api(request):
+    employee_id = request.query_params.get('employee_id')
+    start_date = request.query_params.get('start_date')
+    end_date = request.query_params.get('end_date')
+
+    if not start_date or not end_date:
+        if request.user.role in ['owner', 'admin']:
+            # Admin or owner must provide dates
+            logger.error("Start date and end date are required for admin/owner")
+            return Response({'error': 'يجب تحديد تاريخ البداية والنهاية'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            # Try to get open shift for normal user
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                logger.warning("No open shift found for user: %s", request.user.username)
+                return Response({'error': 'لا توجد وردية مفتوحة. يجب تسجيل حضور أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+
+            start_date = attendance.check_in.isoformat()
+            end_date = timezone.now().isoformat()
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def generate_daily_report_pdf(request):
+    employee_id = request.query_params.get('employee_id')
+    start_date = request.query_params.get('start_date')
+    end_date = request.query_params.get('end_date')
+
+    if request.user.role not in ['owner', 'admin'] and (not start_date or not end_date):
+        # Try to get open attendance shift for normal user
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club,
+            check_out__isnull=True
+        ).order_by('-check_in').first()
+        if attendance:
+            start_date = attendance.check_in.isoformat()
+            end_date = timezone.now().isoformat()
+
+    data, response_status = get_employee_report_data(
+        request.user,
+        employee_id,
+        start_date,
+        end_date
+    )
+    if response_status != status.HTTP_200_OK:
+        return Response(data, status=response_status)
+
+    data['report_date'] = timezone.localtime(timezone.now()).strftime('%Y-%m-%d')
+
+    template_path = 'templates/report_template.tex'
+    if not os.path.exists(template_path):
+        logger.error("Template file not found: %s", template_path)
+        return Response({'error': 'قالب التقرير غير موجود'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    with open(template_path, 'r', encoding='utf-8') as file:
+        template = Template(file.read())
+
+    rendered = template.render(**data)
+
+    temp_dir = 'temp'
+    os.makedirs(temp_dir, exist_ok=True)
+    tex_file = os.path.join(temp_dir, f'report_{request.user.id}.tex')
+    pdf_file = os.path.join(temp_dir, f'report_{request.user.id}.pdf')
+
+    with open(tex_file, 'w', encoding='utf-8') as f:
+        f.write(rendered)
+
+    try:
+        subprocess.run([
+            'latexmk', '-pdf', tex_file, '-outdir=' + temp_dir
+        ], check=True, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        logger.error("Failed to generate PDF: %s\nstdout: %s\nstderr: %s", e, e.stdout, e.stderr)
+        return Response({'error': 'فشل في إنشاء ملف PDF'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    if not os.path.exists(pdf_file):
+        logger.error("PDF file not created: %s", pdf_file)
+        return Response({'error': 'ملف PDF لم يتم إنشاؤه'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    response = FileResponse(
+        open(pdf_file, 'rb'),
+        content_type='application/pdf',
+        as_attachment=True,
+        filename='daily_report.pdf'
+    )
+
+    try:
+        os.remove(tex_file)
+        os.remove(pdf_file)
+    except Exception as e:
+        logger.warning("Failed to clean up temporary files: %s", e)
+
+    return response
