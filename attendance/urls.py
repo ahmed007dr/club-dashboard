@@ -18,4 +18,9 @@ urlpatterns = [
     # ===== EntryLog API Endpoints =====
     path('api/entry-logs/', api.entry_log_list_api, name='api-entry-log-list'),
     path('api/entry-logs/add/', api.create_entry_log_api, name='api-create-entry-log'),
+
+    path('api/attendance/hourly/', api.attendance_hourly_api, name='attendance-hourly'),
+    path('api/attendance/weekly/', api.attendance_weekly_api, name='attendance-weekly'),
+    path('api/attendance/monthly/', api.attendance_monthly_api, name='attendance-monthly'),
+
 ]
