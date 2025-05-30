@@ -99,18 +99,18 @@ const AttendanceContributionsChart = () => {
   };
 
   // GitHub-like green color classes
-  const getColorClass = (count, maxCount) => {
+   const getColorClass = (count, maxCount) => {
     const level = getIntensityLevel(count, maxCount);
     const colorClasses = {
-      0: "bg-gray-200 dark:bg-gray-700",
-      1: "bg-green-100 dark:bg-green-900",
-      2: "bg-green-300 dark:bg-green-700",
-      3: "bg-green-500 dark:bg-green-500",
-      4: "bg-green-700 dark:bg-green-300",
+      0: "bg-gray-200 dark:bg-gray-800",
+      1: "bg-purple-200 dark:bg-purple-900",
+      2: "bg-purple-400 dark:bg-purple-700",
+      3: "bg-purple-600 dark:bg-purple-500",
+      4: "bg-purple-800 dark:bg-purple-300",
     };
     return colorClasses[level];
   };
-
+  
   // Handle mouse events for tooltip
   const handleMouseEnter = (day, event) => {
     if (day.date) {

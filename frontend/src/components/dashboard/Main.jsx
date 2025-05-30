@@ -206,47 +206,61 @@ const Main = () => {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
         <DataCard
-          label="إجمالي التذاكر"
-          value={totalTickets}
-          icon={<IoTicketOutline className={iconClasses} />}
-          link="/tickets"
-        />
-        <DataCard
-          label="إجمالي الأعضاء"
-          value={totalMembers}
-          icon={<RiGroupLine className={iconClasses} />}
-          link="/members"
-        />
-        <DataCard
-          label="إجمالي الاشتراكات"
-          value={totalSubscriptions}
-          icon={<MdSubscriptions className={iconClasses} />}
-          link="/subscriptions"
-        />
-        <DataCard
-          label="إجمالي الحضور"
-          value={totalAttendances}
-          icon={<FaRegCalendarCheck className={iconClasses} />}
-          link="/attendance"
-        />
-        <DataCard
-          label="إجمالي الموظفين"
-          value={totalStaff}
-          icon={<BsPeopleFill className={iconClasses} />}
-          link="/staff"
-        />
-        <DataCard
-          label="الدعوات"
-          value={totalInvites}
-          icon={<RiVipCrown2Line className={iconClasses} />}
-          link="/free-invites"
-        />
-        <DataCard
-          label="الإيصالات"
-          value={totalReceipts}
-          icon={<FaReceipt className={iconClasses} />}
-          link="/receipts"
-        />
+            label="إجمالي التذاكر"
+            value={totalTickets}
+            icon={<IoTicketOutline />}
+            link="/tickets"
+            gradient="from-emerald-500 to-teal-600"
+            bgGradient="from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20"
+          />
+          <DataCard
+            label="إجمالي الأعضاء"
+            value={totalMembers}
+            icon={<RiGroupLine />}
+            link="/members"
+            gradient="from-blue-500 to-cyan-600"
+            bgGradient="from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20"
+          />
+          <DataCard
+            label="إجمالي الاشتراكات"
+            value={totalSubscriptions}
+            icon={<MdSubscriptions />}
+            link="/subscriptions"
+            gradient="from-purple-500 to-indigo-600"
+            bgGradient="from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20"
+          />
+          <DataCard
+            label="إجمالي الحضور"
+            value={totalAttendances}
+            icon={<FaRegCalendarCheck />}
+            link="/attendance"
+            gradient="from-orange-500 to-red-600"
+            bgGradient="from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20"
+          />
+          <DataCard
+            label="إجمالي الموظفين"
+            value={totalStaff}
+            icon={<BsPeopleFill />}
+            link="/staff"
+            gradient="from-pink-500 to-rose-600"
+            bgGradient="from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20"
+          />
+          <DataCard
+            label="الدعوات"
+            value={totalInvites}
+            icon={<RiVipCrown2Line />}
+            link="/free-invites"
+            gradient="from-yellow-500 to-amber-600"
+            bgGradient="from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20"
+          />
+          <DataCard
+            label="الإيصالات"
+            value={totalReceipts}
+            icon={<FaReceipt />}
+            link="/receipts"
+            gradient="from-slate-500 to-gray-600"
+            bgGradient="from-slate-50 to-gray-50 dark:from-slate-900/20 dark:to-gray-900/20"
+          />
       </div>
 
       {/* فلتر زمني */}
@@ -273,7 +287,7 @@ const Main = () => {
       <div className="grid grid-cols-1 gap-6 mt-4">
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow">
           <h3 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-white mb-4">
-            حضور المشتركين حسب {timeFilter === 'day' ? 'اليوم' : timeFilter === 'week' ? 'الأسبوع' : timeFilter === 'month' ? 'الشهر' : 'السنة'}
+           حضور المشتركين حسب السنة 
           </h3>
           <div className="h-96"> {/* ارتفاع كبير */}
             {attendances.length === 0 ? (
@@ -299,22 +313,50 @@ const Main = () => {
   );
 };
 
-const DataCard = ({ label, value, icon, link }) => {
-  const cardClasses = "bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 shadow transition hover:shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4";
-  const textLinkClasses = "text-xs sm:text-sm text-blue-500 hover:underline mt-2 sm:mt-0 inline-block";
-
+const DataCard = ({ label, value, icon, link, gradient, bgGradient }) => {
   return (
-    <div className={cardClasses}>
-      <div className="text-center sm:text-right">
-        <h3 className="text-gray-600 dark:text-gray-300 text-sm sm:text-base font-semibold">{label}</h3>
-        <p className="text-xl sm:text-2xl font-extrabold text-gray-800 dark:text-white truncate">
-          {value !== undefined ? value : 'جاري التحميل...'}
-        </p>
-        <Link to={link} className={textLinkClasses}>عرض الكل</Link>
+    <div
+      className={`group relative overflow-hidden bg-gradient-to-br ${bgGradient} backdrop-blur-sm border border-white/20 dark:border-gray-700/50 rounded-3xl p-6 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1`}
+    >
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-5">
+        <div className="absolute inset-0 bg-gradient-to-br from-white to-transparent"></div>
       </div>
-      {icon}
+
+      <div className="relative z-10 flex items-center justify-between">
+        <div className="space-y-3">
+          <h3 className="text-gray-600 dark:text-gray-300 text-sm font-medium leading-tight">{label}</h3>
+          <p className="text-2xl lg:text-3xl font-bold text-gray-800 dark:text-white">
+            {value !== undefined ? value.toLocaleString() : "جاري التحميل..."}
+          </p>
+          <Link
+            to={link}
+            className="inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-colors duration-200 group-hover:translate-x-1 transform"
+          >
+            عرض الكل
+            <svg
+              className="w-4 h-4 mr-1 transition-transform duration-200 group-hover:-translate-x-0.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </Link>
+        </div>
+
+        <div
+          className={`flex-shrink-0 w-16 h-16 bg-gradient-to-br ${gradient} rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300`}
+        >
+          <div className="text-white text-2xl">{icon}</div>
+        </div>
+      </div>
+
+      {/* Hover Effect */}
+      <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
     </div>
-  );
-};
+  )
+}
+
 
 export default Main;

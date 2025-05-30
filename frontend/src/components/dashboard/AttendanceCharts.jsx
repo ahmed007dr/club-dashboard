@@ -30,26 +30,31 @@ const AttendanceDashboard = () => {
   });
   const [error, setError] = useState({});
 
-  const fetchData = async (endpoint, setter, key) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`http://127.0.0.1:8000/attendance/api/attendances/${endpoint}/`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+const fetchData = async (endpoint, setter, key) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch(`http://127.0.0.1:8000/attendance/api/attendances/${endpoint}/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
 
-      if (!response.ok) throw new Error(`Failed to fetch ${key} data`);
+    if (!response.ok) throw new Error(`Failed to fetch ${key} data`);
 
-      const result = await response.json();
-      setter(result || []); // fallback to empty array if null
-    } catch (err) {
-      setError(prev => ({ ...prev, [key]: err.message }));
-      setter([]); // prevent null value from being set
-    } finally {
-      setLoading(prev => ({ ...prev, [key]: false }));
+    const result = await response.json();
+    setter(result || []);
+    
+    // Log specifically for hourly data
+    if (key === 'hourly') {
+      console.log('Hourly Data:', result);
     }
-  };
+  } catch (err) {
+    setError(prev => ({ ...prev, [key]: err.message }));
+    setter([]);
+  } finally {
+    setLoading(prev => ({ ...prev, [key]: false }));
+  }
+};
 
   useEffect(() => {
     fetchData('monthly', setMonthlyData, 'monthly');
@@ -57,11 +62,11 @@ const AttendanceDashboard = () => {
     fetchData('hourly', setHourlyData, 'hourly');
   }, []);
 
-  const renderFullWidthChart = (data, labels, label, colors, title) => {
+  const renderChart = (data, labels, label, title) => {
     if (!Array.isArray(data) || data.length === 0) {
       return (
-        <div className="w-full bg-white dark:bg-gray-800 rounded-2xl p-6 shadow mb-6">
-          <div className="text-center py-8">لا توجد بيانات لعرضها</div>
+        <div className="w-full bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-lg mb-6">
+          <div className="text-center text-purple-500 py-8">لا توجد بيانات لعرضها</div>
         </div>
       );
     }
@@ -72,50 +77,48 @@ const AttendanceDashboard = () => {
         {
           label: label,
           data: data,
-          backgroundColor: colors.backgroundColor,
-          borderColor: colors.borderColor,
-          borderWidth: 1,
+          backgroundColor: 'rgba(128, 90, 213, 0.7)', // Purple (Tailwind: purple-600)
+          borderColor: 'rgba(107, 70, 193, 1)', // Purple (Tailwind: purple-700)
+          borderWidth: 0,
+          borderRadius: 6,
         },
       ],
     };
 
-    const options = {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        title: {
-          display: true,
-          text: title,
-          font: { size: 16 }
-        },
-        tooltip: {
-          callbacks: {
-            label: (context) => `${context.raw} حضور`,
-          },
-        },
+   const options = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    title: {
+      display: true,
+      text: title,
+      color: '#6b46c1', // Keep title purple
+      font: { size: 18, weight: 'bold' },
+      padding: { top: 10, bottom: 20 }
+    },
+    tooltip: {
+      callbacks: {
+        label: (context) => `${context.raw} حضور`,
       },
-      scales: {
-        x: {
-          title: {
-            display: true,
-            text: title.includes('ساعة') ? 'الساعة' : 'التاريخ',
-            font: { weight: 'bold' }
-          },
-        },
-        y: {
-          title: {
-            display: true,
-            text: 'عدد الحضور',
-            font: { weight: 'bold' }
-          },
-          beginAtZero: true,
-        },
-      },
-    };
+    },
+  },
+  scales: {
+    x: {
+      grid: { display: false },
+      ticks: { color: '#6b7280', font: { weight: 'bold' } } // Gray: Tailwind slate-500
+    },
+    y: {
+      beginAtZero: true,
+      grid: { display: false },
+      ticks: { color: '#6b7280', font: { weight: 'bold' } } // Gray: Tailwind slate-500
+    },
+  },
+};
+
 
     return (
-      <div className="w-full bg-white dark:bg-gray-800 rounded-2xl p-6 shadow mb-6" style={{ height: '400px' }}>
+      <div className="w-full bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-lg mb-6" style={{ height: '400px' }}>
         <Bar data={chartData} options={options} />
       </div>
     );
@@ -130,43 +133,37 @@ const AttendanceDashboard = () => {
   }
 
   return (
-    <div className="w-full p-4">
-      {/* Monthly Chart */}
+    <div className="w-full p-4 bg-gradient-to-br from-purple-100 to-white dark:from-gray-800 dark:to-gray-900 min-h-screen">
       {loading.monthly ? (
-        <div className="w-full bg-white dark:bg-gray-800 rounded-2xl p-6 shadow mb-6">
-          <div className="text-center py-8">جاري تحميل البيانات الشهرية...</div>
+        <div className="w-full bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-lg mb-6 text-center text-purple-500">
+          جاري تحميل البيانات الشهرية...
         </div>
-      ) : renderFullWidthChart(
+      ) : renderChart(
         monthlyData.map(item => item.count),
         monthlyData.map(item => item.date),
         'عدد الحضور الشهري',
-        { backgroundColor: 'rgba(54, 162, 235, 0.6)', borderColor: 'rgba(54, 162, 235, 1)' },
         'إحصائيات الحضور الشهري'
       )}
 
-      {/* Weekly Chart */}
       {loading.weekly ? (
-        <div className="w-full bg-white dark:bg-gray-800 rounded-2xl p-6 shadow mb-6">
-          <div className="text-center py-8">جاري تحميل البيانات الأسبوعية...</div>
+        <div className="w-full bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-lg mb-6 text-center text-purple-500">
+          جاري تحميل البيانات الأسبوعية...
         </div>
-      ) : renderFullWidthChart(
+      ) : renderChart(
         weeklyData.map(item => item.count),
         weeklyData.map(item => item.date),
         'عدد الحضور الأسبوعي',
-        { backgroundColor: 'rgba(255, 159, 64, 0.6)', borderColor: 'rgba(255, 159, 64, 1)' },
         'إحصائيات الحضور الأسبوعي'
       )}
 
-      {/* Hourly Chart */}
       {loading.hourly ? (
-        <div className="w-full bg-white dark:bg-gray-800 rounded-2xl p-6 shadow mb-6">
-          <div className="text-center py-8">جاري تحميل البيانات اليومية...</div>
+        <div className="w-full bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-lg mb-6 text-center text-purple-500">
+          جاري تحميل البيانات اليومية...
         </div>
-      ) : renderFullWidthChart(
-        hourlyData.map((item, index) => item || 0), // handle undefined/null values
+      ) : renderChart(
+        hourlyData.map((item) => item || 0),
         Array.from({ length: 24 }, (_, i) => `${i}:00`),
         'عدد الحضور بالساعة',
-        { backgroundColor: 'rgba(75, 192, 192, 0.6)', borderColor: 'rgba(75, 192, 192, 1)' },
         'إحصائيات الحضور حسب الساعة'
       )}
     </div>
@@ -174,3 +171,4 @@ const AttendanceDashboard = () => {
 };
 
 export default AttendanceDashboard;
+
