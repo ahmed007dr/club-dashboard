@@ -8,9 +8,8 @@ from .serializers import (
     PayrollPeriodSerializer, PayrollSerializer,
     PayrollCreateSerializer, PayrollDeductionCreateSerializer
 )
-from django.utils import timezone
-from utils.permissions import IsOwnerOrRelatedToClub
 from django.db.models import Q
+from utils.permissions import IsAdminOrOwnerForClub
 
 class CustomPageNumberPagination(PageNumberPagination):
     page_size = 20
@@ -18,13 +17,10 @@ class CustomPageNumberPagination(PageNumberPagination):
     max_page_size = 100
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated, IsAdminOrOwnerForClub])
 def get_payroll_periods(request):
-    periods = PayrollPeriod.objects.all()
-    if request.user.role != 'owner':
-        if not request.user.club:
-            return Response({'detail': 'User is not associated with any club'}, status=status.HTTP_403_FORBIDDEN)
-        periods = periods.filter(club=request.user.club)
+    # Filter periods by user's club
+    periods = PayrollPeriod.objects.filter(club=request.user.club)
 
     search_query = request.query_params.get('search', None)
     if search_query:
@@ -38,35 +34,28 @@ def get_payroll_periods(request):
     if is_active is not None:
         periods = periods.filter(is_active=is_active.lower() == 'true')
 
-    club_id = request.query_params.get('club_id', None)
-    if club_id and request.user.role == 'owner':
-        periods = periods.filter(club_id=club_id)
-
     paginator = CustomPageNumberPagination()
     paginated_periods = paginator.paginate_queryset(periods, request)
     serializer = PayrollPeriodSerializer(paginated_periods, many=True)
     return paginator.get_paginated_response(serializer.data)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated, IsAdminOrOwnerForClub])
 def create_payroll_period(request):
     serializer = PayrollPeriodSerializer(data=request.data)
     if serializer.is_valid():
-        club_id = serializer.validated_data['club'].id
-        if request.user.role != 'owner' and (not request.user.club or request.user.club.id != club_id):
+        # Ensure the club in the request matches the user's club
+        if serializer.validated_data['club'] != request.user.club:
             return Response({'detail': 'You can only create periods for your club'}, status=status.HTTP_403_FORBIDDEN)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated, IsAdminOrOwnerForClub])
 def get_current_period(request):
-    periods = PayrollPeriod.objects.filter(is_active=True)
-    if request.user.role != 'owner':
-        if not request.user.club:
-            return Response({'detail': 'User is not associated with any club'}, status=status.HTTP_403_FORBIDDEN)
-        periods = periods.filter(club=request.user.club)
+    # Filter active periods by user's club
+    periods = PayrollPeriod.objects.filter(is_active=True, club=request.user.club)
     
     period = periods.first()
     if not period:
@@ -75,22 +64,19 @@ def get_current_period(request):
     return Response(serializer.data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated, IsAdminOrOwnerForClub])
 def get_payroll_report(request):
     period_id = request.query_params.get('period_id', None)
     if period_id:
         try:
             period = PayrollPeriod.objects.get(id=period_id)
-            if request.user.role != 'owner' and (not request.user.club or request.user.club != period.club):
+            # Ensure period belongs to user's club
+            if period.club != request.user.club:
                 return Response({'detail': 'You do not have permission to access this period'}, status=status.HTTP_403_FORBIDDEN)
         except PayrollPeriod.DoesNotExist:
             return Response({'detail': 'Period not found'}, status=status.HTTP_404_NOT_FOUND)
     else:
-        periods = PayrollPeriod.objects.filter(is_active=True)
-        if request.user.role != 'owner':
-            if not request.user.club:
-                return Response({'detail': 'User is not associated with any club'}, status=status.HTTP_403_FORBIDDEN)
-            periods = periods.filter(club=request.user.club)
+        periods = PayrollPeriod.objects.filter(is_active=True, club=request.user.club)
         period = periods.first()
         if not period:
             return Response({'detail': 'No active payroll period found'}, status=status.HTTP_404_NOT_FOUND)
@@ -100,10 +86,6 @@ def get_payroll_report(request):
     search_query = request.query_params.get('search', None)
     if search_query:
         payrolls = payrolls.filter(employee__username__icontains=search_query)
-
-    club_id = request.query_params.get('club_id', None)
-    if club_id and request.user.role == 'owner':
-        payrolls = payrolls.filter(club_id=club_id)
 
     is_employee = request.query_params.get('is_employee', None)
     if is_employee is not None:
@@ -125,36 +107,35 @@ def get_payroll_report(request):
     return paginator.get_paginated_response(serializer.data)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated, IsAdminOrOwnerForClub])
 def create_payroll(request):
     serializer = PayrollCreateSerializer(data=request.data)
     if serializer.is_valid():
-        club_id = serializer.validated_data['club'].id
-        period = serializer.validated_data['period']
-        if request.user.role != 'owner':
-            if not request.user.club or request.user.club.id != club_id:
-                return Response({'detail': 'You can only create payrolls for your club'}, status=status.HTTP_403_FORBIDDEN)
-            if period.club != request.user.club:
-                return Response({'detail': 'Period does not belong to your club'}, status=status.HTTP_403_FORBIDDEN)
+        # Ensure club and period belong to user's club
+        if serializer.validated_data['club'] != request.user.club:
+            return Response({'detail': 'You can only create payrolls for your club'}, status=status.HTTP_403_FORBIDDEN)
+        if serializer.validated_data['period'].club != request.user.club:
+            return Response({'detail': 'Period does not belong to your club'}, status=status.HTTP_403_FORBIDDEN)
         serializer.save()
         payroll = Payroll.objects.get(id=serializer.instance.id)
         return Response(PayrollSerializer(payroll).data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated, IsAdminOrOwnerForClub])
 def create_deduction(request):
     serializer = PayrollDeductionCreateSerializer(data=request.data)
     if serializer.is_valid():
         payroll = serializer.validated_data['payroll']
-        if request.user.role != 'owner' and (not request.user.club or request.user.club != payroll.club):
+        # Ensure payroll belongs to user's club
+        if payroll.club != request.user.club:
             return Response({'detail': 'You do not have permission to add deductions to this payroll'}, status=status.HTTP_403_FORBIDDEN)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated, IsAdminOrOwnerForClub])
 def finalize_payroll(request):
     """
     Finalize payrolls for a given period, marking them as finalized and recording salaries as expenses.
@@ -167,7 +148,8 @@ def finalize_payroll(request):
 
     try:
         period = PayrollPeriod.objects.get(id=period_id)
-        if request.user.role != 'owner' and (not request.user.club or request.user.club != period.club):
+        # Ensure period belongs to user's club
+        if period.club != request.user.club:
             return Response({'detail': 'You do not have permission to finalize payrolls for this period'}, status=status.HTTP_403_FORBIDDEN)
     except PayrollPeriod.DoesNotExist:
         return Response({'error': 'Payroll period not found'}, status=status.HTTP_404_NOT_FOUND)

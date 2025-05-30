@@ -1,5 +1,28 @@
 from rest_framework.permissions import BasePermission
 
+
+
+class IsAdminOrOwnerForClub(BasePermission):
+    def has_permission(self, request, view):
+        if not request.user.is_authenticated:
+            return False
+        
+        is_admin = request.user.is_staff
+        is_owner = request.user.role == 'owner'
+        if not (is_admin or is_owner):
+            return False
+        
+        # Check if user is associated with a club        if not request.user.club:
+            return False
+        
+        return True
+    
+    def has_object_permission(self, request, view, obj):
+        if hasattr(obj, 'club'):
+            return obj.club == request.user.club
+        return False
+    
+
 class IsOwnerOrRelatedToClub(BasePermission):
     """
     Custom permission to allow:

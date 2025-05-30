@@ -219,7 +219,10 @@ class Payroll(models.Model):
             )
             self.private_earnings = sum(payment.coach_share for payment in private_payments) or 0
 
-        additional_deductions = sum(deduction.amount for deduction in self.deductions.all()) or 0
+        # Only access deductions if the instance has a primary key
+        additional_deductions = 0
+        if self.pk:
+            additional_deductions = sum(deduction.amount for deduction in self.deductions.all()) or 0
         self.total_deductions = self.absence_deduction + additional_deductions
         self.total_salary = self.base_salary + self.private_earnings + self.bonuses - self.total_deductions
 
@@ -229,7 +232,6 @@ class Payroll(models.Model):
             self.is_finalized = True
             self.save()
 
-            # Record total_salary as Expense
             category, created = ExpenseCategory.objects.get_or_create(
                 club=self.club,
                 name='Payroll',
@@ -246,9 +248,14 @@ class Payroll(models.Model):
             expense.save()
 
     def save(self, *args, **kwargs):
-        if not self.pk:
+        # Calculate payroll only if it's a new instance and not being finalized
+        if not self.pk and not self.is_finalized:
             self.calculate_payroll()
         super().save(*args, **kwargs)
+        # Recalculate payroll after saving to include deductions
+        if self.pk:
+            self.calculate_payroll()
+            super().save(*args, **kwargs)  # Save again with updated values
 
     def __str__(self):
         return f"{self.employee.username} - {self.period}"
