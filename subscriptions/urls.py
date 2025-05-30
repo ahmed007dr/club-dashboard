@@ -27,4 +27,8 @@ urlpatterns = [
     path('api/subscriptions/member/', api.member_subscriptions, name='api-member-subscriptions'),
     path('api/subscriptions/stats/', api.subscription_stats, name='api-subscription-stats'),
     
+    # Freeze Requests
+    path('api/subscriptions/<int:pk>/request-freeze/', api.request_freeze, name='api-request-freeze'),
+    path('api/freeze-requests/<int:freeze_id>/approve/', api.approve_freeze, name='api-approve-freeze'),
+
 ]

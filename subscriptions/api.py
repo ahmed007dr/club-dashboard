@@ -6,7 +6,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q
 from .models import Subscription, SubscriptionType
-from .serializers import SubscriptionSerializer, SubscriptionTypeSerializer
+from .serializers import SubscriptionSerializer, FreezeRequest
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub
 from decimal import Decimal
@@ -15,8 +15,7 @@ from rest_framework.pagination import PageNumberPagination
 from members.models import Member
 from rest_framework import status
 from django.db.models import Q, Count
-
-
+from staff.models import StaffAttendance
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -29,20 +28,12 @@ def subscription_type_list(request):
         includes_pool = request.GET.get('includes_pool', '')
         includes_classes = request.GET.get('includes_classes', '')
 
-        if request.user.role == 'owner':
-            types = SubscriptionType.objects.all().annotate(
-                active_subscriptions_count=Count(
-                    'subscription',
-                    filter=Q(subscription__end_date__gte=timezone.now().date())
-                )
+        types = SubscriptionType.objects.filter(club=request.user.club).annotate(
+            active_subscriptions_count=Count(
+                'subscription',
+                filter=Q(subscription__end_date__gte=timezone.now().date())
             )
-        else:
-            types = SubscriptionType.objects.filter(club=request.user.club).annotate(
-                active_subscriptions_count=Count(
-                    'subscription',
-                    filter=Q(subscription__end_date__gte=timezone.now().date())
-                )
-            )
+        )
 
         if search_term:
             types = types.filter(Q(name__icontains=search_term))
@@ -79,96 +70,37 @@ def subscription_type_list(request):
             subscription_type = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    if request.method == 'GET':
-        # Get query parameters for filtering
-        search_term = request.GET.get('q', '')
-        status_filter = request.GET.get('status', 'all')
-        duration = request.GET.get('duration', '')
-        includes_gym = request.GET.get('includes_gym', '')
-        includes_pool = request.GET.get('includes_pool', '')
-        includes_classes = request.GET.get('includes_classes', '')
-
-        # Base queryset with subscriptions_count annotation
-        if request.user.role == 'owner':
-            types = SubscriptionType.objects.all().annotate(
-                subscriptions_count=Count(
-                    'subscription',
-                    filter=Q(subscription__end_date__gte=timezone.now().date())
-                )
-            )
-        else:
-            types = SubscriptionType.objects.filter(club=request.user.club).annotate(
-                subscriptions_count=Count(
-                    'subscription',
-                    filter=Q(subscription__end_date__gte=timezone.now().date())
-                )
-            )
-
-        # Apply search filter
-        if search_term:
-            types = types.filter(Q(name__icontains=search_term))
-
-        # Apply status filter
-        if status_filter != 'all':
-            is_active = status_filter == 'active'
-            types = types.filter(is_active=is_active)
-
-        # Apply duration filter
-        if duration:
-            try:
-                types = types.filter(duration_days=int(duration))
-            except ValueError:
-                pass  # Ignore invalid duration values
-
-        # Apply includes_gym filter
-        if includes_gym in ('yes', 'no'):
-            types = types.filter(includes_gym=includes_gym == 'yes')
-
-        # Apply includes_pool filter
-        if includes_pool in ('yes', 'no'):
-            types = types.filter(includes_pool=includes_pool == 'yes')
-
-        # Apply includes_classes filter
-        if includes_classes in ('yes', 'no'):
-            types = types.filter(includes_classes=includes_classes == 'yes')
-
-        # Order by ID descending
-        types = types.order_by('-id')
-
-        # Paginate the results
-        paginator = PageNumberPagination()
-        page = paginator.paginate_queryset(types, request)
-        serializer = SubscriptionTypeSerializer(page, many=True, context={'request': request})
-        return paginator.get_paginated_response(serializer.data)
-
-    elif request.method == 'POST':
-        serializer = SubscriptionTypeSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            subscription_type = serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
+    
+# subscriptions/views.py
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
-    """
-    Handle GET requests to retrieve a filtered list of subscriptions and POST requests to create a new subscription.
-    """
     if request.method == 'GET':
-        # Get the identifier from query parameters
         search_term = request.GET.get('identifier', '')
 
-        if request.user.role == 'owner':
-            subscriptions = Subscription.objects.select_related('member', 'type', 'club').all()
-        else:
-            subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
+        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
+
+        if request.user.role in ['reception', 'accountant']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_in__lte=timezone.now(),
+                check_out__gte=timezone.now()
+            ).first()
+            if attendance and attendance.shift:
+                subscriptions = subscriptions.filter(
+                    created_by=request.user,
+                    created_at__gte=attendance.check_in,
+                    created_at__lte=attendance.check_out if attendance.check_out else timezone.now()
+                )
+            else:
+                subscriptions = subscriptions.none()  # No active shift, return empty
 
         filterable_fields = {
             'member_id': 'member_id',
             'type_id': 'type_id',
             'club_id': 'club_id',
-            'club_name': 'club__name__iexact',  
+            'club_name': 'club__name__iexact',
             'start_date': 'start_date',
             'end_date': 'end_date',
             'paid_amount': 'paid_amount',
@@ -188,7 +120,6 @@ def subscription_list(request):
                 if field_name in filterable_fields.values():
                     range_filters[param] = request.query_params[param]
 
-        search_term = request.query_params.get('search_term', '')
         if search_term:
             subscriptions = subscriptions.filter(
                 Q(member__name__icontains=search_term) |
@@ -206,11 +137,11 @@ def subscription_list(request):
         except ValueError as e:
             return Response({'error': f'Invalid range filter value: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        subscriptions = subscriptions.order_by('-id') 
+        subscriptions = subscriptions.order_by('-id')
 
         status_filter = request.query_params.get('status', '').lower()
         today = timezone.now().date()
-        
+
         status_filters = {
             'active': {
                 'start_date__lte': today,
@@ -223,7 +154,7 @@ def subscription_list(request):
                 'start_date__gt': today
             }
         }
-        
+
         if status_filter in status_filters:
             subscriptions = subscriptions.filter(**status_filters[status_filter])
 
@@ -249,6 +180,7 @@ def subscription_list(request):
                     )
                 mutable_data = request.data.copy()
                 mutable_data['member'] = member.id
+                mutable_data['created_by'] = request.user.id
             except Member.DoesNotExist:
                 return Response(
                     {'error': 'Invalid identifier provided'},
@@ -256,6 +188,7 @@ def subscription_list(request):
                 )
         else:
             mutable_data = request.data
+            mutable_data['created_by'] = request.user.id
 
         serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
         if serializer.is_valid():
@@ -331,6 +264,8 @@ def active_subscription_types(request):
     page = paginator.paginate_queryset(types, request)
     serializer = SubscriptionTypeSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
+
+
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_detail(request, pk):
@@ -400,21 +335,16 @@ def subscription_detail(request, pk):
         subscription.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+# subscriptions/views.py
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def active_subscriptions(request):
     today = timezone.now().date()
-    if request.user.role == 'owner':
-        subscriptions = Subscription.objects.filter(
-            start_date__lte=today,
-            end_date__gte=today
-        ).order_by('-start_date')
-    else:
-        subscriptions = Subscription.objects.filter(
-            start_date__lte=today,
-            end_date__gte=today,
-            club=request.user.club
-        ).order_by('-start_date')
+    subscriptions = Subscription.objects.filter(
+        start_date__lte=today,
+        end_date__gte=today,
+        club=request.user.club
+    ).order_by('-start_date')
     
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
@@ -568,3 +498,51 @@ def subscription_stats(request):
             'upcoming': Subscription.objects.filter(start_date__gt=today, club=request.user.club).count(),
         }
     return Response(stats)
+
+# subscriptions/views.py
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def request_freeze(request, pk):
+    subscription = get_object_or_404(Subscription, pk=pk)
+    
+    if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
+        return Response({'error': 'You do not have permission to request a freeze for this subscription'}, status=status.HTTP_403_FORBIDDEN)
+
+    requested_days = request.data.get('requested_days', 0)
+    start_date = request.data.get('start_date', timezone.now().date())
+
+    if requested_days <= 0:
+        return Response({'error': 'Requested freeze days must be positive'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    total_freeze_days = sum(fr.requested_days for fr in subscription.freeze_requests.filter(approved=True))
+    if total_freeze_days + requested_days > subscription.type.max_freeze_days:
+        return Response({'error': f'Total freeze days ({total_freeze_days + requested_days}) exceeds maximum allowed ({subscription.type.max_freeze_days})'}, status=status.HTTP_400_BAD_REQUEST)
+
+    freeze_request = FreezeRequest(
+        subscription=subscription,
+        requested_days=requested_days,
+        start_date=start_date,
+        approved=False,
+        created_by=request.user
+    )
+    freeze_request.save()
+
+    return Response({'message': 'Freeze request submitted successfully', 'freeze_request_id': freeze_request.id}, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def approve_freeze(request, freeze_id):
+    freeze_request = get_object_or_404(FreezeRequest, pk=freeze_id)
+    
+    if not IsOwnerOrRelatedToClub().has_object_permission(request, None, freeze_request):
+        return Response({'error': 'You do not have permission to approve this freeze request'}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'Only owners or admins can approve freeze requests'}, status=status.HTTP_403_FORBIDDEN)
+
+    freeze_request.approved = True
+    freeze_request.approved_by = request.user
+    freeze_request.save()
+
+    serializer = SubscriptionSerializer(freeze_request.subscription)
+    return Response(serializer.data)
