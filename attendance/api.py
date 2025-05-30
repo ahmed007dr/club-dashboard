@@ -243,6 +243,7 @@ def create_entry_log_api(request):
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+from django.db.models.functions import ExtractHour
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -255,9 +256,9 @@ def attendance_hourly_api(request):
         return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if request.user.role in ['owner', 'admin']:
-        attendances = Attendance.objects.filter(
-            subscription__club=request.user.club,
-            attendance_date__date=target_date
+        entry_logs = EntryLog.objects.filter(
+            club=request.user.club,
+            timestamp__date=target_date
         )
     else:
         attendance = StaffAttendance.objects.filter(
@@ -269,17 +270,17 @@ def attendance_hourly_api(request):
         check_out = attendance.check_out if attendance.check_out else timezone.now()
         if target_date < attendance.check_in.date() or target_date > check_out.date():
             return Response({'error': 'Date must be within your shift.'}, status=status.HTTP_400_BAD_REQUEST)
-        attendances = Attendance.objects.filter(
-            subscription__club=request.user.club,
+        entry_logs = EntryLog.objects.filter(
+            club=request.user.club,
             approved_by=request.user,
-            attendance_date__date=target_date
+            timestamp__date=target_date
         )
 
-    # Aggregate attendance by hour
+    # SQLite-compatible way to extract hour
     hourly_counts = (
-        attendances
-        .extra({'hour': "EXTRACT(HOUR FROM attendance_date)"})
-        .values('hour')
+        entry_logs.annotate(
+            hour=ExtractHour('timestamp')
+        ).values('hour')
         .annotate(count=Count('id'))
         .order_by('hour')
     )
@@ -287,29 +288,31 @@ def attendance_hourly_api(request):
     # Initialize array for 24 hours
     hourly_data = [0] * 24
     for entry in hourly_counts:
-        hour = int(entry['hour'])
+        hour = entry['hour']
         hourly_data[hour] = entry['count']
 
     return Response(hourly_data)
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_weekly_api(request):
-    """Get daily attendance data for the last 5 working days (Monday to Friday)."""
+    """Get daily attendance data for the last 7 days (Saturday to Friday)."""
     today = timezone.now().date()
-    # Find the last 5 working days (skip weekends)
-    working_days = []
-    current_date = today
-    while len(working_days) < 7:
-        if current_date.weekday() < 7:  # Monday to Friday
-            working_days.append(current_date)
-        current_date -= timedelta(days=1)
-    working_days.reverse()  # Sort from oldest to newest
+    # Find the last Friday (end of week)
+    end_date = today
+    while end_date.weekday() != 4:  # Friday is 4
+        end_date -= timedelta(days=1)
+    start_date = end_date - timedelta(days=6)  # Start from Saturday
+
+    # Generate list of 7 days from Saturday to Friday
+    week_days = [start_date + timedelta(days=i) for i in range(7)]
 
     if request.user.role in ['owner', 'admin']:
         attendances = Attendance.objects.filter(
             subscription__club=request.user.club,
-            attendance_date__date__gte=working_days[0]
+            attendance_date__gte=start_date,
+            attendance_date__lte=end_date
         )
     else:
         attendance = StaffAttendance.objects.filter(
@@ -322,29 +325,30 @@ def attendance_weekly_api(request):
         attendances = Attendance.objects.filter(
             subscription__club=request.user.club,
             approved_by=request.user,
-            attendance_date__date__gte=working_days[0],
-            attendance_date__range=(attendance.check_in, check_out)
+            attendance_date__gte=start_date,
+            attendance_date__lte=end_date,
+            attendance_date__range=(attendance.check_in.date(), check_out.date())
         )
 
     # Aggregate attendance by date
     daily_counts = (
         attendances
-        .filter(attendance_date__date__lte=today)
-        .values('attendance_date__date')
+        .values('attendance_date')
         .annotate(count=Count('id'))
-        .order_by('attendance_date__date')
+        .order_by('attendance_date')
     )
 
-    # Map counts to working days
-    daily_data = [{'date': date.isoformat(), 'count': 0} for date in working_days]
+    # Map counts to week days
+    daily_data = [{'date': date.isoformat(), 'count': 0} for date in week_days]
     for entry in daily_counts:
-        date_str = entry['attendance_date__date'].isoformat()
+        date_str = entry['attendance_date'].isoformat()
         for data in daily_data:
             if data['date'] == date_str:
                 data['count'] = entry['count']
                 break
 
     return Response(daily_data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -363,7 +367,7 @@ def attendance_monthly_api(request):
     if request.user.role in ['owner', 'admin']:
         attendances = Attendance.objects.filter(
             subscription__club=request.user.club,
-            attendance_date__date__gte=working_days[0]
+            attendance_date__gte=working_days[0]  # Fixed: Removed __date
         )
     else:
         attendance = StaffAttendance.objects.filter(
@@ -376,23 +380,23 @@ def attendance_monthly_api(request):
         attendances = Attendance.objects.filter(
             subscription__club=request.user.club,
             approved_by=request.user,
-            attendance_date__date__gte=working_days[0],
-            attendance_date__range=(attendance.check_in, check_out)
+            attendance_date__gte=working_days[0],  # Fixed: Removed __date
+            attendance_date__range=(attendance.check_in.date(), check_out.date())
         )
 
     # Aggregate attendance by date
     daily_counts = (
         attendances
-        .filter(attendance_date__date__lte=today)
-        .values('attendance_date__date')
+        .filter(attendance_date__lte=today)  # Fixed: Removed __date
+        .values('attendance_date')
         .annotate(count=Count('id'))
-        .order_by('attendance_date__date')
+        .order_by('attendance_date')
     )
 
     # Map counts to working days
     daily_data = [{'date': date.isoformat(), 'count': 0} for date in working_days]
     for entry in daily_counts:
-        date_str = entry['attendance_date__date'].isoformat()
+        date_str = entry['attendance_date'].isoformat()
         for data in daily_data:
             if data['date'] == date_str:
                 data['count'] = entry['count']
