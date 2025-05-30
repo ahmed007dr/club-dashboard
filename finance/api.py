@@ -14,7 +14,6 @@ from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub
 from rest_framework.pagination import PageNumberPagination
 from datetime import datetime
-from core.models import Club
 from staff.models import StaffAttendance
 from django.db.models import Sum, Q
 from django.utils import timezone
@@ -25,6 +24,7 @@ import logging
 import os
 import subprocess
 from utils.reports import get_employee_report_data
+from utils.convert_to_name import get_object_from_id_or_name
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -38,10 +38,7 @@ class StandardPagination(PageNumberPagination):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_category_api(request):
     if request.method == 'GET':
-        if request.user.role == 'owner':
-            categories = ExpenseCategory.objects.all()
-        else:
-            categories = ExpenseCategory.objects.filter(club=request.user.club)
+        categories = ExpenseCategory.objects.filter(club=request.user.club)
 
         name = request.query_params.get('name', '')
         description = request.query_params.get('description', '')
@@ -56,10 +53,7 @@ def expense_category_api(request):
         serializer = ExpenseCategorySerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
     
-    elif request.method == 'POST':
-        if request.user.role != 'owner':
-            return Response({'error': 'Only owners can create expense categories'}, status=status.HTTP_403_FORBIDDEN)
-        
+    elif request.method == 'POST':        
         serializer = ExpenseCategorySerializer(data=request.data)
         if serializer.is_valid():
             category = serializer.save()
@@ -70,12 +64,13 @@ def expense_category_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_api(request):
     if request.method == 'GET':
-        if request.user.role == 'owner':
-            expenses = Expense.objects.select_related('category', 'paid_by').all().order_by('-id')
-        elif request.user.role == 'admin':
-            return Response({'error': 'Admins cannot view expenses'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role in ['owner', 'admin']:
+            # Owner و Admin يشوفوا بس مصروفات ناديهم
+            expenses = Expense.objects.select_related('category', 'paid_by').filter(
+                club=request.user.club
+            ).order_by('-id')
         else:
-            # Staff see their expenses for their latest open or closed shift
+            # Reception و Accountant يشوفوا مصروفاتهم في الشيفت الأخير
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club
@@ -98,32 +93,24 @@ def expense_api(request):
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
-        if request.user.role == 'admin':
-            return Response({'error': 'Admins cannot create expenses'}, status=status.HTTP_403_FORBIDDEN)
-            
         data = request.data.copy()
         data['paid_by'] = request.user.id
         
         club_id = data.get('club')
-        if club_id and request.user.role != 'owner':
-            if int(club_id) != request.user.club.id:
-                return Response({'error': 'You can only create expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
-            club = get_object_or_404(Club, id=club_id)
+        if club_id and int(club_id) != request.user.club.id:
+            return Response({'error': 'You can only create expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = ExpenseSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             expense = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_source_api(request):
     if request.method == 'GET':
-        if request.user.role == 'owner':
-            sources = IncomeSource.objects.all().order_by('-id')
-        else:
-            sources = IncomeSource.objects.filter(club=request.user.club).order_by('-id')
+        sources = IncomeSource.objects.filter(club=request.user.club).order_by('-id')
 
         name = request.query_params.get('name', None)
         description = request.query_params.get('description', None)
@@ -139,10 +126,13 @@ def income_source_api(request):
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
-        if request.user.role != 'owner':
-            return Response({'error': 'Only owners can create income sources'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role != 'admin':
+            return Response({'error': 'Only admin can create income sources'}, status=status.HTTP_403_FORBIDDEN)
         
-        serializer = IncomeSourceSerializer(data=request.data)
+        data = request.data.copy()
+        data['club'] = request.user.club.id
+        
+        serializer = IncomeSourceSerializer(data=data)
         if serializer.is_valid():
             source = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -152,14 +142,13 @@ def income_source_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_api(request):
     if request.method == 'GET':
-        if request.user.role == 'owner':
-            incomes = Income.objects.select_related('source', 'received_by').all()
-        elif request.user.role == 'admin':
+        if request.user.role in ['owner', 'admin']:
+            # Owner و Admin يشوفوا بس إيرادات ناديهم
             incomes = Income.objects.select_related('source', 'received_by').filter(
                 club=request.user.club
             )
         else:
-            # Staff see their incomes for their latest open or closed shift
+            # Reception و Accountant يشوفوا إيراداتهم في الشيفت الأخير
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club
@@ -181,8 +170,8 @@ def income_api(request):
         description = request.query_params.get('description')
 
         if source:
-            if not IncomeSource.objects.filter(name__icontains=source).exists():
-                return Response({"error": "No income source found with this name"}, status=status.HTTP_400_BAD_REQUEST)
+            if not IncomeSource.objects.filter(name__icontains=source, club=request.user.club).exists():
+                return Response({"error": "No income source found with this name in your club"}, status=status.HTTP_400_BAD_REQUEST)
             incomes = incomes.filter(source__name__icontains=source)
         if amount:
             try:
@@ -200,17 +189,12 @@ def income_api(request):
         return paginator.get_paginated_response(serializer.data)
     
     elif request.method == 'POST':
-        if request.user.role == 'admin':
-            return Response({'error': 'Admins cannot create incomes'}, status=status.HTTP_403_FORBIDDEN)
-            
         data = request.data.copy()
         data['received_by'] = request.user.id
         
         club_id = data.get('club')
-        if club_id and request.user.role != 'owner':
-            if int(club_id) != request.user.club.id:
-                return Response({'error': 'You can only create incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
-            club = get_object_or_404(Club, id=club_id)
+        if club_id and int(club_id) != request.user.club.id:
+            return Response({'error': 'You can only create incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
         
         serializer = IncomeSerializer(data=data)
         if serializer.is_valid():
@@ -226,21 +210,25 @@ def expense_detail_api(request, pk):
     if request.method == 'GET':
         if request.user.role == 'admin':
             return Response({'error': 'Admins cannot view expenses'}, status=status.HTTP_403_FORBIDDEN)
-        if request.user.role not in ['owner'] and expense.club != request.user.club:
+        if expense.club != request.user.club:
             return Response({'error': 'You can only view expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role not in ['owner'] and expense.paid_by != request.user:
+            return Response({'error': 'You can only view your own expenses'}, status=status.HTTP_403_FORBIDDEN)
         serializer = ExpenseSerializer(expense, context={'request': request})
         return Response(serializer.data)
     
     elif request.method == 'PUT':
         if request.user.role == 'admin':
             return Response({'error': 'Admins cannot update expenses'}, status=status.HTTP_403_FORBIDDEN)
+        if expense.club != request.user.club:
+            return Response({'error': 'You can only update expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
         if request.user.role not in ['owner'] and expense.paid_by != request.user:
             return Response({'error': 'You can only update your own expenses'}, status=status.HTTP_403_FORBIDDEN)
             
         serializer = ExpenseSerializer(expense, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated_expense = serializer.save()
-            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, updated_expense):
+            if updated_expense.club != request.user.club:
                 return Response({'error': 'You do not have permission to update this expense to this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -248,32 +236,36 @@ def expense_detail_api(request, pk):
     elif request.method == 'DELETE':
         if request.user.role != 'owner':
             return Response({'error': 'Only owners can delete expenses'}, status=status.HTTP_403_FORBIDDEN)
+        if expense.club != request.user.club:
+            return Response({'error': 'You can only delete expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
         expense.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
+    
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_detail_api(request, pk):
     income = get_object_or_404(Income, pk=pk)
     
     if request.method == 'GET':
+        if income.club != request.user.club:
+            return Response({'error': 'You can only view incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
         if request.user.role not in ['owner', 'admin'] and income.received_by != request.user:
             return Response({'error': 'You can only view your own incomes'}, status=status.HTTP_403_FORBIDDEN)
-        if request.user.role not in ['owner'] and income.club != request.user.club:
-            return Response({'error': 'You can only view incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
         serializer = IncomeSerializer(income)
         return Response(serializer.data)
     
     elif request.method == 'PUT':
         if request.user.role == 'admin':
             return Response({'error': 'Admins cannot update incomes'}, status=status.HTTP_403_FORBIDDEN)
+        if income.club != request.user.club:
+            return Response({'error': 'You can only update incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
         if request.user.role not in ['owner'] and income.received_by != request.user:
             return Response({'error': 'You can only update your own incomes'}, status=status.HTTP_403_FORBIDDEN)
             
         serializer = IncomeSerializer(income, data=request.data, partial=True)
         if serializer.is_valid():
             updated_income = serializer.save()
-            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, updated_income):
+            if updated_income.club != request.user.club:
                 return Response({'error': 'You do not have permission to update this income to this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -281,6 +273,8 @@ def income_detail_api(request, pk):
     elif request.method == 'DELETE':
         if request.user.role != 'owner':
             return Response({'error': 'Only owners can delete incomes'}, status=status.HTTP_403_FORBIDDEN)
+        if income.club != request.user.club:
+            return Response({'error': 'You can only delete incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
         income.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -307,13 +301,10 @@ def daily_summary_api(request):
         except ValueError:
             return Response({'error': 'Invalid month format. Use YYYY-MM.'}, status=status.HTTP_400_BAD_REQUEST)
     else:
-        filter_date = datetime.now().date()
+        filter_date = timezone.now().date()
         date_filter = {'check_in__date': filter_date}
     
-    if request.user.role == 'owner':
-        club_filter = {}
-    else:
-        club_filter = {'club': request.user.club}
+    club_filter = {'club': request.user.club}
     
     if username:
         employees = User.objects.filter(**club_filter, username=username)
@@ -341,24 +332,24 @@ def daily_summary_api(request):
         }
         
         for attendance in attendances:
-            expenses = Expense.objects.none() if request.user.role == 'admin' else Expense.objects.filter(
+            expenses = Expense.objects.filter(
                 **club_filter,
                 paid_by=employee,
                 date__gte=attendance.check_in,
-                date__lte=attendance.check_out if attendance.check_out else datetime.now()
+                date__lte=attendance.check_out if attendance.check_out else timezone.now()
             )
             
             incomes = Income.objects.filter(
                 **club_filter,
                 received_by=employee,
                 date__gte=attendance.check_in,
-                date__lte=attendance.check_out if attendance.check_out else datetime.now()
+                date__lte=attendance.check_out if attendance.check_out else timezone.now()
             )
             
             total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or 0
             total_incomes = incomes.aggregate(total=Sum('amount'))['total'] or 0
             
-            expense_details = ExpenseDetailSerializer(expenses, many=True).data if request.user.role != 'admin' else []
+            expense_details = ExpenseDetailSerializer(expenses, many=True).data
             income_details = IncomeDetailSerializer(incomes, many=True).data
             
             attendance_summary = {
@@ -385,38 +376,31 @@ def daily_summary_api(request):
     page = paginator.paginate_queryset(summary, request)
     return paginator.get_paginated_response(page)
 
-def get_object_from_id_or_name(model, value, fields=['id', 'name']):
-    """
-    Retrieve an object by ID or name. Returns None if not found or multiple results exist.
-    """
-    try:
-        return model.objects.get(id=int(value))
-    except (ValueError, model.DoesNotExist):
-        q = Q()
-        for field in fields:
-            q |= Q(**{f"{field}__iexact": value})
-        results = model.objects.filter(q)
-        return results.first() if results.count() == 1 else None
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_summary(request):
-    """
-    Calculate total income based on filters.
-    Query params:
-    - date: Specific date (YYYY-MM-DD)
-    - start: Start date (YYYY-MM-DD)
-    - end: End date (YYYY-MM-DD)
-    - user: User ID or username
-    - source: Income source ID or name
-    - details: Boolean to include detailed records (true/false)
-    """
     try:
-        if request.user.role == 'owner':
-            incomes = Income.objects.select_related('source', 'received_by').all()
-        else:
+        if request.user.role in ['owner', 'admin']:
+            # Owner و Admin يشوفوا كل إيرادات النادي
             incomes = Income.objects.select_related('source', 'received_by').filter(
                 club=request.user.club
+            )
+        else:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club
+            ).order_by('-check_in').first()
+            
+            if not attendance:
+                return Response({'error': 'No open or recent shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+
+            check_out = attendance.check_out if attendance.check_out else timezone.now()
+            incomes = Income.objects.select_related('source', 'received_by').filter(
+                club=request.user.club,
+                received_by=request.user,
+                date__gte=attendance.check_in,
+                date__lte=check_out
             )
 
         date = request.query_params.get('date')
@@ -431,31 +415,37 @@ def income_summary(request):
                 date_obj = datetime.strptime(date, '%Y-%m-%d').date()
                 incomes = incomes.filter(date=date_obj)
             except ValueError:
-                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=400)
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if start and end:
             try:
-                start_obj = datetime.strptime(start, '%Y-%m-%d').date()
-                end_obj = datetime.strptime(end, '%Y-%m-%d').date()
-                incomes = incomes.filter(date__range=[start_obj, end_obj])
+                start_date = datetime.strptime(start, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end, '%Y-%m-%d').date()
+                # For Reception and Accountant, ensure date range is within their shift
+                if request.user.role not in ['owner', 'admin']:
+                    if start_date < attendance.check_in.date() or end_date > check_out.date():
+                        return Response({'error': 'Date range must be within your shift.'}, status=status.HTTP_400_BAD_REQUEST)
+                incomes = incomes.filter(date__range=[start_date, end_date])
             except ValueError:
-                return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=400)
+                return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
         elif start or end:
-            return Response({'error': 'Both start and end dates are required.'}, status=400)
+            return Response({'error': 'Both start and end dates are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if user_param:
             user_obj = get_object_from_id_or_name(User, user_param, ['id', 'username'])
-            if user_obj:
+            if user_obj and user_obj.user.club == request.user.user.club:
+                if request.user.role not in ['owner', 'admin'] and user_obj.id != request.user.id:
+                    return Response({'error': 'You can only view your own income.'}, status=status.HTTP_403_FORBIDDEN)
                 incomes = incomes.filter(received_by=user_obj)
             else:
-                return Response({'error': 'User not found or multiple matches.'}, status=400)
+                return Response({'error': 'User not found or not in your club.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if source_param:
             source_obj = get_object_from_id_or_name(IncomeSource, source_param, ['id', 'name'])
-            if source_obj:
+            if source_obj and source_obj.club == request.user.club:
                 incomes = incomes.filter(source=source_obj)
             else:
-                return Response({'error': 'Income source not found or multiple matches.'}, status=400)
+                return Response({'error': 'Income source not found or not in your club.'}, status=status.HTTP_400_BAD_REQUEST)
 
         total = incomes.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         response_data = {'total_income': float(total)}
@@ -463,30 +453,38 @@ def income_summary(request):
         if details:
             response_data['details'] = IncomeSummarySerializer(incomes, many=True).data
 
-        return Response(response_data, status=200)
+        return Response(response_data, status=status.HTTP_200_OK)
 
     except Exception as e:
-        return Response({'error': str(e)}, status=500)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_summary(request):
-    """
-    Calculate total expenses based on filters.
-    Query params:
-    - date: Specific date (YYYY-MM-DD)
-    - start: Start date (YYYY-MM-DD)
-    - end: End date (YYYY-MM-DD)
-    - user: User ID or username
-    - category: Expense category ID or name
-    - details: Boolean to include detailed records (true/false)
-    """
     try:
-        if request.user.role != 'owner':
-            return Response({'error': 'Only owners can view expense summaries'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role in ['owner', 'admin']:
+            expenses = Expense.objects.select_related('category', 'paid_by').filter(
+                club=request.user.club
+            )
+        else:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club
+            ).order_by('-check_in').first()
             
-        expenses = Expense.objects.select_related('category', 'paid_by').all()
+            if not attendance:
+                return Response({'error': 'No open or recent shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
 
+            check_out = attendance.check_out if attendance.check_out else timezone.now()
+            expenses = Expense.objects.select_related('category', 'paid_by').filter(
+                club=request.user.club,
+                paid_by=request.user,
+                date__gte=attendance.check_in,
+                date__lte=check_out
+            )
+
+        # تطبيق الفلاتر
         date = request.query_params.get('date')
         start = request.query_params.get('start')
         end = request.query_params.get('end')
@@ -499,59 +497,60 @@ def expense_summary(request):
                 date_obj = datetime.strptime(date, '%Y-%m-%d').date()
                 expenses = expenses.filter(date=date_obj)
             except ValueError:
-                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=400)
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if start and end:
             try:
                 start_obj = datetime.strptime(start, '%Y-%m-%d').date()
                 end_obj = datetime.strptime(end, '%Y-%m-%d').date()
+                if request.user.role not in ['owner', 'admin']:
+                    if start_obj < attendance.check_in.date() or end_obj > check_out.date():
+                        return Response({'error': 'Date range must be within your shift.'}, status=status.HTTP_400_BAD_REQUEST)
                 expenses = expenses.filter(date__range=[start_obj, end_obj])
             except ValueError:
-                return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=400)
+                return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
         elif start or end:
-            return Response({'error': 'Both start and end dates are required.'}, status=400)
+            return Response({'error': 'Both start and end dates are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if user_param:
             user_obj = get_object_from_id_or_name(User, user_param, ['id', 'username'])
-            if user_obj:
+            if user_obj and user_obj.club == request.user.club:
+                if request.user.role not in ['owner', 'admin'] and user_obj.id != request.user.id:
+                    return Response({'error': 'You can only view your own expenses.'}, status=status.HTTP_403_FORBIDDEN)
                 expenses = expenses.filter(paid_by=user_obj)
             else:
-                return Response({'error': 'User not found or multiple matches.'}, status=400)
+                return Response({'error': 'User not found or not in your club.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if category_param:
             category_obj = get_object_from_id_or_name(ExpenseCategory, category_param, ['id', 'name'])
-            if category_obj:
+            if category_obj and category_obj.club == request.user.club:
                 expenses = expenses.filter(category=category_obj)
             else:
-                return Response({'error': 'Expense category not found or multiple matches.'}, status=400)
+                return Response({'error': 'Expense category not found or not in your club.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # حساب إجمالي المصروفات
         total = expenses.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         response_data = {'total_expense': float(total)}
 
+        # إضافة التفاصيل إذا طُلبت
         if details:
             response_data['details'] = ExpenseDetailSerializer(expenses, many=True).data
 
-        return Response(response_data, status=200)
+        return Response(response_data, status=status.HTTP_200_OK)
 
     except Exception as e:
-        return Response({'error': str(e)}, status=500)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def finance_overview(request):
-    """
-    Provide an overview of total income, expenses, and net profit.
-    Query params:
-    - start: Start date (YYYY-MM-DD)
-    - end: End date (YYYY-MM-DD)
-    """
     try:
-        if request.user.role == 'owner':
-            income_qs = Income.objects.select_related('source', 'received_by').all()
-            expense_qs = Expense.objects.select_related('category', 'paid_by').all()
-        else:
-            income_qs = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
-            expense_qs = Expense.objects.none()
+        if request.user.role not in ['owner', 'admin']:
+            return Response({'error': 'Only owners and admins can view finance overview'}, status=status.HTTP_403_FORBIDDEN)
+
+        income_qs = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
+        expense_qs = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)
 
         start = request.query_params.get('start')
         end = request.query_params.get('end')
@@ -562,10 +561,11 @@ def finance_overview(request):
                 income_qs = income_qs.filter(date__range=[start_obj, end_obj])
                 expense_qs = expense_qs.filter(date__range=[start_obj, end_obj])
             except ValueError:
-                return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=400)
+                return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
         elif start or end:
-            return Response({'error': 'Both start and end dates are required.'}, status=400)
+            return Response({'error': 'Both start and end dates are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # حساب الإجماليات
         total_income = income_qs.aggregate(total=Sum('amount'))['total'] or 0
         total_expense = expense_qs.aggregate(total=Sum('amount'))['total'] or 0
         net = total_income - total_expense
@@ -574,10 +574,11 @@ def finance_overview(request):
             'total_income': float(total_income),
             'total_expense': float(total_expense),
             'net_profit': float(net)
-        }, status=200)
+        }, status=status.HTTP_200_OK)
 
     except Exception as e:
-        return Response({'error': str(e)}, status=500)
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -588,7 +589,6 @@ def employee_daily_report_api(request):
 
     if not start_date or not end_date:
         if request.user.role in ['owner', 'admin']:
-            logger.error("Start date and end date are required for admin/owner")
             return Response({'error': 'يجب تحديد تاريخ البداية والنهاية'}, status=status.HTTP_400_BAD_REQUEST)
         else:
             attendance = StaffAttendance.objects.filter(
@@ -597,11 +597,21 @@ def employee_daily_report_api(request):
                 check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
-                logger.warning("No open shift found for user: %s", request.user.username)
                 return Response({'error': 'لا توجد وردية مفتوحة. يجب تسجيل حضور أولاً.'}, status=status.HTTP_404_NOT_FOUND)
 
             start_date = attendance.check_in.isoformat()
             end_date = timezone.now().isoformat()
+            employee_id = request.user.id 
+
+    if request.user.role not in ['owner', 'admin']:
+        if employee_id and str(employee_id) != str(request.user.id):
+            return Response({'error': 'غير مسموح لك بمشاهدة تقارير موظف آخر'}, status=status.HTTP_403_FORBIDDEN)
+        employee_id = request.user.id 
+
+    if employee_id:
+        employee = get_object_or_404(User, id=employee_id)
+        if employee.club != request.user.club:
+            return Response({'error': 'Employee not in your club'}, status=status.HTTP_403_FORBIDDEN)
 
     data, status_code = get_employee_report_data(
         user=request.user,
@@ -620,7 +630,6 @@ def generate_daily_report_pdf(request):
     end_date = request.query_params.get('end_date')
 
     if request.user.role not in ['owner', 'admin'] and (not start_date or not end_date):
-        # Try to get open attendance shift for normal user
         attendance = StaffAttendance.objects.filter(
             staff=request.user,
             club=request.user.club,
@@ -629,6 +638,11 @@ def generate_daily_report_pdf(request):
         if attendance:
             start_date = attendance.check_in.isoformat()
             end_date = timezone.now().isoformat()
+
+    if employee_id:
+        employee = get_object_or_404(User, id=employee_id)
+        if employee.club != request.user.club:
+            return Response({'error': 'Employee not in your club'}, status=status.HTTP_403_FORBIDDEN)
 
     data, response_status = get_employee_report_data(
         request.user,
