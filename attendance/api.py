@@ -125,8 +125,8 @@ def attendance_list_api(request):
         'total_attendances': total_attendances,
         'results': serializer.data
     }
-
-    return paginator.get_paginated_response(response_data)
+    return paginator.get_paginated_response(serializer.data)
+    #return paginator.get_paginated_response(response_data)
 
 
 @api_view(['DELETE'])
