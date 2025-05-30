@@ -6,49 +6,125 @@ from .models import Attendance, EntryLog
 from .serializers import AttendanceSerializer, EntryLogSerializer
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub
-from django.db.models import Q
 from django.utils import timezone
-from members.models import Member
 from rest_framework.pagination import PageNumberPagination
-from datetime import datetime
+from datetime import datetime, timedelta
+from django.db.models import Count
+from staff.models import StaffAttendance
 
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_list_api(request):    
-    # Get filters from query parameters
+    # heatmap mode
+    if request.GET.get('format') == 'heatmap':
+        one_year_ago = timezone.now().date() - timedelta(days=365)
+        
+        if request.user.role in ['owner', 'admin']:
+            attendances = Attendance.objects.filter(
+                attendance_date__gte=one_year_ago,
+                subscription__club=request.user.club
+            )
+        else:
+            # Reception and Accountant see only their shift's attendances by default
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club
+            ).order_by('-check_in').first()
+            
+            if not attendance:
+                return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
+            
+            check_out = attendance.check_out if attendance.check_out else timezone.now()
+            attendances = Attendance.objects.filter(
+                subscription__club=request.user.club,
+                approved_by=request.user,
+                attendance_date__range=(attendance.check_in, check_out)
+            ).filter(attendance_date__gte=one_year_ago)  # تم فصل الشرط لتجنب التكرار
+
+        daily_counts = (
+            attendances
+            .values('attendance_date')
+            .annotate(count=Count('id'))
+            .order_by('attendance_date')
+        )
+
+        heatmap_data = [
+            {'date': entry['attendance_date'].isoformat(), 'count': entry['count']}
+            for entry in daily_counts
+        ]
+
+        return Response(heatmap_data)
+
+    # باقي الكود بدون تغيير...
+    # Standard list mode
     rfid = request.GET.get('rfid', '')
     attendance_date = request.GET.get('attendance_date', '')
     member_name = request.GET.get('member_name', '')
     page = request.GET.get('page', 1)
     page_size = request.GET.get('page_size', 20)
 
-    # Base queryset
-    if request.user.role == 'owner':
-        attendances = Attendance.objects.select_related('subscription', 'subscription__member').all()
-    else:
+    # Determine if search mode is active
+    is_search_mode = rfid or member_name
+
+    if request.user.role in ['owner', 'admin']:
         attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(
             subscription__club=request.user.club
         )
+    else:
+        if is_search_mode:
+            # In search mode, allow seeing all attendances for the specified member
+            attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(
+                subscription__club=request.user.club
+            )
+        else:
+            # Default mode: only show attendances from their shift
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club
+            ).order_by('-check_in').first()
+            
+            if not attendance:
+                return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
+            
+            check_out = attendance.check_out if attendance.check_out else timezone.now()
+            attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(
+                subscription__club=request.user.club,
+                approved_by=request.user,
+                attendance_date__range=(attendance.check_in, check_out)
+            )
 
-    # Apply filters
     if rfid:
         attendances = attendances.filter(subscription__member__rfid_code__iexact=rfid)
     
     if attendance_date:
-        attendances = attendances.filter(attendance_date=attendance_date)
+        try:
+            date_obj = datetime.strptime(attendance_date, '%Y-%m-%d').date()
+            if request.user.role not in ['owner', 'admin'] and not is_search_mode:
+                if date_obj < attendance.check_in.date() or date_obj > check_out.date():
+                    return Response({'error': 'Date must be within your shift.'}, status=status.HTTP_400_BAD_REQUEST)
+            attendances = attendances.filter(attendance_date=date_obj)
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
     
     if member_name:
         attendances = attendances.filter(subscription__member__name__icontains=member_name)
 
-    # Ordering and pagination
+    # Calculate total attendances
+    total_attendances = attendances.count()
+
     attendances = attendances.order_by('-attendance_date')
     paginator = PageNumberPagination()
     paginator.page_size = page_size
     result_page = paginator.paginate_queryset(attendances, request)
     serializer = AttendanceSerializer(result_page, many=True)
 
-    return paginator.get_paginated_response(serializer.data)
+    response_data = {
+        'total_attendances': total_attendances,
+        'results': serializer.data
+    }
+
+    return paginator.get_paginated_response(response_data)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

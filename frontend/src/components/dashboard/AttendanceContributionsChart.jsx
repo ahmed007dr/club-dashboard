@@ -5,62 +5,91 @@ const AttendanceContributionsChart = ({ data }) => {
     return <div className="text-center py-4">لا توجد بيانات لعرضها</div>;
   }
 
-  // إنشاء خريطة للبيانات حسب التاريخ
   const dataMap = data.reduce((acc, item) => {
     acc[item.date] = item.count;
     return acc;
   }, {});
 
-  // إنشاء 53 أسبوع × 7 أيام
-  const weeks = 53;
-  const daysInWeek = 7;
-  const grid = [];
   const today = new Date();
-  const oneYearAgo = new Date();
-  oneYearAgo.setFullYear(today.getFullYear() - 1);
+  const startDate = new Date(today);
+  startDate.setFullYear(today.getFullYear() - 1);
+  startDate.setDate(startDate.getDate() - startDate.getDay()); // يبدأ من أول أسبوع
 
-  for (let week = 0; week < weeks; week++) {
-    const weekData = [];
-    for (let day = 0; day < daysInWeek; day++) {
-      const currentDate = new Date(oneYearAgo);
-      currentDate.setDate(oneYearAgo.getDate() + (week * daysInWeek + day));
-      
-      if (currentDate > today) {
-        weekData.push({ date: '', count: 0 });
-        continue;
-      }
+  const dates = [];
+  let current = new Date(startDate);
+  while (current <= today) {
+    dates.push(new Date(current));
+    current.setDate(current.getDate() + 1);
+  }
 
-      const dateStr = currentDate.toISOString().split('T')[0];
-      weekData.push({
-        date: dateStr,
-        count: dataMap[dateStr] || 0
-      });
-    }
-    grid.push(weekData);
+  const weeks = [];
+  for (let i = 0; i < dates.length; i += 7) {
+    weeks.push(dates.slice(i, i + 7));
   }
 
   const getColor = (count) => {
-    if (count === 0) return '#ebedf0';
-    if (count <= 2) return '#c6e48b';
-    if (count <= 5) return '#7bc96f';
-    return '#239a3b';
+    if (count === 0) return 'bg-gray-200 dark:bg-gray-700';
+    if (count <= 2) return 'bg-green-100 dark:bg-green-200';
+    if (count <= 5) return 'bg-green-400 dark:bg-green-500';
+    return 'bg-green-700 dark:bg-green-600';
   };
 
+  const legendColors = [
+    { label: '0', className: 'bg-gray-200 dark:bg-gray-700' },
+    { label: '1–2', className: 'bg-green-100 dark:bg-green-200' },
+    { label: '3–5', className: 'bg-green-400 dark:bg-green-500' },
+    { label: '6+', className: 'bg-green-700 dark:bg-green-600' },
+  ];
+
+  const weekDays = ['أحد', 'ث', 'أر', 'خ', 'ج', 'س', 'سب'];
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 shadow">
-      <div className="flex flex-wrap gap-1" dir="ltr">
-        {grid.map((week, weekIndex) => (
-          <div key={weekIndex} className="flex flex-col gap-1">
-            {week.map((day, dayIndex) => (
-              <div
-                key={`${weekIndex}-${dayIndex}`}
-                className="w-3 h-3 sm:w-4 sm:h-4 rounded-sm"
-                style={{ backgroundColor: getColor(day.count) }}
-                title={`${day.date}: ${day.count} حضور`}
-              />
-            ))}
-          </div>
+    <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 sm:p-6 shadow overflow-x-auto">
+      <div className="flex items-start space-x-2" dir="ltr">
+        {/* Days Labels */}
+        <div className="flex flex-col justify-between h-full pt-6 pr-2 text-xs text-gray-500 dark:text-gray-400">
+          {weekDays.map((day, idx) => (
+            <div key={idx} className="h-4">{day}</div>
+          ))}
+        </div>
+
+        {/* Heatmap */}
+        <div className="flex space-x-1">
+          {weeks.map((week, weekIndex) => (
+            <div key={weekIndex} className="flex flex-col space-y-1">
+              {Array.from({ length: 7 }).map((_, dayIndex) => {
+                const dateObj = week[dayIndex];
+                if (!dateObj) {
+                  return <div key={dayIndex} className="w-4 h-4" />;
+                }
+
+                const dateStr = dateObj.toISOString().split('T')[0];
+                const count = dataMap[dateStr] || 0;
+
+                return (
+                  <div
+                    key={dayIndex}
+                    className={`w-4 h-4 rounded ${getColor(count)}`}
+                    title={`${dateStr} - ${count} حضور`}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-end mt-4 space-x-2 text-sm text-gray-500 dark:text-gray-300" dir="ltr">
+        <span>أقل</span>
+        {legendColors.map((color, idx) => (
+          <div
+            key={idx}
+            className={`w-4 h-4 rounded ${color.className}`}
+            title={color.label}
+          />
         ))}
+        <span>أكثر</span>
       </div>
     </div>
   );
