@@ -15,49 +15,52 @@ from staff.models import StaffAttendance
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def attendance_list_api(request):    
-    # heatmap mode
-    if request.GET.get('format') == 'heatmap':
-        one_year_ago = timezone.now().date() - timedelta(days=365)
+def attendance_heatmap_api(request):
+    one_year_ago = timezone.now().date() - timedelta(days=365)
+    
+    if request.user.role in ['owner', 'admin']:
+        attendances = Attendance.objects.filter(
+            attendance_date__gte=one_year_ago,
+            subscription__club=request.user.club
+        )
+    else:
+        # Reception and Accountant see only their shift's attendances
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club
+        ).order_by('-check_in').first()
         
-        if request.user.role in ['owner', 'admin']:
-            attendances = Attendance.objects.filter(
-                attendance_date__gte=one_year_ago,
-                subscription__club=request.user.club
-            )
-        else:
-            # Reception and Accountant see only their shift's attendances by default
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user,
-                club=request.user.club
-            ).order_by('-check_in').first()
-            
-            if not attendance:
-                return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
-            
-            check_out = attendance.check_out if attendance.check_out else timezone.now()
-            attendances = Attendance.objects.filter(
-                subscription__club=request.user.club,
-                approved_by=request.user,
-                attendance_date__range=(attendance.check_in, check_out)
-            ).filter(attendance_date__gte=one_year_ago)  # تم فصل الشرط لتجنب التكرار
-
-        daily_counts = (
-            attendances
-            .values('attendance_date')
-            .annotate(count=Count('id'))
-            .order_by('attendance_date')
+        if not attendance:
+            return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        check_out = attendance.check_out if attendance.check_out else timezone.now()
+        attendances = Attendance.objects.filter(
+            subscription__club=request.user.club,
+            approved_by=request.user,
+            attendance_date__range=(attendance.check_in, check_out),
+            attendance_date__gte=one_year_ago
         )
 
-        heatmap_data = [
-            {'date': entry['attendance_date'].isoformat(), 'count': entry['count']}
-            for entry in daily_counts
-        ]
+    daily_counts = (
+        attendances
+        .values('attendance_date')
+        .annotate(count=Count('id'))
+        .order_by('attendance_date')
+    )
 
-        return Response(heatmap_data)
+    heatmap_data = [
+        {'date': entry['attendance_date'].isoformat(), 'count': entry['count']}
+        for entry in daily_counts
+    ]
 
-    # باقي الكود بدون تغيير...
-    # Standard list mode
+    return Response(heatmap_data)
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def attendance_list_api(request):
     rfid = request.GET.get('rfid', '')
     attendance_date = request.GET.get('attendance_date', '')
     member_name = request.GET.get('member_name', '')
@@ -73,7 +76,6 @@ def attendance_list_api(request):
         )
     else:
         if is_search_mode:
-            # In search mode, allow seeing all attendances for the specified member
             attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(
                 subscription__club=request.user.club
             )
@@ -125,6 +127,7 @@ def attendance_list_api(request):
     }
 
     return paginator.get_paginated_response(response_data)
+
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

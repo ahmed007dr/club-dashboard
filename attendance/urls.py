@@ -10,6 +10,8 @@ urlpatterns = [
     
     # ===== Attendance API Endpoints =====
     path('api/attendances/', api.attendance_list_api, name='api-attendance-list'),
+    path('api/attendances/heatmap/', api.attendance_heatmap_api, name='api-attendance-heatmap'),
+
     path('api/attendances/add/', api.add_attendance_api, name='api-add-attendance'),
     path('api/attendances/<int:attendance_id>/delete/', api.delete_attendance_api, name='api-delete-attendance'),
     

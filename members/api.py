@@ -71,21 +71,22 @@ def api_user_profile(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def create_member_api(request):
     membership_number = generate_membership_number()
-
     data = request.data.copy()
     data['membership_number'] = membership_number  
 
-    serializer = MemberSerializer(data=data)
+    serializer = MemberSerializer(data=data, context={'request': request})
 
     if serializer.is_valid():
         try:
             member = serializer.save()
             if not IsOwnerOrRelatedToClub().has_object_permission(request, None, member):
-                member.delete() 
+                member.delete()
                 return Response({'error': 'You do not have permission to create a member for this club'}, status=status.HTTP_403_FORBIDDEN)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except IntegrityError:
-            return Response({'error': 'Membership number already exists'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Membership number or RFID code already exists'}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': f'Error uploading file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
