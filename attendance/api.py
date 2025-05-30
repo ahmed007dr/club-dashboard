@@ -57,17 +57,14 @@ def attendance_heatmap_api(request):
 
 
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_list_api(request):
     rfid = request.GET.get('rfid', '')
     attendance_date = request.GET.get('attendance_date', '')
     member_name = request.GET.get('member_name', '')
-    page = request.GET.get('page', 1)
     page_size = request.GET.get('page_size', 20)
 
-    # Determine if search mode is active
     is_search_mode = rfid or member_name
 
     if request.user.role in ['owner', 'admin']:
@@ -80,15 +77,14 @@ def attendance_list_api(request):
                 subscription__club=request.user.club
             )
         else:
-            # Default mode: only show attendances from their shift
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club
             ).order_by('-check_in').first()
-            
+
             if not attendance:
-                return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
-            
+                return Response({'error': 'No open or recent shift found.'}, status=404)
+
             check_out = attendance.check_out if attendance.check_out else timezone.now()
             attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(
                 subscription__club=request.user.club,
@@ -98,35 +94,29 @@ def attendance_list_api(request):
 
     if rfid:
         attendances = attendances.filter(subscription__member__rfid_code__iexact=rfid)
-    
+
     if attendance_date:
         try:
             date_obj = datetime.strptime(attendance_date, '%Y-%m-%d').date()
             if request.user.role not in ['owner', 'admin'] and not is_search_mode:
                 if date_obj < attendance.check_in.date() or date_obj > check_out.date():
-                    return Response({'error': 'Date must be within your shift.'}, status=status.HTTP_400_BAD_REQUEST)
+                    return Response({'error': 'Date must be within your shift.'}, status=400)
             attendances = attendances.filter(attendance_date=date_obj)
         except ValueError:
-            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
-    
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=400)
+
     if member_name:
         attendances = attendances.filter(subscription__member__name__icontains=member_name)
-
-    # Calculate total attendances
-    total_attendances = attendances.count()
 
     attendances = attendances.order_by('-attendance_date')
     paginator = PageNumberPagination()
     paginator.page_size = page_size
     result_page = paginator.paginate_queryset(attendances, request)
+
     serializer = AttendanceSerializer(result_page, many=True)
 
-    response_data = {
-        'total_attendances': total_attendances,
-        'results': serializer.data
-    }
+    # بدل response_data، نرجع البيانات مباشرة للpagination response
     return paginator.get_paginated_response(serializer.data)
-    #return paginator.get_paginated_response(response_data)
 
 
 @api_view(['DELETE'])
