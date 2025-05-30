@@ -29,6 +29,6 @@ urlpatterns = [
     
     # Freeze Requests
     path('api/subscriptions/<int:pk>/request-freeze/', api.request_freeze, name='api-request-freeze'),
-    path('api/freeze-requests/<int:freeze_id>/approve/', api.approve_freeze, name='api-approve-freeze'),
+    path('api/freeze-requests/<int:freeze_id>/cancel/', api.cancel_freeze, name='api-cancel-freeze'),
 
 ]

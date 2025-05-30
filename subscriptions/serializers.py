@@ -23,14 +23,18 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
 
 
 class FreezeRequestSerializer(serializers.ModelSerializer):
-    approved_by_details = UserSerializer(source='approved_by', read_only=True)
+    created_by_details = UserSerializer(source='created_by', read_only=True)
 
     class Meta:
         model = FreezeRequest
         fields = [
-            'id', 'subscription', 'requested_days', 'start_date',
-            'approved', 'approved_by', 'approved_by_details', 'created_at'
+            'id', 'subscription', 'requested_days', 'start_date', 'end_date',
+            'is_active', 'cancelled_at', 'created_by', 'created_by_details', 'created_at'
         ]
+        extra_kwargs = {
+            'is_active': {'read_only': True},
+            'cancelled_at': {'read_only': True},
+        }
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):

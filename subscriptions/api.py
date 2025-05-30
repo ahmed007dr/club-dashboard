@@ -499,7 +499,7 @@ def subscription_stats(request):
         }
     return Response(stats)
 
-# subscriptions/views.py
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def request_freeze(request, pk):
@@ -514,7 +514,11 @@ def request_freeze(request, pk):
     if requested_days <= 0:
         return Response({'error': 'Requested freeze days must be positive'}, status=status.HTTP_400_BAD_REQUEST)
     
-    total_freeze_days = sum(fr.requested_days for fr in subscription.freeze_requests.filter(approved=True))
+    # Check if there's already an active freeze
+    if subscription.freeze_requests.filter(is_active=True).exists():
+        return Response({'error': 'This subscription already has an active freeze'}, status=status.HTTP_400_BAD_REQUEST)
+
+    total_freeze_days = sum(fr.requested_days for fr in subscription.freeze_requests.filter(is_active=False, cancelled_at__isnull=True))
     if total_freeze_days + requested_days > subscription.type.max_freeze_days:
         return Response({'error': f'Total freeze days ({total_freeze_days + requested_days}) exceeds maximum allowed ({subscription.type.max_freeze_days})'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -522,27 +526,44 @@ def request_freeze(request, pk):
         subscription=subscription,
         requested_days=requested_days,
         start_date=start_date,
-        approved=False,
+        is_active=True,
         created_by=request.user
     )
     freeze_request.save()
 
-    return Response({'message': 'Freeze request submitted successfully', 'freeze_request_id': freeze_request.id}, status=status.HTTP_201_CREATED)
+    serializer = SubscriptionSerializer(subscription)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def approve_freeze(request, freeze_id):
+def cancel_freeze(request, freeze_id):
     freeze_request = get_object_or_404(FreezeRequest, pk=freeze_id)
     
     if not IsOwnerOrRelatedToClub().has_object_permission(request, None, freeze_request):
-        return Response({'error': 'You do not have permission to approve this freeze request'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'You do not have permission to cancel this freeze request'}, status=status.HTTP_403_FORBIDDEN)
 
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'Only owners or admins can approve freeze requests'}, status=status.HTTP_403_FORBIDDEN)
+    if not freeze_request.is_active:
+        return Response({'error': 'This freeze request is not active'}, status=status.HTTP_400_BAD_REQUEST)
 
-    freeze_request.approved = True
-    freeze_request.approved_by = request.user
+    # Calculate used freeze days
+    today = timezone.now().date()
+    used_days = (today - freeze_request.start_date).days
+    if used_days < 0:
+        used_days = 0  # In case start_date is in the future
+    elif used_days > freeze_request.requested_days:
+        used_days = freeze_request.requested_days
+
+    # Adjust subscription end_date
+    subscription = freeze_request.subscription
+    remaining_days = freeze_request.requested_days - used_days
+    if remaining_days > 0:
+        subscription.end_date -= timedelta(days=remaining_days)
+        subscription.save()
+
+    # Mark freeze as cancelled
+    freeze_request.is_active = False
+    freeze_request.cancelled_at = timezone.now()
     freeze_request.save()
 
-    serializer = SubscriptionSerializer(freeze_request.subscription)
+    serializer = SubscriptionSerializer(subscription)
     return Response(serializer.data)
