@@ -45,8 +45,8 @@ def create_payroll_period(request):
     serializer = PayrollPeriodSerializer(data=request.data)
     if serializer.is_valid():
         # Ensure the club in the request matches the user's club
-        if serializer.validated_data['club'] != request.user.club:
-            return Response({'detail': 'You can only create periods for your club'}, status=status.HTTP_403_FORBIDDEN)
+        # if serializer.validated_data['club'] != request.user.club:
+        #     return Response({'detail': 'You can only create periods for your club'}, status=status.HTTP_403_FORBIDDEN)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
