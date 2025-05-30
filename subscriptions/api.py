@@ -6,7 +6,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.db.models import Q
 from .models import Subscription, SubscriptionType
-from .serializers import SubscriptionSerializer, FreezeRequest
+from .serializers import SubscriptionSerializer, FreezeRequest,SubscriptionTypeSerializer
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub
 from decimal import Decimal
