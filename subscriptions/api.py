@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.db.models import Q
 from .models import Subscription, SubscriptionType
 from .serializers import SubscriptionSerializer, FreezeRequest,SubscriptionTypeSerializer
@@ -499,22 +499,31 @@ def subscription_stats(request):
         }
     return Response(stats)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def request_freeze(request, pk):
     subscription = get_object_or_404(Subscription, pk=pk)
     
-    if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
-        return Response({'error': 'You do not have permission to request a freeze for this subscription'}, status=status.HTTP_403_FORBIDDEN)
+    # if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
+    #     return Response({'error': 'You do not have permission to request a freeze for this subscription'}, status=status.HTTP_403_FORBIDDEN)
 
     requested_days = request.data.get('requested_days', 0)
-    start_date = request.data.get('start_date', timezone.now().date())
+    start_date_str = request.data.get('start_date', timezone.now().date())
+
+    if isinstance(start_date_str, str):
+        try:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid start_date format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        start_date = start_date_str
 
     if requested_days <= 0:
         return Response({'error': 'Requested freeze days must be positive'}, status=status.HTTP_400_BAD_REQUEST)
     
-    # Check if there's already an active freeze
+    if start_date < timezone.now().date():
+        return Response({'error': 'Start date cannot be in the past'}, status=status.HTTP_400_BAD_REQUEST)
+    
     if subscription.freeze_requests.filter(is_active=True).exists():
         return Response({'error': 'This subscription already has an active freeze'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -533,6 +542,7 @@ def request_freeze(request, pk):
 
     serializer = SubscriptionSerializer(subscription)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
