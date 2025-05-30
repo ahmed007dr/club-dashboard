@@ -287,7 +287,7 @@ const Main = () => {
       <div className="grid grid-cols-1 gap-6 mt-4">
         <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow">
           <h3 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-white mb-4">
-            حضور المشتركين حسب {timeFilter === 'day' ? 'اليوم' : timeFilter === 'week' ? 'الأسبوع' : timeFilter === 'month' ? 'الشهر' : 'السنة'}
+           حضور المشتركين حسب السنة 
           </h3>
           <div className="h-96"> {/* ارتفاع كبير */}
             {attendances.length === 0 ? (
