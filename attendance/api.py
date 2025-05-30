@@ -349,25 +349,20 @@ def attendance_weekly_api(request):
 
     return Response(daily_data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_monthly_api(request):
-    """Get daily attendance data for the last 30 working days."""
+    """Get daily attendance data for the last 30 consecutive days."""
     today = timezone.now().date()
-    # Find the last 30 working days (skip weekends)
-    working_days = []
-    current_date = today
-    while len(working_days) < 30:
-        if current_date.weekday() < 5:  # Monday to Friday
-            working_days.append(current_date)
-        current_date -= timedelta(days=1)
-    working_days.reverse()  # Sort from oldest to newest
+    # Get the last 30 consecutive days (including weekends)
+    start_date = today - timedelta(days=29)  # 30 days back from today
+    days = [start_date + timedelta(days=i) for i in range(30)]  # List of 30 consecutive days
 
     if request.user.role in ['owner', 'admin']:
         attendances = Attendance.objects.filter(
             subscription__club=request.user.club,
-            attendance_date__gte=working_days[0]  # Fixed: Removed __date
+            attendance_date__gte=start_date,
+            attendance_date__lte=today
         )
     else:
         attendance = StaffAttendance.objects.filter(
@@ -380,21 +375,21 @@ def attendance_monthly_api(request):
         attendances = Attendance.objects.filter(
             subscription__club=request.user.club,
             approved_by=request.user,
-            attendance_date__gte=working_days[0],  # Fixed: Removed __date
+            attendance_date__gte=start_date,
+            attendance_date__lte=today,
             attendance_date__range=(attendance.check_in.date(), check_out.date())
         )
 
     # Aggregate attendance by date
     daily_counts = (
         attendances
-        .filter(attendance_date__lte=today)  # Fixed: Removed __date
         .values('attendance_date')
         .annotate(count=Count('id'))
         .order_by('attendance_date')
     )
 
-    # Map counts to working days
-    daily_data = [{'date': date.isoformat(), 'count': 0} for date in working_days]
+    # Map counts to the 30 days
+    daily_data = [{'date': date.isoformat(), 'count': 0} for date in days]
     for entry in daily_counts:
         date_str = entry['attendance_date'].isoformat()
         for data in daily_data:
