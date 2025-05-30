@@ -369,149 +369,170 @@ const Staff = () => {
       </div>
 
       {/* Staff Table */}
+    <div>
+  {staff.length > 0 ? (
+    <>
+      {/* Desktop Table View */}
       <div className="overflow-x-auto">
-        {staff.length > 0 ? (
-          <>
-            <table className="w-full border text-sm hidden sm:table">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="p-2 sm:p-3 text-right">#</th>
-                  <th className="p-2 sm:p-3 text-right">التاريخ</th>
-                  <th className="p-2 sm:p-3 text-right">بداية الوردية</th>
-                  <th className="p-2 sm:p-3 text-right">نهاية الوردية</th>
-                  <th className="p-2 sm:p-3 text-right">النادي</th>
-                  <th className="p-2 sm:p-3 text-right">الموظف</th>
-                  <th className="p-2 sm:p-3 text-right">تمت الموافقة بواسطة</th>
-                  <th className="p-2 sm:p-3 text-right">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {staff.map((shift, index) => (
-                  <tr key={shift.id} className="hover:bg-gray-50">
-                    <td className="p-2 sm:p-3">
-                      {(currentPage - 1) * itemsPerPage + index + 1}
-                    </td>
-                    <td className="p-2 sm:p-3">{shift.date}</td>
-                    <td className="p-2 sm:p-3">{shift.shift_start}</td>
-                    <td className="p-2 sm:p-3">{shift.shift_end}</td>
-                    <td className="p-2 sm:p-3">{shift.club_details?.name}</td>
-                    <td className="p-2 sm:p-3 text-blue-600 hover:underline">
-                      <Link to={`/staff/${shift.staff_details.id}`}>
-                        {`${shift.staff_details.first_name} ${shift.staff_details.last_name}`}
-                      </Link>
-                    </td>
-                    <td className="p-2 sm:p-3">
-                      {shift.approved_by_details?.username || "غير موافق عليه"}
-                    </td>
-                    <td className="p-2 sm:p-3 flex gap-2 justify-center">
-                      <DropdownMenu dir="rtl">
-                        <DropdownMenuTrigger asChild>
-                          <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                            <MoreVertical className="h-5 w-5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
-                          <DropdownMenuItem
-                            onClick={() => handleOpenModal("view", shift)}
-                            className="cursor-pointer text-green-600 hover:bg-green-50"
-                          >
-                            <FaEye className="mr-2" /> بيانات
-                          </DropdownMenuItem>
-                          {canEditStaffAttendance && (
-                            <DropdownMenuItem
-                              onClick={() => handleOpenModal("edit", shift)}
-                              className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                            >
-                              <CiEdit className="mr-2" /> تعديل
-                            </DropdownMenuItem>
-                          )}
-                          {canDeleteStaffAttendance && (
-                            <DropdownMenuItem
-                              onClick={() => handleOpenModal("delete", shift)}
-                              className="cursor-pointer text-red-600 hover:bg-red-50"
-                            >
-                              <CiTrash className="mr-2" /> حذف
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {/* Mobile View */}
-            <div className="sm:hidden space-y-4">
-              {staff.map((shift) => (
-                <div
-                  key={shift.id}
-                  className="border rounded-md p-4 bg-white shadow-sm"
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-semibold">
-                      التاريخ:{" "}
-                      {shift.date
-                        ? new Date(shift.date).toLocaleDateString("en-GB")
-                        : "N/A"}
-                    </span>
-                    <DropdownMenu dir="rtl">
-                      <DropdownMenuTrigger asChild>
-                        <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                          <MoreVertical className="h-5 w-5" />
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem
-                          onClick={() => handleOpenModal("view", shift)}
-                          className="cursor-pointer text-green-600 hover:bg-green-50"
-                        >
-                          <FaEye className="mr-2" /> بيانات
-                        </DropdownMenuItem>
+        <table className="w-full border text-sm hidden sm:table">
+          <thead>
+            <tr className="bg-gray-50">
+              <th className="p-2 sm:p-3 text-right">#</th>
+              <th className="p-2 sm:p-3 text-right">التاريخ</th>
+              <th className="p-2 sm:p-3 text-right">بداية الوردية</th>
+              <th className="p-2 sm:p-3 text-right">نهاية الوردية</th>
+              <th className="p-2 sm:p-3 text-right">النادي</th>
+              <th className="p-2 sm:p-3 text-right">الموظف</th>
+              <th className="p-2 sm:p-3 text-right">تمت الموافقة بواسطة</th>
+              <th className="p-2 sm:p-3 text-right">الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {staff.map((shift, index) => (
+              <tr key={shift.id} className="hover:bg-gray-50">
+                <td className="p-2 sm:p-3">
+                  {(currentPage - 1) * itemsPerPage + index + 1}
+                </td>
+                <td className="p-2 sm:p-3">{shift.date}</td>
+                <td className="p-2 sm:p-3">{shift.shift_start}</td>
+                <td className="p-2 sm:p-3">{shift.shift_end}</td>
+                <td className="p-2 sm:p-3">{shift.club_details?.name}</td>
+                <td className="p-2 sm:p-3 text-blue-600 hover:underline">
+                  <Link to={`/staff/${shift.staff_details.id}`}>
+                    {`${shift.staff_details.first_name} ${shift.staff_details.last_name}`}
+                  </Link>
+                </td>
+                <td className="p-2 sm:p-3">
+                  {shift.approved_by_details?.username || "غير موافق عليه"}
+                </td>
+                <td className="p-2 sm:p-3 flex gap-2 justify-center">
+                  <DropdownMenu dir="rtl">
+                    <DropdownMenuTrigger asChild>
+                      <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                        <MoreVertical className="h-5 w-5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      <DropdownMenuItem
+                        onClick={() => handleOpenModal("view", shift)}
+                        className="cursor-pointer text-green-600 hover:bg-green-50"
+                      >
+                        <FaEye className="mr-2" /> بيانات
+                      </DropdownMenuItem>
+                      {canEditStaffAttendance && (
                         <DropdownMenuItem
                           onClick={() => handleOpenModal("edit", shift)}
                           className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
                         >
                           <CiEdit className="mr-2" /> تعديل
                         </DropdownMenuItem>
+                      )}
+                      {canDeleteStaffAttendance && (
                         <DropdownMenuItem
                           onClick={() => handleOpenModal("delete", shift)}
                           className="cursor-pointer text-red-600 hover:bg-red-50"
                         >
                           <CiTrash className="mr-2" /> حذف
                         </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <p className="text-sm">
-                    <strong>بداية الوردية:</strong> {shift.shift_start}
-                  </p>
-                  <p className="text-sm">
-                    <strong>نهاية الوردية:</strong> {shift.shift_end}
-                  </p>
-                  <p className="text-sm">
-                    <strong>النادي:</strong> {shift.club_details?.name}
-                  </p>
-                  <p className="text-sm">
-                    <strong>الموظف:</strong>{" "}
-                    {`${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`}
-                  </p>
-                  <p className="text-sm">
-                    <strong>تمت الموافقة بواسطة:</strong>{" "}
-                    {shift.approved_by_details
-                      ? shift.approved_by_details.username
-                      : "غير موافق عليه"}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <p className="text-sm sm:text-base text-center p-4 text-gray-500">
-            لا توجد ورديات متاحة
-          </p>
-        )}
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
+
+      {/* Mobile Card View */}
+      <div className="sm:hidden space-y-3">
+        {staff.map((shift, index) => (
+          <div
+            key={shift.id}
+            className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow"
+          >
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <span className="text-xs text-gray-500">#{(currentPage - 1) * itemsPerPage + index + 1}</span>
+                <h3 className="text-sm font-semibold">
+                  {shift.date ? new Date(shift.date).toLocaleDateString("ar-EG") : "N/A"}
+                </h3>
+              </div>
+              <DropdownMenu dir="rtl">
+                <DropdownMenuTrigger asChild>
+                  <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem
+                    onClick={() => handleOpenModal("view", shift)}
+                    className="cursor-pointer text-green-600 hover:bg-green-50"
+                  >
+                    <FaEye className="mr-2" /> بيانات
+                  </DropdownMenuItem>
+                  {canEditStaffAttendance && (
+                    <DropdownMenuItem
+                      onClick={() => handleOpenModal("edit", shift)}
+                      className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                    >
+                      <CiEdit className="mr-2" /> تعديل
+                    </DropdownMenuItem>
+                  )}
+                  {canDeleteStaffAttendance && (
+                    <DropdownMenuItem
+                      onClick={() => handleOpenModal("delete", shift)}
+                      className="cursor-pointer text-red-600 hover:bg-red-50"
+                    >
+                      <CiTrash className="mr-2" /> حذف
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-gray-500">بداية الوردية</p>
+                <p className="text-sm font-medium">{shift.shift_start}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">نهاية الوردية</p>
+                <p className="text-sm font-medium">{shift.shift_end}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">النادي</p>
+                <p className="text-sm">{shift.club_details?.name}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">الموظف</p>
+                <Link 
+                  to={`/staff/${shift.staff_details.id}`}
+                  className="text-sm text-blue-600 hover:underline"
+                >
+                  {`${shift.staff_details?.first_name} ${shift.staff_details?.last_name}`}
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-3 pt-3 border-t">
+              <p className="text-xs text-gray-500">تمت الموافقة بواسطة</p>
+              <p className="text-sm">
+                {shift.approved_by_details?.username || "غير موافق عليه"}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  ) : (
+    <div className="text-center p-6">
+      <p className="text-sm sm:text-base text-gray-500">
+        لا توجد ورديات متاحة
+      </p>
+    </div>
+  )}
+</div>
 
       {/* Pagination */}
       {pagination.count > 0 && (

@@ -13,6 +13,14 @@ import { IoAddOutline } from "react-icons/io5";
 import toast from 'react-hot-toast';
 import usePermission from "@/hooks/usePermission"; 
 import { RiGroupLine, RiForbidLine } from "react-icons/ri";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/DropdownMenu";
+import { MoreVertical } from "lucide-react";
+import { FaEye } from "react-icons/fa";
 const Members = () => {
   const [data, setData] = useState([
     {
@@ -200,30 +208,90 @@ console.log("Pagination:", pagination);
         </div>
       )}
 
-      <table className="min-w-full border border-gray-200">
-        <thead className="text-right">
-          <tr>
-            <th className="p-3 border-b">#</th>
-            <th className="p-3 border-b">الصورة</th>
-            <th className="p-3 border-b">الاسم</th>
-            <th className="p-3 border-b">rfid code</th>
-            <th className="p-3 border-b">رقم العضوية</th>
-            <th className="p-3 border-b">الرقم القومي</th>
-            <th className="p-3 border-b">الهاتف</th>
-            <th className="p-3 border-b">اسم النادي</th>
-            <th className="p-3 border-b">الإجراءات</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Array.isArray(members) &&
-            members.map((member, index) => (
-              <tr key={member.id}>
-                <td className="p-3 border-b">
-                  {(currentPage - 1) * itemsPerPage + index + 1}
-                </td>
-                <td className="p-3 border-b">
-                  <Link to={`/member/${member.id}`}>
-                          
+   <div className="overflow-x-auto">
+  <table className="w-full border text-sm hidden sm:table">
+    <thead className="bg-gray-50">
+      <tr>
+        <th className="p-2 sm:p-3 text-right border-b">#</th>
+        <th className="p-2 sm:p-3 text-right border-b">الصورة</th>
+        <th className="p-2 sm:p-3 text-right border-b">الاسم</th>
+        <th className="p-2 sm:p-3 text-right border-b">rfid code</th>
+        <th className="p-2 sm:p-3 text-right border-b">رقم العضوية</th>
+        <th className="p-2 sm:p-3 text-right border-b">الرقم القومي</th>
+        <th className="p-2 sm:p-3 text-right border-b">الهاتف</th>
+        <th className="p-2 sm:p-3 text-right border-b">اسم النادي</th>
+        <th className="p-2 sm:p-3 text-right border-b">الإجراءات</th>
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-gray-200">
+      {Array.isArray(members) && members.map((member, index) => (
+        <tr key={member.id} className="hover:bg-gray-50">
+          <td className="p-2 sm:p-3">
+            {(currentPage - 1) * itemsPerPage + index + 1}
+          </td>
+          <td className="p-2 sm:p-3">
+            <Link to={`/member/${member.id}`}>
+              <img
+                src={
+                  member.photo
+                    ? member.photo
+                    : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"
+                }
+                alt="member"
+                className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
+              />
+            </Link>
+          </td>
+          <td className="p-2 sm:p-3">{member.name}</td>
+          <td className="p-2 sm:p-3">{member.rfid_code}</td>
+          <td className="p-2 sm:p-3">{member.membership_number}</td>
+          <td className="p-2 sm:p-3">{member.national_id}</td>
+          <td className="p-2 sm:p-3">{member.phone}</td>
+          <td className="p-2 sm:p-3">{member.club_name}</td>
+          <td className="p-2 sm:p-3 flex gap-2 justify-center">
+            <DropdownMenu dir="rtl">
+              <DropdownMenuTrigger asChild>
+                <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                  <MoreVertical className="h-5 w-5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+              
+                {canEditMembers && (
+                  <DropdownMenuItem
+                    onClick={() => handleEditClick(member)}
+                    className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                  >
+                    <CiEdit className="mr-2" /> تعديل
+                  </DropdownMenuItem>
+                )}
+                {canDeleteMembers && (
+                  <DropdownMenuItem
+                    onClick={() => handleDeleteClick(member)}
+                    className="cursor-pointer text-red-600 hover:bg-red-50"
+                  >
+                    <CiTrash className="mr-2" /> حذف
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+
+{/* Mobile Card View */}
+<div className="sm:hidden space-y-3">
+  {Array.isArray(members) && members.map((member, index) => (
+    <div
+      key={member.id}
+      className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow"
+    >
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex items-center gap-3">
+          <Link to={`/member/${member.id}`}>
             <img
               src={
                 member.photo
@@ -231,44 +299,71 @@ console.log("Pagination:", pagination);
                   : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"
               }
               alt="member"
-              className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
+              className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
             />
-        
-                  </Link>
-                </td>
-                <td className="p-3 border-b">{member.name}</td>
-                <td className="p-3 border-b">{member.rfid_code}</td>
-                <td className="p-3 border-b">{member.membership_number}</td>
-                <td className="p-3 border-b">{member.national_id}</td>
-                <td className="p-3 border-b">{member.phone}</td>
-                <td className="p-3 border-b">{member.club_name}</td>
-                <td className="p-3 border-b">
-                  <div className="flex gap-2">
-                         {canEditMembers && (
-                      <button
-                        onClick={() => handleEditClick(member)}
-                        className="text-green-700 text-xl"
-                        title="Edit"
-                      >
-                        <CiEdit />
-                      </button>
-                    )}
-                      {/* Only show delete button if user has permission */}
-                    {canDeleteMembers && (
-                      <button
-                        onClick={() => handleDeleteClick(member)}
-                        className="text-red-500 text-xl"
-                        title="Delete"
-                      >
-                        <CiTrash />
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-        </tbody>
-      </table>
+          </Link>
+          <div>
+            <span className="text-xs text-gray-500">
+              #{(currentPage - 1) * itemsPerPage + index + 1}
+            </span>
+            <h3 className="text-sm font-semibold">{member.name}</h3>
+          </div>
+        </div>
+        <DropdownMenu dir="rtl">
+          <DropdownMenuTrigger asChild>
+            <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+              <MoreVertical className="h-5 w-5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+         
+            {canEditMembers && (
+              <DropdownMenuItem
+                onClick={() => handleEditClick(member)}
+                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+              >
+                <CiEdit className="mr-2" /> تعديل
+              </DropdownMenuItem>
+            )}
+            {canDeleteMembers && (
+              <DropdownMenuItem
+                onClick={() => handleDeleteClick(member)}
+                className="cursor-pointer text-red-600 hover:bg-red-50"
+              >
+                <CiTrash className="mr-2" /> حذف
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <p className="text-xs text-gray-500">rfid code</p>
+          <p className="text-sm font-medium">{member.rfid_code}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">رقم العضوية</p>
+          <p className="text-sm font-medium">{member.membership_number}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">الرقم القومي</p>
+          <p className="text-sm">{member.national_id}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">الهاتف</p>
+          <p className="text-sm">{member.phone}</p>
+        </div>
+      </div>
+
+      <div className="mt-3 pt-3 border-t">
+        <p className="text-xs text-gray-500">اسم النادي</p>
+        <p className="text-sm">{member.club_name}</p>
+      </div>
+    </div>
+  ))}
+</div>
+
 
       {/* Updated Pagination Controls */}
       <div className="flex justify-between items-center mt-4" dir="rtl">

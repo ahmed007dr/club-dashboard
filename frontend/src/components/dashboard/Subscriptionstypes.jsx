@@ -184,7 +184,7 @@ const SubscriptionsTypes = () => {
         {canAddSubscriptionTypes && (
           <button
             onClick={openCreateModal}
-            className="flex items-center bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+            className="flex items-center btn"
           >
             <FaPlus className="mr-2" />
             إضافة نوع جديد
@@ -203,7 +203,7 @@ const SubscriptionsTypes = () => {
           />
           <button
             onClick={handleSearch}
-            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center"
+            className="flex items-center gap-2 btn"
           >
             <FaSearch className="mr-2" />
             بحث
@@ -257,7 +257,7 @@ const SubscriptionsTypes = () => {
       <div className="mb-6">
         <button
           onClick={handleSearch}
-          className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 flex items-center"
+          className="flex items-center gap-2 btn"
         >
           <FaSearch className="mr-2" />
           تطبيق الفلاتر

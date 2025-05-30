@@ -337,93 +337,144 @@ const Expense = () => {
                 <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
               )}
 
-              <div className="rounded-md border overflow-x-auto" dir="rtl">
-                <table className="min-w-full divide-y divide-border">
-                  <thead>
-                    <tr className="bg-muted/50">
-                      {[
-                        "النادي",
-                        "الفئة",
-                        "المبلغ",
-                        "الوصف",
-                        "التاريخ",
-                        "رقم الفاتورة",
-                        "الإجراءات",
-                      ].map((header, idx) => (
-                        <th
-                          key={idx}
-                          className="px-4 py-3 text-right text-sm font-medium whitespace-nowrap"
-                        >
-                          {header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border bg-background">
-                    {expenses?.length > 0 ? (
-                      expenses.map((expense, index) => (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-100 transition"
-                        >
-                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                            {expense.club_details?.name || "غير متاح"}
-                          </td>
-                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                            {expense.category_details?.name || "غير متاح"}
-                          </td>
-                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                            {expense.amount
-                              ? `${expense.amount} جنيه`
-                              : "غير متاح"}
-                          </td>
-                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                            {expense.description || "غير متاح"}
-                          </td>
-                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                            {expense.date || "غير متاح"}
-                          </td>
-                          <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                            {expense.invoice_number || "غير متاح"}
-                          </td>
-                          <td className="px-2 sm:px-4 py-3 text-sm flex justify-end">
-                            <DropdownMenu dir="rtl">
-                              <DropdownMenuTrigger asChild>
-                                <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                                  <MoreVertical className="h-5 w-5" />
-                                </button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-40">
-                                <DropdownMenuItem
-                                  onClick={() => handleEditClick(expense)}
-                                  className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                                >
-                                  تعديل
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleDeleteClick(expense.id)}
-                                  className="cursor-pointer text-red-600 hover:bg-red-50"
-                                >
-                                  حذف
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan={8}
-                          className="px-4 py-3 text-center text-sm"
-                        >
-                          لا توجد مصروفات متاحة
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <div dir="rtl">
+  {/* Table view (lg screens and above) */}
+  <div className="hidden lg:block rounded-md border overflow-x-auto">
+    <table className="min-w-full divide-y divide-border">
+      <thead>
+        <tr className="bg-muted/50">
+          {["النادي", "الفئة", "المبلغ", "الوصف", "التاريخ", "رقم الفاتورة", "الإجراءات"].map((header, idx) => (
+            <th key={idx} className="px-4 py-3 text-right text-sm font-medium whitespace-nowrap">
+              {header}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-border bg-background">
+        {expenses?.length > 0 ? (
+          expenses.map((expense, index) => (
+            <tr key={index} className="hover:bg-gray-100 transition">
+              <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                {expense.club_details?.name || "غير متاح"}
+              </td>
+              <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                {expense.category_details?.name || "غير متاح"}
+              </td>
+              <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                {expense.amount ? `${expense.amount} جنيه` : "غير متاح"}
+              </td>
+              <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                {expense.description || "غير متاح"}
+              </td>
+              <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                {expense.date || "غير متاح"}
+              </td>
+              <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
+                {expense.invoice_number || "غير متاح"}
+              </td>
+              <td className="px-2 sm:px-4 py-3 text-sm flex justify-end">
+                <DropdownMenu dir="rtl">
+                  <DropdownMenuTrigger asChild>
+                    <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                      <MoreVertical className="h-5 w-5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-40">
+                    <DropdownMenuItem
+                      onClick={() => handleEditClick(expense)}
+                      className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                    >
+                      تعديل
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleDeleteClick(expense.id)}
+                      className="cursor-pointer text-red-600 hover:bg-red-50"
+                    >
+                      حذف
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan={8} className="px-4 py-3 text-center text-sm">
+              لا توجد مصروفات متاحة
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+
+  {/* Card view (md and sm screens) */}
+  <div className="lg:hidden space-y-4">
+    {expenses?.length > 0 ? (
+      expenses.map((expense, index) => (
+        <div key={index} className="border rounded-md p-4 hover:bg-gray-50 transition-colors">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground">النادي</p>
+              <p className="text-xs sm:text-sm">{expense.club_details?.name || "غير متاح"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">الفئة</p>
+              <p className="text-xs sm:text-sm">{expense.category_details?.name || "غير متاح"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">المبلغ</p>
+              <p className="text-xs sm:text-sm">
+                {expense.amount ? `${expense.amount} جنيه` : "غير متاح"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">التاريخ</p>
+              <p className="text-xs sm:text-sm">{expense.date || "غير متاح"}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-muted-foreground">الوصف</p>
+              <p className="text-xs sm:text-sm">{expense.description || "غير متاح"}</p>
+            </div>
+            <div className="col-span-2">
+              <p className="text-xs text-muted-foreground">رقم الفاتورة</p>
+              <p className="text-xs sm:text-sm">{expense.invoice_number || "غير متاح"}</p>
+            </div>
+          </div>
+          
+          {/* Actions */}
+          <div className="mt-3 flex justify-start">
+            <DropdownMenu dir="rtl">
+              <DropdownMenuTrigger asChild>
+                <button className="bg-gray-200 text-gray-700 px-2 py-1 rounded-md hover:bg-gray-300 transition-colors text-sm">
+                  الإجراءات <MoreVertical className="h-4 w-4 inline mr-1" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem
+                  onClick={() => handleEditClick(expense)}
+                  className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                >
+                  تعديل
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => handleDeleteClick(expense.id)}
+                  className="cursor-pointer text-red-600 hover:bg-red-50"
+                >
+                  حذف
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      ))
+    ) : (
+      <div className="border rounded-md p-4 text-center text-sm text-muted-foreground">
+        لا توجد مصروفات متاحة
+      </div>
+    )}
+  </div>
+</div>
 
               <div className="flex items-center justify-between mt-4">
                 <Button
