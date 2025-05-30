@@ -1,127 +1,139 @@
 "use client"
+import { useState, useEffect, useMemo } from "react";
 
-import { useState, useMemo } from "react"
+const AttendanceContributionsChart = () => {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [hoveredCell, setHoveredCell] = useState(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
 
-const AttendanceContributionsChart = ({ data, timeFilter = "day" }) => {
-  const [hoveredCell, setHoveredCell] = useState(null)
-  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+  // Fetch data from API with Bearer token
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Retrieve token from localStorage
+        const token = localStorage.getItem("token");
+        if (!token) {
+          throw new Error("لم يتم العثور على رمز المصادقة");
+        }
 
-  // Enhanced data processing with memoization
+        const response = await fetch("http://127.0.0.1:8000/attendance/api/attendances/heatmap/", {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error("فشل في جلب البيانات: " + response.statusText);
+        }
+
+        const result = await response.json();
+        setData(result);
+        setLoading(false);
+      } catch (err) {
+        setError(err.message);
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  // Process data to create a year-long grid (53 weeks)
   const processedData = useMemo(() => {
     if (!data || data.length === 0) {
-      return { grid: [], maxCount: 0, totalContributions: 0 }
+      return { grid: [], maxCount: 0, totalContributions: 0 };
     }
 
     // Create data map
     const dataMap = data.reduce((acc, item) => {
-      acc[item.date] = item.count
-      return acc
-    }, {})
+      acc[item.date] = item.count;
+      return acc;
+    }, {});
 
-    // Calculate grid based on time filter
-    const grid = []
-    let maxCount = 0
-    let totalContributions = 0
+    // Generate 53 weeks of data
+    const weeks = 53;
+    const daysInWeek = 7;
+    const today = new Date();
+    const grid = [];
+    let maxCount = 0;
+    let totalContributions = 0;
 
-    if (timeFilter === "day" || timeFilter === "week") {
-      // For daily/weekly view - show last 12 weeks
-      const weeks = 12
-      const daysInWeek = 7
-      const today = new Date()
+    for (let week = weeks - 1; week >= 0; week--) {
+      const weekData = [];
+      for (let day = 0; day < daysInWeek; day++) {
+        const currentDate = new Date(today);
+        currentDate.setDate(today.getDate() - (week * daysInWeek + (6 - day)));
+        const dateStr = currentDate.toISOString().split("T")[0];
+        const count = dataMap[dateStr] || 0;
 
-      for (let week = weeks - 1; week >= 0; week--) {
-        const weekData = []
-        for (let day = 0; day < daysInWeek; day++) {
-          const currentDate = new Date(today)
-          currentDate.setDate(today.getDate() - (week * daysInWeek + (6 - day)))
+        weekData.push({
+          date: dateStr,
+          count,
+          displayDate: currentDate.toLocaleDateString("ar-SA", {
+            day: "numeric",
+            month: "short",
+            year: "numeric",
+          }),
+        });
 
-          const dateStr = currentDate.toISOString().split("T")[0]
-          const count = dataMap[dateStr] || 0
-
-          weekData.push({
-            date: dateStr,
-            count,
-            displayDate: currentDate.toLocaleDateString("ar-SA", {
-              day: "numeric",
-              month: "short",
-            }),
-          })
-
-          maxCount = Math.max(maxCount, count)
-          totalContributions += count
-        }
-        grid.push(weekData)
+        maxCount = Math.max(maxCount, count);
+        totalContributions += count;
       }
-    } else {
-      // For monthly/yearly view - show simplified grid
-      const chunks = Math.ceil(data.length / 7)
-      for (let i = 0; i < chunks; i++) {
-        const weekData = data.slice(i * 7, (i + 1) * 7).map((item) => ({
-          ...item,
-          displayDate: item.date,
-        }))
-
-        // Fill remaining slots if needed
-        while (weekData.length < 7) {
-          weekData.push({ date: "", count: 0, displayDate: "" })
-        }
-
-        weekData.forEach((item) => {
-          maxCount = Math.max(maxCount, item.count)
-          totalContributions += item.count
-        })
-
-        grid.push(weekData)
-      }
+      grid.push(weekData);
     }
 
-    return { grid, maxCount, totalContributions }
-  }, [data, timeFilter])
+    return { grid, maxCount, totalContributions };
+  }, [data]);
 
+  // Determine intensity level for coloring
   const getIntensityLevel = (count, maxCount) => {
-    if (count === 0) return 0
-    if (maxCount === 0) return 1
+    if (count === 0) return 0;
+    if (maxCount === 0) return 1;
+    const ratio = count / maxCount;
+    if (ratio <= 0.25) return 1;
+    if (ratio <= 0.5) return 2;
+    if (ratio <= 0.75) return 3;
+    return 4;
+  };
 
-    const ratio = count / maxCount
-    if (ratio <= 0.25) return 1
-    if (ratio <= 0.5) return 2
-    if (ratio <= 0.75) return 3
-    return 4
-  }
-
+  // GitHub-like green color classes
   const getColorClass = (count, maxCount) => {
-    const level = getIntensityLevel(count, maxCount)
+    const level = getIntensityLevel(count, maxCount);
     const colorClasses = {
-      0: "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700",
-      1: "bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800",
-      2: "bg-blue-300 dark:bg-blue-700/50 border-blue-400 dark:border-blue-600",
-      3: "bg-blue-500 dark:bg-blue-600/70 border-blue-600 dark:border-blue-500",
-      4: "bg-blue-700 dark:bg-blue-500 border-blue-800 dark:border-blue-400",
-    }
-    return colorClasses[level]
-  }
+      0: "bg-gray-200 dark:bg-gray-700",
+      1: "bg-green-100 dark:bg-green-900",
+      2: "bg-green-300 dark:bg-green-700",
+      3: "bg-green-500 dark:bg-green-500",
+      4: "bg-green-700 dark:bg-green-300",
+    };
+    return colorClasses[level];
+  };
 
+  // Handle mouse events for tooltip
   const handleMouseEnter = (day, event) => {
     if (day.date) {
-      setHoveredCell(day)
-      const rect = event.target.getBoundingClientRect()
+      setHoveredCell(day);
+      const rect = event.target.getBoundingClientRect();
       setTooltipPosition({
         x: rect.left + rect.width / 2,
-        y: rect.top - 10,
-      })
+        y: rect.top - 40,
+      });
     }
-  }
+  };
 
   const handleMouseLeave = () => {
-    setHoveredCell(null)
-  }
+    setHoveredCell(null);
+  };
 
-  if (!data || data.length === 0) {
+  // Loading state
+  if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full py-12 space-y-4">
-        <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-2xl flex items-center justify-center">
+      <div className="flex flex-col items-center justify-center h-full py-12">
+        <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center animate-pulse">
           <svg
-            className="w-8 h-8 text-blue-500 dark:text-blue-400"
+            className="w-8 h-8 text-green-500 dark:text-green-400"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -130,7 +142,55 @@ const AttendanceContributionsChart = ({ data, timeFilter = "day" }) => {
               strokeLinecap="round"
               strokeLinejoin="round"
               strokeWidth={2}
-              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 00-2-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4"
+              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </div>
+        <p className="mt-4 text-gray-600 dark:text-gray-300">جارٍ التحميل...</p>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-12">
+        <div className="w-16 h-16 bg-red-100 dark:bg-red-900 rounded-full flex items-center justify-center">
+          <svg
+            className="w-8 h-8 text-red-500 dark:text-red-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        </div>
+        <p className="mt-4 text-gray-600 dark:text-gray-300">{error}</p>
+      </div>
+    );
+  }
+
+  // Empty data state
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full py-12 space-y-4">
+        <div className="w-16 h-16 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+          <svg
+            className="w-8 h-8 text-green-500 dark:text-green-400"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14"
             />
           </svg>
         </div>
@@ -139,105 +199,105 @@ const AttendanceContributionsChart = ({ data, timeFilter = "day" }) => {
           <p className="text-sm text-gray-500 dark:text-gray-400">ستظهر البيانات هنا عند توفرها</p>
         </div>
       </div>
-    )
+    );
   }
 
-  const { grid, maxCount, totalContributions } = processedData
+  const { grid, maxCount, totalContributions } = processedData;
 
-  const legendColors = [
-    { label: '0', className: 'bg-gray-200 dark:bg-gray-700' },
-    { label: '1–2', className: 'bg-green-100 dark:bg-green-200' },
-    { label: '3–5', className: 'bg-green-400 dark:bg-green-500' },
-    { label: '6+', className: 'bg-green-700 dark:bg-green-600' },
-  ];
+  // Define all days of the week in Arabic
+  const daysOfWeek = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
-  const weekDays = ['أحد', 'ث', 'أر', 'خ', 'ج', 'س', 'سب'];
-
-  return (
-    <div className="relative h-full flex flex-col">
-      {/* Header Stats */}
-      <div className="flex flex-wrap items-center justify-between mb-6 gap-4">
+ return (
+  
+    <div className="relative w-full flex flex-col font-sans">
+      {/* Header Stats - keep exactly the same */}
+      <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
         <div className="flex items-center space-x-6 space-x-reverse">
           <div className="text-center">
-            <p className="text-2xl font-bold text-gray-800 dark:text-white">{totalContributions}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">إجمالي الحضور</p>
+            <p className="text-lg font-semibold text-gray-800 dark:text-white">{totalContributions}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">إجمالي الحضور</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{maxCount}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">أعلى حضور</p>
+            <p className="text-lg font-semibold text-green-600 dark:text-green-400">{maxCount}</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">أعلى حضور</p>
           </div>
         </div>
 
-        {/* Legend */}
+        {/* Legend - keep exactly the same */}
         <div className="flex items-center space-x-2 space-x-reverse">
-          <span className="text-sm text-gray-600 dark:text-gray-400">أقل</span>
+          <span className="text-xs text-gray-600 dark:text-gray-400">أقل</span>
           {[0, 1, 2, 3, 4].map((level) => (
             <div
               key={level}
-              className={`w-3 h-3 rounded-sm border ${getColorClass(level === 0 ? 0 : Math.ceil((level / 4) * maxCount), maxCount)} transition-all duration-200`}
+              className={`w-3 h-3 rounded border border-gray-300 dark:border-gray-600 ${getColorClass(
+                level === 0 ? 0 : Math.ceil((level / 4) * maxCount),
+                maxCount
+              )}`}
             />
           ))}
-          <span className="text-sm text-gray-600 dark:text-gray-400">أكثر</span>
+          <span className="text-xs text-gray-600 dark:text-gray-400">أكثر</span>
         </div>
       </div>
 
-      {/* Chart Grid */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="relative">
-          {/* Day Labels */}
-          <div className="flex mb-2" dir="ltr">
-            <div className="w-8"></div> {/* Spacer for week labels */}
-            {["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"].map((day, index) => (
+      {/* Chart Grid - modified to move days to side */}
+      <div className="overflow-x-auto">
+        <div className="flex items-start gap-1" dir="ltr">
+          {/* Day Labels - moved to left side */}
+          <div className="flex flex-col gap-0.5 mr-4">
+            {daysOfWeek.map((day, index) => (
               <div
-                key={day}
-                className={`w-4 text-xs text-gray-500 dark:text-gray-400 text-center ${index % 2 === 0 ? "block" : "hidden sm:block"}`}
+                key={index}
+                className="h-4 text-xs text-gray-500 dark:text-gray-400 text-right pr-1"
+                style={{ width: '24px' }}
               >
-                {day.slice(0, 2)}
+                {day}
               </div>
             ))}
           </div>
 
-          {/* Grid with Week Labels */}
-          <div className="flex gap-1" dir="ltr">
-            {grid.map((week, weekIndex) => (
-              <div key={weekIndex} className="flex flex-col gap-1">
-                {week.map((day, dayIndex) => (
-                  <div
-                    key={`${weekIndex}-${dayIndex}`}
-                    className={`
-                      w-3 h-3 sm:w-4 sm:h-4 rounded-sm border transition-all duration-300 cursor-pointer
-                      ${getColorClass(day.count, maxCount)}
-                      ${day.count > 0 ? "hover:scale-110 hover:shadow-lg hover:z-10 relative" : ""}
-                      ${hoveredCell?.date === day.date ? "ring-2 ring-blue-400 ring-offset-1 ring-offset-white dark:ring-offset-gray-800 scale-110 z-20" : ""}
-                    `}
-                    onMouseEnter={(e) => handleMouseEnter(day, e)}
-                    onMouseLeave={handleMouseLeave}
-                    style={{
-                      animationDelay: `${(weekIndex * 7 + dayIndex) * 10}ms`,
-                    }}
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
+          {/* Grid Container - keep exactly the same */}
+          <div className="flex flex-col ">
+            {/* Grid - keep exactly the same */}
+            <div className="flex gap-0.5">
+              {grid.map((week, weekIndex) => (
+                <div key={weekIndex} className="flex flex-col gap-0.5">
+                  {week.map((day, dayIndex) => (
+                    <div
+                      key={`${weekIndex}-${dayIndex}`}
+                      className={`
+                        w-4 h-4 rounded border border-gray-300 dark:border-gray-600 transition-all duration-200 cursor-pointer
+                        ${getColorClass(day.count, maxCount)}
+                        ${day.count > 0 ? "hover:scale-110 hover:shadow-sm" : ""}
+                        ${hoveredCell?.date === day.date ? "ring-1 ring-green-400 ring-offset-1 ring-offset-white dark:ring-offset-gray-800 scale-110" : ""}
+                      `}
+                      onMouseEnter={(e) => handleMouseEnter(day, e)}
+                      onMouseLeave={handleMouseLeave}
+                      style={{
+                        animationDelay: `${(weekIndex * 7 + dayIndex) * 5}ms`,
+                      }}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
 
-          {/* Month Labels */}
-          <div className="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400" dir="ltr">
-            {Array.from({ length: Math.min(4, grid.length) }, (_, i) => {
-              const monthIndex = Math.floor((i * grid.length) / 4)
-              const date = new Date()
-              date.setMonth(date.getMonth() - (3 - i))
-              return (
-                <span key={i} className="text-center">
-                  {date.toLocaleDateString("ar-SA", { month: "short" })}
-                </span>
-              )
-            })}
+            {/* Month Labels - keep exactly the same */}
+            <div className="flex justify-between mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {Array.from({ length: 12 }, (_, i) => {
+                const date = new Date();
+                date.setMonth(date.getMonth() - (11 - i));
+                return (
+                  <span key={i} className="text-center w-12">
+                    {date.toLocaleDateString("ar-SA", { month: "short" })}
+                  </span>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Enhanced Tooltip */}
+      {/* Tooltip - keep exactly the same */}
       {hoveredCell && (
         <div
           className="fixed z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full"
@@ -246,39 +306,37 @@ const AttendanceContributionsChart = ({ data, timeFilter = "day" }) => {
             top: tooltipPosition.y,
           }}
         >
-          <div className="bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 px-3 py-2 rounded-lg shadow-xl border border-gray-700 dark:border-gray-300">
-            <div className="text-sm font-medium">{hoveredCell.displayDate}</div>
-            <div className="text-xs opacity-90">
+          <div className="bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 px-2 py-1 rounded shadow-lg border border-gray-700 dark:border-gray-200 text-xs">
+            <div className="font-medium">{hoveredCell.displayDate}</div>
+            <div>
               {hoveredCell.count} {hoveredCell.count === 1 ? "حضور" : "حضور"}
             </div>
-            {/* Tooltip Arrow */}
             <div className="absolute top-full left-1/2 transform -translate-x-1/2">
-              <div className="border-4 border-transparent border-t-gray-900 dark:border-t-gray-100"></div>
+              <div className="border-4 border-transparent border-t-gray-800 dark:border-t-gray-100"></div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Loading Animation Styles */}
+      {/* Animation Styles - keep exactly the same */}
       <style jsx>{`
-        @keyframes fadeInUp {
+        @keyframes fadeIn {
           from {
             opacity: 0;
-            transform: translateY(10px);
+            transform: scale(0.8);
           }
           to {
             opacity: 1;
-            transform: translateY(0);
+            transform: scale(1);
           }
         }
-        
-        .w-3, .w-4 {
-          animation: fadeInUp 0.3s ease-out forwards;
+        .w-3 {
+          animation: fadeIn 0.2s ease-out forwards;
           opacity: 0;
         }
       `}</style>
     </div>
-  )
-}
+  );
+};
 
-export default AttendanceContributionsChart
+export default AttendanceContributionsChart;

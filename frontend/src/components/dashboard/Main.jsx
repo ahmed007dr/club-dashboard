@@ -14,7 +14,7 @@ import { BsPeopleFill } from "react-icons/bs";
 import { IoTicketOutline } from "react-icons/io5";
 import { Link } from "react-router-dom";
 import AttendanceContributionsChart from './AttendanceContributionsChart';
-import AttendanceHourlyChart from './AttendanceHourlyChart';
+import AttendanceCharts from './AttendanceCharts';
 
 const Main = () => {
   const dispatch = useDispatch();
@@ -250,7 +250,7 @@ const Main = () => {
       </div>
 
       {/* فلتر زمني */}
-      <div className="flex gap-4 mt-6 mb-4">
+      {/* <div className="flex gap-4 mt-6 mb-4">
         <select 
           className="bg-white dark:bg-gray-700 rounded-lg px-4 py-2 shadow"
           value={timeFilter}
@@ -267,7 +267,7 @@ const Main = () => {
           <span>{getAverageAttendance()}</span>
           <span className="text-sm text-gray-500 mr-2"> (شخص/ساعة)</span>
         </div>
-      </div>
+      </div>*/}
 
       {/* المخططات */}
       <div className="grid grid-cols-1 gap-6 mt-4">
@@ -279,20 +279,18 @@ const Main = () => {
             {attendances.length === 0 ? (
               <p className="text-gray-500 text-center py-20">لا توجد بيانات حضور متاحة</p>
             ) : (
-              <AttendanceContributionsChart data={getAttendanceData()} timeFilter={timeFilter} />
+              <AttendanceContributionsChart  />
             )}
           </div>
         </div>
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow">
-          <h3 className="text-lg sm:text-xl font-semibold text-gray-700 dark:text-white mb-4">
-            الحضور حسب الساعة
-          </h3>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 ">
+         
           <div className="h-80"> {/* ارتفاع متوسط */}
             {attendances.length === 0 ? (
               <p className="text-gray-500 text-center py-16">لا توجد بيانات حضور متاحة</p>
             ) : (
-              <AttendanceHourlyChart data={getHourlyData()} />
+              <AttendanceCharts  />
             )}
           </div>
         </div>
