@@ -112,22 +112,14 @@ def attendance_list_api(request):
     if member_name:
         attendances = attendances.filter(subscription__member__name__icontains=member_name)
 
-    # Calculate total attendances
-    total_attendances = attendances.count()
-
     attendances = attendances.order_by('-attendance_date')
     paginator = PageNumberPagination()
     paginator.page_size = page_size
     result_page = paginator.paginate_queryset(attendances, request)
     serializer = AttendanceSerializer(result_page, many=True)
 
-    response_data = {
-        'total_attendances': total_attendances,
-        'results': serializer.data
-    }
-
-    return paginator.get_paginated_response(response_data)
-
+    # Return the paginated response with serializer.data directly
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
