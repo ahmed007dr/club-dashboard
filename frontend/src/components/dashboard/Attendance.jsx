@@ -1,3 +1,12 @@
+import React, { useEffect, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  addAttendance,
+  deleteAttendance,
+  fetchAttendances,
+} from "@/redux/slices/AttendanceSlice";
+import { fetchEntryLogs } from "@/redux/slices/EntryLogsSlice";
+import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -8,32 +17,19 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, MoreVertical } from "lucide-react";
-import React, { useEffect, useState } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import {
-  addAttendance,
-  deleteAttendance,
-  fetchAttendances,
-} from "@/redux/slices/AttendanceSlice";
-import { fetchEntryLogs } from "@/redux/slices/EntryLogsSlice";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
-import { fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
 import EntryForm from "./EntryForm";
 import { toast } from "react-hot-toast";
 import { FaUser } from "react-icons/fa";
 import usePermission from "@/hooks/usePermission";
+import BASE_URL from "@/config/api";
 
-
-
-import { fetchClubs } from '../../redux/slices/clubSlice';
-
-
-
+// Attendance Component
 const Attendance = () => {
   const dispatch = useDispatch();
 
@@ -62,7 +58,7 @@ const Attendance = () => {
   const [isAttendanceDialogOpen, setIsAttendanceDialogOpen] = useState(false);
   const [isEntryLogDialogOpen, setIsEntryLogDialogOpen] = useState(false);
   const [allSubscriptions, setAllSubscriptions] = useState({ results: [] });
-  const [clubs, setClubs] = useState([]);
+  const [userClub, setUserClub] = useState(null); // New state for user club
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Filters and Pagination
@@ -79,11 +75,33 @@ const Attendance = () => {
     member: "",
     timestamp: "",
   });
-
   const [attendancePage, setAttendancePage] = useState(1);
   const [attendanceItemsPerPage] = useState(20);
   const [entryLogPage, setEntryLogPage] = useState(1);
   const [entryLogItemsPerPage] = useState(20);
+
+  // Fetch user profile to get club details
+  useEffect(() => {
+    fetch(`${BASE_URL}/accounts/api/profile/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        "Content-Type": "application/json",
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setUserClub({
+          id: data.club.id,
+          name: data.club.name,
+        });
+        setNewAttendance((prev) => ({ ...prev, club: data.club.id.toString() }));
+      })
+      .catch((err) => {
+        console.error("Failed to fetch user profile:", err);
+        toast.error("فشل في تحميل بيانات النادي");
+      });
+  }, []);
 
   // Fetch all subscriptions across pages
   const fetchAllSubscriptions = async () => {
@@ -111,12 +129,7 @@ const Attendance = () => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [clubsResponse, subscriptionsResponse] = await Promise.all([
-          dispatch(fetchClubs()).unwrap(),
-          fetchAllSubscriptions(),
-        ]);
-
-        setClubs(clubsResponse);
+        const subscriptionsResponse = await fetchAllSubscriptions();
         setAllSubscriptions(subscriptionsResponse);
 
         await Promise.all([
@@ -137,7 +150,7 @@ const Attendance = () => {
         ]);
       } catch (error) {
         console.error('خطأ في جلب البيانات:', error);
-        toast.error('فشل في جلب بيانات الأندية، الاشتراكات، أو الحضور');
+        toast.error('فشل في جلب بيانات الاشتراكات أو الحضور');
       } finally {
         setIsInitialLoad(false);
       }
@@ -204,7 +217,7 @@ const Attendance = () => {
       .unwrap()
       .then(() => {
         toast.success("تم إضافة الحضور بنجاح!");
-        setNewAttendance({ club: '', identifier: '' });
+        setNewAttendance({ club: userClub?.id?.toString() || '', identifier: '' });
         setFoundSubscription(null);
         setIsAttendanceDialogOpen(false);
         dispatch(
@@ -220,7 +233,7 @@ const Attendance = () => {
       });
   };
 
-  // Pagination Controls Component
+  // Pagination Controls Component (unchanged)
   const PaginationControls = ({
     currentPage,
     totalItems,
@@ -353,9 +366,6 @@ const Attendance = () => {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-             
-                </div>
-                <div>
                   <label className="block text-sm mb-1">تاريخ الحضور</label>
                   <input
                     type="date"
@@ -420,7 +430,7 @@ const Attendance = () => {
                 </div>
               </div>
 
-              <Button onClick={() => setIsAttendanceDialogOpen(true)} disabled={isInitialLoad}>
+              <Button onClick={() => setIsAttendanceDialogOpen(true)} disabled={isInitialLoad || !userClub}>
                 <Plus className="mr-2 h-4 w-4" />
                 إضافة حضور
               </Button>
@@ -517,7 +527,7 @@ const Attendance = () => {
           </Card>
         </TabsContent>
 
-        {/* Entry Logs Tab */}
+        {/* Entry Logs Tab (unchanged) */}
         <TabsContent value="entry-logs" className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
@@ -678,7 +688,7 @@ const Attendance = () => {
               onClick={() => {
                 setIsAttendanceDialogOpen(false);
                 setFoundSubscription(null);
-                setNewAttendance({ club: '', identifier: '' });
+                setNewAttendance({ club: userClub?.id?.toString() || '', identifier: '' });
               }}
               className="absolute top-3 left-3 text-gray-400 hover:text-gray-600 text-2xl"
             >
@@ -694,16 +704,15 @@ const Attendance = () => {
                   name="club"
                   value={newAttendance.club}
                   onChange={handleAttendanceInputChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm"
+                  disabled
                   required
-                  disabled={isInitialLoad}
                 >
-                  <option value="">اختر ناديًا</option>
-                  {clubs.map((club) => (
-                    <option key={club.id} value={club.id}>
-                      {club.name}
-                    </option>
-                  ))}
+                  {userClub ? (
+                    <option value={userClub.id}>{userClub.name}</option>
+                  ) : (
+                    <option value="">جاري التحميل...</option>
+                  )}
                 </select>
               </div>
               <div>
@@ -848,7 +857,7 @@ const Attendance = () => {
         </div>
       )}
 
-      {/* Entry Log Dialog */}
+      {/* Entry Log Dialog (unchanged) */}
       {isEntryLogDialogOpen && canAddEntryLog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full relative" dir="rtl">
