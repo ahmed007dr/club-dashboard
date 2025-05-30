@@ -31,6 +31,7 @@ import ShiftAttendanceList from './components/dashboard/ShiftAttendanceList';
 import ExpenseCategory from './components/dashboard/ExpenseCategory';
 import Expense from './components/dashboard/Expense';
 import IncomeSources from './components/dashboard/IncomeSources';
+import ReportsPage from './components/dashboard/Reports'; // استيراد ReportsPage
 import useTokenRefresh from './hooks/useTokenRefresh';
 import { Toaster } from 'react-hot-toast';
 
@@ -46,10 +47,9 @@ const ProtectedRoute = ({ element }) => {
 
 function App() {
   const navigate = useNavigate();
-  const { error } = useTokenRefresh(); // Use the custom hook to refresh token every 40 minutes
+  const { error } = useTokenRefresh();
   const { token } = useSelector((state) => state.auth);
 
-  // Handle token refresh errors by redirecting to login
   React.useEffect(() => {
     if (error) {
       toast.error(`جلسة منتهية، يرجى تسجيل الدخول مجدداً: ${error}`);
@@ -86,11 +86,12 @@ function App() {
           <Route path="attendance-form" element={<AttendanceForm />} />
           <Route path="check-out" element={<OutForm />} />
           <Route path="attendance/:staffId" element={<AttendanceAnalysis />} />
-          <Route path="staff-reports" element={<UserList/>} />
+          <Route path="staff-reports" element={<UserList />} />
           <Route path="/shift-attendance" element={<ShiftAttendanceList />} />
           <Route path="expense-category" element={<ExpenseCategory />} />
           <Route path="expense" element={<Expense />} />
           <Route path="income-sources" element={<IncomeSources />} />
+          <Route path="reports" element={<ReportsPage />} />
         </Route>
       </Routes>
     </div>
