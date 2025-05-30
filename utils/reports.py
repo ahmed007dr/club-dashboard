@@ -4,8 +4,7 @@ from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from accounts.models import User
 from finance.models import Income, Expense
-from attendance.models import  Attendance
-
+from staff.models import StaffAttendance 
 import logging
 
 logger = logging.getLogger(__name__)
@@ -37,12 +36,11 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
             logger.error("Start date and end date are required for admin/owner")
             return {'error': 'يجب تحديد تاريخ البداية والنهاية'}, status.HTTP_400_BAD_REQUEST
     else:
-        attendance = Attendance.objects.filter(
+        attendance = StaffAttendance.objects.filter(
             staff=employee,
             club=employee.club,
             check_out__isnull=True
         ).order_by('-check_in').first()
-
         if not attendance:
             logger.warning("No open shift found for user: %s", employee.username)
             return {'error': 'لا توجد وردية مفتوحة. يجب تسجيل حضور أولاً.'}, status.HTTP_404_NOT_FOUND

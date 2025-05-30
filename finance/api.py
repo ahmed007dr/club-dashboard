@@ -15,7 +15,7 @@ from utils.permissions import IsOwnerOrRelatedToClub
 from rest_framework.pagination import PageNumberPagination
 from datetime import datetime
 from core.models import Club
-from staff.serializers import StaffAttendance
+from staff.models import StaffAttendance
 from django.db.models import Sum, Q
 from django.utils import timezone
 from accounts.models import User
@@ -588,11 +588,9 @@ def employee_daily_report_api(request):
 
     if not start_date or not end_date:
         if request.user.role in ['owner', 'admin']:
-            # Admin or owner must provide dates
             logger.error("Start date and end date are required for admin/owner")
             return Response({'error': 'يجب تحديد تاريخ البداية والنهاية'}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            # Try to get open shift for normal user
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club,
@@ -604,6 +602,15 @@ def employee_daily_report_api(request):
 
             start_date = attendance.check_in.isoformat()
             end_date = timezone.now().isoformat()
+
+    data, status_code = get_employee_report_data(
+        user=request.user,
+        employee_id=employee_id,
+        start_date=start_date,
+        end_date=end_date
+    )
+    return Response(data, status=status_code)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
