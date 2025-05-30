@@ -417,161 +417,287 @@ const SubscriptionList = () => {
       </div>
 
       {/* Subscriptions Table */}
-      <div className="overflow-x-auto">
-        {subscriptions.length === 0 ? (
-          <p className="text-center text-lg text-gray-500">
-            لا توجد اشتراكات متاحة.
-          </p>
-        ) : (
-          <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="py-1 px-2 text-right text-sm">العضو</th>
-                <th className="py-1 px-2 text-right text-sm">اسم النادي</th>
-                <th className="py-1 px-2 text-right text-sm">تاريخ البدء</th>
-                <th className="py-1 px-2 text-right text-sm">تاريخ الانتهاء</th>
-                <th className="py-1 px-2 text-right text-sm">عدد الإدخالات</th>
-                <th className="py-1 px-2 text-right text-sm">
-                  الإدخالات المتبقية
-                </th>
-                <th className="py-1 px-2 text-right text-sm">المبلغ المدفوع</th>
-                <th className="py-1 px-2 text-right text-sm">المبلغ المتبقي</th>
-                <th className="py-1 px-2 text-right text-sm">الحالة</th>
-                <th className="py-1 px-2 text-center text-sm">الدفع</th>
-                <th className="py-1 px-2 text-right text-sm">الإجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-              {subscriptions.map((subscription) => {
-                const displayStatus = normalizeStatus(subscription.status);
-                return (
-                  <tr
-                    key={subscription.id}
-                    className="border-b hover:bg-gray-50 transition"
+     <div className="overflow-x-auto">
+  {subscriptions.length === 0 ? (
+    <p className="text-center text-lg text-gray-500">
+      لا توجد اشتراكات متاحة.
+    </p>
+  ) : (
+    <>
+      {/* Table for Medium Screens and Above */}
+      <table className="w-full bg-white shadow-md rounded-lg overflow-hidden hidden md:table">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="py-1 px-2 text-right text-sm">العضو</th>
+            <th className="py-1 px-2 text-right text-sm">اسم النادي</th>
+            <th className="py-1 px-2 text-right text-sm">تاريخ البدء</th>
+            <th className="py-1 px-2 text-right text-sm">تاريخ الانتهاء</th>
+            <th className="py-1 px-2 text-right text-sm">عدد الإدخالات</th>
+            <th className="py-1 px-2 text-right text-sm">الإدخالات المتبقية</th>
+            <th className="py-1 px-2 text-right text-sm">المبلغ المدفوع</th>
+            <th className="py-1 px-2 text-right text-sm">المبلغ المتبقي</th>
+            <th className="py-1 px-2 text-right text-sm">الحالة</th>
+            <th className="py-1 px-2 text-center text-sm">الدفع</th>
+            <th className="py-1 px-2 text-right text-sm">الإجراءات</th>
+          </tr>
+        </thead>
+        <tbody>
+          {subscriptions.map((subscription) => {
+            const displayStatus = normalizeStatus(subscription.status);
+            return (
+              <tr
+                key={subscription.id}
+                className="border-b hover:bg-gray-50 transition"
+              >
+                <td className="py-1 px-2 text-sm">
+                  <Link
+                    to={`/member-subscriptions/${subscription.member_details.id}`}
+                    className="text-blue-600 hover:underline"
                   >
-                    <td className="py-1 px-2 text-sm">
-                      <Link
-                        to={`/member-subscriptions/${subscription.member_details.id}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {subscription.member_details.name}
-                      </Link>
-                    </td>
-                    <td className="py-1 px-2 text-sm">
-                      {subscription.club_details.name}
-                    </td>
-                    <td className="py-1 px-2 text-sm">
-                      {subscription.start_date}
-                    </td>
-                    <td className="py-1 px-2 text-sm">
-                      {subscription.end_date}
-                    </td>
-                    <td className="py-1 px-2 text-sm">
-                      {subscription.entry_count}
-                    </td>
-                    <td className="py-1 px-2 text-sm">
-                      {subscription.type_details.max_entries -
-                        subscription.entry_count}
-                    </td>
-                    <td className="py-1 px-2 text-sm">
-                      ${subscription.paid_amount}
-                    </td>
-                    <td className="py-1 px-2 text-sm">
-                      ${subscription.remaining_amount}
-                    </td>
-                    <td className="py-1 px-2 text-sm">
-                      <span
-                        className={`px-1 py-0.5 rounded text-xs font-medium
-                          ${
-                            displayStatus === "Active"
-                              ? "bg-green-100 text-green-600"
-                              : displayStatus === "Expired"
-                              ? "bg-red-100 text-red-600"
-                              : displayStatus === "Upcoming"
-                              ? "bg-blue-100 text-blue-600"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
-                      >
-                        {displayStatus === "Active"
-                          ? "نشط"
+                    {subscription.member_details.name}
+                  </Link>
+                </td>
+                <td className="py-1 px-2 text-sm">
+                  {subscription.club_details.name}
+                </td>
+                <td className="py-1 px-2 text-sm">
+                  {subscription.start_date}
+                </td>
+                <td className="py-1 px-2 text-sm">
+                  {subscription.end_date}
+                </td>
+                <td className="py-1 px-2 text-sm">
+                  {subscription.entry_count}
+                </td>
+                <td className="py-1 px-2 text-sm">
+                  {subscription.type_details.max_entries -
+                    subscription.entry_count}
+                </td>
+                <td className="py-1 px-2 text-sm">
+                  ${subscription.paid_amount}
+                </td>
+                <td className="py-1 px-2 text-sm">
+                  ${subscription.remaining_amount}
+                </td>
+                <td className="py-1 px-2 text-sm">
+                  <span
+                    className={`px-1 py-0.5 rounded text-xs font-medium
+                      ${
+                        displayStatus === "Active"
+                          ? "bg-green-100 text-green-600"
                           : displayStatus === "Expired"
-                          ? "منتهي"
+                          ? "bg-red-100 text-red-600"
                           : displayStatus === "Upcoming"
-                          ? "قادمة"
-                          : "غير معروف"}
-                      </span>
-                    </td>
-                    <td className="py-1 px-2 flex items-center">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        pattern="[0-9]*\.?[0-9]*"
-                        placeholder="0.00"
-                        value={paymentAmounts[subscription.id] || ""}
-                        onChange={(e) => handleInputChange(e, subscription.id)}
-                        className="border p-0.5 rounded w-12 text-sm"
-                      />
-                      <button
-                        onClick={() => handlePayment(subscription)}
-                        className="btn bg-blue-500 text-white px-2 py-0.5 ml-1 rounded-lg hover:bg-blue-600"
-                        disabled={updateStatus === "loading"}
+                          ? "bg-blue-100 text-blue-600"
+                          : "bg-gray-100 text-gray-600"
+                      }`}
+                  >
+                    {displayStatus === "Active"
+                      ? "نشط"
+                      : displayStatus === "Expired"
+                      ? "منتهي"
+                      : displayStatus === "Upcoming"
+                      ? "قادمة"
+                      : "غير معروف"}
+                  </span>
+                </td>
+                <td className="py-1 px-2 flex items-center">
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    pattern="[0-9]*\.?[0-9]*"
+                    placeholder="0.00"
+                    value={paymentAmounts[subscription.id] || ""}
+                    onChange={(e) => handleInputChange(e, subscription.id)}
+                    className="border p-0.5 rounded w-12 text-sm"
+                  />
+                  <button
+                    onClick={() => handlePayment(subscription)}
+                    className="btn bg-blue-500 text-white px-2 py-0.5 ml-1 rounded-lg hover:bg-blue-600"
+                    disabled={updateStatus === "loading"}
+                  >
+                    {updateStatus === "loading" ? "جاري الدفع..." : "دفع"}
+                  </button>
+                </td>
+                <td className="py-1 px-2">
+                  <div className="flex items-center gap-1">
+                    <DropdownMenu dir="rtl">
+                      <DropdownMenuTrigger asChild>
+                        <button className="bg-gray-200 text-gray-700 px-0.5 py-0.5 rounded-md hover:bg-gray-300 transition-colors">
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-32 text-sm"
                       >
-                        {updateStatus === "loading" ? "جاري الدفع..." : "دفع"}
-                      </button>
-                    </td>
-                    <td className="py-1 px-2">
-                      <div className="flex items-center gap-1">
-                        <DropdownMenu dir="rtl">
-                          <DropdownMenuTrigger asChild>
-                            <button className="bg-gray-200 text-gray-700 px-0.5 py-0.5 rounded-md hover:bg-gray-300 transition-colors">
-                              <MoreVertical className="h-4 w-4" />
-                            </button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="w-32 text-sm"
+                        {canUpdateSubscription && (
+                          <DropdownMenuItem
+                            onClick={() => openModal(subscription)}
+                            className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
                           >
-                            {canUpdateSubscription && (
-                              <DropdownMenuItem
-                                onClick={() => openModal(subscription)}
-                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                              >
-                                تعديل
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem
-                              onClick={() => openDetailModal(subscription.id)}
-                              className="cursor-pointer text-green-600 hover:bg-yellow-50"
-                            >
-                              عرض
-                            </DropdownMenuItem>
-                            {subscription.status === "Expired" && (
-                              <DropdownMenuItem
-                                onClick={() => handleRenew(subscription.id)}
-                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                              >
-                                تجديد
-                              </DropdownMenuItem>
-                            )}
-                            {canDeleteSubscription && (
-                              <DropdownMenuItem
-                                onClick={() => openDeleteModal(subscription)}
-                                className="cursor-pointer text-red-600 hover:bg-red-50"
-                              >
-                                حذف
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
+                            تعديل
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => openDetailModal(subscription.id)}
+                          className="cursor-pointer text-green-600 hover:bg-yellow-50"
+                        >
+                          عرض
+                        </DropdownMenuItem>
+                        {subscription.status === "Expired" && (
+                          <DropdownMenuItem
+                            onClick={() => handleRenew(subscription.id)}
+                            className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                          >
+                            تجديد
+                          </DropdownMenuItem>
+                        )}
+                        {canDeleteSubscription && (
+                          <DropdownMenuItem
+                            onClick={() => openDeleteModal(subscription)}
+                            className="cursor-pointer text-red-600 hover:bg-red-50"
+                          >
+                            حذف
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      {/* Card Layout for Mobile and Small Screens */}
+      <div className="md:hidden space-y-4">
+        {subscriptions.map((subscription) => {
+          const displayStatus = normalizeStatus(subscription.status);
+          return (
+            <div
+              key={subscription.id}
+              className="border rounded-md p-4 bg-white shadow-sm"
+            >
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-semibold">
+                  <Link
+                    to={`/member-subscriptions/${subscription.member_details.id}`}
+                    className="text-blue-600 hover:underline"
+                  >
+                    {subscription.member_details.name}
+                  </Link>
+                </span>
+                <DropdownMenu dir="rtl">
+                  <DropdownMenuTrigger asChild>
+                    <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                      <MoreVertical className="h-5 w-5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-32 text-sm">
+                    {canUpdateSubscription && (
+                      <DropdownMenuItem
+                        onClick={() => openModal(subscription)}
+                        className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                      >
+                        تعديل
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      onClick={() => openDetailModal(subscription.id)}
+                      className="cursor-pointer text-green-600 hover:bg-yellow-50"
+                    >
+                      عرض
+                    </DropdownMenuItem>
+                    {subscription.status === "Expired" && (
+                      <DropdownMenuItem
+                        onClick={() => handleRenew(subscription.id)}
+                        className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                      >
+                        تجديد
+                      </DropdownMenuItem>
+                    )}
+                    {canDeleteSubscription && (
+                      <DropdownMenuItem
+                        onClick={() => openDeleteModal(subscription)}
+                        className="cursor-pointer text-red-600 hover:bg-red-50"
+                      >
+                        حذف
+                      </DropdownMenuItem>
+                    )}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <p className="text-sm">
+                <strong>اسم النادي:</strong> {subscription.club_details.name}
+              </p>
+              <p className="text-sm">
+                <strong>تاريخ البدء:</strong> {subscription.start_date}
+              </p>
+              <p className="text-sm">
+                <strong>تاريخ الانتهاء:</strong> {subscription.end_date}
+              </p>
+              <p className="text-sm">
+                <strong>عدد الإدخالات:</strong> {subscription.entry_count}
+              </p>
+              <p className="text-sm">
+                <strong>الإدخالات المتبقية:</strong>{" "}
+                {subscription.type_details.max_entries - subscription.entry_count}
+              </p>
+              <p className="text-sm">
+                <strong>المبلغ المدفوع:</strong> ${subscription.paid_amount}
+              </p>
+              <p className="text-sm">
+                <strong>المبلغ المتبقي:</strong> ${subscription.remaining_amount}
+              </p>
+              <p className="text-sm">
+                <strong>الحالة:</strong>{" "}
+                <span
+                  className={`px-2 py-1 rounded text-xs ${
+                    displayStatus === "Active"
+                      ? "bg-green-100 text-green-600"
+                      : displayStatus === "Expired"
+                      ? "bg-red-100 text-red-600"
+                      : displayStatus === "Upcoming"
+                      ? "bg-blue-100 text-blue-600"
+                      : "bg-gray-100 text-gray-600"
+                  }`}
+                >
+                  {displayStatus === "Active"
+                    ? "نشط"
+                    : displayStatus === "Expired"
+                    ? "منتهي"
+                    : displayStatus === "Upcoming"
+                    ? "قادمة"
+                    : "غير معروف"}
+                </span>
+              </p>
+              <div className="flex items-center mt-2">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  pattern="[0-9]*\.?[0-9]*"
+                  placeholder="0.00"
+                  value={paymentAmounts[subscription.id] || ""}
+                  onChange={(e) => handleInputChange(e, subscription.id)}
+                  className="border p-0.5 rounded w-20 text-sm"
+                />
+                <button
+                  onClick={() => handlePayment(subscription)}
+                  className="btn bg-blue-500 text-white px-2 py-0.5 ml-2 rounded-lg hover:bg-blue-600"
+                  disabled={updateStatus === "loading"}
+                >
+                  {updateStatus === "loading" ? "جاري الدفع..." : "دفع"}
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
+    </>
+  )}
+</div>
 
       {/* Pagination */}
       {totalItems === 0 && (

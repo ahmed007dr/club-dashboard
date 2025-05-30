@@ -182,44 +182,89 @@ const ShiftAttendanceList = () => {
 
       {/* Attendance Table */}
       {currentItems.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">اسم الموظف</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النادي</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وقت الحضور</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وقت الانصراف</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المدة (ساعات)</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {currentItems.map((attendance) => (
-                <tr key={attendance.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <Link
-                      to={`/attendance/${attendance.staff_details.id}`}  className=" hover:underline">
-                    {attendance.staff_details.username}
-                     </Link>
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    
-                    {attendance.club_details.name}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {new Date(attendance.check_in).toLocaleString('ar-EG')}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {attendance.check_out ? new Date(attendance.check_out).toLocaleString('ar-EG') : 'لا يزال موجوداً'}
-                  </td>
-                  <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {attendance.duration_hours ? attendance.duration_hours.toFixed(2) : 'غير متاح'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+       <div>
+  {/* Table view - for larger screens */}
+  <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">اسم الموظف</th>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النادي</th>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وقت الحضور</th>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">وقت الانصراف</th>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المدة (ساعات)</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {currentItems.map((attendance) => (
+          <tr key={attendance.id} className="hover:bg-gray-50">
+            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+              <Link to={`/attendance/${attendance.staff_details.id}`} className="hover:underline">
+                {attendance.staff_details.username}
+              </Link>
+            </td>
+            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+              {attendance.club_details.name}
+            </td>
+            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+              {new Date(attendance.check_in).toLocaleString('ar-EG')}
+            </td>
+            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+              {attendance.check_out ? new Date(attendance.check_out).toLocaleString('ar-EG') : 'لا يزال موجوداً'}
+            </td>
+            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+              {attendance.duration_hours ? attendance.duration_hours.toFixed(2) : 'غير متاح'}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  {/* Card view - for mobile screens */}
+  <div className="md:hidden space-y-3">
+    {currentItems.map((attendance) => (
+      <div key={attendance.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+        <div className="grid grid-cols-2 gap-y-3">
+          <div className="col-span-2">
+            <p className="text-xs text-gray-500">اسم الموظف</p>
+            <p className="text-sm font-medium">
+              <Link to={`/attendance/${attendance.staff_details.id}`} className="hover:underline">
+                {attendance.staff_details.username}
+              </Link>
+            </p>
+          </div>
+          
+          <div>
+            <p className="text-xs text-gray-500">النادي</p>
+            <p className="text-sm">{attendance.club_details.name}</p>
+          </div>
+          
+          <div>
+            <p className="text-xs text-gray-500">المدة (ساعات)</p>
+            <p className="text-sm">
+              {attendance.duration_hours ? attendance.duration_hours.toFixed(2) : 'غير متاح'}
+            </p>
+          </div>
+          
+          <div className="col-span-2">
+            <p className="text-xs text-gray-500">وقت الحضور</p>
+            <p className="text-sm">
+              {new Date(attendance.check_in).toLocaleString('ar-EG')}
+            </p>
+          </div>
+          
+          <div className="col-span-2">
+            <p className="text-xs text-gray-500">وقت الانصراف</p>
+            <p className="text-sm">
+              {attendance.check_out ? new Date(attendance.check_out).toLocaleString('ar-EG') : 'لا يزال موجوداً'}
+            </p>
+          </div>
         </div>
+      </div>
+    ))}
+  </div>
+</div>
       ) : (
         !isLoading && !error && (
           <div className="p-4 bg-yellow-50 text-yellow-700 rounded-lg text-center border border-yellow-200">

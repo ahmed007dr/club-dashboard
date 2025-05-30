@@ -351,83 +351,135 @@ const Income = () => {
                 <p className="text-lg text-red-600 text-right">خطأ: {error}</p>
               )}
 
-              <div className="rounded-md border">
-                <table className="min-w-full divide-y divide-border">
-                  <thead>
-                    <tr className="bg-muted/50">
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المعرف
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        مصدر الدخل
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المبلغ
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        الوصف
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        التاريخ
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        المستلم
-                      </th>
-                      <th className="px-4 py-3 text-right text-sm font-medium">
-                        الإجراءات
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border bg-background">
-                    {incomes?.map((income) => (
-                      <tr
-                        key={income.id}
-                        className="hover:bg-gray-100 transition"
-                      >
-                        <td className="px-4 py-3 text-sm">{income.id}</td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.source_details?.name || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.amount ? `${income.amount} جنيه` : "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.description || "لا يوجد وصف"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.date || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm">
-                          {income.received_by_details?.username || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-sm flex gap-2 justify-end">
-                          <DropdownMenu dir="rtl">
-                            <DropdownMenuTrigger asChild>
-                              <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                                <MoreVertical className="h-5 w-5" />
-                              </button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-40">
-                              <DropdownMenuItem
-                                onClick={() => handleEditClick(income)}
-                                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                              >
-                                تعديل
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => handleDeleteClick(income.id)}
-                                className="cursor-pointer text-red-600 hover:bg-red-50"
-                              >
-                                حذف
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+             <div>
+  {/* Table view (lg screens and above) */}
+  <div className="hidden lg:block rounded-md border">
+    <table className="min-w-full divide-y divide-border">
+      <thead>
+        <tr className="bg-muted/50">
+          <th className="px-4 py-3 text-right text-sm font-medium">المعرف</th>
+          <th className="px-4 py-3 text-right text-sm font-medium">مصدر الدخل</th>
+          <th className="px-4 py-3 text-right text-sm font-medium">المبلغ</th>
+          <th className="px-4 py-3 text-right text-sm font-medium">الوصف</th>
+          <th className="px-4 py-3 text-right text-sm font-medium">التاريخ</th>
+          <th className="px-4 py-3 text-right text-sm font-medium">المستلم</th>
+          <th className="px-4 py-3 text-right text-sm font-medium">الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-border bg-background">
+        {incomes?.map((income) => (
+          <tr key={income.id} className="hover:bg-gray-100 transition">
+            <td className="px-4 py-3 text-sm">{income.id}</td>
+            <td className="px-4 py-3 text-sm">
+              {income.source_details?.name || "غير متاح"}
+            </td>
+            <td className="px-4 py-3 text-sm">
+              {income.amount ? `${income.amount} جنيه` : "غير متاح"}
+            </td>
+            <td className="px-4 py-3 text-sm">
+              {income.description || "لا يوجد وصف"}
+            </td>
+            <td className="px-4 py-3 text-sm">
+              {income.date || "غير متاح"}
+            </td>
+            <td className="px-4 py-3 text-sm">
+              {income.received_by_details?.username || "غير متاح"}
+            </td>
+            <td className="px-4 py-3 text-sm flex gap-2 justify-end">
+              <DropdownMenu dir="rtl">
+                <DropdownMenuTrigger asChild>
+                  <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
+                    <MoreVertical className="h-5 w-5" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-40">
+                  <DropdownMenuItem
+                    onClick={() => handleEditClick(income)}
+                    className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+                  >
+                    تعديل
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleDeleteClick(income.id)}
+                    className="cursor-pointer text-red-600 hover:bg-red-50"
+                  >
+                    حذف
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+
+  {/* Card view (md and sm screens) */}
+  <div className="lg:hidden space-y-4">
+    {incomes?.map((income) => (
+      <div key={income.id} className="border rounded-md p-4 hover:bg-gray-50 transition-colors">
+        <div className="grid grid-cols-2 gap-3">
+          {/* Column 1 */}
+          <div className="space-y-2">
+            <div>
+              <p className="text-sm text-muted-foreground">المعرف</p>
+              <p className="text-sm">{income.id}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">مصدر الدخل</p>
+              <p className="text-sm">{income.source_details?.name || "غير متاح"}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">المبلغ</p>
+              <p className="text-sm">{income.amount ? `${income.amount} جنيه` : "غير متاح"}</p>
+            </div>
+          </div>
+          
+          {/* Column 2 */}
+          <div className="space-y-2">
+            <div>
+              <p className="text-sm text-muted-foreground">الوصف</p>
+              <p className="text-sm">{income.description || "لا يوجد وصف"}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">التاريخ</p>
+              <p className="text-sm">{income.date || "غير متاح"}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">المستلم</p>
+              <p className="text-sm">{income.received_by_details?.username || "غير متاح"}</p>
+            </div>
+          </div>
+        </div>
+        
+        {/* Actions */}
+        <div className="mt-3 flex justify-end">
+          <DropdownMenu dir="rtl">
+            <DropdownMenuTrigger asChild>
+              <button className="bg-gray-200 text-gray-700 px-2 py-1 rounded-md hover:bg-gray-300 transition-colors text-sm">
+                الإجراءات <MoreVertical className="h-4 w-4 inline mr-1" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem
+                onClick={() => handleEditClick(income)}
+                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
+              >
+                تعديل
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleDeleteClick(income.id)}
+                className="cursor-pointer text-red-600 hover:bg-red-50"
+              >
+                حذف
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
               <PaginationControls
                 currentPage={incomePage}
                 setPage={setIncomePage}

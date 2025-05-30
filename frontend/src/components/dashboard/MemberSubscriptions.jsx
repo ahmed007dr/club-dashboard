@@ -90,106 +90,210 @@ const MemberSubscriptions = () => {
 
       {results.length > 0 ? (
         <>
-          <div className="overflow-x-auto mb-6">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاشتراك</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النادي</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">rfid code</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التواريخ</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الدفع</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التفاصيل</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {results.map((sub) => {
-                  const statusDisplay = getStatusDisplay(sub.status);
-                  return (
-                    <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-4">
-                        <div className="flex items-center justify-end">
-                          <div className="mr-2">
-                            <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                              <CiShoppingTag className="text-blue-500" />
-                              {sub.type_details?.name || 'غير معروف'}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {sub.type_details?.duration_days} يوم
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              رقم العضوية: {sub.member_details?.membership_number || 'غير متوفر'}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm font-medium text-gray-900">{sub.club_details?.name || 'غير معروف'}</div>
-                        <div className="text-xs text-gray-500 mt-1 line-clamp-1">{sub.club_details?.location}</div>
-                      </td> <td className="px-4 py-4">
-                        <div className="text-sm font-medium text-gray-900">{sub.member_details?.rfid_code|| 'غير معروف'}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm space-y-1">
-                          <div className="flex items-center gap-1">
-                            <FaCalendarAlt className="text-gray-400 text-xs" />
-                            {formatDate(sub.start_date)}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <FaCalendarCheck className="text-gray-400 text-xs" />
-                            {formatDate(sub.end_date)}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm space-y-1">
-                          <div className="flex items-center gap-1">
-                            <FaMoneyBillAlt className="text-gray-400 text-xs" />
-                            السعر: ${sub.type_details?.price}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <FaCheck className="text-gray-400 text-xs" />
-                            المدفوع: ${sub.paid_amount}
-                          </div>
-                          <div className={`flex items-center gap-1 ${parseFloat(sub.remaining_amount) < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                            <FaExclamation className="text-xs" />
-                            الرصيد: ${sub.remaining_amount}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col gap-1 text-sm">
-                          <div className="flex items-center gap-1">
-                            <FaClock className="text-gray-400 text-xs" />
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              الدخول: {sub.entry_count || 0}/{sub.type_details?.max_entries || '∞'}
-                            </span>
-                          </div>
-                          {sub.type_details?.includes_pool && (
-                            <div className="flex items-center gap-1 text-blue-600">
-                              <FaSwimmer className="text-xs" /> حمام السباحة
-                            </div>
-                          )}
-                          {sub.type_details?.includes_gym && (
-                            <div className="flex items-center gap-1 text-green-600">
-                              <FaDumbbell className="text-xs" /> صالة الألعاب الرياضية
-                            </div>
-                          )}
-                          {sub.type_details?.includes_classes && (
-                            <div className="flex items-center gap-1 text-purple-600">
-                              <FaUsers className="text-xs" /> الفصول الدراسية
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                     
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div>
+  {/* Table view - for larger screens */}
+  <div className="hidden md:block overflow-x-auto mb-6">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاشتراك</th>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النادي</th>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">rfid code</th>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التواريخ</th>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الدفع</th>
+          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التفاصيل</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {results.map((sub) => {
+          const statusDisplay = getStatusDisplay(sub.status);
+          return (
+            <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
+              <td className="px-4 py-4">
+                <div className="flex items-center justify-end">
+                  <div className="mr-2">
+                    <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                      <CiShoppingTag className="text-blue-500" />
+                      {sub.type_details?.name || 'غير معروف'}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {sub.type_details?.duration_days} يوم
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      رقم العضوية: {sub.member_details?.membership_number || 'غير متوفر'}
+                    </div>
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-4">
+                <div className="text-sm font-medium text-gray-900">{sub.club_details?.name || 'غير معروف'}</div>
+                <div className="text-xs text-gray-500 mt-1 line-clamp-1">{sub.club_details?.location}</div>
+              </td>
+              <td className="px-4 py-4">
+                <div className="text-sm font-medium text-gray-900">{sub.member_details?.rfid_code || 'غير معروف'}</div>
+              </td>
+              <td className="px-4 py-4">
+                <div className="text-sm space-y-1">
+                  <div className="flex items-center gap-1">
+                    <FaCalendarAlt className="text-gray-400 text-xs" />
+                    {formatDate(sub.start_date)}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <FaCalendarCheck className="text-gray-400 text-xs" />
+                    {formatDate(sub.end_date)}
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-4">
+                <div className="text-sm space-y-1">
+                  <div className="flex items-center gap-1">
+                    <FaMoneyBillAlt className="text-gray-400 text-xs" />
+                    السعر: ${sub.type_details?.price}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <FaCheck className="text-gray-400 text-xs" />
+                    المدفوع: ${sub.paid_amount}
+                  </div>
+                  <div className={`flex items-center gap-1 ${parseFloat(sub.remaining_amount) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                    <FaExclamation className="text-xs" />
+                    الرصيد: ${sub.remaining_amount}
+                  </div>
+                </div>
+              </td>
+              <td className="px-4 py-4">
+                <div className="flex flex-col gap-1 text-sm">
+                  <div className="flex items-center gap-1">
+                    <FaClock className="text-gray-400 text-xs" />
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      الدخول: {sub.entry_count || 0}/{sub.type_details?.max_entries || '∞'}
+                    </span>
+                  </div>
+                  {sub.type_details?.includes_pool && (
+                    <div className="flex items-center gap-1 text-blue-600">
+                      <FaSwimmer className="text-xs" /> حمام السباحة
+                    </div>
+                  )}
+                  {sub.type_details?.includes_gym && (
+                    <div className="flex items-center gap-1 text-green-600">
+                      <FaDumbbell className="text-xs" /> صالة الألعاب الرياضية
+                    </div>
+                  )}
+                  {sub.type_details?.includes_classes && (
+                    <div className="flex items-center gap-1 text-purple-600">
+                      <FaUsers className="text-xs" /> الفصول الدراسية
+                    </div>
+                  )}
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
 
+  {/* Card view - for mobile screens */}
+  <div className="md:hidden space-y-4 mb-6">
+    {results.length > 0 ? (
+      results.map((sub) => {
+        const statusDisplay = getStatusDisplay(sub.status);
+        return (
+          <div key={sub.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+            {/* Subscription Header */}
+            <div className="flex justify-between items-start border-b pb-3 mb-3">
+              <div>
+                <div className="text-xs text-gray-500">رقم العضوية</div>
+                <div className="text-sm">{sub.member_details?.membership_number || 'غير متوفر'}</div>
+              </div>
+              <div className="flex items-center gap-2 text-blue-500">
+                <CiShoppingTag className="text-lg" />
+                <span className="font-medium">{sub.type_details?.name || 'غير معروف'}</span>
+              </div>
+            </div>
+
+            {/* Main Info Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              {/* Club Info */}
+              <div>
+                <div className="text-xs text-gray-500">النادي</div>
+                <div className="text-sm font-medium">{sub.club_details?.name || 'غير معروف'}</div>
+                <div className="text-xs text-gray-500 mt-1">{sub.club_details?.location}</div>
+              </div>
+
+              {/* RFID Code */}
+              <div>
+                <div className="text-xs text-gray-500">RFID Code</div>
+                <div className="text-sm font-medium">{sub.member_details?.rfid_code || 'غير معروف'}</div>
+              </div>
+
+              {/* Dates */}
+              <div>
+                <div className="text-xs text-gray-500">التواريخ</div>
+                <div className="text-sm space-y-1">
+                  <div className="flex items-center gap-1">
+                    <FaCalendarAlt className="text-gray-400 text-xs" />
+                    {formatDate(sub.start_date)}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <FaCalendarCheck className="text-gray-400 text-xs" />
+                    {formatDate(sub.end_date)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Payment */}
+              <div>
+                <div className="text-xs text-gray-500">الدفع</div>
+                <div className="text-sm space-y-1">
+                  <div>السعر: ${sub.type_details?.price}</div>
+                  <div>المدفوع: ${sub.paid_amount}</div>
+                  <div className={parseFloat(sub.remaining_amount) < 0 ? 'text-red-500' : 'text-green-500'}>
+                    الرصيد: ${sub.remaining_amount}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Subscription Features */}
+            <div className="mt-4 pt-3 border-t">
+              <div className="text-xs text-gray-500 mb-2">التفاصيل</div>
+              <div className="flex flex-wrap gap-2">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  الدخول: {sub.entry_count || 0}/{sub.type_details?.max_entries || '∞'}
+                </span>
+                {sub.type_details?.includes_pool && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <FaSwimmer className="mr-1" /> حمام السباحة
+                  </span>
+                )}
+                {sub.type_details?.includes_gym && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                    <FaDumbbell className="mr-1" /> الجيم
+                  </span>
+                )}
+                {sub.type_details?.includes_classes && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                    <FaUsers className="mr-1" /> الفصول
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Duration */}
+            <div className="mt-3 pt-3 border-t">
+              <div className="text-xs text-gray-500">مدة الاشتراك</div>
+              <div className="text-sm">{sub.type_details?.duration_days} يوم</div>
+            </div>
+          </div>
+        );
+      })
+    ) : (
+      <div className="text-center py-8 text-gray-500">
+        لا توجد نتائج متاحة
+      </div>
+    )}
+  </div>
+</div>
           <div className="flex justify-between items-center mt-4" dir="rtl">
             {safeCount === 0 && (
               <div className="text-sm text-gray-600">لا توجد اشتراكات لعرضها</div>

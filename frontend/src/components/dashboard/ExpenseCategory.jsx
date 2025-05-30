@@ -216,46 +216,77 @@ const ExpenseCategory = () => {
 
           {/* Table */}
           {!loading && !error && (
-            <div className="rounded-md border overflow-x-auto">
-              <table className="min-w-full divide-y divide-border">
-                <thead>
-                  <tr className="bg-muted/50">
-                    <th className="px-4 py-3 text-right text-xs sm:text-sm font-medium">
-                      النادي
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs sm:text-sm font-medium">
-                      الاسم
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs sm:text-sm font-medium">
-                      الوصف
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border bg-background">
-                  {expenseCategories.length > 0 ? (
-                    expenseCategories.map((category, index) => (
-                      <tr key={index} className="hover:bg-gray-100 transition">
-                        <td className="px-4 py-3 text-xs sm:text-sm">
-                          {category.club_details?.name || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-xs sm:text-sm">
-                          {category.name || "غير متاح"}
-                        </td>
-                        <td className="px-4 py-3 text-xs sm:text-sm">
-                          {category.description || "غير متاح"}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={3} className="px-4 py-3 text-center text-sm">
-                        لا توجد فئات مصروفات متاحة
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+           <div>
+  {/* Table view (lg screens and above) */}
+  <div className="hidden lg:block rounded-md border overflow-x-auto">
+    <table className="min-w-full divide-y divide-border">
+      <thead>
+        <tr className="bg-muted/50">
+          <th className="px-4 py-3 text-right text-xs sm:text-sm font-medium">النادي</th>
+          <th className="px-4 py-3 text-right text-xs sm:text-sm font-medium">الاسم</th>
+          <th className="px-4 py-3 text-right text-xs sm:text-sm font-medium">الوصف</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-border bg-background">
+        {expenseCategories.length > 0 ? (
+          expenseCategories.map((category, index) => (
+            <tr key={index} className="hover:bg-gray-100 transition">
+              <td className="px-4 py-3 text-xs sm:text-sm">
+                {category.club_details?.name || "غير متاح"}
+              </td>
+              <td className="px-4 py-3 text-xs sm:text-sm">
+                {category.name || "غير متاح"}
+              </td>
+              <td className="px-4 py-3 text-xs sm:text-sm">
+                {category.description || "غير متاح"}
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan={3} className="px-4 py-3 text-center text-sm">
+              لا توجد فئات مصروفات متاحة
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+
+  {/* Card view (md and sm screens) */}
+  <div className="lg:hidden space-y-3">
+    {expenseCategories.length > 0 ? (
+      expenseCategories.map((category, index) => (
+        <div key={index} className="border rounded-md p-4 hover:bg-gray-50 transition-colors">
+          <div className="grid grid-cols-1 gap-2">
+            <div className="flex justify-between">
+              <span className="text-xs text-muted-foreground">النادي:</span>
+              <span className="text-xs sm:text-sm">
+                {category.club_details?.name || "غير متاح"}
+              </span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-muted-foreground">الاسم:</span>
+              <span className="text-xs sm:text-sm font-medium">
+                {category.name || "غير متاح"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-xs text-muted-foreground">الوصف:</span>
+              <span className="text-xs sm:text-sm text-right flex-1">
+                {category.description || "غير متاح"}
+              </span>
+            </div>
+          </div>
+        </div>
+      ))
+    ) : (
+      <div className="border rounded-md p-4 text-center text-sm text-muted-foreground">
+        لا توجد فئات مصروفات متاحة
+      </div>
+    )}
+  </div>
+</div>
           )}
 
           {/* Pagination */}

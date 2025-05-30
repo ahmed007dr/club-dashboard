@@ -9,6 +9,8 @@ import axios from 'axios';
 import BASE_URL from '../../config/api';
 import toast from 'react-hot-toast';
 
+
+
 const Navbar = ({ hideMenuButton = false }) => {
   const dispatch = useDispatch();
   const location = useLocation();
@@ -19,7 +21,7 @@ const Navbar = ({ hideMenuButton = false }) => {
   const clubList = useSelector((state) => state.club.clubList);
   const clubStatus = useSelector((state) => state.club.status);
   const clubError = useSelector((state) => state.club.error);
-  const currentClub = useSelector((state) => state.club.currentClub); // Added current club selector
+  const currentClub = useSelector((state) => state.club.currentClub);
 
   // Local state
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
@@ -88,6 +90,7 @@ const Navbar = ({ hideMenuButton = false }) => {
       .unwrap()
       .then(() => {
         toast.success(`Switched to club successfully`);
+        window.location.reload();
       })
       .catch((error) => {
         toast.error(`Failed to switch club: ${error}`);
@@ -162,6 +165,8 @@ const Navbar = ({ hideMenuButton = false }) => {
             <img src="/logo.png" alt="Logo" className="w-8 h-8 object-contain" />
             <span className="hidden sm:inline text-purple-800">Fitness Time</span>
           </Link>
+          {/* Display current club name for owners */}
+
         </div>
 
         {/* Right Section */}
@@ -174,6 +179,11 @@ const Navbar = ({ hideMenuButton = false }) => {
               day: 'numeric',
             })}
           </span>
+                   {isLoggedIn && profile?.club && (
+  <span className="text-sm font-semibold text-gray-900">
+    {profile.club.name}
+  </span>
+)}
 
           {isLoggedIn && (
             <div className="flex space-x-4">
@@ -191,7 +201,7 @@ const Navbar = ({ hideMenuButton = false }) => {
                   <Menu.Items className="absolute right-0 mt-2 w-64 origin-top-right rounded-lg bg-white dark:bg-gray-800 shadow-xl ring-1 ring-black ring-opacity-5 focus:outline-none z-50 max-h-80 overflow-y-auto">
                     <div className="py-2">
                       <p className="px-4 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                       لأندية الخاصة بك
+                        لأندية الخاصة بك
                       </p>
                       {clubStatus === 'loading' ? (
                         <p className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 italic animate-pulse">
@@ -223,9 +233,9 @@ const Navbar = ({ hideMenuButton = false }) => {
                           </Menu.Item>
                         ))
                       ) : (
-                       <p className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 italic">
-  لا توجد أندية متاحة
-</p>
+                        <p className="px-4 py-3 text-sm text-gray-600 dark:text-gray-300 italic">
+                          لا توجد أندية متاحة
+                        </p>
                       )}
                     </div>
                   </Menu.Items>

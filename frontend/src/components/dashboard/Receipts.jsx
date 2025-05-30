@@ -497,156 +497,156 @@ function Receipts() {
       )}
 
       {/* Receipts Table */}
-      <div className="overflow-x-auto">
-        {filteredReceipts.length > 0 ? (
-          <>
-            {/* Table for Small Screens and Above */}
-            <table className="min-w-full divide-y divide-gray-200 hidden sm:table">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-                    الإجراءات
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-                    المبلغ
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-                    طريقة الدفع
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-                    ملاحظة
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-                    رقم الفاتورة
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-                    النادي
-                  </th>
-                  <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
-                    العضو
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {filteredReceipts.map((receipt) => (
-                  <tr key={receipt.id}>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm flex gap-2">
-                      {canEditReceipts && (
-                        <button
-                          onClick={() => handleEdit(receipt.id)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          aria-label="تعديل الإيصال"
-                        >
-                          <CiEdit className="w-5 h-5" />
-                        </button>
-                      )}
-                      {canDeleteReceipts && (
-                        <button
-                          onClick={() => handleDelete(receipt.id)}
-                          className="text-red-600 hover:text-red-900"
-                          aria-label="حذف الإيصال"
-                        >
-                          <CiTrash className="w-5 h-5" />
-                        </button>
-                      )}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm">
-                      {receipt.amount}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm capitalize">
-                      {receipt.payment_method === "cash"
-                        ? "نقدي"
-                        : receipt.payment_method === "bank"
-                        ? "تحويل بنكي"
-                        : receipt.payment_method === "visa"
-                        ? "فيزا"
-                        : receipt.payment_method}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm">
-                      {receipt.note || "لا يوجد"}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm">
-                      {receipt.invoice_number}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm">
-                      {receipt.club_details?.name || "غير معروف"}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 text-sm">
-                      {receipt.member_details?.name || "غير معروف"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    <div className="overflow-x-auto">
+  {filteredReceipts.length > 0 ? (
+    <>
+      {/* Table for Medium Screens and Above */}
+      <table className="min-w-full divide-y divide-gray-200 hidden md:table">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+              الإجراءات
+            </th>
+            <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+              المبلغ
+            </th>
+            <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+              طريقة الدفع
+            </th>
+            <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+              ملاحظة
+            </th>
+            <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+              رقم الفاتورة
+            </th>
+            <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+              النادي
+            </th>
+            <th className="px-4 sm:px-6 py-3 text-right text-xs sm:text-sm font-medium text-gray-500 uppercase tracking-wider">
+              العضو
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {filteredReceipts.map((receipt) => (
+            <tr key={receipt.id}>
+              <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm flex gap-2">
+                {canEditReceipts && (
+                  <button
+                    onClick={() => handleEdit(receipt.id)}
+                    className="text-indigo-600 hover:text-indigo-900"
+                    aria-label="تعديل الإيصال"
+                  >
+                    <CiEdit className="w-5 h-5" />
+                  </button>
+                )}
+                {canDeleteReceipts && (
+                  <button
+                    onClick={() => handleDelete(receipt.id)}
+                    className="text-red-600 hover:text-red-900"
+                    aria-label="حذف الإيصال"
+                  >
+                    <CiTrash className="w-5 h-5" />
+                  </button>
+                )}
+              </td>
+              <td className="px-4 sm:px-6 py-4 text-sm">
+                {receipt.amount}
+              </td>
+              <td className="px-4 sm:px-6 py-4 text-sm capitalize">
+                {receipt.payment_method === "cash"
+                  ? "نقدي"
+                  : receipt.payment_method === "bank"
+                  ? "تحويل بنكي"
+                  : receipt.payment_method === "visa"
+                  ? "فيزا"
+                  : receipt.payment_method}
+              </td>
+              <td className="px-4 sm:px-6 py-4 text-sm">
+                {receipt.note || "لا يوجد"}
+              </td>
+              <td className="px-4 sm:px-6 py-4 text-sm">
+                {receipt.invoice_number}
+              </td>
+              <td className="px-4 sm:px-6 py-4 text-sm">
+                {receipt.club_details?.name || "غير معروف"}
+              </td>
+              <td className="px-4 sm:px-6 py-4 text-sm">
+                {receipt.member_details?.name || "غير معروف"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-            {/* Card Layout for Mobile */}
-            <div className="sm:hidden space-y-4">
-              {filteredReceipts.map((receipt) => (
-                <div
-                  key={receipt.id}
-                  className="border rounded-md p-4 bg-white shadow-sm"
-                >
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-semibold">
-                      رقم الفاتورة: {receipt.invoice_number}
-                    </span>
-                    <div className="flex gap-2">
-                      {canEditReceipts && (
-                        <button
-                          onClick={() => handleEdit(receipt.id)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                          aria-label="تعديل الإيصال"
-                        >
-                          <CiEdit className="w-5 h-5" />
-                        </button>
-                      )}
-                      {canDeleteReceipts && (
-                        <button
-                          onClick={() => handleDelete(receipt.id)}
-                          className="text-red-600 hover:text-red-900"
-                          aria-label="حذف الإيصال"
-                        >
-                          <CiTrash className="w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-sm">
-                    <strong>المبلغ:</strong> {receipt.amount}
-                  </p>
-                  <p className="text-sm">
-                    <strong>طريقة الدفع:</strong>{" "}
-                    {receipt.payment_method === "cash"
-                      ? "نقدي"
-                      : receipt.payment_method === "bank"
-                      ? "تحويل بنكي"
-                      : receipt.payment_method === "visa"
-                      ? "فيزا"
-                      : receipt.payment_method}
-                  </p>
-                  <p className="text-sm">
-                    <strong>النادي:</strong>{" "}
-                    {receipt.club_details?.name || "غير معروف"}
-                  </p>
-                  <p className="text-sm">
-                    <strong>العضو:</strong>{" "}
-                    {receipt.member_details?.name || "غير معروف"}
-                  </p>
-                  <p className="text-sm">
-                    <strong>ملاحظة:</strong> {receipt.note || "لا يوجد"}
-                  </p>
-                </div>
-              ))}
+      {/* Card Layout for Mobile and Small Screens */}
+      <div className="md:hidden space-y-4">
+        {filteredReceipts.map((receipt) => (
+          <div
+            key={receipt.id}
+            className="border rounded-md p-4 bg-white shadow-sm"
+          >
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm font-semibold">
+                رقم الفاتورة: {receipt.invoice_number}
+              </span>
+              <div className="flex gap-2">
+                {canEditReceipts && (
+                  <button
+                    onClick={() => handleEdit(receipt.id)}
+                    className="text-indigo-600 hover:text-indigo-900"
+                    aria-label="تعديل الإيصال"
+                  >
+                    <CiEdit className="w-5 h-5" />
+                  </button>
+                )}
+                {canDeleteReceipts && (
+                  <button
+                    onClick={() => handleDelete(receipt.id)}
+                    className="text-red-600 hover:text-red-900"
+                    aria-label="حذف الإيصال"
+                  >
+                    <CiTrash className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
             </div>
-          </>
-        ) : (
-          <p className="p-4 text-gray-500 text-sm sm:text-base">
-            {searchTerm
-              ? "لم يتم العثور على إيصال بهذه المعايير"
-              : "لم يتم العثور على إيصالات"}
-          </p>
-        )}
+            <p className="text-sm">
+              <strong>المبلغ:</strong> {receipt.amount}
+            </p>
+            <p className="text-sm">
+              <strong>طريقة الدفع:</strong>{" "}
+              {receipt.payment_method === "cash"
+                ? "نقدي"
+                : receipt.payment_method === "bank"
+                ? "تحويل بنكي"
+                : receipt.payment_method === "visa"
+                ? "فيزا"
+                : receipt.payment_method}
+            </p>
+            <p className="text-sm">
+              <strong>النادي:</strong>{" "}
+              {receipt.club_details?.name || "غير معروف"}
+            </p>
+            <p className="text-sm">
+              <strong>العضو:</strong>{" "}
+              {receipt.member_details?.name || "غير معروف"}
+            </p>
+            <p className="text-sm">
+              <strong>ملاحظة:</strong> {receipt.note || "لا يوجد"}
+            </p>
+          </div>
+        ))}
       </div>
+    </>
+  ) : (
+    <p className="p-4 text-gray-500 text-sm sm:text-base">
+      {searchTerm
+        ? "لم يتم العثور على إيصال بهذه المعايير"
+        : "لم يتم العثور على إيصالات"}
+    </p>
+  )}
+</div>
 
       {/* Total Info */}
       <div className="flex justify-end mt-4">

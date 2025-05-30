@@ -101,14 +101,18 @@ const CreateSubscriptionTypes = ({ onClose }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md mx-auto bg-white p-6 rounded shadow" dir="rtl">
-      <h2 className="text-2xl font-bold text-center mb-6">إنشاء نوع اشتراك جديد</h2>
+  <form onSubmit={handleSubmit} className="max-w-2xl mx-auto bg-white p-6 rounded shadow" dir="rtl">
+  <h2 className="text-2xl font-bold text-center mb-6">إنشاء نوع اشتراك جديد</h2>
 
-      {error && (
-        <div className="p-3 bg-red-100 text-red-700 rounded mb-4">{error}</div>
-      )}
+  {error && (
+    <div className="p-3 bg-red-100 text-red-700 rounded mb-4">{error}</div>
+  )}
 
-      <div className="mb-4">
+  {/* Input pairs - each pair in a flex row */}
+  <div className="space-y-4">
+    {/* Name + Price */}
+    <div className="flex gap-4">
+      <div className="flex-1">
         <label className="block text-sm font-medium text-gray-700 mb-1">الاسم</label>
         <input
           type="text"
@@ -119,8 +123,7 @@ const CreateSubscriptionTypes = ({ onClose }) => {
           required
         />
       </div>
-
-      <div className="mb-4">
+      <div className="flex-1">
         <label className="block text-sm font-medium text-gray-700 mb-1">السعر</label>
         <input
           type="number"
@@ -133,8 +136,11 @@ const CreateSubscriptionTypes = ({ onClose }) => {
           required
         />
       </div>
+    </div>
 
-      <div className="mb-4">
+    {/* Duration + Club */}
+    <div className="flex gap-4">
+      <div className="flex-1">
         <label className="block text-sm font-medium text-gray-700 mb-1">المدة (بالأيام)</label>
         <input
           type="number"
@@ -146,8 +152,7 @@ const CreateSubscriptionTypes = ({ onClose }) => {
           required
         />
       </div>
-
-      <div className="mb-4">
+      <div className="flex-1">
         <label className="block text-sm font-medium text-gray-700 mb-1">النادي</label>
         <select
           name="club"
@@ -164,19 +169,11 @@ const CreateSubscriptionTypes = ({ onClose }) => {
           ))}
         </select>
       </div>
+    </div>
 
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-1">هل الاشتراك فعال؟</label>
-        <input
-          type="checkbox"
-          name="is_active"
-          checked={formData.is_active}
-          onChange={handleChange}
-          className="h-4 w-4 text-blue-600"
-        />
-      </div>
-
-      <div className="mb-4">
+    {/* Max Entries + Active Status */}
+    <div className="flex gap-4">
+      <div className="flex-1">
         <label className="block text-sm font-medium text-gray-700 mb-1">أقصى عدد للحضور</label>
         <input
           type="number"
@@ -188,50 +185,63 @@ const CreateSubscriptionTypes = ({ onClose }) => {
           required
         />
       </div>
-
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-2">المرافق المشمولة:</label>
-        <div className="space-y-2">
-          <label className="inline-flex items-center">
-            <input
-              type="checkbox"
-              name="includes_gym"
-              checked={formData.includes_gym}
-              onChange={handleChange}
-              className="h-4 w-4 text-blue-600"
-            />
-            <span className="mr-2 text-sm text-gray-700">صالة الألعاب الرياضية</span>
-          </label>
-          <label className="inline-flex items-center">
-            <input
-              type="checkbox"
-              name="includes_pool"
-              checked={formData.includes_pool}
-              onChange={handleChange}
-              className="h-4 w-4 text-blue-600"
-            />
-            <span className="mr-2 text-sm text-gray-700">المسبح</span>
-          </label>
-          <label className="inline-flex items-center">
-            <input
-              type="checkbox"
-              name="includes_classes"
-              checked={formData.includes_classes}
-              onChange={handleChange}
-              className="h-4 w-4 text-blue-600"
-            />
-            <span className="mr-2 text-sm text-gray-700">الحصص التدريبية</span>
-          </label>
-        </div>
+      <div className="flex-1 flex items-end gap-2 pb-1">
+        <input
+          type="checkbox"
+          name="is_active"
+          checked={formData.is_active}
+          onChange={handleChange}
+          className="h-4 w-4 text-blue-600"
+        />
+        <label className="text-sm font-medium text-gray-700">هل الاشتراك فعال؟</label>
       </div>
+    </div>
 
-      <button
-        type="submit"
-        className="btn w-full bg-green-500 text-white py-2 rounded-md hover:bg-green-600 transition"
-      >
-        إنشاء الاشتراك
-      </button>
-    </form>
+    {/* Facilities Checkboxes - full width */}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">المرافق المشمولة:</label>
+      <div className="flex flex-wrap gap-4">
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            name="includes_gym"
+            checked={formData.includes_gym}
+            onChange={handleChange}
+            className="h-4 w-4 text-blue-600"
+          />
+          <span className="text-sm text-gray-700">صالة الألعاب الرياضية</span>
+        </label>
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            name="includes_pool"
+            checked={formData.includes_pool}
+            onChange={handleChange}
+            className="h-4 w-4 text-blue-600"
+          />
+          <span className="text-sm text-gray-700">المسبح</span>
+        </label>
+        <label className="inline-flex items-center gap-2">
+          <input
+            type="checkbox"
+            name="includes_classes"
+            checked={formData.includes_classes}
+            onChange={handleChange}
+            className="h-4 w-4 text-blue-600"
+          />
+          <span className="text-sm text-gray-700">الحصص التدريبية</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <button
+    type="submit"
+    className="btn w-full bg-green-500 text-white py-2 rounded-md hover:bg-green-600 transition mt-6"
+  >
+    إنشاء الاشتراك
+  </button>
+</form>
   );
 };
 
