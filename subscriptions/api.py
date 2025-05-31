@@ -223,14 +223,14 @@ def subscription_list(request):
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_type_detail(request, pk):
     subscription_type = get_object_or_404(SubscriptionType, pk=pk)
     
     if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription_type):
-        return Response({'error': 'You do not have permission to access this subscription type'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'غير مخول للوصول إلى نوع الاشتراك هذا'}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == 'GET':
         serializer = SubscriptionTypeSerializer(subscription_type)
@@ -246,20 +246,17 @@ def subscription_type_detail(request, pk):
     elif request.method == 'DELETE':
         if Subscription.objects.filter(type=subscription_type).exists():
             return Response(
-                {'error': 'Cannot delete subscription type with active subscriptions'},
+                {'error': 'لا يمكن حذف نوع اشتراك مرتبط باشتراكات نشطة'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         subscription_type.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def active_subscription_types(request):
-    if request.user.role == 'owner':
-        types = SubscriptionType.objects.filter(is_active=True).order_by('id')
-    else:
-        types = SubscriptionType.objects.filter(is_active=True, club=request.user.club).order_by('id')
-    
+    types = SubscriptionType.objects.filter(is_active=True, club=request.user.club).order_by('id')    
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(types, request)
     serializer = SubscriptionTypeSerializer(page, many=True)
@@ -338,11 +335,7 @@ def active_subscriptions(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expired_subscriptions(request):
     today = timezone.now().date()
-    if request.user.role == 'owner':
-        subscriptions = Subscription.objects.filter(end_date__lt=today).order_by('-end_date')
-    else:
-        subscriptions = Subscription.objects.filter(end_date__lt=today, club=request.user.club).order_by('-end_date')
-    
+    subscriptions = Subscription.objects.filter(end_date__lt=today, club=request.user.club).order_by('-end_date')    
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
     serializer = SubscriptionSerializer(page, many=True)
@@ -352,11 +345,8 @@ def expired_subscriptions(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def upcoming_subscriptions(request):
     today = timezone.now().date()
-    if request.user.role == 'owner':
-        subscriptions = Subscription.objects.filter(start_date__gt=today).order_by('start_date')
-    else:
-        subscriptions = Subscription.objects.filter(start_date__gt=today, club=request.user.club).order_by('start_date')
-    
+    subscriptions = Subscription.objects.filter(start_date__gt=today, club=request.user.club).order_by('start_date')    
+
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
     serializer = SubscriptionSerializer(page, many=True)
@@ -444,10 +434,9 @@ def member_subscriptions(request):
     if not member_id:
         return Response({"error": "member_id parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
     
-    if request.user.role == 'owner':
-        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(member_id=member_id)
-    else:
-        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(member_id=member_id, club=request.user.club)
+    subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(
+            member_id=member_id, club=request.user.club
+        )    
     
     if search_term:
         subscriptions = subscriptions.filter(
@@ -466,15 +455,7 @@ def member_subscriptions(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_stats(request):
     today = timezone.now().date()
-    if request.user.role == 'owner':
-        stats = {
-            'total': Subscription.objects.count(),
-            'active': Subscription.objects.filter(start_date__lte=today, end_date__gte=today).count(),
-            'expired': Subscription.objects.filter(end_date__lt=today).count(),
-            'upcoming': Subscription.objects.filter(start_date__gt=today).count(),
-        }
-    else:
-        stats = {
+    stats = {
             'total': Subscription.objects.filter(club=request.user.club).count(),
             'active': Subscription.objects.filter(start_date__lte=today, end_date__gte=today, club=request.user.club).count(),
             'expired': Subscription.objects.filter(end_date__lt=today, club=request.user.club).count(),
