@@ -36,6 +36,7 @@ class FreezeRequestSerializer(serializers.ModelSerializer):
             'cancelled_at': {'read_only': True},
         }
 
+
 class SubscriptionSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     member_details = MemberSerializer(source='member', read_only=True)
@@ -43,6 +44,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     coach_details = serializers.SerializerMethodField()
     freeze_requests = FreezeRequestSerializer(many=True, read_only=True)
     created_by_details = UserSerializer(source='created_by', read_only=True)
+    subscriptions_count = serializers.SerializerMethodField()  
+    coach_simple = serializers.SerializerMethodField()  
 
     class Meta:
         model = Subscription
@@ -50,7 +53,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'id', 'club', 'club_details', 'member', 'member_details',
             'type', 'type_details', 'coach', 'coach_details', 'start_date', 'end_date',
             'private_training_price', 'paid_amount', 'remaining_amount', 'entry_count',
-            'created_by', 'created_by_details', 'freeze_requests'
+            'created_by', 'created_by_details', 'freeze_requests', 'subscriptions_count', 'coach_simple'
         ]
         extra_kwargs = {
             'remaining_amount': {'read_only': True},
@@ -59,6 +62,19 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'coach': {'required': False},
             'private_training_price': {'required': False},
         }
+
+    def get_subscriptions_count(self, obj):
+ 
+        return Subscription.objects.filter(member=obj.member).count()
+
+    def get_coach_simple(self, obj):
+   
+        if obj.coach:
+            return {
+                'id': obj.coach.id,
+                'username': obj.coach.username
+            }
+        return None
 
     def get_coach_details(self, obj):
         if obj.coach and hasattr(obj.coach, 'coach_profile'):
@@ -121,12 +137,11 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("يجب تسوية المدفوعات المستحقة أولاً.")
 
         return data
-    
+
+
 class CoachReportSerializer(serializers.Serializer):
     coach_id = serializers.IntegerField()
     coach_username = serializers.CharField()
     active_clients = serializers.IntegerField()
     total_private_training_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-
-    

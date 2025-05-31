@@ -1,21 +1,24 @@
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework import status
+from datetime import datetime, timedelta
+from decimal import Decimal
+
+from django.db.models import Q, Count, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from datetime import timedelta, datetime
-from django.db.models import Q
-from .models import Subscription, SubscriptionType
-from .serializers import SubscriptionSerializer, FreezeRequest,SubscriptionTypeSerializer
+
+from rest_framework import status, serializers
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from utils.permissions import IsOwnerOrRelatedToClub
-from decimal import Decimal
-from finance.models import Income, IncomeSource
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+
+from .models import Subscription, SubscriptionType
+from .serializers import SubscriptionSerializer, FreezeRequest, SubscriptionTypeSerializer
+
+from finance.models import Income, IncomeSource
 from members.models import Member
-from rest_framework import status
-from django.db.models import Q, Count
 from staff.models import StaffAttendance
+from utils.permissions import IsOwnerOrRelatedToClub
+from accounts.models import User
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -539,11 +542,7 @@ def cancel_freeze(request, freeze_id):
     serializer = SubscriptionSerializer(subscription)
     return Response(serializer.data)
 
-from django.db.models import Sum
-from datetime import datetime
-from rest_framework import serializers
 
-# Serializer لتقرير الكابتن
 class CoachReportSerializer(serializers.Serializer):
     coach_id = serializers.IntegerField()
     coach_username = serializers.CharField()
@@ -551,8 +550,6 @@ class CoachReportSerializer(serializers.Serializer):
     total_private_training_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
 
-
-from accounts.models import User
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -602,3 +599,5 @@ def coach_report(request, coach_id):
 
     serializer = CoachReportSerializer(report)
     return Response(serializer.data)
+
+
