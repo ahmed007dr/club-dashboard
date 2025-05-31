@@ -1,9 +1,14 @@
+from datetime import datetime
+
+from dateutil.relativedelta import relativedelta
+from django.db.models import Sum, Count, ExpressionWrapper, F, DurationField
+from django.db.models.functions import TruncMonth, TruncDate
+from django.utils import timezone
 from rest_framework import serializers
+
 from .models import Shift, StaffAttendance
 from core.serializers import ClubSerializer
 from accounts.serializers import UserSerializer
-from django.utils import timezone
-from datetime import datetime
 
 class ShiftSerializer(serializers.ModelSerializer):
     """Serializer for Shift model, handling shift creation and validation."""
@@ -90,3 +95,56 @@ class StaffAttendanceSerializer(serializers.ModelSerializer):
     def get_duration_hours(self, obj):
         """Calculate the duration of attendance in hours."""
         return obj.duration_hours()
+    
+
+
+
+class StaffMonthlyHoursSerializer(serializers.Serializer):
+    staff_id = serializers.IntegerField(source='staff__id')
+    staff_name = serializers.CharField(source='staff__username')
+    rfid_code = serializers.CharField(source='staff__rfid_code')
+    month = serializers.DateTimeField(format='%B %Y')
+    total_hours = serializers.SerializerMethodField()
+    attendance_days = serializers.IntegerField()
+    hours_change = serializers.SerializerMethodField()
+    percentage_change = serializers.SerializerMethodField()
+
+    def get_total_hours(self, obj):
+        return round(obj['total_hours'].total_seconds() / 3600, 2)
+
+    def get_hours_change(self, obj):
+        staff_id = obj['staff__id']
+        month = obj['month']
+        total_hours = obj['total_hours'].total_seconds() / 3600
+        
+        # Access context to get previous months' data
+        monthly_data = self.context.get('monthly_data', {})
+        prev_month = month - relativedelta(months=1)
+        
+        prev_hours = monthly_data.get(staff_id, {}).get(prev_month, 0)
+        return round(total_hours - prev_hours, 2)
+
+    def get_percentage_change(self, obj):
+        staff_id = obj['staff__id']
+        month = obj['month']
+        total_hours = obj['total_hours'].total_seconds() / 3600
+        
+        monthly_data = self.context.get('monthly_data', {})
+        prev_month = month - relativedelta(months=1)
+        
+        prev_hours = monthly_data.get(staff_id, {}).get(prev_month, 0)
+        if prev_hours > 0:
+            return round(((total_hours - prev_hours) / prev_hours) * 100, 2)
+        return 0
+
+    class Meta:
+        fields = [
+            'staff_id',
+            'staff_name',
+            'rfid_code',
+            'month',
+            'total_hours',
+            'attendance_days',
+            'hours_change',
+            'percentage_change'
+        ]

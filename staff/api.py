@@ -1,39 +1,43 @@
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from django.db.models import Sum, Count, ExpressionWrapper, F, DurationField, Q
+from django.db.models.functions import TruncMonth, TruncDate, Concat
+from django.utils import timezone
+from django.shortcuts import get_object_or_404
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
-from django.shortcuts import get_object_or_404
-from django.utils import timezone
-from datetime import datetime
-from .models import Shift, StaffAttendance
-from .serializers import ShiftSerializer, StaffAttendanceSerializer
 from rest_framework.permissions import IsAuthenticated
-from utils.permissions import IsOwnerOrRelatedToClub
-from accounts.models import User
-from django.db.models.functions import TruncDate
 from rest_framework.pagination import PageNumberPagination
-from django.db.models import Q
-from django.db.models.functions import Concat
+
+from .models import Shift, StaffAttendance
+from .serializers import ShiftSerializer, StaffAttendanceSerializer, StaffMonthlyHoursSerializer
+from accounts.models import User
+from utils.permissions import IsOwnerOrRelatedToClub
 
 # Shift Management APIs
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def staff_shifts_api(request, staff_id):
-    shifts = Shift.objects.filter(staff_id=staff_id).select_related('club', 'approved_by').order_by('-date')
-    if request.user.role != 'owner':
-        shifts = shifts.filter(club=request.user.club)
+    """Retrieve all shifts for a specific staff member, filtered by user's club."""
+    shifts = Shift.objects.filter(
+        staff_id=staff_id,
+        club=request.user.club
+    ).select_related('club', 'approved_by').order_by('-date')
 
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(shifts, request)
     serializer = ShiftSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def shift_list_api(request):
-    shifts = Shift.objects.select_related('club', 'staff', 'approved_by').order_by('-date')
-    if request.user.role != 'owner':
-        shifts = shifts.filter(club=request.user.club)
+    """Retrieve a list of shifts, filtered by user's club with optional filters."""
+    shifts = Shift.objects.filter(
+        club=request.user.club
+    ).select_related('club', 'staff', 'approved_by').order_by('-date')
 
     # Apply filters
     if 'club_name' in request.GET:
@@ -43,36 +47,24 @@ def shift_list_api(request):
     if 'staff_search' in request.GET:
         search_term = request.GET['staff_search'].strip()
         if search_term:
-            # Split search term in case it contains first+last name
             name_parts = search_term.split()
-            
-            # Base query for individual fields
             base_query = (
                 Q(staff__username__icontains=search_term) |
                 Q(staff__first_name__icontains=search_term) |
                 Q(staff__last_name__icontains=search_term)
             )
-            
-            # Add combined name search if search term has multiple words
             if len(name_parts) > 1:
-                # Search for "first last" combination
                 first_last = Q(
                     staff__first_name__icontains=name_parts[0],
                     staff__last_name__icontains=name_parts[1]
                 )
-                
-                # Search for "last first" combination
                 last_first = Q(
                     staff__first_name__icontains=name_parts[1],
                     staff__last_name__icontains=name_parts[0]
                 )
-                
-                # Also search concatenated full name
                 full_name_query = Q(
                     staff__full_name__icontains=search_term
                 ) if hasattr(Shift.staff.field.related_model, 'full_name') else Q()
-                
-                # Combine all conditions
                 shifts = shifts.filter(
                     base_query | first_last | last_first | full_name_query
                 )
@@ -96,15 +88,14 @@ def shift_list_api(request):
     if 'date_max' in request.GET:
         try:
             date_max = datetime.strptime(request.GET['date_max'], '%Y-%m-%d').date()
+            shifts = shifts.filter(date__lte=date_max)
         except ValueError:
             return Response({'error': 'Invalid date_max format. Use YYYY-MM-DD'}, status=status.HTTP_400_BAD_REQUEST)
-        shifts = shifts.filter(date__lte=date_max)
 
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(shifts, request)
     serializer = ShiftSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -130,44 +121,28 @@ def add_shift_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def shift_detail_api(request, shift_id):
     """Retrieve details of a specific shift."""
-    shift = get_object_or_404(Shift, id=shift_id)
+    shift = get_object_or_404(Shift, id=shift_id, club=request.user.club)
     serializer = ShiftSerializer(shift)
     return Response(serializer.data)
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def edit_shift_api(request, shift_id):
-    """Update an existing shift with permission checks."""
-    shift = get_object_or_404(Shift, id=shift_id)
+    """Update an existing shift (Owner or Admin only)."""
+    shift = get_object_or_404(Shift, id=shift_id, club=request.user.club)
     serializer = ShiftSerializer(shift, data=request.data, partial=True)
     if serializer.is_valid():
         updated_shift = serializer.save()
-        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, updated_shift):
-            return Response(
-                {'error': 'You do not have permission to update this shift to this club'},
-                status=status.HTTP_403_FORBIDDEN
-            )
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_shift_api(request, shift_id):
-    """Delete a specific shift."""
-    shift = get_object_or_404(Shift, id=shift_id)
+    """Delete a specific shift (Owner or Admin only)."""
+    shift = get_object_or_404(Shift, id=shift_id, club=request.user.club)
     shift.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def staff_shifts_api(request, staff_id):
-    """Retrieve all shifts for a specific staff member."""
-    shifts = Shift.objects.filter(staff_id=staff_id).select_related('club', 'approved_by')
-    if request.user.role != 'owner':
-        shifts = shifts.filter(club=request.user.club)
-    
-    serializer = ShiftSerializer(shifts, many=True)
-    return Response(serializer.data)
 
 # Attendance Management APIs
 def find_current_shift(user):
@@ -175,10 +150,9 @@ def find_current_shift(user):
     now = timezone.now()
     today = now.date()
     yesterday = today - timezone.timedelta(days=1)
-
     current_time = now.time()
 
-    shifts = Shift.objects.filter(staff=user).select_related('club')
+    shifts = Shift.objects.filter(staff=user, club=user.club).select_related('club')
 
     for shift in shifts:
         shift_start_dt = datetime.combine(shift.date, shift.shift_start)
@@ -222,7 +196,6 @@ def staff_check_in_by_code_api(request):
                 attendance.check_out = timezone.now()
         else:
             attendance.check_out = timezone.now()
-
         attendance.save()
 
     shift = find_current_shift(user)
@@ -232,10 +205,7 @@ def staff_check_in_by_code_api(request):
         shift=shift,
         check_in=timezone.now()
     )
-
     return Response(StaffAttendanceSerializer(attendance).data, status=status.HTTP_201_CREATED)
-
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -258,14 +228,12 @@ def staff_check_out_by_code_api(request):
     attendance.save()
     return Response(StaffAttendanceSerializer(attendance).data)
 
-
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def staff_attendance_analysis_api(request, attendance_id):
     """Analyze a specific attendance record for punctuality and duration."""
     try:
-        attendance = StaffAttendance.objects.get(id=attendance_id)
+        attendance = StaffAttendance.objects.get(id=attendance_id, club=request.user.club)
     except StaffAttendance.DoesNotExist:
         return Response({'error': 'سجل الحضور غير موجود'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -311,15 +279,12 @@ def staff_attendance_analysis_api(request, attendance_id):
 def staff_attendance_report_api(request, staff_id):
     """Generate a report of attendance days and total hours for a staff member."""
     try:
-        staff = User.objects.get(id=staff_id, is_active=True)  # تغيير إلى is_active فقط
+        staff = User.objects.get(id=staff_id, is_active=True)
     except User.DoesNotExist:
         return Response({'error': 'Staff not found'}, status=status.HTTP_404_NOT_FOUND)
 
-    attendances = StaffAttendance.objects.filter(staff=staff)
-    if request.user.role != 'owner':
-        attendances = attendances.filter(club=request.user.club)
+    attendances = StaffAttendance.objects.filter(staff=staff, club=request.user.club)
 
-    # Count distinct attendance days
     attendance_days = attendances.annotate(date=TruncDate('check_in')) \
                                  .values('date') \
                                  .distinct() \
@@ -343,17 +308,15 @@ def staff_attendance_report_api(request, staff_id):
 def missing_checkins_api(request):
     """Retrieve staff who have shifts today but haven't checked in."""
     today = timezone.now().date()
-    shifts = Shift.objects.filter(date=today).select_related('staff', 'club')
-    
-    if request.user.role != 'owner':
-        shifts = shifts.filter(club=request.user.club)
+    shifts = Shift.objects.filter(date=today, club=request.user.club).select_related('staff', 'club')
     
     missing_checkins = []
     for shift in shifts:
         if not StaffAttendance.objects.filter(
             staff=shift.staff,
             check_in__date=today,
-            shift=shift
+            shift=shift,
+            club=request.user.club
         ).exists():
             missing_checkins.append({
                 "shift_id": shift.id,
@@ -368,14 +331,76 @@ def missing_checkins_api(request):
     
     return Response(missing_checkins)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_list_api(request):
     """Retrieve a list of all staff attendance records with staff name, check-in, check-out, club, and duration."""
-    attendances = StaffAttendance.objects.select_related('staff', 'club', 'shift')
-    if request.user.role != 'owner':
-        attendances = attendances.filter(club=request.user.club)
+    attendances = StaffAttendance.objects.filter(
+        club=request.user.club
+    ).select_related('staff', 'club', 'shift')
     
     serializer = StaffAttendanceSerializer(attendances, many=True)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def staff_monthly_hours_report_api(request):
+    """
+    Generate a report of total attendance hours and days per staff member for each month.
+    Includes RFID code, staff name, total hours, attendance days, and percentage change
+    in hours compared to the previous month.
+    """
+    attendances = StaffAttendance.objects.filter(
+        check_out__isnull=False,
+        club=request.user.club
+    )
+    
+    if 'staff_id' in request.GET:
+        try:
+            staff_id = int(request.GET['staff_id'])
+            attendances = attendances.filter(staff_id=staff_id)
+        except ValueError:
+            return Response({'error': 'Invalid staff_id'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if 'year' in request.GET:
+        try:
+            year = int(request.GET['year'])
+            attendances = attendances.filter(check_in__year=year)
+        except ValueError:
+            return Response({'error': 'Invalid year format'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    monthly_data = attendances.annotate(
+        month=TruncMonth('check_in')
+    ).values(
+        'staff__id',
+        'staff__username',
+        'staff__rfid_code',
+        'month'
+    ).annotate(
+        total_hours=Sum(
+            ExpressionWrapper(
+                F('check_out') - F('check_in'),
+                output_field=DurationField()
+            )
+        ),
+        attendance_days=Count(
+            TruncDate('check_in'),
+            distinct=True
+        )
+    ).order_by('staff__id', 'month')
+    
+    staff_monthly_map = {}
+    for entry in monthly_data:
+        staff_id = entry['staff__id']
+        month = entry['month']
+        total_hours = entry['total_hours'].total_seconds() / 3600
+        if staff_id not in staff_monthly_map:
+            staff_monthly_map[staff_id] = {}
+        staff_monthly_map[staff_id][month] = total_hours
+    
+    serializer = StaffMonthlyHoursSerializer(
+        monthly_data,
+        many=True,
+        context={'monthly_data': staff_monthly_map}
+    )
     return Response(serializer.data)
