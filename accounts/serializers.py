@@ -49,7 +49,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'role',
-            'club', 'rfid_code', 'phone', 'birth_date', 'qualifications',
+            'club', 'rfid_code', 'phone', 'birth_date', 'note','national_id','qualifications',
             'is_active', 'permissions', 'groups'
         ]
         extra_kwargs = {
