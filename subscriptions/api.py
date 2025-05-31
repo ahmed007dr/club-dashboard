@@ -17,8 +17,9 @@ from .serializers import SubscriptionSerializer, FreezeRequest, SubscriptionType
 from finance.models import Income, IncomeSource
 from members.models import Member
 from staff.models import StaffAttendance
-from utils.permissions import IsOwnerOrRelatedToClub
 from accounts.models import User
+
+from utils.permissions import IsOwnerOrRelatedToClub
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -74,7 +75,6 @@ def subscription_type_list(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-# subscriptions/views.py
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
@@ -97,7 +97,7 @@ def subscription_list(request):
                     created_at__lte=attendance.check_out if attendance.check_out else timezone.now()
                 )
             else:
-                subscriptions = subscriptions.none()  # No active shift, return empty
+                subscriptions = subscriptions.none()
 
         filterable_fields = {
             'member_id': 'member_id',
@@ -182,6 +182,25 @@ def subscription_list(request):
             except Member.DoesNotExist:
                 return Response({'error': 'معرف غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
 
+        if 'start_date' not in mutable_data or not mutable_data['start_date']:
+            today = timezone.now().date()
+            active_subscriptions = Subscription.objects.filter(
+                member=mutable_data['member'],
+                club=mutable_data['club'],
+                start_date__lte=today,
+                end_date__gte=today
+            ).exclude(entry_count__gte=models.F('type__max_entries')).exclude(type__max_entries=0)
+            
+            if active_subscriptions.exists():
+                latest_subscription = active_subscriptions.order_by('-end_date').first()
+                if (latest_subscription.entry_count >= latest_subscription.type.max_entries and
+                    latest_subscription.type.max_entries > 0):
+                    mutable_data['start_date'] = today
+                else:
+                    mutable_data['start_date'] = latest_subscription.end_date + timedelta(days=1)
+            else:
+                mutable_data['start_date'] = today
+
         serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
         if serializer.is_valid():
             subscription = serializer.save()
@@ -204,7 +223,7 @@ def subscription_list(request):
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_type_detail(request, pk):
