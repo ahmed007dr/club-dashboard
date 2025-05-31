@@ -581,6 +581,56 @@ export const addAttendance = createAsyncThunk(
   }
 );
 
+export const requestSubscriptionFreeze = createAsyncThunk(
+  'subscriptions/requestFreeze',
+  async ({ subscriptionId, requestedDays, startDate }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token'); // Get token from localStorage
+      const response = await axios.post(
+        `${BASE_URL}/subscriptions/api/subscriptions/${subscriptionId}/request-freeze/`,
+        {
+          requested_days: requestedDays,
+          start_date: startDate,
+        },
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        }
+      );
+      console.log('Subscription freeze request successful:', response.data);
+      return { subscriptionId, data: response.data };
+    } catch (error) {
+      console.error('Subscription freeze request failed:', error.response?.data || error.message);
+      return rejectWithValue({ subscriptionId, error: error.response?.data || error.message });
+    }
+  }
+);
+
+// Cancel subscription freeze
+export const cancelSubscriptionFreeze = createAsyncThunk(
+  'subscriptions/cancelFreeze',
+  async ({ freezeRequestId }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.post(
+        `${BASE_URL}/subscriptions/api/freeze-requests/${freezeRequestId}/cancel/`,
+        {},
+        {
+          headers: {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        }
+      );
+      console.log('Subscription freeze cancel successful:', response.data);
+      return { freezeRequestId, data: response.data };
+    } catch (error) {
+      console.error('Subscription freeze cancel failed:', error.response?.data || error.message);
+      return rejectWithValue({ freezeRequestId, error: error.response?.data || error.message });
+    }
+  }
+);
+
 const subscriptionsSlice = createSlice({
   name: "subscriptions",
   initialState: {
@@ -611,8 +661,25 @@ const subscriptionsSlice = createSlice({
     loading: false,
     error: null,
     status: "idle",
+    freezeStatus: {}, // Track freeze status per subscription (e.g., { [subscriptionId]: 'loading' })
+    freezeError: {}, // Track freeze error per subscription
+    freezeSuccess: {}, 
+     cancelStatus: {}, // Explicitly initialized
+    cancelError: {},
+    cancelSuccess: {},// Track freeze success message per subscription
   },
-  reducers: {},
+  reducers: {
+    clearFreezeFeedback: (state, action) => {
+      const subscriptionId = action.payload;
+       const id = action.payload;
+      delete state.freezeStatus[id];
+      delete state.freezeError[id];
+      delete state.freezeSuccess[id];
+      delete state.cancelStatus[id];
+      delete state.cancelError[id];
+      delete state.cancelSuccess[id];
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchSubscriptionTypes.pending, (state) => {
@@ -899,8 +966,66 @@ const subscriptionsSlice = createSlice({
 .addCase(addAttendance.fulfilled, (state, action) => {
     state.loading = false;
     state.attendances.push(action.payload);
-});
+})
+  // Request Subscription Freeze
+      .addCase(requestSubscriptionFreeze.pending, (state, action) => {
+        const { subscriptionId } = action.meta.arg;
+        state.freezeStatus[subscriptionId] = 'loading';
+        delete state.freezeError[subscriptionId];
+        delete state.freezeSuccess[subscriptionId];
+      })
+      .addCase(requestSubscriptionFreeze.fulfilled, (state, action) => {
+        const { subscriptionId, data } = action.payload || {};
+        if (subscriptionId) {
+          state.freezeStatus[subscriptionId] = 'succeeded';
+          state.freezeSuccess[subscriptionId] = data.message || 'تم طلب تجميد الاشتراك بنجاح';
+          delete state.freezeError[subscriptionId];
+        }
+      })
+      .addCase(requestSubscriptionFreeze.rejected, (state, action) => {
+        const { subscriptionId, error } = action.payload || {};
+        if (subscriptionId) {
+          state.freezeStatus[subscriptionId] = 'failed';
+          state.freezeError[subscriptionId] = error || 'Unknown error';
+          delete state.freezeSuccess[subscriptionId];
+        }
+      })
+      // Cancel Subscription Freeze
+      .addCase(cancelSubscriptionFreeze.pending, (state, action) => {
+        const { freezeRequestId } = action.meta.arg;
+        state.cancelStatus[freezeRequestId] = 'loading';
+        delete state.cancelError[freezeRequestId];
+        delete state.cancelSuccess[freezeRequestId];
+      })
+      .addCase(cancelSubscriptionFreeze.fulfilled, (state, action) => {
+        const { freezeRequestId, data } = action.payload || {};
+        if (freezeRequestId) {
+          state.cancelStatus[freezeRequestId] = 'succeeded';
+          state.cancelSuccess[freezeRequestId] = data.message || 'تم إلغاء تجميد الاشتراك بنجاح';
+          delete state.cancelError[freezeRequestId];
+          // Update subscription data if returned
+          if (data.id && state.memberSubscriptions.results) {
+            const index = state.memberSubscriptions.results.findIndex(
+              (sub) => sub.id === data.id
+            );
+            if (index !== -1) {
+              state.memberSubscriptions.results[index] = {
+                ...state.memberSubscriptions.results[index],
+                ...data,
+              };
+            }
+          }
+        }
+      })
+      .addCase(cancelSubscriptionFreeze.rejected, (state, action) => {
+        const { freezeRequestId, error } = action.payload || {};
+        if (freezeRequestId) {
+          state.cancelStatus[freezeRequestId] = 'failed';
+          state.cancelError[freezeRequestId] = error || 'Unknown error';
+          delete state.cancelSuccess[freezeRequestId];
+        }
+      })
   },
 });
-
+export const { clearFreezeFeedback } = subscriptionsSlice.actions;
 export default subscriptionsSlice.reducer;
