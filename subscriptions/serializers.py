@@ -36,11 +36,11 @@ class FreezeRequestSerializer(serializers.ModelSerializer):
             'cancelled_at': {'read_only': True},
         }
 
-
 class SubscriptionSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     member_details = MemberSerializer(source='member', read_only=True)
     type_details = SubscriptionTypeSerializer(source='type', read_only=True)
+    coach_details = serializers.SerializerMethodField()
     freeze_requests = FreezeRequestSerializer(many=True, read_only=True)
     created_by_details = UserSerializer(source='created_by', read_only=True)
 
@@ -48,52 +48,85 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         model = Subscription
         fields = [
             'id', 'club', 'club_details', 'member', 'member_details',
-            'type', 'type_details', 'start_date', 'end_date',
-            'paid_amount', 'remaining_amount', 'entry_count',
+            'type', 'type_details', 'coach', 'coach_details', 'start_date', 'end_date',
+            'private_training_price', 'paid_amount', 'remaining_amount', 'entry_count',
             'created_by', 'created_by_details', 'freeze_requests'
         ]
         extra_kwargs = {
             'remaining_amount': {'read_only': True},
             'end_date': {'read_only': True},
             'created_by': {'read_only': True},
+            'coach': {'required': False},
+            'private_training_price': {'required': False},
         }
+
+    def get_coach_details(self, obj):
+        if obj.coach and hasattr(obj.coach, 'coach_profile'):
+            profile = obj.coach.coach_profile
+            return {
+                'id': obj.coach.id,
+                'username': obj.coach.username,
+                'role': obj.coach.role,
+                'max_trainees': profile.max_trainees
+            }
+        return None
 
     def validate(self, data):
         club = data.get('club')
         subscription_type = data.get('type')
-        start_date = data.get('start_date')
+        coach = data.get('coach')
         member = data.get('member')
+        private_training_price = data.get('private_training_price', 0)
+
+        if subscription_type and subscription_type.is_private_training:
+            if not coach:
+                raise serializers.ValidationError("مطلوب كابتن لاشتراك التدريب الخاص.")
+            if coach and (coach.club != club or coach.role != 'coach' or not coach.is_active):
+                raise serializers.ValidationError("الكابتن يجب أن يكون نشط ومن نفس النادي.")
+            if private_training_price <= 0:
+                raise serializers.ValidationError("سعر التدريب الخاص يجب أن يكون أكبر من 0.")
+
+            if coach and hasattr(coach, 'coach_profile'):
+                profile = coach.coach_profile
+                if profile.max_trainees > 0:
+                    active_subscriptions = Subscription.objects.filter(
+                        coach=coach,
+                        club=club,
+                        start_date__lte=timezone.now().date(),
+                        end_date__gte=timezone.now().date()
+                    ).exclude(pk=self.instance.pk if self.instance else None).count()
+                    if active_subscriptions >= profile.max_trainees:
+                        raise serializers.ValidationError(
+                            f"الكابتن {coach.username} وصل للحد الأقصى للعملاء ({profile.max_trainees})."
+                        )
+            else:
+                raise serializers.ValidationError("الكابتن ليس لديه ملف تدريب.")
+
+        elif private_training_price > 0:
+            raise serializers.ValidationError("لا يمكن تحديد سعر تدريب خاص لاشتراك غير خاص.")
 
         if club and subscription_type and subscription_type.club != club:
-            raise serializers.ValidationError("The subscription type must belong to the same club as the subscription.")
+            raise serializers.ValidationError("نوع الاشتراك يجب أن يكون لنفس النادي.")
 
         if member:
             today = timezone.now().date()
             active_subscriptions = Subscription.objects.filter(
-                member=member,
-                club=club,
-                start_date__lte=today,
-                end_date__gte=today
-            ).exclude(
-                entry_count__gte=models.F('type__max_entries')
-            ).exclude(
-                type__max_entries=0
-            )
-
+                member=member, club=club, start_date__lte=today, end_date__gte=today
+            ).exclude(entry_count__gte=models.F('type__max_entries')).exclude(type__max_entries=0)
             if active_subscriptions.exists() and not self.instance:
-                raise serializers.ValidationError(
-                    "هذا العضو لديه اشتراك نشط بالفعل. يرجى الانتظار حتى ينتهي أو تنفد الإدخالات."
-                )
+                raise serializers.ValidationError("العضو لديه اشتراك نشط بالفعل.")
 
-            unpaid_subscriptions = Subscription.objects.filter(
-                member=member,
-                club=club,
-                remaining_amount__gt=0
-            )
-
+            unpaid_subscriptions = Subscription.objects.filter(member=member, club=club, remaining_amount__gt=0)
             if unpaid_subscriptions.exists() and not self.instance:
-                raise serializers.ValidationError(
-                    "هذا العضو لديه مبالغ غير مدفوعة لاشتراكات سابقة. يرجى تسوية جميع المدفوعات المستحقة قبل إنشاء اشتراك جديد."
-                )
+                raise serializers.ValidationError("يجب تسوية المدفوعات المستحقة أولاً.")
 
         return data
+    
+class CoachReportSerializer(serializers.Serializer):
+    coach_id = serializers.IntegerField()
+    coach_username = serializers.CharField()
+    active_clients = serializers.IntegerField()
+    total_private_training_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+    

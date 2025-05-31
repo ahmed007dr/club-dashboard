@@ -165,64 +165,42 @@ def subscription_list(request):
 
     elif request.method == 'POST':
         identifier = request.data.get('identifier', '')
+        mutable_data = request.data.copy()
+        mutable_data['created_by'] = request.user.id
 
         if identifier:
             try:
                 member = Member.objects.filter(
-                    Q(phone=identifier) |
-                    Q(rfid_code=identifier) |
-                    Q(name__iexact=identifier)
+                    Q(phone=identifier) | Q(rfid_code=identifier) | Q(name__iexact=identifier)
                 ).first()
                 if not member:
-                    return Response(
-                        {'error': 'No member found with the provided identifier'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                mutable_data = request.data.copy()
+                    return Response({'error': 'لا يوجد عضو بهذا المعرف'}, status=status.HTTP_400_BAD_REQUEST)
                 mutable_data['member'] = member.id
-                mutable_data['created_by'] = request.user.id
             except Member.DoesNotExist:
-                return Response(
-                    {'error': 'Invalid identifier provided'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        else:
-            mutable_data = request.data
-            mutable_data['created_by'] = request.user.id
+                return Response({'error': 'معرف غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
         if serializer.is_valid():
             subscription = serializer.save()
-            
             if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
                 subscription.delete()
-                return Response(
-                    {'error': 'You do not have permission to create a subscription for this club'},
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
+                return Response({'error': 'غير مخول لإنشاء اشتراك لهذا النادي'}, status=status.HTTP_403_FORBIDDEN)
+
             if subscription.paid_amount > 0:
-                source, created = IncomeSource.objects.get_or_create(
-                    club=subscription.club,
-                    name='Subscription',
-                    defaults={'description': 'ايراد عن اشتراك'}
+                source, _ = IncomeSource.objects.get_or_create(
+                    club=subscription.club, name='Subscription', defaults={'description': 'ايراد عن اشتراك'}
                 )
                 income = Income(
-                    club=subscription.club,
-                    source=source,
-                    amount=subscription.paid_amount,
-                    description=f"ايراد اشتراك عن اللاعب {subscription.member.name}",
-                    date=timezone.now().date(),
-                    received_by=request.user
+                    club=subscription.club, source=source, amount=subscription.paid_amount,
+                    description=f"اشتراك {subscription.member.name}" + 
+                                (f" مع الكابتن {subscription.coach.username} بسعر {subscription.private_training_price}" 
+                                 if subscription.coach and subscription.type.is_private_training else ""),
+                    date=timezone.now().date(), received_by=request.user
                 )
                 income.save()
 
-            subscription.remaining_amount = subscription.type.price - subscription.paid_amount
-            subscription.save()
-
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -279,63 +257,46 @@ def subscription_detail(request, pk):
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        identifier = request.GET.get('identifier', '')  
-        mutable_data = request.data.copy()  
+        identifier = request.GET.get('identifier', '')
+        mutable_data = request.data.copy()
 
         if identifier:
             try:
                 member = Member.objects.filter(
-                    Q(phone=identifier) |
-                    Q(rfid_code=identifier) |
-                    Q(name__iexact=identifier)
+                    Q(phone=identifier) | Q(rfid_code=identifier) | Q(name__iexact=identifier)
                 ).first()
                 if not member:
-                    return Response(
-                        {'error': 'No member found with the provided identifier'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                mutable_data['member'] = member.id  
+                    return Response({'error': 'لا يوجد عضو بهذا المعرف'}, status=status.HTTP_400_BAD_REQUEST)
+                mutable_data['member'] = member.id
             except Member.DoesNotExist:
-                return Response(
-                    {'error': 'Invalid identifier provided'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response({'error': 'معرف غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Update the subscription
         serializer = SubscriptionSerializer(subscription, data=mutable_data, partial=True, context={'request': request})
         if serializer.is_valid():
             updated_subscription = serializer.save()
-            
-            # Recalculate remaining_amount
-            updated_subscription.remaining_amount = updated_subscription.type.price - updated_subscription.paid_amount
-            
-            # Create Income record if paid_amount is updated
+
             if 'paid_amount' in mutable_data and updated_subscription.paid_amount > subscription.paid_amount:
                 additional_amount = updated_subscription.paid_amount - subscription.paid_amount
-                source, created = IncomeSource.objects.get_or_create(
-                    club=updated_subscription.club,
-                    name='Subscription',
-                    defaults={'description': 'ايراد عن اشتراك'}
+                source, _ = IncomeSource.objects.get_or_create(
+                    club=updated_subscription.club, name='Subscription', defaults={'description': 'ايراد عن اشتراك'}
                 )
                 income = Income(
-                    club=updated_subscription.club,
-                    source=source,
-                    amount=additional_amount,
-                    description=f"ايراد اضافي عن اشتراك اللاعب {updated_subscription.member.name}",
-                    date=timezone.now().date(),
-                    received_by=request.user
+                    club=updated_subscription.club, source=source, amount=additional_amount,
+                    description=f"ايراد اضافي لاشتراك {updated_subscription.member.name}" +
+                                (f" مع الكابتن {updated_subscription.coach.username} بسعر {updated_subscription.private_training_price}" 
+                                 if updated_subscription.coach and updated_subscription.type.is_private_training else ""),
+                    date=timezone.now().date(), received_by=request.user
                 )
                 income.save()
 
-            updated_subscription.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
     elif request.method == 'DELETE':
         subscription.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
 
-# subscriptions/views.py
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def active_subscriptions(request):
@@ -576,4 +537,68 @@ def cancel_freeze(request, freeze_id):
     freeze_request.save()
 
     serializer = SubscriptionSerializer(subscription)
+    return Response(serializer.data)
+
+from django.db.models import Sum
+from datetime import datetime
+from rest_framework import serializers
+
+# Serializer لتقرير الكابتن
+class CoachReportSerializer(serializers.Serializer):
+    coach_id = serializers.IntegerField()
+    coach_username = serializers.CharField()
+    active_clients = serializers.IntegerField()
+    total_private_training_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+from accounts.models import User
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def coach_report(request, coach_id):
+    coach = get_object_or_404(User, pk=coach_id, role='coach', is_active=True)
+    if coach.club != request.user.club and request.user.role != 'owner':
+        return Response({'error': 'غير مخول لعرض تقرير هذا الكابتن'}, status=status.HTTP_403_FORBIDDEN)
+
+    start_date = request.query_params.get('start_date', None)
+    end_date = request.query_params.get('end_date', None)
+    
+    if start_date:
+        try:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'صيغة تاريخ البداية غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        start_date = timezone.now().date().replace(day=1)  # أول الشهر
+
+    if end_date:
+        try:
+            end_date = datetime.strptime(end_date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'صيغة تاريخ النهاية غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        end_date = timezone.now().date()
+
+    subscriptions = Subscription.objects.filter(
+        coach=coach,
+        club=request.user.club,
+        type__is_private_training=True,
+        start_date__lte=end_date,
+        end_date__gte=start_date
+    ).aggregate(
+        active_clients=Count('id'),
+        total_private_training_amount=Sum('private_training_price'),
+        total_paid_amount=Sum('paid_amount')
+    )
+
+    report = {
+        'coach_id': coach.id,
+        'coach_username': coach.username,
+        'active_clients': subscriptions['active_clients'] or 0,
+        'total_private_training_amount': subscriptions['total_private_training_amount'] or 0,
+        'total_paid_amount': subscriptions['total_paid_amount'] or 0
+    }
+
+    serializer = CoachReportSerializer(report)
     return Response(serializer.data)
