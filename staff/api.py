@@ -274,56 +274,46 @@ def staff_attendance_analysis_api(request, attendance_id):
         "expected_hours": round(expected_hours, 2)
     })
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def staff_attendance_report_api(request):
-    staff_id = request.query_params.get('staff_id')
-    username = request.query_params.get('username')
-    rfid_code = request.query_params.get('rfid_code')
-    year = request.query_params.get('year')
-
-    staff = None
-
-    if staff_id:
-        try:
-            staff = User.objects.get(id=int(staff_id), club=request.user.club)
-        except (User.DoesNotExist, ValueError):
-            return Response({'error': 'Invalid staff ID'}, status=status.HTTP_400_BAD_REQUEST)
-    elif username:
-        try:
-            staff = User.objects.get(username=username, club=request.user.club)
-        except User.DoesNotExist:
-            return Response({'error': 'Invalid username'}, status=status.HTTP_400_BAD_REQUEST)
-    elif rfid_code:
-        try:
-            staff = User.objects.get(rfid_code=rfid_code, club=request.user.club)
-        except User.DoesNotExist:
-            return Response({'error': 'Invalid RFID code'}, status=status.HTTP_400_BAD_REQUEST)
-
+def staff_attendance_report_api(request, staff_id=None):
     if request.user.role in ['owner', 'admin']:
         attendances = StaffAttendance.objects.filter(
             check_out__isnull=False,
             club=request.user.club
         )
-    else:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club
-        ).order_by('-check_in').first()
+    # else:
+    #     attendance = StaffAttendance.objects.filter(
+    #         staff=request.user,
+    #         club=request.user.club
+    #     ).order_by('-check_in').first()
 
-        if not attendance:
-            return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
+    #     if not attendance:
+    #         return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        check_out = attendance.check_out or timezone.now()
-        attendances = StaffAttendance.objects.filter(
-            check_out__isnull=False,
-            club=request.user.club,
-            check_in__range=(attendance.check_in, check_out)
-        )
+    #     check_out = attendance.check_out if attendance.check_out else timezone.now()
+    #     attendances = StaffAttendance.objects.filter(
+    #         check_out__isnull=False,
+    #         club=request.user.club,
+    #         check_in__range=(attendance.check_in, check_out)
+    #     )
 
-    if staff:
-        attendances = attendances.filter(staff=staff)
+    staff_id = request.query_params.get('staff_id', None)
+    year = request.query_params.get('year', None)
+
+    if staff_id or year:
+        if request.user.role not in ['owner', 'admin']:
+            attendances = StaffAttendance.objects.filter(
+                check_out__isnull=False,
+                club=request.user.club
+            )
+
+    if staff_id:
+        try:
+            staff_id = int(staff_id)
+            attendances = attendances.filter(staff_id=staff_id)
+        except ValueError:
+            return Response({'error': 'Invalid staff_id'}, status=status.HTTP_400_BAD_REQUEST)
 
     if year:
         try:
@@ -332,6 +322,7 @@ def staff_attendance_report_api(request):
         except ValueError:
             return Response({'error': 'Invalid year format'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Aggregate data by month
     monthly_data = attendances.annotate(
         month=TruncMonth('check_in')
     ).values(
@@ -354,12 +345,12 @@ def staff_attendance_report_api(request):
 
     staff_monthly_map = {}
     for entry in monthly_data:
-        sid = entry['staff__id']
+        staff_id = entry['staff__id']
         month = entry['month']
         total_hours = entry['total_hours'].total_seconds() / 3600
-        if sid not in staff_monthly_map:
-            staff_monthly_map[sid] = {}
-        staff_monthly_map[sid][month] = total_hours
+        if staff_id not in staff_monthly_map:
+            staff_monthly_map[staff_id] = {}
+        staff_monthly_map[staff_id][month] = total_hours
 
     serializer = StaffMonthlyHoursSerializer(
         monthly_data,
@@ -367,7 +358,6 @@ def staff_attendance_report_api(request):
         context={'monthly_data': staff_monthly_map}
     )
     return Response(serializer.data)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
