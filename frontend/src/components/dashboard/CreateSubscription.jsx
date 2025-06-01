@@ -5,6 +5,11 @@ import { fetchUsers } from "../../redux/slices/memberSlice";
 import { Button } from "@/components/ui/button";
 import { FaUser } from 'react-icons/fa';
 
+import axios from 'axios';
+import BASE_URL from '../../config/api';
+
+
+
 const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
   const { subscriptionTypes } = useSelector((state) => state.subscriptions);
@@ -16,14 +21,15 @@ const CreateSubscription = ({ onClose }) => {
     type: "",
     start_date: "",
     paid_amount: "",
-    coach: "", // New field for coach selection
+    coach: "",
+    private_training_price: ""
   });
 
   // Data state
   const [clubs, setClubs] = useState([]);
   const [allMembers, setAllMembers] = useState({ results: [] });
   const [allSubscriptionTypes, setAllSubscriptionTypes] = useState([]);
-  const [allCoaches, setAllCoaches] = useState([]); // New state for all coaches
+  const [allCoaches, setAllCoaches] = useState([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [foundMember, setFoundMember] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -33,20 +39,38 @@ const CreateSubscription = ({ onClose }) => {
   const [errorMessage, setErrorMessage] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Fetch all users across pages with role filter
-  const fetchAllUsers = async (roleFilter = null) => {
+  const fetchAllCoaches = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      let allCoaches = [];
+      let nextUrl = `${BASE_URL}/accounts/api/users/`;
+      
+      while (nextUrl) {
+        const response = await axios.get(nextUrl, { headers });
+        allCoaches = [...allCoaches, ...response.data.results];
+        nextUrl = response.data.next;
+      }
+      
+      const coaches = allCoaches.filter(user => user.role === 'coach');
+      return coaches;
+      
+    } catch (error) {
+      console.error('❌ Failed to fetch all coaches:', error);
+      throw error;
+    }
+  };
+
+  // Fetch all members (regular users)
+  const fetchAllMembers = async () => {
     try {
       let allResults = [];
       let currentPage = 1;
       let hasMore = true;
 
       while (hasMore) {
-        const params = {};
-        if (roleFilter) {
-          params.role = roleFilter;
-        }
-        
-        const response = await dispatch(fetchUsers({ page: currentPage, ...params })).unwrap();
+        const response = await dispatch(fetchUsers({ page: currentPage })).unwrap();
         const results = Array.isArray(response) ? response : response.results || [];
         allResults = [...allResults, ...results];
         hasMore = !!response.next;
@@ -55,12 +79,12 @@ const CreateSubscription = ({ onClose }) => {
 
       return { results: allResults };
     } catch (error) {
-      console.error("Failed to fetch all users:", error.message);
+      console.error("Failed to fetch all members:", error.message);
       throw error;
     }
   };
 
-  // Fetch all subscription types across pages
+  // Fetch all subscription types
   const fetchAllSubscriptionTypes = async () => {
     try {
       let allResults = [];
@@ -87,9 +111,9 @@ const CreateSubscription = ({ onClose }) => {
     const fetchInitialData = async () => {
       try {
         const [membersResult, subscriptionTypesResult, coachesResult] = await Promise.all([
-          fetchAllUsers(),
+          fetchAllMembers(),
           fetchAllSubscriptionTypes(),
-          fetchAllUsers('coach'), // Fetch only coaches
+          fetchAllCoaches(),
         ]);
 
         // Extract unique clubs
@@ -105,7 +129,7 @@ const CreateSubscription = ({ onClose }) => {
         setClubs(uniqueClubs);
         setAllMembers(membersResult);
         setAllSubscriptionTypes(subscriptionTypesResult);
-        setAllCoaches(coachesResult.results); // Set coaches data
+        setAllCoaches(coachesResult);
       } catch (error) {
         handleError(error, "Failed to load initial data");
       } finally {
@@ -158,7 +182,7 @@ const CreateSubscription = ({ onClose }) => {
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { club, identifier, type, start_date, paid_amount, coach } = formData;
+    const { club, identifier, type, start_date, paid_amount, coach, private_training_price } = formData;
 
     // Client-side validation
     if (!club || !identifier || !type || !start_date || !paid_amount) {
@@ -173,6 +197,12 @@ const CreateSubscription = ({ onClose }) => {
       return;
     }
 
+    if (private_training_price && isNaN(parseFloat(private_training_price))) {
+      setErrorMessage("سعر التدريب الخاص يجب أن يكون رقمًا صحيحًا");
+      setIsModalOpen(true);
+      return;
+    }
+
     setIsSubmitting(true);
 
     const payload = {
@@ -181,7 +211,8 @@ const CreateSubscription = ({ onClose }) => {
       type: parseInt(type),
       start_date,
       paid_amount: parseFloat(paid_amount),
-      coach: coach ? parseInt(coach) : null, // Add coach to payload if selected
+      coach: coach ? parseInt(coach) : null,
+      private_training_price: private_training_price ? parseFloat(private_training_price) : null
     };
 
     try {
@@ -193,6 +224,7 @@ const CreateSubscription = ({ onClose }) => {
         start_date: "",
         paid_amount: "",
         coach: "",
+        private_training_price: ""
       });
       if (onClose) onClose();
     } catch (error) {
@@ -224,7 +256,7 @@ const CreateSubscription = ({ onClose }) => {
   };
 
   return (
-    <div className="container max-w-xl mx-auto p-4" dir="rtl">
+    <div className="container max-w-[1000px] mx-auto p-4" dir="rtl">
       <h2 className="text-xl font-bold mb-6">إنشاء اشتراك جديد</h2>
 
       {isModalOpen && (
@@ -241,9 +273,14 @@ const CreateSubscription = ({ onClose }) => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Club & Identifier Inputs in Flex */}
+      <form onSubmit={handleSubmit} className="space-y-5 max-w-[1000px] ">
+        {/* Club & Identifier Inputs */}
         <div className="flex flex-col md:flex-row gap-4">
+        <div className="">
+          <div className="">
+
+        <div className="flex flex-col md:flex-row gap-4">
+          
           <div className="w-full md:w-1/2">
             <label className="block text-sm font-medium mb-2">النادي</label>
             <select
@@ -299,7 +336,103 @@ const CreateSubscription = ({ onClose }) => {
           </div>
         )}
 
-        {/* Member Info Display */}
+       
+
+        {/* Subscription Type & Coach */}
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="w-full md:w-1/2">
+            <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
+            <select
+              value={formData.type}
+              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+              disabled={isSubmitting || !foundMember}
+            >
+              <option value="">اختر النوع</option>
+              {allSubscriptionTypes
+                .filter((type) => type.club_details.id.toString() === formData.club?.toString())
+                .map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name} - {type.price} جنيها
+                  </option>
+                ))}
+            </select>
+          </div>
+          
+          <div className="w-full md:w-1/2">
+            <label className="block text-sm font-medium mb-2">المدرب</label>
+            <select
+              value={formData.coach}
+              onChange={(e) => setFormData({ ...formData, coach: e.target.value })}
+              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+              disabled={isSubmitting || !foundMember}
+            >
+              <option value="">اختر مدربًا</option>
+              {allCoaches.map((coach) => (
+                <option key={coach.id} value={coach.id}>
+                  {coach.username} 
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Start Date & Paid Amount */}
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="w-full md:w-1/2">
+            <label className="block text-sm font-medium mb-2">تاريخ البدء</label>
+            <input
+              type="date"
+              value={formData.start_date}
+              onChange={(e) =>
+                setFormData({ ...formData, start_date: e.target.value })
+              }
+              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+              min={new Date().toISOString().split("T")[0]}
+              disabled={isSubmitting || !foundMember}
+            />
+          </div>
+
+          <div className="w-full md:w-1/2">
+            <label className="block text-sm font-medium mb-2">المبلغ المدفوع</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.paid_amount}
+              onChange={(e) =>
+                setFormData({ ...formData, paid_amount: e.target.value })
+              }
+              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+              placeholder="0.00"
+              disabled={isSubmitting || !foundMember}
+            />
+          </div>
+        </div>
+
+        {/* Private Training Price */}
+        <div className="w-full">
+          <label className="block text-sm font-medium mb-2">سعر التدريب الخاص</label>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={formData.private_training_price}
+            onChange={(e) =>
+              setFormData({ ...formData, private_training_price: e.target.value })
+            }
+            className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+            placeholder="0.00"
+            disabled={isSubmitting || !foundMember}
+          />
+        </div>
+        </div>
+
+
+       
+          </div>
+          <div className="">
+             {/* Member Info Display */}
         {foundMember && (
           <div className="border rounded-lg p-4 bg-gray-50">
             <div className="flex items-start gap-4">
@@ -338,81 +471,8 @@ const CreateSubscription = ({ onClose }) => {
             </div>
           </div>
         )}
-
-        {/* Subscription Type & Coach */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitting || !foundMember}
-            >
-              <option value="">اختر النوع</option>
-              {allSubscriptionTypes
-                .filter((type) => type.club_details.id.toString() === formData.club?.toString())
-                .map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name} - {type.price} جنيها
-                  </option>
-                ))}
-            </select>
           </div>
-          
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-medium mb-2">المدرب (اختياري)</label>
-            <select
-              value={formData.coach}
-              onChange={(e) => setFormData({ ...formData, coach: e.target.value })}
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitting || !foundMember}
-            >
-              <option value="">اختر مدربًا</option>
-              {allCoaches
-                .filter(coach => coach.club?.toString() === formData.club?.toString())
-                .map((coach) => (
-                  <option key={coach.id} value={coach.id}>
-                    {coach.name} 
-                  </option>
-                ))}
-            </select>
           </div>
-        </div>
-
-        {/* Start Date & Paid Amount */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-medium mb-2">تاريخ البدء</label>
-            <input
-              type="date"
-              value={formData.start_date}
-              onChange={(e) =>
-                setFormData({ ...formData, start_date: e.target.value })
-              }
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              min={new Date().toISOString().split("T")[0]}
-              disabled={isSubmitting || !foundMember}
-            />
-          </div>
-
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-medium mb-2">المبلغ المدفوع</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.paid_amount}
-              onChange={(e) =>
-                setFormData({ ...formData, paid_amount: e.target.value })
-              }
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              placeholder="0.00"
-              disabled={isSubmitting || !foundMember}
-            />
-          </div>
-        </div>
-
         {/* Submit */}
         <Button
           type="submit"

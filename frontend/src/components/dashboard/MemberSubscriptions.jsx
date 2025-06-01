@@ -336,7 +336,7 @@ const MemberSubscriptions = () => {
                 )}
                 {sub.type_details?.includes_classes && (
                   <div className="flex items-center gap-1 text-purple-600">
-                    <FaUsers className="text-xs" /> الفصول الدراسية
+                    <FaUsers className="text-xs" /> الحصص التدريبية
                   </div>
                 )}
               </div>
