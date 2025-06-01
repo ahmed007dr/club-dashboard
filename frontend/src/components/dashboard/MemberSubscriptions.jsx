@@ -7,7 +7,8 @@ import {
   FaClock, FaDumbbell, FaSwimmer, FaUsers, FaListUl, FaCalendarCheck,
 } from 'react-icons/fa';
 import { CiShoppingTag } from 'react-icons/ci';
-
+import { FaSnowflake } from "react-icons/fa";
+import { FaBoxOpen } from "react-icons/fa";
 const MemberSubscriptions = () => {
   const { memberId } = useParams();
   const dispatch = useDispatch();
@@ -164,7 +165,7 @@ const MemberSubscriptions = () => {
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 bg-white shadow-lg rounded-xl" dir="rtl">
       <h2 className="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-6 sm:mb-10 flex items-center justify-center gap-3">
-        <FaListUl className="text-green-600" />
+        <FaBoxOpen className="text-[26px] text-blue-700 " />
         اشتراكات العضو: {results[0]?.member_details?.name || 'العضو'}
       </h2>
 
@@ -216,300 +217,326 @@ const MemberSubscriptions = () => {
 
           {/* Table view - for larger screens */}
           <div className="hidden md:block overflow-x-auto mb-6">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاشتراك</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">النادي</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">rfid code</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التواريخ</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الدفع</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التفاصيل</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {results.map((sub) => {
-                  const statusDisplay = getStatusDisplay(sub.status);
-                  const activeFreeze = Array.isArray(sub.freeze_requests) ? sub.freeze_requests.find(fr => fr.is_active) : null;
-                  if (!sub.freeze_requests) {
-                    console.warn(`freeze_requests missing for subscription ${sub.id}`);
-                  }
-                  return (
-                    <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-4">
-                        <div className="flex items-center justify-end">
-                          <div className="mr-2">
-                            <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
-                              <CiShoppingTag className="text-blue-500" />
-                              {sub.type_details?.name || 'غير معروف'}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {sub.type_details?.duration_days} يوم
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              رقم العضوية: {sub.member_details?.membership_number || 'غير متوفر'}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm font-medium text-gray-900">{sub.club_details?.name || 'غير معروف'}</div>
-                        <div className="text-xs text-gray-500 mt-1 line-clamp-1">{sub.club_details?.location}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm font-medium text-gray-900">{sub.member_details?.rfid_code || 'غير معروف'}</div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm space-y-1">
-                          <div className="flex items-center gap-1">
-                            <FaCalendarAlt className="text-gray-400 text-xs" />
-                            {formatDate(sub.start_date)}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <FaCalendarCheck className="text-gray-400 text-xs" />
-                            {formatDate(sub.end_date)}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm space-y-1">
-                          <div className="flex items-center gap-1">
-                            <FaMoneyBillAlt className="text-gray-400 text-xs" />
-                            السعر: ${sub.type_details?.price}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <FaCheck className="text-gray-400 text-xs" />
-                            المدفوع: ${sub.paid_amount}
-                          </div>
-                          <div className={`flex items-center gap-1 ${parseFloat(sub.remaining_amount) < 0 ? 'text-red-500' : 'text-green-500'}`}>
-                            <FaExclamation className="text-xs" />
-                            الرصيد: ${sub.remaining_amount}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col gap-1 text-sm">
-                          <div className="flex items-center gap-1">
-                            <FaClock className="text-gray-400 text-xs" />
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                              الدخول: {sub.entry_count || 0}/{sub.type_details?.max_entries || '∞'}
-                            </span>
-                          </div>
-                          {sub.type_details?.includes_pool && (
-                            <div className="flex items-center gap-1 text-blue-600">
-                              <FaSwimmer className="text-xs" /> حمام السباحة
-                            </div>
-                          )}
-                          {sub.type_details?.includes_gym && (
-                            <div className="flex items-center gap-1 text-green-600">
-                              <FaDumbbell className="text-xs" /> صالة الألعاب الرياضية
-                            </div>
-                          )}
-                          {sub.type_details?.includes_classes && (
-                            <div className="flex items-center gap-1 text-purple-600">
-                              <FaUsers className="text-xs" /> الفصول الدراسية
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex flex-col gap-2">
-                          {!activeFreeze && (
-                            <button
-                              onClick={() => openModal(sub.id)}
-                              disabled={freezeStatus[sub.id] === 'loading' || (activeFreeze && cancelStatus[activeFreeze.id] === 'loading')}
-                              className={`px-3 py-1 rounded text-sm font-medium ${
-                                freezeStatus[sub.id] === 'loading' || (activeFreeze && cancelStatus[activeFreeze.id] === 'loading')
-                                  ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-                                  : 'bg-blue-700 text-white hover:bg-blue-800'
-                              }`}
-                            >
-                              {freezeStatus[sub.id] === 'loading' ? 'جاري التجميد...' : 'جمّد الاشتراك'}
-                            </button>
-                          )}
-                          {activeFreeze && (
-                            <button
-                              onClick={() => handleCancelFreeze(activeFreeze.id)}
-                              disabled={cancelStatus[activeFreeze.id] === 'loading' || freezeStatus[sub.id] === 'loading'}
-                              className={`px-3 py-1 rounded text-sm font-medium ${
-                                cancelStatus[activeFreeze.id] === 'loading' || freezeStatus[sub.id] === 'loading'
-                                  ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-                                  : 'bg-red-700 text-white hover:bg-red-800'
-                              }`}
-                            >
-                              {cancelStatus[activeFreeze.id] === 'loading' ? 'جاري الإلغاء...' : 'إلغاء التجميد'}
-                            </button>
-                          )}
-                          {freezeSuccess[sub.id] && (
-                            <p className="text-green-600 text-xs">{freezeSuccess[sub.id]}</p>
-                          )}
-                          {freezeError[sub.id] && (
-                            <p className="text-red-600 text-xs">خطأ: {getErrorMessage(freezeError[sub.id])}</p>
-                          )}
-                          {activeFreeze && cancelSuccess[activeFreeze.id] && (
-                            <p className="text-green-600 text-xs">{cancelSuccess[activeFreeze.id]}</p>
-                          )}
-                          {activeFreeze && cancelError[activeFreeze.id] && (
-                            <p className="text-red-600 text-xs">خطأ: {getErrorMessage(cancelError[activeFreeze.id])}</p>
-                          )}
-                          {!sub.freeze_requests && (
-                            <p className="text-yellow-600 text-xs">تحذير: بيانات التجميد غير متوفرة</p>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Card view - for mobile screens */}
-          <div className="md:hidden space-y-4 mb-6">
-            {results.length > 0 ? (
-              results.map((sub) => {
-                const statusDisplay = getStatusDisplay(sub.status);
-                const activeFreeze = Array.isArray(sub.freeze_requests) ? sub.freeze_requests.find(fr => fr.is_active) : null;
-                if (!sub.freeze_requests) {
-                  console.warn(`freeze_requests missing for subscription ${sub.id}`);
-                }
-                return (
-                  <div key={sub.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
-                    {/* Subscription Header */}
-                    <div className="flex justify-between items-start border-b pb-3 mb-3">
-                      <div>
-                        <div className="text-xs text-gray-500">رقم العضوية</div>
-                        <div className="text-sm">{sub.member_details?.membership_number || 'غير متوفر'}</div>
-                      </div>
-                      <div className="flex items-center gap-2 text-blue-500">
-                        <CiShoppingTag className="text-lg" />
-                        <span className="font-medium">{sub.type_details?.name || 'غير معروف'}</span>
-                      </div>
-                    </div>
-
-                    {/* Main Info Grid */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <div className="text-xs text-gray-500">النادي</div>
-                        <div className="text-sm font-medium">{sub.club_details?.name || 'غير معروف'}</div>
-                        <div className="text-xs text-gray-500 mt-1">{sub.club_details?.location}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-500">RFID Code</div>
-                        <div className="text-sm font-medium">{sub.member_details?.rfid_code || 'غير معروف'}</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-500">التواريخ</div>
-                        <div className="text-sm space-y-1">
-                          <div className="flex items-center gap-1">
-                            <FaCalendarAlt className="text-gray-400 text-xs" />
-                            {formatDate(sub.start_date)}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <FaCalendarCheck className="text-gray-400 text-xs" />
-                            {formatDate(sub.end_date)}
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-gray-500">الدفع</div>
-                        <div className="text-sm space-y-1">
-                          <div>السعر: ${sub.type_details?.price}</div>
-                          <div>المدفوع: ${sub.paid_amount}</div>
-                          <div className={parseFloat(sub.remaining_amount) < 0 ? 'text-red-500' : 'text-green-500'}>
-                            الرصيد: ${sub.remaining_amount}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Subscription Features */}
-                    <div className="mt-4 pt-3 border-t">
-                      <div className="text-xs text-gray-500 mb-2">التفاصيل</div>
-                      <div className="flex flex-wrap gap-2">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          الدخول: {sub.entry_count || 0}/{sub.type_details?.max_entries || '∞'}
-                        </span>
-                        {sub.type_details?.includes_pool && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            <FaSwimmer className="mr-1" /> حمام السباحة
-                          </span>
-                        )}
-                        {sub.type_details?.includes_gym && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                            <FaDumbbell className="mr-1" /> الجيم
-                          </span>
-                        )}
-                        {sub.type_details?.includes_classes && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                            <FaUsers className="mr-1" /> الفصول
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Duration */}
-                    <div className="mt-3 pt-3 border-t">
-                      <div className="text-xs text-gray-500">مدة الاشتراك</div>
-                      <div className="text-sm">{sub.type_details?.duration_days} يوم</div>
-                    </div>
-
-                    {/* Freeze Actions */}
-                    <div className="mt-3 pt-3 border-t">
-                      <div className="flex flex-col gap-2">
-                        {!activeFreeze && (
-                          <button
-                            onClick={() => openModal(sub.id)}
-                            disabled={freezeStatus[sub.id] === 'loading' || (activeFreeze && cancelStatus[activeFreeze.id] === 'loading')}
-                            className={`px-3 py-1 rounded text-sm font-medium ${
-                              freezeStatus[sub.id] === 'loading' || (activeFreeze && cancelStatus[activeFreeze.id] === 'loading')
-                                ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-                                : 'bg-blue-700 text-white hover:bg-blue-800'
-                            }`}
-                          >
-                            {freezeStatus[sub.id] === 'loading' ? 'جاري التجميد...' : 'جمّد الاشتراك'}
-                          </button>
-                        )}
-                        {activeFreeze && (
-                          <button
-                            onClick={() => handleCancelFreeze(activeFreeze.id)}
-                            disabled={cancelStatus[activeFreeze.id] === 'loading' || freezeStatus[sub.id] === 'loading'}
-                            className={`px-3 py-1 rounded text-sm font-medium ${
-                              cancelStatus[activeFreeze.id] === 'loading' || freezeStatus[sub.id] === 'loading'
-                                ? 'bg-gray-200 opacity-50 cursor-not-allowed'
-                                : 'bg-red-700 text-white hover:bg-red-800'
-                            }`}
-                          >
-                            {cancelStatus[activeFreeze.id] === 'loading' ? 'جاري الإلغاء...' : 'إلغاء التجميد'}
-                          </button>
-                        )}
-                        {freezeSuccess[sub.id] && (
-                          <p className="text-green-600 text-xs">{freezeSuccess[sub.id]}</p>
-                        )}
-                        {freezeError[sub.id] && (
-                          <p className="text-red-600 text-xs">خطأ: {getErrorMessage(freezeError[sub.id])}</p>
-                        )}
-                        {activeFreeze && cancelSuccess[activeFreeze.id] && (
-                          <p className="text-green-600 text-xs">{cancelSuccess[activeFreeze.id]}</p>
-                        )}
-                        {activeFreeze && cancelError[activeFreeze.id] && (
-                          <p className="text-red-600 text-xs">خطأ: {getErrorMessage(cancelError[activeFreeze.id])}</p>
-                        )}
-                        {!sub.freeze_requests && (
-                          <p className="text-yellow-600 text-xs">تحذير: بيانات التجميد غير متوفرة</p>
-                        )}
-                      </div>
-                    </div>
+  <table className="min-w-full divide-y divide-gray-200">
+    <thead className="bg-gray-50">
+      <tr>
+        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الاشتراك</th>
+        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المدرب</th>
+        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">حالة التجميد</th>
+        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التواريخ</th>
+        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الدفع</th>
+        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">التفاصيل</th>
+        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الإجراءات</th>
+      </tr>
+    </thead>
+    <tbody className="bg-white divide-y divide-gray-200">
+      {results.map((sub) => {
+        const activeFreeze = Array.isArray(sub.freeze_requests) ? 
+          sub.freeze_requests.find(fr => fr.is_active) : null;
+        
+        return (
+          <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
+            {/* Subscription Info */}
+            <td className="px-4 py-4">
+              <div className="flex items-center justify-end">
+                <div className="mr-2">
+                  <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                    <CiShoppingTag className="text-blue-500" />
+                    {sub.type_details?.name || 'غير معروف'}
                   </div>
-                );
-              })
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                لا توجد نتائج متاحة
+                  <div className="text-xs text-gray-500 mt-1">
+                    {sub.type_details?.duration_days} يوم
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    رقم العضوية: {sub.member_details?.membership_number || 'غير متوفر'}
+                  </div>
+                </div>
               </div>
-            )}
+            </td>
+            
+            {/* Coach Info */}
+            <td className="px-4 py-4">
+              {sub.coach_details ? (
+                <div className="text-sm">
+                  <div className="font-medium text-gray-900">{sub.coach_details.username}</div>
+                  <div className="text-xs text-gray-500">الحد الأقصى: {sub.coach_details.max_trainees} متدرب</div>
+                </div>
+              ) : (
+                <span className="text-xs text-gray-500">بدون مدرب</span>
+              )}
+            </td>
+            
+            {/* Freeze Status */}
+            <td className="px-4 py-4">
+              {activeFreeze ? (
+                <div className="text-sm space-y-1">
+                  <div className="flex items-center gap-1 text-yellow-600">
+                    <FaSnowflake />
+                    مجمد ({activeFreeze.requested_days} يوم)
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    من {formatDate(activeFreeze.start_date)}
+                  </div>
+                </div>
+              ) : (
+                <span className="text-sm text-gray-500">نشط</span>
+              )}
+            </td>
+            
+            {/* Dates */}
+            <td className="px-4 py-4">
+              <div className="text-sm space-y-1">
+                <div className="flex items-center gap-1">
+                  <FaCalendarAlt className="text-gray-400 text-xs" />
+                  {formatDate(sub.start_date)}
+                </div>
+                <div className="flex items-center gap-1">
+                  <FaCalendarCheck className="text-gray-400 text-xs" />
+                  {formatDate(sub.end_date)}
+                </div>
+              </div>
+            </td>
+            
+            {/* Payment */}
+            <td className="px-4 py-4">
+              <div className="text-sm space-y-1">
+                <div className="flex items-center gap-1">
+                  <FaMoneyBillAlt className="text-gray-400 text-xs" />
+                  السعر: ${sub.type_details?.price}
+                </div>
+                <div className="flex items-center gap-1">
+                  <FaCheck className="text-gray-400 text-xs" />
+                  المدفوع: ${sub.paid_amount}
+                </div>
+                <div className={`flex items-center gap-1 ${parseFloat(sub.remaining_amount) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                  <FaExclamation className="text-xs" />
+                  الرصيد: ${sub.remaining_amount}
+                </div>
+              </div>
+            </td>
+            
+            {/* Details */}
+            <td className="px-4 py-4">
+              <div className="flex flex-col gap-1 text-sm">
+                <div className="flex items-center gap-1">
+                  <FaClock className="text-gray-400 text-xs" />
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    الدخول: {sub.entry_count || 0}/{sub.type_details?.max_entries || '∞'}
+                  </span>
+                </div>
+                {sub.type_details?.includes_pool && (
+                  <div className="flex items-center gap-1 text-blue-600">
+                    <FaSwimmer className="text-xs" /> حمام السباحة
+                  </div>
+                )}
+                {sub.type_details?.includes_gym && (
+                  <div className="flex items-center gap-1 text-green-600">
+                    <FaDumbbell className="text-xs" /> صالة الألعاب الرياضية
+                  </div>
+                )}
+                {sub.type_details?.includes_classes && (
+                  <div className="flex items-center gap-1 text-purple-600">
+                    <FaUsers className="text-xs" /> الفصول الدراسية
+                  </div>
+                )}
+              </div>
+            </td>
+            
+            {/* Actions */}
+            <td className="px-4 py-4">
+              <div className="flex flex-col gap-2">
+                {!activeFreeze ? (
+                  <button
+                    onClick={() => openModal(sub.id)}
+                    disabled={freezeStatus[sub.id] === 'loading'}
+                    className={`px-3 py-1 rounded text-sm font-medium ${
+                      freezeStatus[sub.id] === 'loading'
+                        ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                        : 'bg-blue-700 text-white hover:bg-blue-800'
+                    }`}
+                  >
+                    {freezeStatus[sub.id] === 'loading' ? 'جاري التجميد...' : 'جمّد الاشتراك'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleCancelFreeze(activeFreeze.id)}
+                    disabled={cancelStatus[activeFreeze.id] === 'loading'}
+                    className={`px-3 py-1 rounded text-sm font-medium ${
+                      cancelStatus[activeFreeze.id] === 'loading'
+                        ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                        : 'bg-red-700 text-white hover:bg-red-800'
+                    }`}
+                  >
+                    {cancelStatus[activeFreeze.id] === 'loading' ? 'جاري الإلغاء...' : 'إلغاء التجميد'}
+                  </button>
+                )}
+                {freezeSuccess[sub.id] && (
+                  <p className="text-green-600 text-xs">{freezeSuccess[sub.id]}</p>
+                )}
+                {freezeError[sub.id] && (
+                  <p className="text-red-600 text-xs">خطأ: {getErrorMessage(freezeError[sub.id])}</p>
+                )}
+              </div>
+            </td>
+          </tr>
+        );
+      })}
+    </tbody>
+  </table>
+</div>
+
+{/* Mobile Card View */}
+<div className="md:hidden space-y-4 mb-6">
+  {results.length > 0 ? (
+    results.map((sub) => {
+      const activeFreeze = Array.isArray(sub.freeze_requests) ? 
+        sub.freeze_requests.find(fr => fr.is_active) : null;
+
+      return (
+        <div key={sub.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+          {/* Header */}
+          <div className="flex justify-between items-start border-b pb-3 mb-3">
+            <div>
+              <div className="text-xs text-gray-500">رقم العضوية</div>
+              <div className="text-sm">{sub.member_details?.membership_number || 'غير متوفر'}</div>
+            </div>
+            <div className="flex items-center gap-2 text-blue-500">
+              <CiShoppingTag className="text-lg" />
+              <span className="font-medium">{sub.type_details?.name || 'غير معروف'}</span>
+            </div>
           </div>
+
+          {/* Main Grid */}
+          <div className="grid grid-cols-2 gap-4">
+            {/* Coach */}
+            <div>
+              <div className="text-xs text-gray-500">المدرب</div>
+              {sub.coach_details ? (
+                <div className="text-sm">
+                  <div>{sub.coach_details.username}</div>
+                  <div className="text-xs text-gray-500">الحد: {sub.coach_details.max_trainees}</div>
+                </div>
+              ) : (
+                <div className="text-xs text-gray-500">بدون مدرب</div>
+              )}
+            </div>
+            
+            {/* Freeze Status */}
+            <div>
+              <div className="text-xs text-gray-500">حالة التجميد</div>
+              {activeFreeze ? (
+                <div className="text-sm text-yellow-600">
+                  <div className="flex items-center gap-1">
+                    <FaSnowflake className="text-xs" />
+                    {activeFreeze.requested_days} يوم
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    من {formatDate(activeFreeze.start_date)}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500">نشط</div>
+              )}
+            </div>
+            
+            {/* Dates */}
+            <div>
+              <div className="text-xs text-gray-500">التواريخ</div>
+              <div className="text-sm space-y-1">
+                <div className="flex items-center gap-1">
+                  <FaCalendarAlt className="text-xs" />
+                  {formatDate(sub.start_date)}
+                </div>
+                <div className="flex items-center gap-1">
+                  <FaCalendarCheck className="text-xs" />
+                  {formatDate(sub.end_date)}
+                </div>
+              </div>
+            </div>
+            
+            {/* Payment */}
+            <div>
+              <div className="text-xs text-gray-500">الدفع</div>
+              <div className="text-sm space-y-1">
+                <div>السعر: ${sub.type_details?.price}</div>
+                <div>المدفوع: ${sub.paid_amount}</div>
+                <div className={parseFloat(sub.remaining_amount) < 0 ? 'text-red-500' : 'text-green-500'}>
+                  الرصيد: ${sub.remaining_amount}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Features */}
+          <div className="mt-4 pt-3 border-t">
+            <div className="text-xs text-gray-500 mb-2">التفاصيل</div>
+            <div className="flex flex-wrap gap-2">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                الدخول: {sub.entry_count || 0}/{sub.type_details?.max_entries || '∞'}
+              </span>
+              {sub.type_details?.includes_pool && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  <FaSwimmer className="mr-1" /> حمام السباحة
+                </span>
+              )}
+              {sub.type_details?.includes_gym && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  <FaDumbbell className="mr-1" /> الجيم
+                </span>
+              )}
+              {sub.type_details?.includes_classes && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                  <FaUsers className="mr-1" /> الفصول
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="mt-3 pt-3 border-t">
+            <div className="flex flex-col gap-2">
+              {!activeFreeze ? (
+                <button
+                  onClick={() => openModal(sub.id)}
+                  disabled={freezeStatus[sub.id] === 'loading'}
+                  className={`px-3 py-1 rounded text-sm font-medium ${
+                    freezeStatus[sub.id] === 'loading'
+                      ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                      : 'bg-blue-700 text-white hover:bg-blue-800'
+                  }`}
+                >
+                  {freezeStatus[sub.id] === 'loading' ? 'جاري التجميد...' : 'جمّد الاشتراك'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleCancelFreeze(activeFreeze.id)}
+                  disabled={cancelStatus[activeFreeze.id] === 'loading'}
+                  className={`px-3 py-1 rounded text-sm font-medium ${
+                    cancelStatus[activeFreeze.id] === 'loading'
+                      ? 'bg-gray-200 opacity-50 cursor-not-allowed'
+                      : 'bg-red-700 text-white hover:bg-red-800'
+                  }`}
+                >
+                  {cancelStatus[activeFreeze.id] === 'loading' ? 'جاري الإلغاء...' : 'إلغاء التجميد'}
+                </button>
+              )}
+              {freezeSuccess[sub.id] && (
+                <p className="text-green-600 text-xs">{freezeSuccess[sub.id]}</p>
+              )}
+              {freezeError[sub.id] && (
+                <p className="text-red-600 text-xs">خطأ: {getErrorMessage(freezeError[sub.id])}</p>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    })
+  ) : (
+    <div className="text-center py-8 text-gray-500">
+      لا توجد نتائج متاحة
+    </div>
+  )}
+</div>
 
           {/* Pagination */}
         <div className="flex justify-between items-center mt-4" dir="rtl">
