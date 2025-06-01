@@ -6,9 +6,10 @@ from core.models import Club
 
 class Attendance(models.Model):
     subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='attendance_attendances')
-    attendance_date = models.DateField(auto_now_add=True)
-    entry_time = models.TimeField(auto_now_add=True) 
-    
+    # attendance_date = models.DateField(auto_now_add=True)
+    # entry_time = models.TimeField(auto_now_add=True) 
+    attendance_date = models.DateField()  
+    entry_time = models.TimeField(null=True, blank=True) 
     def __str__(self):
         return f"{self.subscription.member.name} - {self.attendance_date} {self.entry_time}"
 

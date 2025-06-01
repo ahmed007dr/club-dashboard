@@ -16,7 +16,7 @@ from .serializers import ShiftSerializer, StaffAttendanceSerializer, StaffMonthl
 from accounts.models import User
 from utils.permissions import IsOwnerOrRelatedToClub
 
-# Shift Management APIs
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def staff_shifts_api(request, staff_id):

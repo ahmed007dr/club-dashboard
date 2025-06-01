@@ -114,7 +114,6 @@ def attendance_list_api(request):
 
     serializer = AttendanceSerializer(result_page, many=True)
 
-    # بدل response_data، نرجع البيانات مباشرة للpagination response
     return paginator.get_paginated_response(serializer.data)
 
 
