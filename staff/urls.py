@@ -16,6 +16,5 @@ urlpatterns = [
     path('api/staff/<int:staff_id>/attendance/report/', api.staff_attendance_report_api, name='attendance_report'),
     path('attendance/', api.attendance_list_api, name='attendance_list'),
     path('api/missing-checkins/', api.missing_checkins_api, name='missing_checkins'),
-    path('api/monthly-report/', api.staff_monthly_hours_report_api, name='monthly-report'),
 
 ]

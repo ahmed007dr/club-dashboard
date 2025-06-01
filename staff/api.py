@@ -276,32 +276,88 @@ def staff_attendance_analysis_api(request, attendance_id):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def staff_attendance_report_api(request, staff_id):
-    """Generate a report of attendance days and total hours for a staff member."""
-    try:
-        staff = User.objects.get(id=staff_id, is_active=True)
-    except User.DoesNotExist:
-        return Response({'error': 'Staff not found'}, status=status.HTTP_404_NOT_FOUND)
+def staff_attendance_report_api(request):
+    if request.user.role in ['owner', 'admin']:
+        attendances = StaffAttendance.objects.filter(
+            check_out__isnull=False,
+            club=request.user.club
+        )
+    else:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club
+        ).order_by('-check_in').first()
 
-    attendances = StaffAttendance.objects.filter(staff=staff, club=request.user.club)
+        if not attendance:
+            return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
 
-    attendance_days = attendances.annotate(date=TruncDate('check_in')) \
-                                 .values('date') \
-                                 .distinct() \
-                                 .count()
-    total_hours = sum(
-        attendance.duration_hours() or 0
-        for attendance in attendances
-        if attendance.check_out
+        check_out = attendance.check_out if attendance.check_out else timezone.now()
+        attendances = StaffAttendance.objects.filter(
+            check_out__isnull=False,
+            club=request.user.club,
+            check_in__range=(attendance.check_in, check_out)
+        )
+
+    staff_id = request.query_params.get('staff_id', None)
+    year = request.query_params.get('year', None)
+
+    if staff_id or year:
+        if request.user.role not in ['owner', 'admin']:
+            attendances = StaffAttendance.objects.filter(
+                check_out__isnull=False,
+                club=request.user.club
+            )
+
+    if staff_id:
+        try:
+            staff_id = int(staff_id)
+            attendances = attendances.filter(staff_id=staff_id)
+        except ValueError:
+            return Response({'error': 'Invalid staff_id'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if year:
+        try:
+            year = int(year)
+            attendances = attendances.filter(check_in__year=year)
+        except ValueError:
+            return Response({'error': 'Invalid year format'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Aggregate data by month
+    monthly_data = attendances.annotate(
+        month=TruncMonth('check_in')
+    ).values(
+        'staff__id',
+        'staff__username',
+        'staff__rfid_code',
+        'month'
+    ).annotate(
+        total_hours=Sum(
+            ExpressionWrapper(
+                F('check_out') - F('check_in'),
+                output_field=DurationField()
+            )
+        ),
+        attendance_days=Count(
+            TruncDate('check_in'),
+            distinct=True
+        )
+    ).order_by('staff__id', 'month')
+
+    staff_monthly_map = {}
+    for entry in monthly_data:
+        staff_id = entry['staff__id']
+        month = entry['month']
+        total_hours = entry['total_hours'].total_seconds() / 3600
+        if staff_id not in staff_monthly_map:
+            staff_monthly_map[staff_id] = {}
+        staff_monthly_map[staff_id][month] = total_hours
+
+    serializer = StaffMonthlyHoursSerializer(
+        monthly_data,
+        many=True,
+        context={'monthly_data': staff_monthly_map}
     )
-
-    return Response({
-        'staff_id': staff.id,
-        'staff_name': staff.username,
-        'rfid_code': staff.rfid_code,
-        'attendance_days': attendance_days,
-        'total_hours': round(total_hours, 2)
-    })
+    return Response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -340,67 +396,4 @@ def attendance_list_api(request):
     ).select_related('staff', 'club', 'shift')
     
     serializer = StaffAttendanceSerializer(attendances, many=True)
-    return Response(serializer.data)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def staff_monthly_hours_report_api(request):
-    """
-    Generate a report of total attendance hours and days per staff member for each month.
-    Includes RFID code, staff name, total hours, attendance days, and percentage change
-    in hours compared to the previous month.
-    """
-    attendances = StaffAttendance.objects.filter(
-        check_out__isnull=False,
-        club=request.user.club
-    )
-    
-    if 'staff_id' in request.GET:
-        try:
-            staff_id = int(request.GET['staff_id'])
-            attendances = attendances.filter(staff_id=staff_id)
-        except ValueError:
-            return Response({'error': 'Invalid staff_id'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    if 'year' in request.GET:
-        try:
-            year = int(request.GET['year'])
-            attendances = attendances.filter(check_in__year=year)
-        except ValueError:
-            return Response({'error': 'Invalid year format'}, status=status.HTTP_400_BAD_REQUEST)
-    
-    monthly_data = attendances.annotate(
-        month=TruncMonth('check_in')
-    ).values(
-        'staff__id',
-        'staff__username',
-        'staff__rfid_code',
-        'month'
-    ).annotate(
-        total_hours=Sum(
-            ExpressionWrapper(
-                F('check_out') - F('check_in'),
-                output_field=DurationField()
-            )
-        ),
-        attendance_days=Count(
-            TruncDate('check_in'),
-            distinct=True
-        )
-    ).order_by('staff__id', 'month')
-    
-    staff_monthly_map = {}
-    for entry in monthly_data:
-        staff_id = entry['staff__id']
-        month = entry['month']
-        total_hours = entry['total_hours'].total_seconds() / 3600
-        if staff_id not in staff_monthly_map:
-            staff_monthly_map[staff_id] = {}
-        staff_monthly_map[staff_id][month] = total_hours
-    
-    serializer = StaffMonthlyHoursSerializer(
-        monthly_data,
-        many=True,
-        context={'monthly_data': staff_monthly_map}
-    )
     return Response(serializer.data)
