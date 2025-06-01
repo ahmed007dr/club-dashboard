@@ -4,6 +4,7 @@ from core.serializers import ClubSerializer
 from members.serializers import MemberSerializer
 from accounts.serializers import UserSerializer
 from accounts.models import User
+from members.models import Member
 from django.utils import timezone
 from django.db import models
 from django.db.models import Q
@@ -49,6 +50,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     subscriptions_count = serializers.SerializerMethodField()
     coach_simple = serializers.SerializerMethodField()
     coach_identifier = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    identifier = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = Subscription
@@ -57,7 +59,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'type', 'type_details', 'coach', 'coach_details', 'start_date', 'end_date',
             'private_training_price', 'paid_amount', 'remaining_amount', 'entry_count',
             'created_by', 'created_by_details', 'freeze_requests', 'subscriptions_count',
-            'coach_simple', 'coach_identifier'
+            'coach_simple', 'coach_identifier', 'identifier'
         ]
         extra_kwargs = {
             'remaining_amount': {'read_only': True},
@@ -65,6 +67,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'created_by': {'read_only': True},
             'coach': {'required': False},
             'private_training_price': {'required': False},
+            'member': {'required': False}
         }
 
     def get_subscriptions_count(self, obj):
@@ -95,7 +98,19 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         coach = data.get('coach')
         coach_identifier = data.get('coach_identifier', '')
         member = data.get('member')
+        identifier = data.get('identifier', '')
         private_training_price = data.get('private_training_price', 0)
+
+        # Handle identifier if provided
+        if identifier and not member:
+            try:
+                member = Member.objects.get(
+                    Q(phone=identifier) | Q(rfid_code=identifier) | Q(name__iexact=identifier),
+                    club=club
+                )
+                data['member'] = member
+            except Member.DoesNotExist:
+                raise serializers.ValidationError("لا يوجد عضو بهذا المعرف (هاتف، RFID، أو اسم).")
 
         # Handle coach_identifier if provided
         if coach_identifier and not coach:
@@ -145,11 +160,29 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             active_subscriptions = Subscription.objects.filter(
                 member=member, club=club, start_date__lte=today, end_date__gte=today
             ).exclude(entry_count__gte=models.F('type__max_entries')).exclude(type__max_entries=0)
+
             if active_subscriptions.exists() and not self.instance:
-                raise serializers.ValidationError("العضو لديه اشتراك نشط بالفعل.")
+                latest_active_subscription = active_subscriptions.order_by('-end_date').first()
+                if latest_active_subscription:
+                    max_end_date = latest_active_subscription.end_date
+                    if (latest_active_subscription.entry_count >= latest_active_subscription.type.max_entries and
+                        latest_active_subscription.type.max_entries > 0):
+                        max_end_date = today
+                    start_date = data.get('start_date', today)
+                    if start_date <= max_end_date:
+                        raise serializers.ValidationError(
+                            f"لا يمكن إنشاء اشتراك جديد يبدأ قبل {max_end_date} بسبب وجود اشتراك نشط."
+                        )
 
             unpaid_subscriptions = Subscription.objects.filter(member=member, club=club, remaining_amount__gt=0)
             if unpaid_subscriptions.exists() and not self.instance:
                 raise serializers.ValidationError("يجب تسوية المدفوعات المستحقة أولاً.")
 
         return data
+
+    def create(self, validated_data):
+        # Remove coach_identifier and identifier from validated_data
+        validated_data.pop('coach_identifier', None)
+        validated_data.pop('identifier', None)
+        # Create the subscription
+        return Subscription.objects.create(**validated_data)
