@@ -7,23 +7,43 @@ from .serializers import TicketSerializer
 from rest_framework.permissions import IsAuthenticated
 from utils.permissions import IsOwnerOrRelatedToClub  
 from finance.serializers import IncomeSerializer
-from finance.models import Income
+from finance.models import Income, IncomeSource
 from django.utils import timezone
-from finance.models import Income,IncomeSource
 from rest_framework.pagination import PageNumberPagination
 from members.models import Member
 from django.db.models import Q
 from django.db import transaction
+from staff.models import StaffAttendance
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def ticket_list_api(request):
-    tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club)
+    if request.user.role in ['owner', 'admin']:
+        tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club)
+    else:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club
+        ).order_by('-check_in').first()
+
+        if not attendance:
+            return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        check_out = attendance.check_out if attendance.check_out else timezone.now()
+        tickets = Ticket.objects.select_related('club', 'used_by').filter(
+            club=request.user.club,
+            issue_date__range=(attendance.check_in, check_out)
+        )
 
     ticket_type = request.query_params.get('ticket_type')
     used = request.query_params.get('used')
     issue_date = request.query_params.get('issue_date')
     buyer_name = request.query_params.get('buyer_name')
+
+    if ticket_type or used is not None or issue_date or buyer_name:
+        if request.user.role not in ['owner', 'admin']:
+            tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club)
 
     if ticket_type:
         tickets = tickets.filter(ticket_type=ticket_type)
@@ -45,6 +65,15 @@ def ticket_list_api(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_ticket_api(request):
+    if request.user.role not in ['owner', 'admin']:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club
+        ).order_by('-check_in').first()
+
+        if not attendance or (attendance.check_out and attendance.check_out < timezone.now()):
+            return Response({'error': 'You can only add tickets during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
+
     serializer = TicketSerializer(data=request.data)
     
     if serializer.is_valid():
@@ -105,17 +134,34 @@ def add_ticket_api(request):
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def ticket_detail_api(request, ticket_id):
     ticket = get_object_or_404(Ticket, id=ticket_id)
+    if request.user.role not in ['owner', 'admin']:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club
+        ).order_by('-check_in').first()
+
+        if not attendance:
+            return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        check_out = attendance.check_out if attendance.check_out else timezone.now()
+        if not (attendance.check_in <= ticket.issue_date <= check_out):
+            return Response({'error': 'This ticket is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
 
     serializer = TicketSerializer(ticket)
     return Response(serializer.data)
 
+
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def edit_ticket_api(request, ticket_id):
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'Only owners or admins can edit tickets.'}, status=status.HTTP_403_FORBIDDEN)
+
     ticket = get_object_or_404(Ticket, id=ticket_id)
     
     identifier = request.data.get('identifier')
@@ -150,26 +196,37 @@ def edit_ticket_api(request, ticket_id):
             )
     serializer = TicketSerializer(ticket, data=request.data)
     if serializer.is_valid():
-
         if used_by:
             serializer.validated_data['used_by'] = used_by
         
         updated_ticket = serializer.save()
-
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_ticket_api(request, ticket_id):
-    ticket = get_object_or_404(Ticket, id=ticket_id)
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'Only owners or admins can delete tickets.'}, status=status.HTTP_403_FORBIDDEN)
 
+    ticket = get_object_or_404(Ticket, id=ticket_id)
     ticket.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def mark_ticket_used_api(request, ticket_id):
+    if request.user.role not in ['owner', 'admin']:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club
+        ).order_by('-check_in').first()
+
+        if not attendance or (attendance.check_out and attendance.check_out < timezone.now()):
+            return Response({'error': 'You can only mark tickets as used during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
+
     ticket = get_object_or_404(Ticket, id=ticket_id)
     if not IsOwnerOrRelatedToClub().has_object_permission(request, None, ticket):
         return Response(
