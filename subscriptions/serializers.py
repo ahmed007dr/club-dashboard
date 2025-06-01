@@ -3,8 +3,10 @@ from .models import Subscription, SubscriptionType, FreezeRequest
 from core.serializers import ClubSerializer
 from members.serializers import MemberSerializer
 from accounts.serializers import UserSerializer
+from accounts.models import User
 from django.utils import timezone
 from django.db import models
+from django.db.models import Q
 
 
 class SubscriptionTypeSerializer(serializers.ModelSerializer):
@@ -46,6 +48,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     created_by_details = UserSerializer(source='created_by', read_only=True)
     subscriptions_count = serializers.SerializerMethodField()
     coach_simple = serializers.SerializerMethodField()
+    coach_identifier = serializers.CharField(write_only=True, required=False, allow_blank=True)
 
     class Meta:
         model = Subscription
@@ -53,7 +56,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'id', 'club', 'club_details', 'member', 'member_details',
             'type', 'type_details', 'coach', 'coach_details', 'start_date', 'end_date',
             'private_training_price', 'paid_amount', 'remaining_amount', 'entry_count',
-            'created_by', 'created_by_details', 'freeze_requests', 'subscriptions_count', 'coach_simple'
+            'created_by', 'created_by_details', 'freeze_requests', 'subscriptions_count',
+            'coach_simple', 'coach_identifier'
         ]
         extra_kwargs = {
             'remaining_amount': {'read_only': True},
@@ -81,7 +85,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 'id': obj.coach.id,
                 'username': obj.coach.username,
                 'role': obj.coach.role,
-                'max_trainees': profile.max_trainees  
+                'max_trainees': profile.max_trainees
             }
         return None
 
@@ -89,8 +93,22 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         club = data.get('club')
         subscription_type = data.get('type')
         coach = data.get('coach')
+        coach_identifier = data.get('coach_identifier', '')
         member = data.get('member')
         private_training_price = data.get('private_training_price', 0)
+
+        # Handle coach_identifier if provided
+        if coach_identifier and not coach:
+            try:
+                coach = User.objects.get(
+                    Q(username=coach_identifier) | Q(rfid_code=coach_identifier),
+                    role='coach',
+                    is_active=True,
+                    club=club
+                )
+                data['coach'] = coach
+            except User.DoesNotExist:
+                raise serializers.ValidationError("لا يوجد مدرب بهذا المعرف (اسم المستخدم أو RFID).")
 
         if subscription_type and subscription_type.is_private_training:
             if not coach:
