@@ -282,33 +282,10 @@ def staff_attendance_report_api(request, staff_id=None):
             check_out__isnull=False,
             club=request.user.club
         )
-    # else:
-    #     attendance = StaffAttendance.objects.filter(
-    #         staff=request.user,
-    #         club=request.user.club
-    #     ).order_by('-check_in').first()
-
-    #     if not attendance:
-    #         return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
-
-    #     check_out = attendance.check_out if attendance.check_out else timezone.now()
-    #     attendances = StaffAttendance.objects.filter(
-    #         check_out__isnull=False,
-    #         club=request.user.club,
-    #         check_in__range=(attendance.check_in, check_out)
-    #     )
-
-    staff_id = request.query_params.get('staff_id', None)
+    
     year = request.query_params.get('year', None)
 
-    if staff_id or year:
-        if request.user.role not in ['owner', 'admin']:
-            attendances = StaffAttendance.objects.filter(
-                check_out__isnull=False,
-                club=request.user.club
-            )
-
-    if staff_id:
+    if staff_id:  
         try:
             staff_id = int(staff_id)
             attendances = attendances.filter(staff_id=staff_id)
@@ -322,7 +299,6 @@ def staff_attendance_report_api(request, staff_id=None):
         except ValueError:
             return Response({'error': 'Invalid year format'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Aggregate data by month
     monthly_data = attendances.annotate(
         month=TruncMonth('check_in')
     ).values(
