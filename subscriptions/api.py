@@ -13,7 +13,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from .models import Subscription, SubscriptionType
-from .serializers import SubscriptionSerializer, FreezeRequest, SubscriptionTypeSerializer
+from .serializers import SubscriptionSerializer, FreezeRequest, SubscriptionTypeSerializer,CoachReportSerializer
 
 from finance.models import Income, IncomeSource
 from members.models import Member
@@ -574,14 +574,6 @@ def cancel_freeze(request, freeze_id):
     return Response(serializer.data)
 
 
-class CoachReportSerializer(serializers.Serializer):
-    coach_id = serializers.IntegerField()
-    coach_username = serializers.CharField()
-    active_clients = serializers.IntegerField()
-    total_private_training_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    total_paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def coach_report(request, coach_id):
@@ -589,6 +581,7 @@ def coach_report(request, coach_id):
     if coach.club != request.user.club and request.user.role != 'owner':
         return Response({'error': 'غير مخول لعرض تقرير هذا الكابتن'}, status=status.HTTP_403_FORBIDDEN)
 
+    # Handle date range
     start_date = request.query_params.get('start_date', None)
     end_date = request.query_params.get('end_date', None)
     
@@ -598,7 +591,7 @@ def coach_report(request, coach_id):
         except ValueError:
             return Response({'error': 'صيغة تاريخ البداية غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
     else:
-        start_date = timezone.now().date().replace(day=1)  # أول الشهر
+        start_date = timezone.now().date().replace(day=1)  # First of the month
 
     if end_date:
         try:
@@ -608,27 +601,45 @@ def coach_report(request, coach_id):
     else:
         end_date = timezone.now().date()
 
+    # Get subscriptions for the specified period
     subscriptions = Subscription.objects.filter(
         coach=coach,
         club=request.user.club,
         type__is_private_training=True,
         start_date__lte=end_date,
         end_date__gte=start_date
+    ).select_related('member', 'type')
+
+    # Calculate previous month's clients
+    prev_month_end = start_date - timedelta(days=1)
+    prev_month_start = prev_month_end.replace(day=1)
+    prev_month_clients = Subscription.objects.filter(
+        coach=coach,
+        club=request.user.club,
+        type__is_private_training=True,
+        start_date__lte=prev_month_end,
+        end_date__gte=prev_month_start
     ).aggregate(
+        prev_clients=Count('id')
+    )['prev_clients'] or 0
+
+    # Aggregate data
+    aggregated_data = subscriptions.aggregate(
         active_clients=Count('id'),
         total_private_training_amount=Sum('private_training_price'),
         total_paid_amount=Sum('paid_amount')
     )
 
+    # Prepare report
     report = {
         'coach_id': coach.id,
         'coach_username': coach.username,
-        'active_clients': subscriptions['active_clients'] or 0,
-        'total_private_training_amount': subscriptions['total_private_training_amount'] or 0,
-        'total_paid_amount': subscriptions['total_paid_amount'] or 0
+        'active_clients': aggregated_data['active_clients'] or 0,
+        'total_private_training_amount': aggregated_data['total_private_training_amount'] or 0,
+        'total_paid_amount': aggregated_data['total_paid_amount'] or 0,
+        'previous_month_clients': prev_month_clients,
+        'subscriptions': subscriptions
     }
 
     serializer = CoachReportSerializer(report)
     return Response(serializer.data)
-
-

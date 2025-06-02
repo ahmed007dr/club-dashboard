@@ -25,6 +25,7 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, data):
+        # Ensure max_freeze_days is non-negative
         max_freeze_days = data.get('max_freeze_days', getattr(self.instance, 'max_freeze_days', 0))
         if max_freeze_days < 0:
             raise serializers.ValidationError({
@@ -212,3 +213,30 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         validated_data.pop('identifier', None)
         # Create the subscription
         return Subscription.objects.create(**validated_data)
+
+
+class CoachReportSerializer(serializers.Serializer):
+    coach_id = serializers.IntegerField()
+    coach_username = serializers.CharField()
+    active_clients = serializers.IntegerField()
+    total_private_training_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    previous_month_clients = serializers.IntegerField()
+    subscriptions = serializers.SerializerMethodField()
+
+    def get_subscriptions(self, obj):
+        # Assuming subscriptions are passed in the object
+        today = timezone.now().date()
+        subscriptions = obj.get('subscriptions', [])
+        return [
+            {
+                'subscription_id': sub.id,
+                'member_name': sub.member.name,
+                'start_date': sub.start_date,
+                'end_date': sub.end_date,
+                'status': 'سارية' if sub.start_date <= today <= sub.end_date else 'منتهية',
+                'private_training_price': sub.private_training_price,
+                'paid_amount': sub.paid_amount,
+            }
+            for sub in subscriptions
+        ]

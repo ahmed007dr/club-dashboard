@@ -144,7 +144,6 @@ def delete_shift_api(request, shift_id):
     shift.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
-# Attendance Management APIs
 def find_current_shift(user):
     """Find the current shift for a user, handling shifts that span across two days."""
     now = timezone.now()
