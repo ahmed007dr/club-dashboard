@@ -1,12 +1,19 @@
-from django.contrib import admin
-from django.utils import timezone
-from django.urls import reverse
-from django.utils.html import format_html
-from django.db.models import Q, Sum
-from django.contrib import messages
-from .models import SubscriptionType, Subscription, FreezeRequest
 from datetime import timedelta
+
+from django.contrib import admin, messages
+from django.contrib.admin import AdminSite
 from django.core.exceptions import ValidationError
+from django.db.models import Q, Sum
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
+from django.urls import reverse
+from django.utils import timezone, html
+
+from .models import SubscriptionType, Subscription, FreezeRequest, CoachProfile
+from finance.models import Income, IncomeSource
+from core.models import Club
+from accounts.models import User
+from members.models import Member
 
 
 @admin.register(SubscriptionType)
@@ -209,14 +216,23 @@ class FreezeRequestAdmin(admin.ModelAdmin):
         )
 
 
-from django.contrib.admin import AdminSite
-from django.http import HttpResponseRedirect
-from django.urls import reverse
-from django.shortcuts import get_object_or_404
-from finance.models import Income, IncomeSource
-from core.models import Club
-from accounts.models import User
-from members.models import Member
+@admin.register(CoachProfile)
+class CoachProfileAdmin(admin.ModelAdmin):
+    list_display = ('user', 'max_trainees', 'user_role', 'user_active')
+    list_filter = ('user__role', 'user__is_active')
+    search_fields = ('user__username',)
+    # readonly_fields = ('user',)
+
+    def user_role(self, obj):
+        return obj.user.role
+    user_role.short_description = 'دور المستخدم'
+
+    def user_active(self, obj):
+        return obj.user.is_active
+    user_active.short_description = 'نشط'
+    user_active.boolean = True
+
+
 
 AdminSite.site_header = "Club Management System"
 AdminSite.site_title = "Club Admin"
