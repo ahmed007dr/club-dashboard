@@ -86,7 +86,6 @@ function UserList() {
     }
   };
 
-  // Calculate starting number for the current page
   const startNumber = (currentPage - 1) * 20 + 1;
 
   return (
@@ -108,117 +107,139 @@ function UserList() {
         <div className="text-center py-8">جاري التحميل...</div>
       ) : (
         <>
-         <div className="overflow-x-auto shadow-md rounded-lg">
-  {/* Table view for large screens (lg and up) */}
-  <table className="hidden lg:table min-w-full divide-y divide-gray-200 bg-white text-right">
-    <thead className="">
-      <tr>
-        <th className="px-4 py-3">#</th>
-        <th className="px-4 py-3">اسم المستخدم</th>
-        <th className="px-4 py-3">الاسم الكامل</th>
-        <th className="px-4 py-3">البريد الإلكتروني</th>
-        <th className="px-4 py-3">الدور</th>
-        <th className="px-4 py-3">الحالة</th>
-        <th className="px-4 py-3">كود RFID</th>
-        <th className="px-4 py-3">النادي</th>
-      </tr>
-    </thead>
-    <tbody className="divide-y divide-gray-100 text-gray-700">
-      {users.length > 0 ? (
-        users.map((user, index) => (
-          <tr key={user.id} className="hover:bg-gray-50">
-            <td className="px-4 py-2 text-gray-500">{startNumber + index}</td>
-            <td className="px-4 py-2">
-              <Link to={`/attendance/${user.id}`} className="text-blue-600 hover:underline">
-                {user.username}
-              </Link>
-            </td>
-            <td className="px-4 py-2">
-              {user.first_name || user.last_name ? `${user.first_name} ${user.last_name}` : '—'}
-            </td>
-            <td className="px-4 py-2">{user.email}</td>
-            <td className="px-4 py-2">{user.role}</td>
-            <td className="px-4 py-2">
-              <span
-                className={`px-2 py-1 rounded text-sm ${
-                  user.is_active ? 'bg-green-100 text-green-500' : 'bg-red-100 text-red-500'
-                }`}
-              >
-                {user.is_active ? 'نشط' : 'غير نشط'}
-              </span>
-            </td>
-            <td className="px-4 py-2">{user.rfid_code || '—'}</td>
-            <td className="px-4 py-2">{user.club?.name || '—'}</td>
-          </tr>
-        ))
-      ) : (
-        <tr>
-          <td colSpan="8" className="px-4 py-4 text-center text-gray-500">
-            لا يوجد مستخدمين متطابقين مع بحثك
-          </td>
-        </tr>
-      )}
-    </tbody>
-  </table>
+          <div className="overflow-x-auto shadow-md rounded-lg" dir="rtl">
+            {/* Table view for large screens (lg and up) */}
+            <table className="hidden lg:table min-w-full divide-y divide-gray-200 bg-white text-right">
+              <thead className="">
+                <tr>
+                  <th className="px-4 py-3">#</th>
+                  <th className="px-4 py-3">اسم المستخدم</th>
+                  <th className="px-4 py-3">الاسم الكامل</th>
+                  <th className="px-4 py-3">البريد الإلكتروني</th>
+                  <th className="px-4 py-3">الدور</th>
+                  <th className="px-4 py-3">الحالة</th>
+                  <th className="px-4 py-3">كود RFID</th>
+                  <th className="px-4 py-3">النادي</th>
+                  <th className="px-4 py-3">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 text-gray-700">
+                {users.length > 0 ? (
+                  users.map((user, index) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-2 text-gray-500">{startNumber + index}</td>
+                      <td className="px-4 py-2">
+                        <Link to={`/attendance/${user.id}`} className="text-blue-600 hover:underline">
+                          {user.username}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2">
+                        {user.first_name || user.last_name ? `${user.first_name} ${user.last_name}` : '—'}
+                      </td>
+                      <td className="px-4 py-2">{user.email}</td>
+                      <td className="px-4 py-2">{user.role}</td>
+                      <td className="px-4 py-2">
+                        <span
+                          className={`px-2 py-1 rounded text-sm ${
+                            user.is_active ? 'bg-green-100 text-green-500' : 'bg-red-100 text-red-500'
+                          }`}
+                        >
+                          {user.is_active ? 'نشط' : 'غير نشط'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2">{user.rfid_code || '—'}</td>
+                      <td className="px-4 py-2">{user.club?.name || '—'}</td>
+                      <td className="px-4 py-2">
+                        {user.role === 'coach' && (
+                          <Link 
+  to={`/coach-profile/${user.id}`}  // Changed from direct API URL to route
+  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+>
+  بروفايل
+</Link>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="9" className="px-4 py-4 text-center text-gray-500">
+                      لا يوجد مستخدمين متطابقين مع بحثك
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
 
-  {/* Card view for medium and small screens (md and below) */}
-  <div className="lg:hidden space-y-4 p-4">
-    {users.length > 0 ? (
-      users.map((user, index) => (
-        <div key={user.id} className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow">
-          <div className="flex justify-between items-start border-b pb-2 mb-2">
-            <span className="text-gray-500">{startNumber + index}</span>
-            <Link to={`/attendance/${user.id}`} className="text-blue-600 hover:underline text-lg font-medium">
-              {user.username}
-            </Link>
+            {/* Card view for medium and small screens (md and below) */}
+            <div className="lg:hidden space-y-4 p-4">
+              {users.length > 0 ? (
+                users.map((user, index) => (
+                  <div key={user.id} className="bg-white p-4 rounded-lg shadow hover:shadow-md transition-shadow">
+                    <div className="flex justify-between items-start border-b pb-2 mb-2">
+                      <span className="text-gray-500">{startNumber + index}</span>
+                      <Link to={`/attendance/${user.id}`} className="text-blue-600 hover:underline text-lg font-medium">
+                        {user.username}
+                      </Link>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-gray-500 text-sm">الاسم الكامل</p>
+                        <p>{user.first_name || user.last_name ? `${user.first_name} ${user.last_name}` : '—'}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-gray-500 text-sm">البريد الإلكتروني</p>
+                        <p>{user.email}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-gray-500 text-sm">الدور</p>
+                        <p>{user.role}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-gray-500 text-sm">الحالة</p>
+                        <span
+                          className={`px-2 py-1 rounded text-sm ${
+                            user.is_active ? 'bg-green-100 text-green-500' : 'bg-red-100 text-red-500'
+                          }`}
+                        >
+                          {user.is_active ? 'نشط' : 'غير نشط'}
+                        </span>
+                      </div>
+                      
+                      <div>
+                        <p className="text-gray-500 text-sm">كود RFID</p>
+                        <p>{user.rfid_code || '—'}</p>
+                      </div>
+                      
+                      <div>
+                        <p className="text-gray-500 text-sm">النادي</p>
+                        <p>{user.club?.name || '—'}</p>
+                      </div>
+                    </div>
+
+                    {user.role === 'coach' && (
+                      <div className="mt-3 text-left">
+                      <Link 
+  to={`/coach-profile/${user.id}`}  // Changed from direct API URL to route
+  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm"
+>
+  بروفايل
+</Link>
+                      </div>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <div className="bg-white p-4 rounded-lg shadow text-center text-gray-500">
+                  لا يوجد مستخدمين متطابقين مع بحثك
+                </div>
+              )}
+            </div>
           </div>
-          
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <p className="text-gray-500 text-sm">الاسم الكامل</p>
-              <p>{user.first_name || user.last_name ? `${user.first_name} ${user.last_name}` : '—'}</p>
-            </div>
-            
-            <div>
-              <p className="text-gray-500 text-sm">البريد الإلكتروني</p>
-              <p>{user.email}</p>
-            </div>
-            
-            <div>
-              <p className="text-gray-500 text-sm">الدور</p>
-              <p>{user.role}</p>
-            </div>
-            
-            <div>
-              <p className="text-gray-500 text-sm">الحالة</p>
-              <span
-                className={`px-2 py-1 rounded text-sm ${
-                  user.is_active ? 'bg-green-100 text-green-500' : 'bg-red-100 text-red-500'
-                }`}
-              >
-                {user.is_active ? 'نشط' : 'غير نشط'}
-              </span>
-            </div>
-            
-            <div>
-              <p className="text-gray-500 text-sm">كود RFID</p>
-              <p>{user.rfid_code || '—'}</p>
-            </div>
-            
-            <div>
-              <p className="text-gray-500 text-sm">النادي</p>
-              <p>{user.club?.name || '—'}</p>
-            </div>
-          </div>
-        </div>
-      ))
-    ) : (
-      <div className="bg-white p-4 rounded-lg shadow text-center text-gray-500">
-        لا يوجد مستخدمين متطابقين مع بحثك
-      </div>
-    )}
-  </div>
-</div>
 
           {count > 20 && (
             <div className="mt-4 flex justify-center gap-4">
