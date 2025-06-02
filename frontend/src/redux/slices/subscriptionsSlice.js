@@ -631,6 +631,25 @@ export const cancelSubscriptionFreeze = createAsyncThunk(
   }
 );
 
+export const fetchCoachProfile = createAsyncThunk(
+  'subscriptions/fetchCoachProfile',
+  async (coachId, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `${BASE_URL}/subscriptions/api/coach-report/${coachId}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || 'Network error');
+    }
+  }
+);
 const subscriptionsSlice = createSlice({
   name: "subscriptions",
   initialState: {
@@ -653,6 +672,12 @@ const subscriptionsSlice = createSlice({
       count: 0,
       next: null,
       previous: null,
+    },
+        coachProfile: {
+      data: null,
+      loading: false,
+      error: null,
+      lastFetch: null
     },
     stats: null,
     subscriptionType: null,
@@ -679,6 +704,15 @@ const subscriptionsSlice = createSlice({
       delete state.cancelError[id];
       delete state.cancelSuccess[id];
     },
+
+     clearCoachProfile: (state) => {
+      state.coachProfile = {
+        data: null,
+        loading: false,
+        error: null,
+        lastFetch: null
+      };
+    }
   },
   extraReducers: (builder) => {
     builder
@@ -1025,7 +1059,25 @@ const subscriptionsSlice = createSlice({
           delete state.cancelSuccess[freezeRequestId];
         }
       })
+
+          builder.addCase(fetchCoachProfile.pending, (state) => {
+      state.coachProfile.loading = true;
+      state.coachProfile.error = null;
+    });
+    
+    builder.addCase(fetchCoachProfile.fulfilled, (state, action) => {
+      state.coachProfile.loading = false;
+      state.coachProfile.data = action.payload;
+      state.coachProfile.lastFetch = new Date().toISOString();
+    });
+    
+    builder.addCase(fetchCoachProfile.rejected, (state, action) => {
+      state.coachProfile.loading = false;
+      state.coachProfile.error = action.payload || 'Failed to fetch coach profile';
+    });
   },
 });
+
+export const { clearCoachProfile } = subscriptionsSlice.actions;
 export const { clearFreezeFeedback } = subscriptionsSlice.actions;
 export default subscriptionsSlice.reducer;

@@ -31,6 +31,7 @@ import ShiftAttendanceList from './components/dashboard/ShiftAttendanceList';
 import ExpenseCategory from './components/dashboard/ExpenseCategory';
 import Expense from './components/dashboard/Expense';
 import IncomeSources from './components/dashboard/IncomeSources';
+import CoachProfile from './components/dashboard/CoachProfile';
 import ReportsPage from './components/dashboard/Reports'; // استيراد ReportsPage
 import useTokenRefresh from './hooks/useTokenRefresh';
 import { Toaster } from 'react-hot-toast';
@@ -92,6 +93,7 @@ function App() {
           <Route path="expense" element={<Expense />} />
           <Route path="income-sources" element={<IncomeSources />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="/coach-profile/:coachId" element={<CoachProfile />} />
         </Route>
       </Routes>
     </div>
