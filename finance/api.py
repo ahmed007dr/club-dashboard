@@ -625,77 +625,43 @@ def employee_daily_report_api(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def generate_daily_report_pdf(request):
-    employee_id = request.query_params.get('employee_id')
-    start_date = request.query_params.get('start_date')
-    end_date = request.query_params.get('end_date')
+    pass
+    # employee_id = request.query_params.get('employee_id')
+    # start_date = request.query_params.get('start_date')
+    # end_date = request.query_params.get('end_date')
 
-    if request.user.role not in ['owner', 'admin'] and (not start_date or not end_date):
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club,
-            check_out__isnull=True
-        ).order_by('-check_in').first()
-        if attendance:
-            start_date = attendance.check_in.isoformat()
-            end_date = timezone.now().isoformat()
+    # if request.user.role not in ['owner', 'admin'] and (not start_date or not end_date):
+    #     attendance = StaffAttendance.objects.filter(
+    #         staff=request.user,
+    #         club=request.user.club,
+    #         check_out__isnull=True
+    #     ).order_by('-check_in').first()
+    #     if attendance:
+    #         start_date = attendance.check_in.isoformat()
+    #         end_date = timezone.now().isoformat()
 
-    if employee_id:
-        employee = get_object_or_404(User, id=employee_id)
-        if employee.club != request.user.club:
-            return Response({'error': 'Employee not in your club'}, status=status.HTTP_403_FORBIDDEN)
+    # if employee_id:
+    #     employee = get_object_or_404(User, id=employee_id)
+    #     if employee.club != request.user.club:
+    #         return Response({'error': 'Employee not in your club'}, status=status.HTTP_403_FORBIDDEN)
 
-    data, response_status = get_employee_report_data(
-        request.user,
-        employee_id,
-        start_date,
-        end_date
-    )
-    if response_status != status.HTTP_200_OK:
-        return Response(data, status=response_status)
+    # data, response_status = get_employee_report_data(
+    #     request.user,
+    #     employee_id,
+    #     start_date,
+    #     end_date
+    # )
+    # if response_status != status.HTTP_200_OK:
+    #     return Response(data, status=response_status)
 
-    data['report_date'] = timezone.localtime(timezone.now()).strftime('%Y-%m-%d')
+    # data['report_date'] = timezone.localtime(timezone.now()).strftime('%Y-%m-%d')
 
-    template_path = 'templates/report_template.tex'
-    if not os.path.exists(template_path):
-        logger.error("Template file not found: %s", template_path)
-        return Response({'error': 'قالب التقرير غير موجود'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+  
+    # html_string = render_to_string("report_template.html", data)
 
-    with open(template_path, 'r', encoding='utf-8') as file:
-        template = Template(file.read())
 
-    rendered = template.render(**data)
+    # pdf_file = HTML(string=html_string).write_pdf()
 
-    temp_dir = 'temp'
-    os.makedirs(temp_dir, exist_ok=True)
-    tex_file = os.path.join(temp_dir, f'report_{request.user.id}.tex')
-    pdf_file = os.path.join(temp_dir, f'report_{request.user.id}.pdf')
-
-    with open(tex_file, 'w', encoding='utf-8') as f:
-        f.write(rendered)
-
-    try:
-        subprocess.run([
-            'latexmk', '-pdf', tex_file, '-outdir=' + temp_dir
-        ], check=True, capture_output=True, text=True)
-    except subprocess.CalledProcessError as e:
-        logger.error("Failed to generate PDF: %s\nstdout: %s\nstderr: %s", e, e.stdout, e.stderr)
-        return Response({'error': 'فشل في إنشاء ملف PDF'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    if not os.path.exists(pdf_file):
-        logger.error("PDF file not created: %s", pdf_file)
-        return Response({'error': 'ملف PDF لم يتم إنشاؤه'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-    response = FileResponse(
-        open(pdf_file, 'rb'),
-        content_type='application/pdf',
-        as_attachment=True,
-        filename='daily_report.pdf'
-    )
-
-    try:
-        os.remove(tex_file)
-        os.remove(pdf_file)
-    except Exception as e:
-        logger.warning("Failed to clean up temporary files: %s", e)
-
-    return response
+    # response = HttpResponse(pdf_file, content_type='application/pdf')
+    # response['Content-Disposition'] = 'attachment; filename="daily_report.pdf"'
+    # return response

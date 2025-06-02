@@ -24,6 +24,26 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
             'club': {'required': True}
         }
 
+    def validate(self, data):
+        max_freeze_days = data.get('max_freeze_days', getattr(self.instance, 'max_freeze_days', 0))
+        if max_freeze_days < 0:
+            raise serializers.ValidationError({
+                'max_freeze_days': 'يجب أن تكون أيام التجميد غير سالبة'
+            })
+
+        # Prevent disabling is_private_training if active subscriptions exist
+        if self.instance and 'is_private_training' in data:
+            if not data['is_private_training'] and self.instance.is_private_training:
+                if Subscription.objects.filter(
+                    type=self.instance,
+                    end_date__gte=timezone.now().date()
+                ).exists():
+                    raise serializers.ValidationError({
+                        'is_private_training': 'لا يمكن إلغاء التدريب الخاص لوجود اشتراكات نشطة'
+                    })
+
+        return data
+
 
 class FreezeRequestSerializer(serializers.ModelSerializer):
     created_by_details = UserSerializer(source='created_by', read_only=True)
@@ -94,12 +114,12 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         club = data.get('club')
-        subscription_type = data.get('type')
+        subscription_type = data.get('type', getattr(self.instance, 'type', None))
         coach = data.get('coach')
         coach_identifier = data.get('coach_identifier', '')
         member = data.get('member')
         identifier = data.get('identifier', '')
-        private_training_price = data.get('private_training_price', 0)
+        private_training_price = data.get('private_training_price', getattr(self.instance, 'private_training_price', 0))
 
         # Handle identifier if provided
         if identifier and not member:
@@ -125,6 +145,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             except User.DoesNotExist:
                 raise serializers.ValidationError("لا يوجد مدرب بهذا المعرف (اسم المستخدم أو RFID).")
 
+        # Handle private training logic
         if subscription_type and subscription_type.is_private_training:
             if not coach:
                 raise serializers.ValidationError("مطلوب كابتن لاشتراك التدريب الخاص.")
@@ -148,9 +169,14 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                         )
             else:
                 raise serializers.ValidationError("الكابتن ليس لديه ملف تدريب.")
-
-        elif private_training_price > 0:
-            raise serializers.ValidationError("لا يمكن تحديد سعر تدريب خاص لاشتراك غير خاص.")
+        else:
+            # If not private training, ensure private_training_price and coach are null
+            if private_training_price is not None and private_training_price > 0:
+                raise serializers.ValidationError("لا يمكن تحديد سعر تدريب خاص لاشتراك غير خاص.")
+            if coach is not None:
+                data['coach'] = None
+            if private_training_price is not None:
+                data['private_training_price'] = None
 
         if club and subscription_type and subscription_type.club != club:
             raise serializers.ValidationError("نوع الاشتراك يجب أن يكون لنفس النادي.")

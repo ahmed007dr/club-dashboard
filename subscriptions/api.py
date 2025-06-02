@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from django.db import transaction
 from django.db.models import Q, Count, Sum
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -262,14 +263,13 @@ def active_subscription_types(request):
     serializer = SubscriptionTypeSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
-
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_detail(request, pk):
     subscription = get_object_or_404(Subscription, pk=pk)
     
     if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
-        return Response({'error': 'You do not have permission to access this subscription'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'غير مخول للوصول إلى هذا الاشتراك'}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == 'GET':
         serializer = SubscriptionSerializer(subscription)
@@ -290,31 +290,62 @@ def subscription_detail(request, pk):
             except Member.DoesNotExist:
                 return Response({'error': 'معرف غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = SubscriptionSerializer(subscription, data=mutable_data, partial=True, context={'request': request})
-        if serializer.is_valid():
-            updated_subscription = serializer.save()
-
-            if 'paid_amount' in mutable_data and updated_subscription.paid_amount > subscription.paid_amount:
-                additional_amount = updated_subscription.paid_amount - subscription.paid_amount
-                source, _ = IncomeSource.objects.get_or_create(
-                    club=updated_subscription.club, name='Subscription', defaults={'description': 'ايراد عن اشتراك'}
+        with transaction.atomic():
+            # Handle SubscriptionType updates if type is provided
+            type_id = mutable_data.get('type')
+            if type_id:
+                subscription_type = get_object_or_404(SubscriptionType, pk=type_id, club=request.user.club)
+                type_data = {
+                    'max_freeze_days': mutable_data.get('max_freeze_days', subscription_type.max_freeze_days),
+                    'is_private_training': mutable_data.get('is_private_training', subscription_type.is_private_training)
+                }
+                type_serializer = SubscriptionTypeSerializer(
+                    subscription_type, 
+                    data=type_data, 
+                    partial=True, 
+                    context={'request': request}
                 )
-                income = Income(
-                    club=updated_subscription.club, source=source, amount=additional_amount,
-                    description=f"ايراد اضافي لاشتراك {updated_subscription.member.name}" +
-                                (f" مع الكابتن {updated_subscription.coach.username} بسعر {updated_subscription.private_training_price}" 
-                                 if updated_subscription.coach and updated_subscription.type.is_private_training else ""),
-                    date=timezone.now().date(), received_by=request.user
-                )
-                income.save()
+                if type_serializer.is_valid():
+                    type_serializer.save()
+                else:
+                    return Response(type_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            serializer = SubscriptionSerializer(subscription, data=mutable_data, partial=True, context={'request': request})
+            if serializer.is_valid():
+                updated_subscription = serializer.save()
+
+                # Update income if paid_amount or private_training_price changes
+                if 'paid_amount' in mutable_data or 'private_training_price' in mutable_data:
+                    old_paid_amount = subscription.paid_amount
+                    old_private_training_price = subscription.private_training_price or Decimal('0')
+                    new_paid_amount = updated_subscription.paid_amount
+                    new_private_training_price = updated_subscription.private_training_price or Decimal('0')
+
+                    additional_amount = (new_paid_amount - old_paid_amount) + (new_private_training_price - old_private_training_price)
+                    if additional_amount > 0:
+                        source, _ = IncomeSource.objects.get_or_create(
+                            club=updated_subscription.club, 
+                            name='Subscription', 
+                            defaults={'description': 'ايراد عن اشتراك'}
+                        )
+                        income = Income(
+                            club=updated_subscription.club,
+                            source=source,
+                            amount=additional_amount,
+                            description=f"ايراد اضافي لاشتراك {updated_subscription.member.name}" +
+                                        (f" مع الكابتن {updated_subscription.coach.username} بسعر {updated_subscription.private_training_price}" 
+                                         if updated_subscription.coach and updated_subscription.type.is_private_training else ""),
+                            date=timezone.now().date(),
+                            received_by=request.user
+                        )
+                        income.save()
+
+                return Response(serializer.data)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         subscription.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
