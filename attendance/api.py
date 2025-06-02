@@ -1,17 +1,24 @@
+import logging
+from datetime import datetime, timedelta
+
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from django.db.models import Count
+from django.db.models.functions import ExtractHour
+
 from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
-from django.shortcuts import get_object_or_404
+from rest_framework.pagination import PageNumberPagination
+
+from utils.permissions import IsOwnerOrRelatedToClub
+
 from .models import Attendance, EntryLog
 from .serializers import AttendanceSerializer, EntryLogSerializer
-from rest_framework.permissions import IsAuthenticated
-from utils.permissions import IsOwnerOrRelatedToClub
-from django.utils import timezone
-from rest_framework.pagination import PageNumberPagination
-from datetime import datetime, timedelta
-from django.db.models import Count
 from staff.models import StaffAttendance
 
+logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -242,44 +249,58 @@ def create_entry_log_api(request):
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-from django.db.models.functions import ExtractHour
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_hourly_api(request):
     """Get hourly attendance data for a specific day (default: today)."""
+    logger.info(f"Request params: {request.GET}")
+    logger.info(f"User: {request.user}, Role: {request.user.role}, Club: {request.user.club}")
+
+    # Check if user has associated club
+    if not hasattr(request.user, 'club') or not request.user.club:
+        logger.error("User has no associated club")
+        return Response({'error': 'User has no associated club.'}, status=status.HTTP_403_FORBIDDEN)
+
     date_str = request.GET.get('date', timezone.now().date().isoformat())
     try:
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
     except ValueError:
+        logger.error(f"Invalid date format: {date_str}")
         return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if request.user.role in ['owner', 'admin']:
-        entry_logs = EntryLog.objects.filter(
-            club=request.user.club,
-            timestamp__date=target_date
+        attendances = Attendance.objects.filter(
+            subscription__club=request.user.club,
+            attendance_date=target_date
         )
     else:
-        attendance = StaffAttendance.objects.filter(
+        # Find the latest staff attendance record
+        staff_attendance = StaffAttendance.objects.filter(
             staff=request.user,
             club=request.user.club
         ).order_by('-check_in').first()
-        if not attendance:
+        if not staff_attendance:
+            logger.error("No open or recent shift found for user")
             return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
-        check_out = attendance.check_out if attendance.check_out else timezone.now()
-        if target_date < attendance.check_in.date() or target_date > check_out.date():
+        
+        check_out = staff_attendance.check_out if staff_attendance.check_out else timezone.now()
+        if target_date < staff_attendance.check_in.date() or target_date > check_out.date():
+            logger.error(f"Date {target_date} is outside user's shift")
             return Response({'error': 'Date must be within your shift.'}, status=status.HTTP_400_BAD_REQUEST)
-        entry_logs = EntryLog.objects.filter(
-            club=request.user.club,
-            approved_by=request.user,
-            timestamp__date=target_date
+        
+        # Staff can see all attendances for the club on the target date
+        attendances = Attendance.objects.filter(
+            subscription__club=request.user.club,
+            attendance_date=target_date
         )
 
-    # SQLite-compatible way to extract hour
+    # SQLite-compatible way to extract hour from entry_time
     hourly_counts = (
-        entry_logs.annotate(
-            hour=ExtractHour('timestamp')
-        ).values('hour')
+        attendances
+        .filter(entry_time__isnull=False)  # Exclude records with null entry_time
+        .annotate(hour=ExtractHour('entry_time'))
+        .values('hour')
         .annotate(count=Count('id'))
         .order_by('hour')
     )
@@ -306,7 +327,6 @@ def attendance_weekly_api(request):
 
     # Generate list of 7 days from Saturday to Friday
     week_days = [start_date + timedelta(days=i) for i in range(7)]
-
     if request.user.role in ['owner', 'admin']:
         attendances = Attendance.objects.filter(
             subscription__club=request.user.club,
