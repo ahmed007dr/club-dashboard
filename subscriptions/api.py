@@ -601,7 +601,7 @@ def coach_report(request, coach_id):
     else:
         end_date = timezone.now().date()
 
-    # Get subscriptions for the specified period
+    # Get all subscriptions for the specified period
     subscriptions = Subscription.objects.filter(
         coach=coach,
         club=request.user.club,
@@ -638,8 +638,11 @@ def coach_report(request, coach_id):
         'total_private_training_amount': aggregated_data['total_private_training_amount'] or 0,
         'total_paid_amount': aggregated_data['total_paid_amount'] or 0,
         'previous_month_clients': prev_month_clients,
-        'subscriptions': subscriptions
+        'subscriptions': subscriptions,
+        'start_date': start_date,
+        'end_date': end_date
     }
 
     serializer = CoachReportSerializer(report)
     return Response(serializer.data)
+

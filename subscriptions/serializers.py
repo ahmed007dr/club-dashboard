@@ -223,9 +223,9 @@ class CoachReportSerializer(serializers.Serializer):
     total_paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     previous_month_clients = serializers.IntegerField()
     subscriptions = serializers.SerializerMethodField()
+    completed_subscriptions = serializers.SerializerMethodField()
 
     def get_subscriptions(self, obj):
-        # Assuming subscriptions are passed in the object
         today = timezone.now().date()
         subscriptions = obj.get('subscriptions', [])
         return [
@@ -239,4 +239,21 @@ class CoachReportSerializer(serializers.Serializer):
                 'paid_amount': sub.paid_amount,
             }
             for sub in subscriptions
+        ]
+
+    def get_completed_subscriptions(self, obj):
+        start_date = obj.get('start_date')
+        end_date = obj.get('end_date')
+        subscriptions = obj.get('subscriptions', [])
+        return [
+            {
+                'subscription_id': sub.id,
+                'member_name': sub.member.name,
+                'start_date': sub.start_date,
+                'end_date': sub.end_date,
+                'private_training_price': sub.private_training_price,
+                'paid_amount': sub.paid_amount,
+            }
+            for sub in subscriptions
+            if start_date <= sub.end_date <= end_date
         ]
