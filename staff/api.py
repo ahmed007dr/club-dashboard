@@ -273,18 +273,20 @@ def staff_attendance_analysis_api(request, attendance_id):
         "expected_hours": round(expected_hours, 2)
     })
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def staff_attendance_report_api(request, staff_id=None):
-    if request.user.role in ['owner', 'admin']:
-        attendances = StaffAttendance.objects.filter(
-            check_out__isnull=False,
-            club=request.user.club
-        )
-    
-    year = request.query_params.get('year', None)
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
-    if staff_id:  
+    attendances = StaffAttendance.objects.filter(
+        check_out__isnull=False,
+        club=request.user.club
+    )
+
+    year = request.query_params.get('year', None)
+    if staff_id:
         try:
             staff_id = int(staff_id)
             attendances = attendances.filter(staff_id=staff_id)
@@ -298,6 +300,7 @@ def staff_attendance_report_api(request, staff_id=None):
         except ValueError:
             return Response({'error': 'Invalid year format'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Aggregate data by staff and month
     monthly_data = attendances.annotate(
         month=TruncMonth('check_in')
     ).values(
@@ -318,20 +321,40 @@ def staff_attendance_report_api(request, staff_id=None):
         )
     ).order_by('staff__id', 'month')
 
+    # Group data by staff
+    staff_data = {}
     staff_monthly_map = {}
     for entry in monthly_data:
         staff_id = entry['staff__id']
-        month = entry['month']
         total_hours = entry['total_hours'].total_seconds() / 3600
+        prev_month = entry['month'] - relativedelta(months=1)
+        prev_hours = staff_monthly_map.get(staff_id, {}).get(prev_month, 0)
+
+        month_entry = {
+            'month': entry['month'],
+            'total_hours': round(total_hours, 2),
+            'attendance_days': entry['attendance_days'],
+            'hours_change': round(total_hours - prev_hours, 2),
+            'percentage_change': round(((total_hours - prev_hours) / prev_hours) * 100, 2) if prev_hours > 0 else 0
+        }
+
+        if staff_id not in staff_data:
+            staff_data[staff_id] = {
+                'staff_id': staff_id,
+                'staff_name': entry['staff__username'],
+                'rfid_code': entry['staff__rfid_code'],
+                'monthly_data': []
+            }
+        staff_data[staff_id]['monthly_data'].append(month_entry)
+
+        # Update staff_monthly_map for next iteration
         if staff_id not in staff_monthly_map:
             staff_monthly_map[staff_id] = {}
-        staff_monthly_map[staff_id][month] = total_hours
+        staff_monthly_map[staff_id][entry['month']] = total_hours
 
-    serializer = StaffMonthlyHoursSerializer(
-        monthly_data,
-        many=True,
-        context={'monthly_data': staff_monthly_map}
-    )
+    # Convert staff_data to list for serialization
+    staff_list = list(staff_data.values())
+    serializer = StaffMonthlyHoursSerializer(staff_list, many=True)
     return Response(serializer.data)
 
 @api_view(['GET'])

@@ -162,6 +162,12 @@ def migrate_data(old_db_path, new_db_path, default_values=None):
         'subscriptions.SubscriptionType.max_entries': 0,
         'subscriptions.Subscription.entry_count': 0,
         'subscriptions.Subscription.remaining_amount': 0,
+        'subscriptions.Subscription.coach': None,
+        'subscriptions.Subscription.private_training_price': 0,
+        'subscriptions.Subscription.created_by': None,
+        'subscriptions.SubscriptionType.is_private_training': False,
+        'subscriptions.SubscriptionType.max_freeze_days': 0,
+        'attendance.Attendance.attendance_date': lambda: datetime.now().date(),
         'attendance.EntryLog.approved_by': None,
         'attendance.EntryLog.related_subscription': None,
         'members.FreeInvite.status': 'pending',
@@ -172,6 +178,7 @@ def migrate_data(old_db_path, new_db_path, default_values=None):
         'finance.Expense.attachment': None,
         'finance.Income.related_receipt': None,
         'tickets.Ticket.used': False,
+
     }
 
     # Table order based on dependencies
