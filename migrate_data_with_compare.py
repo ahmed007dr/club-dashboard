@@ -316,8 +316,8 @@ def migrate_data(old_db_path, new_db_path, default_values=None):
     validate_migration(old_db_path, new_db_path)
 
 if __name__ == "__main__":
-    OLD_DB_PATH = r"F:\club\clubx\src\db_old.sqlite3"  
-    NEW_DB_PATH = r"F:\club\clubx\src\db.sqlite3"
+    OLD_DB_PATH = r"F:\club\club2\src\db_old.sqlite3"  
+    NEW_DB_PATH = r"F:\club\club2\src\db.sqlite3"
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings")
     import django
     django.setup()

@@ -43,7 +43,7 @@ class Subscription(models.Model):
                             limit_choices_to={'role': 'coach', 'is_active': True})
     start_date = models.DateField()
     end_date = models.DateField(blank=True, null=True)
-    private_training_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, blank=True,
+    private_training_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True, blank=True,
                                                help_text="سعر التدريب الخاص المخصص لهذا العضو")
     paid_amount = models.DecimalField(max_digits=10, decimal_places=2)
     remaining_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
