@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
 import BASE_URL from '../../config/api';
+import { FiUser, FiCalendar, FiEye, FiDownload, FiAlertTriangle, FiDollarSign, FiShoppingCart } from 'react-icons/fi';
 import { Loader2 } from 'lucide-react';
 import { format, differenceInHours, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
@@ -178,224 +179,236 @@ const DailyReportButton = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div className="max-w-5xl mx-auto p-6" dir="rtl">
+      {/* Error Modal */}
       {isErrorModalOpen && (
-        <div style={{
-          position: 'fixed',
-          top: '20%',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: 'white',
-          padding: '20px',
-          borderRadius: '8px',
-          boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-          zIndex: 1000,
-          maxWidth: '400px',
-          width: '90%',
-          textAlign: 'right',
-        }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '12px' }}>حدث خطأ</h3>
-          <p style={{ color: 'red', marginBottom: '16px' }}>{error}</p>
-          <button
-            onClick={() => setIsErrorModalOpen(false)}
-            style={{
-              padding: '8px 16px',
-              background: '#dc3545',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            إغلاق
-          </button>
-        </div>
-      )}
-      
-      {(userRole === 'admin' || userRole === 'owner') ? (
-        <div style={{ display: 'grid', gap: '16px' }}>
-          <div>
-            <label htmlFor="employeeSelect" style={{ display: 'block', marginBottom: '8px', fontWeight: 'medium' }}>
-              اختيار الموظف
-            </label>
-            <select
-              id="employeeSelect"
-              value={employeeId}
-              onChange={(e) => setEmployeeId(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                fontSize: '16px',
-              }}
-              disabled={employeeLoading || loading || previewLoading}
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl shadow-lg max-w-md w-full text-right">
+            <div className="flex items-center gap-3 mb-4">
+              <FiAlertTriangle className="text-red-600 w-8 h-8" />
+              <h3 className="text-lg font-bold text-gray-800">حدث خطأ</h3>
+            </div>
+            <p className="text-red-600 mb-6">{error}</p>
+            <button
+              onClick={() => setIsErrorModalOpen(false)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all duration-200"
             >
-              <option value="">
-                {employeeLoading ? 'جارٍ تحميل الموظفين...' : 'اختر موظفًا'}
-              </option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.first_name || employee.last_name
-                    ? `${employee.first_name} ${employee.last_name}`
-                    : employee.username} (RFID: {employee.rfid_code || 'غير متوفر'})
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="startDate" style={{ display: 'block', marginBottom: '8px', fontWeight: 'medium' }}>
-              تاريخ البداية
-            </label>
-            <input
-              id="startDate"
-              type="datetime-local"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                fontSize: '16px',
-              }}
-              disabled={loading || previewLoading}
-            />
-          </div>
-          <div>
-            <label htmlFor="endDate" style={{ display: 'block', marginBottom: '8px', fontWeight: 'medium' }}>
-              تاريخ النهاية
-            </label>
-            <input
-              id="endDate"
-              type="datetime-local"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px',
-                border: '1px solid #ccc',
-                borderRadius: '4px',
-                fontSize: '16px',
-              }}
-              disabled={loading || previewLoading}
-            />
+              إغلاق
+            </button>
           </div>
         </div>
-      ) : (
-        <p style={{ textAlign: 'right', color: '#555' }}>
-          سيتم إنشاء تقرير لورديتك الحالية فقط (من تسجيل الحضور حتى الآن).
-        </p>
       )}
-      <button
-        onClick={handlePreviewReport}
-        disabled={loading || previewLoading}
-        style={{
-          padding: '10px 20px',
-          background: (loading || previewLoading) ? '#ccc' : '#007bff',
-          color: 'white',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: (loading || previewLoading) ? 'not-allowed' : 'pointer',
-          fontSize: '16px',
-        }}
-      >
-        {previewLoading ? (
-          <>
-            <Loader2 style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
-            جارٍ تحميل البيانات...
-          </>
-        ) : (
-          'معاينة التقرير'
-        )}
-      </button>
 
+      {/* Main Card */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3 mb-6">
+          <FiDollarSign className="text-blue-600 bg-blue-100 p-1.5 rounded-full w-8 h-8" />
+          تقرير يومي للموظف
+        </h2>
+
+        {/* Input Section */}
+        {(userRole === 'admin' || userRole === 'owner') ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div>
+              <label htmlFor="employeeSelect" className="block text-sm font-medium text-gray-700 mb-2">
+                اختيار الموظف
+              </label>
+              <div className="relative">
+                <FiUser className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <select
+                  id="employeeSelect"
+                  value={employeeId}
+                  onChange={(e) => setEmployeeId(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg py-2.5 pr-10 pl-4 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 disabled:bg-gray-100"
+                  disabled={employeeLoading || loading || previewLoading}
+                >
+                  <option value="">
+                    {employeeLoading ? 'جارٍ تحميل الموظفين...' : 'اختر موظفًا'}
+                  </option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.first_name || employee.last_name
+                        ? `${employee.first_name} ${employee.last_name}`
+                        : employee.username} (RFID: {employee.rfid_code || 'غير متوفر'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-2">
+                تاريخ البداية
+              </label>
+              <div className="relative">
+                <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  id="startDate"
+                  type="datetime-local"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg py-2.5 pr-10 pl-4 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 disabled:bg-gray-100"
+                  disabled={loading || previewLoading}
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">
+                تاريخ النهاية
+              </label>
+              <div className="relative">
+                <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  id="endDate"
+                  type="datetime-local"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg py-2.5 pr-10 pl-4 bg-white text-gray-700 focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all duration-200 disabled:bg-gray-100"
+                  disabled={loading || previewLoading}
+                />
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="mb-6 text-right text-gray-600 bg-gray-50 p-4 rounded-lg">
+            سيتم إنشاء تقرير لورديتك الحالية فقط (من تسجيل الحضور حتى الآن).
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-4 justify-end">
+          <button
+            onClick={handlePreviewReport}
+            disabled={loading || previewLoading}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {previewLoading ? (
+              <Loader2 className="animate-spin w-5 h-5" />
+            ) : (
+              <FiEye className="w-5 h-5" />
+            )}
+            معاينة التقرير
+          </button>
+          {reportData && (
+            <button
+              onClick={handleGenerateReport}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <Loader2 className="animate-spin w-5 h-5" />
+              ) : (
+                <FiDownload className="w-5 h-5" />
+              )}
+              تنزيل التقرير كـ PDF
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Report Preview Section */}
       {reportData && (
-        <div style={{ marginTop: '20px', border: '1px solid #ccc', padding: '16px', borderRadius: '4px' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', textAlign: 'right' }}>
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 mt-6">
+          <h3 className="text-xl font-bold text-gray-800 flex items-center gap-3 mb-6">
+            <FiEye className="text-blue-600 bg-blue-100 p-1.5 rounded-full w-8 h-8" />
             معاينة التقرير
           </h3>
-          <p><strong>اسم الموظف:</strong> {reportData.employee_name}</p>
-          <p><strong>النادي:</strong> {reportData.club_name}</p>
-          <p>
-            <strong>فترة الوردية:</strong> من {formatDate(reportData.check_in)} إلى {formatDate(reportData.check_out)}
-          </p>
-          <p><strong>مدة الوردية:</strong> {getShiftDuration(reportData.check_in, reportData.check_out)}</p>
 
-          <h4 style={{ fontSize: '16px', fontWeight: 'bold', margin: '16px 0 8px', textAlign: 'right' }}>
-            الإيرادات
-          </h4>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f0f0f0' }}>
-                <th style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>البند</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>العدد</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>الإجمالي</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reportData.incomes.map((income, index) => (
-                <tr key={index}>
-                  <td style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>{income.source}</td>
-                  <td style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>{income.count}</td>
-                  <td style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>{income.total}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Summary Widgets */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-3">
+              <FiDollarSign className="text-blue-600 w-6 h-6" />
+              <div>
+                <p className="text-sm text-gray-600">إجمالي الإيرادات</p>
+                <p className="text-lg font-semibold text-gray-800">{reportData.total_income}</p>
+              </div>
+            </div>
+            <div className="bg-red-50 p-4 rounded-lg flex items-center gap-3">
+              <FiShoppingCart className="text-red-600 w-6 h-6" />
+              <div>
+                <p className="text-sm text-gray-600">إجمالي النفقات</p>
+                <p className="text-lg font-semibold text-gray-800">{reportData.total_expenses}</p>
+              </div>
+            </div>
+            <div className="bg-green-50 p-4 rounded-lg flex items-center gap-3">
+              <FiDollarSign className="text-green-600 w-6 h-6" />
+              <div>
+                <p className="text-sm text-gray-600">صافي الربح</p>
+                <p className="text-lg font-semibold text-gray-800">{reportData.net_profit}</p>
+              </div>
+            </div>
+          </div>
 
-          <h4 style={{ fontSize: '16px', fontWeight: 'bold', margin: '16px 0 8px', textAlign: 'right' }}>
-            النفقات
-          </h4>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#f0f0f0' }}>
-                <th style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>البند</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>القيمة</th>
-                <th style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>الوصف</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reportData.expenses.map((expense, index) => (
-                <tr key={index}>
-                  <td style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>{expense.category}</td>
-                  <td style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>{expense.total}</td>
-                  <td style={{ border: '1px solid #ccc', padding: '8px', textAlign: 'right' }}>{expense.description}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          {/* Report Details */}
+          <div className="space-y-6">
+            <div>
+              <p className="text-gray-700"><strong>اسم الموظف:</strong> {reportData.employee_name}</p>
+              <p className="text-gray-700"><strong>النادي:</strong> {reportData.club_name}</p>
+              <p className="text-gray-700">
+                <strong>فترة الوردية:</strong> من {formatDate(reportData.check_in)} إلى {formatDate(reportData.check_out)}
+              </p>
+              <p className="text-gray-700"><strong>مدة الوردية:</strong> {getShiftDuration(reportData.check_in, reportData.check_out)}</p>
+            </div>
 
-          <h4 style={{ fontSize: '16px', fontWeight: 'bold', margin: '16px 0 8px', textAlign: 'right' }}>
-            الملخص
-          </h4>
-          <p><strong>إجمالي الإيرادات:</strong> {reportData.total_income}</p>
-          <p><strong>إجمالي النفقات:</strong> {reportData.total_expenses}</p>
-          <p><strong>صافي الربح:</strong> {reportData.net_profit}</p>
+            {/* Incomes Table */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-800 mb-4">الإيرادات</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full border border-gray-200 rounded-lg text-right">
+                  <thead>
+                    <tr className="bg-gray-100 text-gray-700">
+                      <th className="p-3 font-semibold">البند</th>
+                      <th className="p-3 font-semibold">العدد</th>
+                      <th className="p-3 font-semibold">الإجمالي</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {reportData.incomes.map((income, index) => (
+                      <tr key={index} className="hover:bg-gray-50 transition-all duration-200">
+                        <td className="p-3 text-gray-800">{income.source}</td>
+                        <td className="p-3 text-gray-800">{income.count}</td>
+                        <td className="p-3 text-gray-800">{income.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
 
-          <button
-            onClick={handleGenerateReport}
-            disabled={loading}
-            style={{
-              padding: '10px 20px',
-              background: loading ? '#ccc' : '#007bff',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '16px',
-              marginTop: '16px',
-            }}
-          >
-            {loading ? (
-              <>
-                <Loader2 style={{ marginRight: '8px', animation: 'spin 1s linear infinite' }} />
-                جارٍ إنشاء التقرير...
-              </>
-            ) : (
-              'تنزيل التقرير كـ PDF'
-            )}
-          </button>
+            {/* Expenses Table */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-800 mb-4">النفقات</h4>
+              <div className="overflow-x-auto">
+                <table className="w-full border border-gray-200 rounded-lg text-right">
+                  <thead>
+                    <tr className="bg-gray-100 text-gray-700">
+                      <th className="p-3 font-semibold">البند</th>
+                      <th className="p-3 font-semibold">القيمة</th>
+                      <th className="p-3 font-semibold">الوصف</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {reportData.expenses.map((expense, index) => (
+                      <tr key={index} className="hover:bg-gray-50 transition-all duration-200">
+                        <td className="p-3 text-gray-800">{expense.category}</td>
+                        <td className="p-3 text-gray-800">{expense.total}</td>
+                        <td className="p-3 text-gray-800">{expense.description}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Summary */}
+            <div>
+              <h4 className="text-lg font-semibold text-gray-800 mb-4">الملخص</h4>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <p className="text-gray-700"><strong>إجمالي الإيرادات:</strong> {reportData.total_income}</p>
+                <p className="text-gray-700"><strong>إجمالي النفقات:</strong> {reportData.total_expenses}</p>
+                <p className="text-gray-700"><strong>صافي الربح:</strong> {reportData.net_profit}</p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

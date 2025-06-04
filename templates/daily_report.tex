@@ -1,0 +1,77 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[arabic]{babel}
+\usepackage{geometry}
+\geometry{margin=1in}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{amsmath}
+\usepackage{amiri}
+\usepackage{datetime}
+\usepackage{pdflscape}
+
+% تعيين الخط للغة العربية
+\selectlanguage{arabic}
+\renewcommand{\familydefault}{\rmdefault}
+\babelprovide[main]{arabic}
+\babelfont{rm}{Amiri}
+
+% أوامر مخصصة للتنسيق
+\newcommand{\reporttitle}[1]{\begin{center}\textbf{\LARGE #1}\vspace{0.5cm}\end{center}}
+\newcommand{\sectiontitle}[1]{\textbf{\large #1}\vspace{0.2cm}}
+\newcommand{\datafield}[2]{\textbf{#1}: #2 \\}
+
+\begin{document}
+
+% عنوان التقرير
+\reporttitle{تقرير يومي للموظف}
+
+% معلومات الموظف والشيفت
+\datafield{اسم الموظف}{{{ employee_name }}}
+\datafield{فترة التقرير}{من {{ start_date }} إلى {{ end_date }}}
+\datafield{تاريخ الشيفت}{{{ shift_date }}}
+\datafield{تاريخ الطباعة}{{{ print_date }}}
+
+% قسم المصروفات
+\sectiontitle{المصروفات}
+\begin{longtable}{|p{4cm}|p{6cm}|p{4cm}|}
+\hline
+\textbf{التاريخ} & \textbf{الفئة} & \textbf{المبلغ} \\
+\hline
+\endhead
+{% for expense in expenses %}
+{{ expense.date }} & {{ expense.category }} & {{ expense.amount }} \\
+\hline
+{% endfor %}
+\end{longtable}
+\datafield{عدد المصروفات}{{{ expenses_count }}}
+\datafield{إجمالي المصروفات}{{{ total_expenses }}}
+
+% قسم الإيرادات
+\sectiontitle{الإيرادات}
+\begin{longtable}{|p{4cm}|p{6cm}|p{4cm}|}
+\hline
+\textbf{التاريخ} & \textbf{المصدر} & \textbf{المبلغ} \\
+\hline
+\endhead
+{% for income in incomes %}
+{{ income.date }} & {{ income.source }} & {{ income.amount }} \\
+\hline
+{% endfor %}
+\end{longtable}
+\datafield{عدد الإيرادات}{{{ incomes_count }}}
+\datafield{إجمالي الإيرادات}{{{ total_incomes }}}
+
+% ملخص الصافي
+\sectiontitle{الملخص}
+\datafield{صافي الربح}{{{ net_profit }}}
+
+% توقيع الموظف
+\vspace{1cm}
+\begin{flushright}
+\datafield{توقيع الموظف}{}
+\vspace{0.5cm}
+\rule{5cm}{0.4pt}
+\end{flushright}
+
+\end{document}

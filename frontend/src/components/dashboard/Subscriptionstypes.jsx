@@ -5,13 +5,10 @@ import UpdateSubscriptionTypes from './UpdateSubscriptionTypes';
 import DeleteSubscriptionTypesModal from './DeleteSubscriptionTypesModal';
 import SubscriptionTypeDetails from './SubscriptionTypeDetails';
 import CreateSubscriptionType from './CreateSubscriptionType';
-import { FaEye, FaEdit, FaTrash, FaPlus, FaSearch } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash, FaPlus, FaSearch, FaChevronRight, FaChevronLeft } from 'react-icons/fa';
 import { CiShoppingTag } from 'react-icons/ci';
 import { RiForbidLine } from 'react-icons/ri';
 import usePermission from '@/hooks/usePermission';
-
-
-
 
 const SubscriptionsTypes = () => {
   const dispatch = useDispatch();
@@ -46,7 +43,7 @@ const SubscriptionsTypes = () => {
   const handleSearch = () => {
     dispatch(
       fetchSubscriptionTypes({
-        page: 1, // Reset to first page on new search
+        page: 1,
         searchQuery,
         statusFilter,
         durationFilter,
@@ -72,7 +69,7 @@ const SubscriptionsTypes = () => {
           );
         }
       });
-    setCurrentPage(1); // Reset page to 1 when filters change
+    setCurrentPage(1);
   };
 
   // Fetch subscriptions when page changes
@@ -150,9 +147,27 @@ const SubscriptionsTypes = () => {
       startPage = Math.max(1, endPage - maxButtons + 1);
     }
 
+    // Add first page and ellipsis if needed
+    if (startPage > 1) {
+      buttons.push(1);
+      if (startPage > 2) {
+        buttons.push('...');
+      }
+    }
+
+    // Add page numbers
     for (let i = startPage; i <= endPage; i++) {
       buttons.push(i);
     }
+
+    // Add last page and ellipsis if needed
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        buttons.push('...');
+      }
+      buttons.push(totalPages);
+    }
+
     return buttons;
   };
 
@@ -219,7 +234,7 @@ const SubscriptionsTypes = () => {
           <option value="inactive">غير نشط</option>
         </select>
         <input
-          type="number" // Fixed typo from 'kilk="number"'
+          type="number"
           placeholder="المدة (أيام)"
           value={durationFilter}
           onChange={(e) => setDurationFilter(e.target.value)}
@@ -264,187 +279,152 @@ const SubscriptionsTypes = () => {
         </button>
       </div>
 
-   <ul className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-  {(subscriptionTypes.results || []).length > 0 ? (
-    subscriptionTypes.results.map((type) => (
-     <li
-  key={type.id}
-  className="bg-gradient-to-br from-white to-gray-50 rounded-2xl shadow-sm hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 border border-gray-200 overflow-hidden"
->
-  <div className="p-6 flex flex-col h-full">
-    {/* Header with accent bar */}
-    <div className="mb-4 relative">
-      <div className="absolute -right-6 top-0 w-1 h-full bg-purple-900 rounded-r-full"></div>
-      <h3 className="text-2xl font-semibold text-gray-800 pl-3">{type.name}</h3>
-    </div>
-
-    {/* Stats grid */}
-    <div className="grid grid-cols-2 gap-3 mb-6">
-      {/* Active Status */}
-      <div className="bg-white p-3 rounded-xl border border-gray-100">
-        <p className="text-xs font-medium text-gray-500 mb-1">الحالة</p>
-        <div className="flex items-center">
-          {type.is_active ? (
-            <>
-              <span className="w-2 h-2 bg-emerald-500 rounded-full mr-2"></span>
-              <span className="text-sm font-medium text-gray-700">نشط</span>
-            </>
-          ) : (
-            <>
-              <span className="w-2 h-2 bg-rose-500 rounded-full mr-2"></span>
-              <span className="text-sm font-medium text-gray-700">غير نشط</span>
-            </>
-          )}
-        </div>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse bg-white shadow-sm rounded-lg">
+          <thead>
+            <tr className="bg-gray-100 text-gray-700 text-right">
+              <th className="px-4 py-3 font-semibold">الاسم</th>
+              <th className="px-4 py-3 font-semibold">الحالة</th>
+              <th className="px-4 py-3 font-semibold">المشتركين</th>
+              <th className="px-4 py-3 font-semibold">أيام التجميد</th>
+              <th className="px-4 py-3 font-semibold">تدريب خاص</th>
+              <th className="px-4 py-3 font-semibold">الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(subscriptionTypes.results || []).length > 0 ? (
+              subscriptionTypes.results.map((type) => (
+                <tr
+                  key={type.id}
+                  className="border-b hover:bg-gray-50 transition-all duration-200"
+                >
+                  <td className="px-4 py-3 text-gray-800">{type.name}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end">
+                      {type.is_active ? (
+                        <>
+                          <span className="w-2 h-2 bg-emerald-500 rounded-full ml-2"></span>
+                          <span className="text-sm text-gray-700">نشط</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-2 h-2 bg-rose-500 rounded-full ml-2"></span>
+                          <span className="text-sm text-gray-700">غير نشط</span>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-gray-700">{type.subscriptions_count}</td>
+                  <td className="px-4 py-3 text-gray-700">{type.max_freeze_days}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end">
+                      {type.is_private_training ? (
+                        <>
+                          <span className="w-2 h-2 bg-indigo-500 rounded-full ml-2"></span>
+                          <span className="text-sm text-gray-700">نعم</span>
+                        </>
+                      ) : (
+                        <>
+                          <span className="w-2 h-2 bg-gray-400 rounded-full ml-2"></span>
+                          <span className="text-sm text-gray-700">لا</span>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end space-x-2 rtl:space-x-reverse">
+                      <button
+                        onClick={() => openDetailsModal(type)}
+                        className="p-2 text-gray-600 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all duration-200 relative group"
+                      >
+                        <FaEye className="w-4 h-4" />
+                        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          عرض التفاصيل
+                        </span>
+                      </button>
+                      {canEditSubscriptionTypes && (
+                        <button
+                          onClick={() => openModal(type)}
+                          className="p-2 text-blue-600 hover:bg-blue-100 hover:text-blue-700 rounded-full transition-all duration-200 relative group"
+                        >
+                          <FaEdit className="w-4 h-4" />
+                          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            تعديل
+                          </span>
+                        </button>
+                      )}
+                      {canDeleteSubscriptionTypes && (
+                        <button
+                          onClick={() => openDeleteModal(type)}
+                          className="p-2 text-rose-600 hover:bg-rose-100 hover:text-rose-700 rounded-full transition-all duration-200 relative group"
+                        >
+                          <FaTrash className="w-4 h-4" />
+                          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                            حذف
+                          </span>
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="6" className="text-center text-gray-600 py-8">
+                  لا توجد أنواع اشتراكات مطابقة
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Subscribers */}
-      <div className="bg-white p-3 rounded-xl border border-gray-100">
-        <p className="text-xs font-medium text-gray-500 mb-1">المشتركين</p>
-        <p className="text-sm font-medium text-gray-700">{type.subscriptions_count}</p>
-      </div>
-
-      {/* Freeze Days */}
-      <div className="bg-white p-3 rounded-xl border border-gray-100">
-        <p className="text-xs font-medium text-gray-500 mb-1">أيام التجميد</p>
-        <p className="text-sm font-medium text-gray-700">{type.max_freeze_days}</p>
-      </div>
-
-      {/* Private Training */}
-      <div className="bg-white p-3 rounded-xl border border-gray-100">
-        <p className="text-xs font-medium text-gray-500 mb-1">تدريب خاص</p>
-        <div className="flex items-center">
-          {type.is_private_training ? (
-            <>
-              <span className="w-2 h-2 bg-indigo-500 rounded-full mr-2"></span>
-              <span className="text-sm font-medium text-gray-700">نعم</span>
-            </>
-          ) : (
-            <>
-              <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
-              <span className="text-sm font-medium text-gray-700">لا</span>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-
-    {/* Action buttons */}
-    <div className="mt-auto pt-4 border-t border-gray-100">
-  <div className="flex justify-end space-x-2 rtl:space-x-reverse">
-    {/* View Button */}
-    <button
-      onClick={() => openDetailsModal(type)}
-      className="p-2.5  text-gray-600 hover:bg-gray-50 hover:text-indigo-600 transition-all duration-200 group relative shadow-sm hover:shadow"
-    >
-      <div className="relative">
-        <FaEye className="w-4 h-4 transition-transform group-hover:scale-110" />
-        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          عرض التفاصيل
-        </span>
-      </div>
-    </button>
-
-    {/* Edit Button */}
-    {canEditSubscriptionTypes && (
-      <button
-        onClick={() => openModal(type)}
-        className="p-2.5  text-blue-600 hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group relative shadow-sm hover:shadow"
-      >
-        <div className="relative">
-          <FaEdit className="w-4 h-4 transition-transform group-hover:scale-110" />
-          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            تعديل
+      <div className="flex justify-center mt-6">
+        <div className="flex flex-col items-center space-y-2">
+          <span className="text-gray-700 text-sm">
+            صفحة {currentPage} من {totalPages || 1}
           </span>
-        </div>
-      </button>
-    )}
-
-    {/* Delete Button */}
-    {canDeleteSubscriptionTypes && (
-      <button
-        onClick={() => openDeleteModal(type)}
-        className="p-2.5  text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-all duration-200 group relative shadow-sm hover:shadow"
-      >
-        <div className="relative">
-          <FaTrash className="w-4 h-4 transition-transform group-hover:scale-110" />
-          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            حذف
-          </span>
-        </div>
-      </button>
-    )}
-  </div>
-</div>
-  </div>
-
-  <style jsx>{`
-    .tooltip {
-      position: absolute;
-      top: -35px;
-      left: 50%;
-      transform: translateX(-50%);
-      background-color: #1f2937;
-      color: white;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      opacity: 0;
-      transition: opacity 0.2s;
-      pointer-events: none;
-      white-space: nowrap;
-    }
-    .group:hover .tooltip {
-      opacity: 1;
-    }
-  `}</style>
-</li>
-    ))
-  ) : (
-    <p className="text-center text-gray-600 col-span-full py-8 bg-gray-50 rounded-lg border border-gray-100">
-      لا توجد أنواع اشتراكات مطابقة
-    </p>
-  )}
-</ul>
-
-      <div className="flex justify-between items-center mt-6">
-        <button
-          onClick={() => setCurrentPage(currentPage - 1)}
-          disabled={currentPage === 1}
-          className={`px-4 py-2 rounded-md ${
-            currentPage === 1
-              ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
-          }`}
-        >
-          السابق
-        </button>
-        <div className="flex gap-2">
-          {getPageButtons().map((pageNum) => (
+          <div className="flex items-center space-x-1 rtl:space-x-reverse">
             <button
-              key={pageNum}
-              onClick={() => setCurrentPage(pageNum)}
-              className={`px-4 py-2 rounded-md ${
-                currentPage === pageNum
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+              className={`p-2 rounded-full transition-all duration-200 ${
+                currentPage === 1
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
               }`}
             >
-              {pageNum}
+              <FaChevronRight className="w-4 h-4" />
             </button>
-          ))}
+            {getPageButtons().map((pageNum, index) => (
+              <button
+                key={index}
+                onClick={() => typeof pageNum === 'number' && setCurrentPage(pageNum)}
+                disabled={typeof pageNum !== 'number'}
+                className={`px-3 py-1 rounded-md text-sm ${
+                  pageNum === currentPage
+                    ? 'bg-blue-500 text-white'
+                    : typeof pageNum === 'number'
+                    ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    : 'bg-gray-200 text-gray-400 cursor-default'
+                }`}
+              >
+                {pageNum}
+              </button>
+            ))}
+            <button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage >= totalPages || totalPages === 0}
+              className={`p-2 rounded-full transition-all duration-200 ${
+                currentPage >= totalPages || totalPages === 0
+                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              <FaChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => setCurrentPage(currentPage + 1)}
-          disabled={currentPage >= totalPages || totalPages === 0}
-          className={`px-4 py-2 rounded-md ${
-            currentPage >= totalPages || totalPages === 0
-              ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
-          }`}
-        >
-          التالي
-        </button>
       </div>
 
       {isModalOpen && (

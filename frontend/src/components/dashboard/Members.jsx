@@ -10,8 +10,8 @@ import {
   searchMember,
 } from "../../redux/slices/memberSlice";
 import { IoAddOutline } from "react-icons/io5";
-import toast from 'react-hot-toast';
-import usePermission from "@/hooks/usePermission"; 
+import toast from "react-hot-toast";
+import usePermission from "@/hooks/usePermission";
 import { RiGroupLine, RiForbidLine } from "react-icons/ri";
 import {
   DropdownMenu,
@@ -19,66 +19,47 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../ui/DropdownMenu";
-import { MoreVertical } from "lucide-react";
-import { FaEye } from "react-icons/fa";
+import { MoreVertical, Loader2 } from "lucide-react";
+
 const Members = () => {
-  const [data, setData] = useState([
-    {
-      id: "4",
-      photo: "https://i.pravatar.cc/100?img=11",
-      name: "ahmed El-Zahrani",
-      membership_number: "1008",
-      national_id: "102030405066",
-      phone: "0101234566",
-      phone2: "", // Add this
-      address: "", // Add this
-      rfid_code: "", // Add this
-      job: "", // Add this
-      note: "", // Add this
-      club_name: "Sports Club",
-    },
-  ]);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState(null);
-  const [searchResult, setSearchResult] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 20; // Matches backend configuration
+  const [isLoading, setIsLoading] = useState(false);
+  const itemsPerPage = 20;
 
-    // Permission checks
   const canViewMembers = usePermission("view_member");
   const canAddMembers = usePermission("add_member");
   const canEditMembers = usePermission("change_member");
   const canDeleteMembers = usePermission("delete_member");
 
-  // Updated selectors
-  const members = useSelector((state) => state.member.items); // Now an array (results)
-  const pagination = useSelector((state) => state.member.pagination); // { count, next, previous }
+  const members = useSelector((state) => state.member.items);
+  const pagination = useSelector((state) => state.member.pagination);
   const dispatch = useDispatch();
-console.log("Members:", members);
-console.log("Pagination:", pagination);
+
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
       try {
-        const fetchedData = await dispatch(fetchUsers({ page: currentPage })).unwrap();
-        console.log('Raw fetched data:', fetchedData);
+        await dispatch(fetchUsers({ page: currentPage })).unwrap();
       } catch (error) {
-        console.error('Fetch error:', error);
-        setError('Failed to fetch members. Please try again later: ' + error.message);
+        setError(`فشل في جلب الأعضاء: ${error.message}`);
+      } finally {
+        setIsLoading(false);
       }
     };
-
     fetchData();
   }, [dispatch, currentPage]);
 
   const handleSearch = async (e) => {
     const query = e.target.value.toLowerCase();
     setSearchQuery(query);
-    setCurrentPage(1); // Reset to first page on search
-
+    setCurrentPage(1);
+    setIsLoading(true);
     try {
       if (query.trim() === "") {
         await dispatch(fetchUsers({ page: 1 })).unwrap();
@@ -86,16 +67,10 @@ console.log("Pagination:", pagination);
         await dispatch(searchMember({ query, page: 1 })).unwrap();
       }
     } catch (error) {
-      setError("Failed to search members. Please try again later: " + error);
+      setError(`فشل في البحث: ${error}`);
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const onAddSuccess = () => {
-    const updatedData = [...data, selectedMember];
-    const sortedUpdatedData = [...updatedData].sort((a, b) => b.id - a.id);
-    setData(sortedUpdatedData);
-    setSearchResult(sortedUpdatedData);
-    setIsAddModalOpen(false);
   };
 
   const handleDeleteClick = (member) => {
@@ -105,31 +80,26 @@ console.log("Pagination:", pagination);
 
   const confirmDelete = async () => {
     if (!selectedMember) {
-      setError("No member selected for deletion.");
+      setError("لم يتم اختيار عضو لحذفه.");
       return;
     }
-
     try {
       await dispatch(deleteMember(selectedMember.id)).unwrap();
-      // Refresh current page
       const fetchedData = await dispatch(fetchUsers({ page: currentPage })).unwrap();
-      // If current page is empty and not the first page, go to previous page
       if (fetchedData.results.length === 0 && currentPage > 1) {
         setCurrentPage(currentPage - 1);
       }
       setIsDeleteModalOpen(false);
       toast.success("تم حذف العضو بنجاح");
     } catch (error) {
-      setError(
-        "Failed to delete member. Please try again later: " + error.message
-      );
+      setError(`فشل في الحذف: ${error.message}`);
     }
   };
 
- const handleEditClick = (member) => {
-  setSelectedMember(member); // Corrected function name
-  setIsEditModalOpen(true);
-};
+  const handleEditClick = (member) => {
+    setSelectedMember(member);
+    setIsEditModalOpen(true);
+  };
 
   const handleEditChange = (e) => {
     setSelectedMember({ ...selectedMember, [e.target.name]: e.target.value });
@@ -137,27 +107,18 @@ console.log("Pagination:", pagination);
 
   const handleEditSubmit = async () => {
     try {
-      const toastId = toast.loading('جاري حفظ التعديلات...', {
-        position: 'top-center',
-      });
-
+      const toastId = toast.loading("جاري حفظ التعديلات...");
       await dispatch(
         editMember({ id: selectedMember.id, updatedUser: selectedMember })
       ).unwrap();
-
-      // Refresh current page
       await dispatch(fetchUsers({ page: currentPage })).unwrap();
       setIsEditModalOpen(false);
-      toast.success('تم تحديث بيانات العضو بنجاح', { id: toastId });
+      toast.success("تم تحديث بيانات العضو بنجاح", { id: toastId });
     } catch (error) {
       toast.error(`فشل في التحديث: ${error.message}`);
     }
   };
 
-  const openAddModal = () => setIsAddModalOpen(true);
-  const closeAddModal = () => setIsAddModalOpen(false);
-
-  // Updated pagination logic
   const totalPages = Math.ceil(pagination.count / itemsPerPage);
 
   const paginate = (pageNumber) => {
@@ -166,329 +127,308 @@ console.log("Pagination:", pagination);
     }
   };
 
-    // Conditional rendering for no permission
   if (!canViewMembers) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen text-center p-4" dir="rtl">
-        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
-          <RiForbidLine className="text-red-600 text-2xl" />
+      <div className="flex flex-col items-center justify-center h-screen text-center p-6" dir="rtl">
+        <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4 animate-pulse">
+          <RiForbidLine className="text-red-600 text-3xl" />
         </div>
-        <h2 className="text-xl font-bold text-gray-700 mb-2">لا يوجد صلاحية</h2>
-        <p className="text-gray-500 max-w-md">
-          ليس لديك الصلاحيات اللازمة لعرض الأعضاء. يرجى التواصل مع المسؤول.
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">لا يوجد صلاحية</h2>
+        <p className="text-gray-600 max-w-md">
+          ليس لديك الصلاحيات اللازمة لعرض الأعضاء. تواصل مع المسؤول.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="p-4 overflow-x-auto" dir="rtl">
-      <div className="flex items-start space-x-3">
-        <RiGroupLine className="text-2xl" />
-        <h2 className="text-2xl font-semibold mb-4">الأعضاء</h2>
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto" dir="rtl">
+      <div className="flex items-center gap-3 mb-6">
+        <RiGroupLine className="text-3xl text-blue-600" />
+        <h2 className="text-3xl font-bold text-gray-800">الأعضاء</h2>
       </div>
-      {error && <p className="text-red-500 mb-4">{error}</p>}
-      <input
-        type="text"
-        value={searchQuery}
-        onChange={handleSearch}
-        placeholder="ابحث بالاسم، رقم العضوية، أو الرقم القومي"
-        className="border p-2 rounded-md mb-4 w-full"
-      />
-           {/* Only show add button if user has permission */}
-      {canAddMembers && (
-        <div className="flex justify-end mb-4">
-          <button
-            onClick={openAddModal}
-            className="flex justify-end btn"
-          >
-            <IoAddOutline className="flex inline-block text-xl" />
-            إضافة عضو
-          </button>
+
+      {error && (
+        <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-2">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+          {error}
         </div>
       )}
 
-   <div className="overflow-x-auto">
-  <table className="w-full border text-sm hidden sm:table">
-    <thead className="bg-gray-50">
-      <tr>
-        <th className="p-2 sm:p-3 text-right border-b">#</th>
-        <th className="p-2 sm:p-3 text-right border-b">الصورة</th>
-        <th className="p-2 sm:p-3 text-right border-b">الاسم</th>
-        <th className="p-2 sm:p-3 text-right border-b">rfid code</th>
-        <th className="p-2 sm:p-3 text-right border-b">رقم العضوية</th>
-        <th className="p-2 sm:p-3 text-right border-b">الرقم القومي</th>
-        <th className="p-2 sm:p-3 text-right border-b">الهاتف</th>
-        <th className="p-2 sm:p-3 text-right border-b">اسم النادي</th>
-        <th className="p-2 sm:p-3 text-right border-b">الإجراءات</th>
-      </tr>
-    </thead>
-    <tbody className="divide-y divide-gray-200">
-      {Array.isArray(members) && members.map((member, index) => (
-        <tr key={member.id} className="hover:bg-gray-50">
-          <td className="p-2 sm:p-3">
-            {(currentPage - 1) * itemsPerPage + index + 1}
-          </td>
-          <td className="p-2 sm:p-3">
-            <Link to={`/member/${member.id}`}>
-              <img
-                src={
-                  member.photo
-                    ? member.photo
-                    : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"
-                }
-                alt="member"
-                className="w-10 h-10 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
-              />
-            </Link>
-          </td>
-          <td className="p-2 sm:p-3">{member.name}</td>
-          <td className="p-2 sm:p-3">{member.rfid_code}</td>
-          <td className="p-2 sm:p-3">{member.membership_number}</td>
-          <td className="p-2 sm:p-3">{member.national_id}</td>
-          <td className="p-2 sm:p-3">{member.phone}</td>
-          <td className="p-2 sm:p-3">{member.club_name}</td>
-          <td className="p-2 sm:p-3 flex gap-2 justify-center">
-            <DropdownMenu dir="rtl">
-              <DropdownMenuTrigger asChild>
-                <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-                  <MoreVertical className="h-5 w-5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-              
-                {canEditMembers && (
-                  <DropdownMenuItem
-                    onClick={() => handleEditClick(member)}
-                    className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-                  >
-                    <CiEdit className="mr-2" /> تعديل
-                  </DropdownMenuItem>
-                )}
-                {canDeleteMembers && (
-                  <DropdownMenuItem
-                    onClick={() => handleDeleteClick(member)}
-                    className="cursor-pointer text-red-600 hover:bg-red-50"
-                  >
-                    <CiTrash className="mr-2" /> حذف
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </td>
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</div>
-
-{/* Mobile Card View */}
-<div className="sm:hidden space-y-3">
-  {Array.isArray(members) && members.map((member, index) => (
-    <div
-      key={member.id}
-      className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow"
-    >
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex items-center gap-3">
-          <Link to={`/member/${member.id}`}>
-            <img
-              src={
-                member.photo
-                  ? member.photo
-                  : "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSU-rxXTrx4QdTdwIpw938VLL8EuJiVhCelkQ&s"
-              }
-              alt="member"
-              className="w-12 h-12 rounded-full object-cover cursor-pointer hover:opacity-80 transition"
-            />
-          </Link>
-          <div>
-            <span className="text-xs text-gray-500">
-              #{(currentPage - 1) * itemsPerPage + index + 1}
-            </span>
-            <h3 className="text-sm font-semibold">{member.name}</h3>
-          </div>
-        </div>
-        <DropdownMenu dir="rtl">
-          <DropdownMenuTrigger asChild>
-            <button className="bg-gray-200 text-gray-700 px-1 py-1 rounded-md hover:bg-gray-300 transition-colors">
-              <MoreVertical className="h-5 w-5" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-40">
-         
-            {canEditMembers && (
-              <DropdownMenuItem
-                onClick={() => handleEditClick(member)}
-                className="cursor-pointer text-yellow-600 hover:bg-yellow-50"
-              >
-                <CiEdit className="mr-2" /> تعديل
-              </DropdownMenuItem>
-            )}
-            {canDeleteMembers && (
-              <DropdownMenuItem
-                onClick={() => handleDeleteClick(member)}
-                className="cursor-pointer text-red-600 hover:bg-red-50"
-              >
-                <CiTrash className="mr-2" /> حذف
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <p className="text-xs text-gray-500">rfid code</p>
-          <p className="text-sm font-medium">{member.rfid_code}</p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500">رقم العضوية</p>
-          <p className="text-sm font-medium">{member.membership_number}</p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500">الرقم القومي</p>
-          <p className="text-sm">{member.national_id}</p>
-        </div>
-        <div>
-          <p className="text-xs text-gray-500">الهاتف</p>
-          <p className="text-sm">{member.phone}</p>
-        </div>
-      </div>
-
-      <div className="mt-3 pt-3 border-t">
-        <p className="text-xs text-gray-500">اسم النادي</p>
-        <p className="text-sm">{member.club_name}</p>
-      </div>
-    </div>
-  ))}
-</div>
-
-
-      {/* Updated Pagination Controls */}
-      <div className="flex justify-between items-center mt-4" dir="rtl">
-        {pagination.count === 0 && (
-          <div className="text-sm text-gray-600">لا توجد أعضاء لعرضهم</div>
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={handleSearch}
+          placeholder="ابحث بالاسم، رقم العضوية، أو الرقم القومي"
+          className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-right bg-white shadow-sm"
+        />
+        {canAddMembers && (
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+          >
+            <IoAddOutline className="text-xl" />
+            إضافة عضو
+          </button>
         )}
-        {pagination.count > 0 && (
-          <>
-            <div className="text-sm text-gray-600">
-              عرض {(currentPage - 1) * itemsPerPage + 1} إلى{" "}
-              {Math.min(currentPage * itemsPerPage, pagination.count)} من{" "}
-              {pagination.count}
-            </div>
-            <div className="flex gap-2">
-              {/* First Page Button */}
-              <button
-                onClick={() => paginate(1)}
-                disabled={currentPage === 1 || pagination.count === 0}
-                className={`px-3 py-1 rounded ${
-                  currentPage === 1 || pagination.count === 0
-                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                    : "bg-blue-700 text-white hover:bg-blue-800"
-                }`}
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center items-center py-10">
+          <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+        </div>
+      ) : (
+        <>
+          {/* Desktop Table View */}
+          <div className="hidden lg:block overflow-x-auto rounded-lg shadow">
+            <table className="w-full text-sm bg-white">
+              <thead className="bg-gray-100 text-gray-700">
+                <tr>
+                  {["#", "الصورة", "الاسم", "كود RFID", "رقم العضوية", "الرقم القومي", "الهاتف", "اسم النادي", "الإجراءات"].map((header) => (
+                    <th key={header} className="p-4 text-right font-semibold border-b">{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {Array.isArray(members) && members.map((member, index) => (
+                  <tr key={member.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="p-4">{(currentPage - 1) * itemsPerPage + index + 1}</td>
+                    <td className="p-4">
+                      <Link to={`/member/${member.id}`}>
+                        <img
+                          src={member.photo || "https://via.placeholder.com/40"}
+                          alt="member"
+                          className="w-10 h-10 rounded-full object-cover hover:scale-105 transition-transform"
+                        />
+                      </Link>
+                    </td>
+                    <td className="p-4 font-medium">{member.name}</td>
+                    <td className="p-4">{member.rfid_code || "—"}</td>
+                    <td className="p-4">{member.membership_number}</td>
+                    <td className="p-4">{member.national_id}</td>
+                    <td className="p-4">{member.phone}</td>
+                    <td className="p-4">{member.club_name}</td>
+                    <td className="p-4 flex gap-2 justify-center">
+                      <DropdownMenu dir="rtl">
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-2 rounded-full hover:bg-gray-200 transition-colors">
+                            <MoreVertical className="w-5 h-5 text-gray-600" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40 bg-white shadow-lg rounded-lg">
+                          {canEditMembers && (
+                            <DropdownMenuItem
+                              onClick={() => handleEditClick(member)}
+                              className="flex items-center gap-2 px-4 py-2 text-yellow-600 hover:bg-yellow-50 cursor-pointer"
+                            >
+                              <CiEdit className="w-5 h-5" /> تعديل
+                            </DropdownMenuItem>
+                          )}
+                          {canDeleteMembers && (
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteClick(member)}
+                              className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 cursor-pointer"
+                            >
+                              <CiTrash className="w-5 h-5" /> حذف
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile/Tablet Card View */}
+          <div className="lg:hidden space-y-4">
+            {Array.isArray(members) && members.map((member, index) => (
+              <div
+                key={member.id}
+                className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-100"
               >
-                الأول
-              </button>
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex items-center gap-3">
+                    <Link to={`/member/${member.id}`}>
+                      <img
+                        src={member.photo || "https://via.placeholder.com/48"}
+                        alt="member"
+                        className="w-12 h-12 rounded-full object-cover hover:scale-105 transition-transform"
+                      />
+                    </Link>
+                    <div>
+                      <span className="text-xs text-gray-500">#{(currentPage - 1) * itemsPerPage + index + 1}</span>
+                      <h3 className="text-lg font-semibold text-gray-800">{member.name}</h3>
+                    </div>
+                  </div>
+                  <DropdownMenu dir="rtl">
+                    <DropdownMenuTrigger asChild>
+                      <button className="p-2 rounded-full hover:bg-gray-200 transition-colors">
+                        <MoreVertical className="w-5 h-5 text-gray-600" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40 bg-white shadow-lg rounded-lg">
+                      {canEditMembers && (
+                        <DropdownMenuItem
+                          onClick={() => handleEditClick(member)}
+                          className="flex items-center gap-2 px-4 py-2 text-yellow-600 hover:bg-yellow-50 cursor-pointer"
+                        >
+                          <CiEdit className="w-5 h-5" /> تعديل
+                        </DropdownMenuItem>
+                      )}
+                      {canDeleteMembers && (
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteClick(member)}
+                          className="flex items-center gap-2 px-4 py-2 text-red-600 hover:bg-red-50 cursor-pointer"
+                        >
+                          <CiTrash className="w-5 h-5" /> حذف
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-xs text-gray-500">كود RFID</p>
+                    <p className="font-medium">{member.rfid_code || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">رقم العضوية</p>
+                    <p className="font-medium">{member.membership_number}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">الرقم القومي</p>
+                    <p>{member.national_id}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">الهاتف</p>
+                    <p>{member.phone}</p>
+                  </div>
+                </div>
+                <div className="mt-4 pt-4 border-t">
+                    <p className="text-xs text-gray-500">اسم النادي</p>
+                    <p className="text-sm font-medium">{member.club_name}</p>
+                </div>
+              </div>
+            ))}
+          </div>
 
-              <button
-                onClick={() => paginate(currentPage - 1)}
-                disabled={!pagination.previous || pagination.count === 0}
-                className={`px-3 py-1 rounded ${
-                  !pagination.previous || pagination.count === 0
-                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                    : "bg-blue-700 text-white hover:bg-blue-800"
-                }`}
-              >
-                السابق
-              </button>
-
-              {/* Page Number Buttons */}
-              {(() => {
-                const maxButtons = 5;
-                const sideButtons = Math.floor(maxButtons / 2);
-                let start = Math.max(1, currentPage - sideButtons);
-                let end = Math.min(totalPages, currentPage + sideButtons);
-
-                if (end - start + 1 < maxButtons) {
-                  if (currentPage <= sideButtons) {
-                    end = Math.min(totalPages, maxButtons);
-                  } else {
-                    start = Math.max(1, totalPages - maxButtons + 1);
-                  }
-                }
-
-                return Array.from(
-                  { length: end - start + 1 },
-                  (_, i) => start + i
-                ).map((page) => (
+          {/* Pagination */}
+          <div className="flex flex-col sm:flex-row justify-between items-center mt-6 gap-4" dir="rtl">
+            {pagination.count === 0 ? (
+              <div className="text-sm text-gray-600">لا توجد أعضاء لعرضهم</div>
+            ) : (
+              <>
+                <div className="text-sm text-gray-600">
+                  عرض {(currentPage - 1) * itemsPerPage + 1} إلى{" "}
+                  {Math.min(currentPage * itemsPerPage, pagination.count)} من{" "}
+                  {pagination.count}
+                </div>
+                <div className="flex gap-2 flex-wrap justify-center">
                   <button
-                    key={page}
-                    onClick={() => paginate(page)}
-                    disabled={pagination.count === 0}
-                    className={`px-3 py-1 rounded ${
-                      currentPage === page && pagination.count > 0
-                        ? "bg-blue-700 text-white"
-                        : "bg-gray-200 hover:bg-gray-300"
-                    } ${
-                      pagination.count === 0
-                        ? "opacity-50 cursor-not-allowed"
-                        : ""
+                    onClick={() => paginate(1)}
+                    disabled={currentPage === 1 || pagination.count === 0}
+                    className={`px-4 py-2 rounded-lg text-sm ${
+                      currentPage === 1 || pagination.count === 0
+                        ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
                     }`}
                   >
-                    {page}
+                    الأول
                   </button>
-                ));
-              })()}
-
-              {/* Next Page Button */}
-              <button
-                onClick={() => paginate(currentPage + 1)}
-                disabled={!pagination.next || pagination.count === 0}
-                className={`px-3 py-1 rounded ${
-                  !pagination.next || pagination.count === 0
-                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                    : "bg-blue-700 text-white hover:bg-blue-800"
-                }`}
-              >
-                التالي
-              </button>
-
-              {/* Last Page Button */}
-              <button
-                onClick={() => paginate(totalPages)}
-                disabled={
-                  currentPage === totalPages || searchResult.length === 0
-                }
-                className={`px-3 py-1 rounded ${
-                  currentPage === totalPages || searchResult.length === 0
-                    ? "bg-gray-200 opacity-50 cursor-not-allowed"
-                    : "bg-blue-700 text-white hover:bg-blue-800"
-                }`}
-              >
-                الأخير
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+                  <button
+                    onClick={() => paginate(currentPage - 1)}
+                    disabled={!pagination.previous || pagination.count === 0}
+                    className={`px-4 py-2 rounded-lg text-sm ${
+                      !pagination.previous || pagination.count === 0
+                        ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                  >
+                    السابق
+                  </button>
+                  {(() => {
+                    const maxButtons = 5;
+                    const sideButtons = Math.floor(maxButtons / 2);
+                    let start = Math.max(1, currentPage - sideButtons);
+                    let end = Math.min(totalPages, currentPage + sideButtons);
+                    if (end - start + 1 < maxButtons) {
+                      if (currentPage <= sideButtons) {
+                        end = Math.min(totalPages, maxButtons);
+                      } else {
+                        start = Math.max(1, totalPages - maxButtons + 1);
+                      }
+                    }
+                    return Array.from({ length: end - start + 1 }, (_, i) => start + i).map((page) => (
+                      <button
+                        key={page}
+                        onClick={() => paginate(page)}
+                        disabled={pagination.count === 0}
+                        className={`px-4 py-2 rounded-lg text-sm ${
+                          currentPage === page && pagination.count > 0
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-200 hover:bg-gray-300"
+                        } ${pagination.count === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                      >
+                        {page}
+                      </button>
+                    ));
+                  })()}
+                  <button
+                    onClick={() => paginate(currentPage + 1)}
+                    disabled={!pagination.next || pagination.count === 0}
+                    className={`px-4 py-2 rounded-lg text-sm ${
+                      !pagination.next || pagination.count === 0
+                        ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                  >
+                    التالي
+                  </button>
+                  <button
+                    onClick={() => paginate(totalPages)}
+                    disabled={currentPage === totalPages || pagination.count === 0}
+                    className={`px-4 py-2 rounded-lg text-sm ${
+                      currentPage === totalPages || pagination.count === 0
+                        ? "bg-gray-200 opacity-50 cursor-not-allowed"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                  >
+                    الأخير
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Add Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(255, 255, 255, 0.2)]">
-          <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]">
-            <div className="bg-white p-6 rounded-lg w-1/3 relative">
-              <button
-                onClick={closeAddModal}
-                className="absolute top-2 right-3 text-xl"
-              >
-                ×
-              </button>
-              <AddMember
-                closeAddModal={closeAddModal}
-                onAddSuccess={onAddSuccess}
-              />
-            </div>
+        <div
+          className="fixed inset-0 flex justify-center items-center z-50 bg-black/50"
+          onClick={() => setIsAddModalOpen(false)}
+        >
+          <div
+            className="bg-white p-6 rounded-lg w-full max-w-md sm:max-w-lg relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsAddModalOpen(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <AddMember closeAddModal={() => setIsAddModalOpen(false)} onAddSuccess={() => {
+              setIsAddModalOpen(false);
+              dispatch(fetchUsers({ page: currentPage }));
+            }} />
           </div>
         </div>
       )}
@@ -496,24 +436,27 @@ console.log("Pagination:", pagination);
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div
-          className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)] dark:bg-[rgba(249, 236, 236, 0.2)]"
-          style={{ backgroundColor: "rgba(0, 0, 0, 0.2)" }}
+          className="fixed inset-0 flex justify-center items-center z-50 bg-black/50"
+          onClick={() => setIsDeleteModalOpen(false)}
         >
-          <div className="modal relative bg-white p-6 rounded-lg">
-            <h3 className="text-lg font-semibold mb-4">تأكيد الحذف</h3>
-            <p>
-              هل أنت متأكد من حذف <strong>{selectedMember?.name}</strong>
+          <div
+            className="bg-white p-6 rounded-lg w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold mb-4 text-right">تأكيد الحذف</h3>
+            <p className="text-right">
+              هل أنت متأكد من حذف <strong>{selectedMember?.name}</strong>؟
             </p>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-6 flex justify-end gap-3">
               <button
                 onClick={() => setIsDeleteModalOpen(false)}
-                className="bg-gray-300 px-4 py-2 rounded"
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
               >
                 إلغاء
               </button>
               <button
                 onClick={confirmDelete}
-                className="bg-red-600 text-white px-4 py-2 rounded"
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 حذف
               </button>
@@ -524,137 +467,87 @@ console.log("Pagination:", pagination);
 
       {/* Edit Modal */}
       {isEditModalOpen && selectedMember && (
-        <div className="fixed inset-0 flex justify-center items-center z-40 bg-[rgba(0,0,0,0.2)]">
-          <div className="modal relative bg-white p-6 rounded-lg w-1/2">
-            <h3 className="text-lg font-semibold mb-4 text-right">
-              تعديل العضو
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-3">
-                <div className="flex flex-col">
-                  <label className="text-right mb-1">الاسم الكامل</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={selectedMember.name}
-                    onChange={handleEditChange}
-                    className="border px-3 py-2 rounded text-right"
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-right mb-1">رقم العضوية</label>
-                  <input
-                    type="text"
-                    name="membership_number"
-                    value={selectedMember.membership_number}
-                    onChange={handleEditChange}
-                    className="border px-3 py-2 rounded text-right"
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-right mb-1">الرقم القومي</label>
-                  <input
-                    type="text"
-                    name="national_id"
-                    value={selectedMember.national_id}
-                    onChange={handleEditChange}
-                    className="border px-3 py-2 rounded text-right"
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-right mb-1">رقم الهاتف الأساسي</label>
-                  <input
-                    type="text"
-                    name="phone"
-                    value={selectedMember.phone}
-                    onChange={handleEditChange}
-                    className="border px-3 py-2 rounded text-right"
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-right mb-1">رقم الهاتف الثانوي</label>
-                  <input
-                    type="text"
-                    name="phone2"
-                    value={selectedMember.phone2 || ""}
-                    onChange={handleEditChange}
-                    className="border px-3 py-2 rounded text-right"
-                  />
-                </div>
+        <div
+          className="fixed inset-0 flex justify-center items-center z-50 bg-black/50"
+          onClick={() => setIsEditModalOpen(false)}
+        >
+          <div
+            className="bg-white p-6 rounded-lg w-full max-w-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsEditModalOpen(false)}
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <h3 className="text-xl font-semibold mb-6 text-right">تعديل العضو</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                {[
+                  { label: "الاسم الكامل", name: "name", value: selectedMember.name },
+                  { label: "رقم العضوية", name: "membership_number", value: selectedMember.membership_number },
+                  { label: "الرقم القومي", name: "national_id", value: selectedMember.national_id },
+                  { label: "رقم الهاتف الأساسي", name: "phone", value: selectedMember.phone },
+                  { label: "رقم الهاتف الثانوي", name: "phone2", value: selectedMember.phone2 || "" },
+                ].map((field) => (
+                  <div key={field.name} className="flex flex-col">
+                    <label className="text-right mb-1 text-sm font-medium">{field.label}</label>
+                    <input
+                      type="text"
+                      name={field.name}
+                      value={field.value}
+                      onChange={handleEditChange}
+                      className="border border-gray-300 px-3 py-2 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                  </div>
+                ))}
               </div>
-
-              <div className="space-y-3">
+              <div className="space-y-4">
+                {[
+                  { label: "كود البطاقة (RFID)", name: "rfid_code", value: selectedMember.rfid_code || "" },
+                  { label: "الوظيفة", name: "job", value: selectedMember.job || "" },
+                  { label: "اسم النادي", name: "club_name", value: selectedMember.club_name, disabled: true },
+                  { label: "العنوان", name: "address", value: selectedMember.address || "" },
+                ].map((field) => (
+                  <div key={field.name} className="flex flex-col">
+                    <label className="text-right mb-1 text-sm font-medium">{field.label}</label>
+                    <input
+                      type="text"
+                      name={field.name}
+                      value={field.value}
+                      onChange={handleEditChange}
+                      disabled={field.disabled}
+                      className={`border border-gray-300 px-3 py-2 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:outline-none ${
+                        field.disabled ? "bg-gray-100 cursor-not-allowed" : ""
+                      }`}
+                    />
+                  </div>
+                ))}
                 <div className="flex flex-col">
-                  <label className="text-right mb-1">كود البطاقة (RFID)</label>
-                  <input
-                    type="text"
-                    name="rfid_code"
-                    value={selectedMember.rfid_code || ""}
-                    onChange={handleEditChange}
-                    className="border px-3 py-2 rounded text-right"
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-right mb-1">الوظيفة</label>
-                  <input
-                    type="text"
-                    name="job"
-                    value={selectedMember.job || ""}
-                    onChange={handleEditChange}
-                    className="border px-3 py-2 rounded text-right"
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-right mb-1">اسم النادي</label>
-                  <input
-                    type="text"
-                    name="club_name"
-                    value={selectedMember.club_name}
-                    disabled
-                    className="border px-3 py-2 rounded text-right bg-gray-100 cursor-not-allowed"
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-right mb-1">العنوان</label>
-                  <input
-                    type="text"
-                    name="address"
-                    value={selectedMember.address || ""}
-                    onChange={handleEditChange}
-                    className="border px-3 py-2 rounded text-right"
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-right mb-1">ملاحظات</label>
+                  <label className="text-right mb-1 text-sm font-medium">ملاحظات</label>
                   <textarea
                     name="note"
                     value={selectedMember.note || ""}
                     onChange={handleEditChange}
-                    className="border px-3 py-2 rounded text-right"
-                    rows={2}
+                    className="border border-gray-300 px-3 py-2 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    rows={3}
                   />
                 </div>
               </div>
             </div>
-
-            <div className="flex justify-end gap-2 mt-6">
+            <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setIsEditModalOpen(false)}
-                className="bg-gray-300 px-4 py-2 rounded"
+                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
               >
                 إلغاء
               </button>
               <button
                 onClick={handleEditSubmit}
-                className="bg-blue-600 text-white px-4 py-2 rounded"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 حفظ التعديلات
               </button>

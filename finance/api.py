@@ -1,8 +1,24 @@
+import os
+import subprocess
 import logging
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework import status
+import tempfile
+from datetime import datetime
+
+from django.db.models import Sum, Q
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from jinja2 import Template
+
+from accounts.models import User
+from staff.models import StaffAttendance
 from .models import Expense, Income, ExpenseCategory, IncomeSource
 from .serializers import (
     ExpenseSerializer, IncomeSerializer,
@@ -10,19 +26,8 @@ from .serializers import (
     ExpenseDetailSerializer, IncomeDetailSerializer,
     IncomeSummarySerializer
 )
-from rest_framework.permissions import IsAuthenticated
+
 from utils.permissions import IsOwnerOrRelatedToClub
-from rest_framework.pagination import PageNumberPagination
-from datetime import datetime
-from staff.models import StaffAttendance
-from django.db.models import Sum, Q
-from django.utils import timezone
-from accounts.models import User
-from django.http import FileResponse
-from jinja2 import Template
-import logging
-import os
-import subprocess
 from utils.reports import get_employee_report_data
 from utils.convert_to_name import get_object_from_id_or_name
 
@@ -65,24 +70,22 @@ def expense_category_api(request):
 def expense_api(request):
     if request.method == 'GET':
         if request.user.role in ['owner', 'admin']:
-            # Owner و Admin يشوفوا بس مصروفات ناديهم
             expenses = Expense.objects.select_related('category', 'paid_by').filter(
                 club=request.user.club
             ).order_by('-id')
         else:
-            # Reception و Accountant يشوفوا مصروفاتهم في الشيفت الأخير
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
-                club=request.user.club
+                club=request.user.club,
+                check_out__isnull=True  
             ).order_by('-check_in').first()
             
             if attendance:
-                check_out = attendance.check_out if attendance.check_out else datetime.now()
                 expenses = Expense.objects.select_related('category', 'paid_by').filter(
                     club=request.user.club,
                     paid_by=request.user,
                     date__gte=attendance.check_in,
-                    date__lte=check_out
+                    date__lte=timezone.now()
                 ).order_by('-date')
             else:
                 expenses = Expense.objects.none()
@@ -105,7 +108,7 @@ def expense_api(request):
             expense = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+        
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_source_api(request):
@@ -138,6 +141,7 @@ def income_source_api(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_api(request):
@@ -148,19 +152,19 @@ def income_api(request):
                 club=request.user.club
             )
         else:
-            # Reception و Accountant يشوفوا إيراداتهم في الشيفت الأخير
+            # Reception و Accountant يشوفوا إيراداتهم في الشيفت المفتوح فقط
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
-                club=request.user.club
-            ).order_by('-id').first()
+                club=request.user.club,
+                check_out__isnull=True  # التأكد إن الشيفت مفتوح
+            ).order_by('-check_in').first()
             
             if attendance:
-                check_out = attendance.check_out if attendance.check_out else datetime.now()
                 incomes = Income.objects.select_related('source', 'received_by').filter(
                     club=request.user.club,
                     received_by=request.user,
                     date__gte=attendance.check_in,
-                    date__lte=check_out
+                    date__lte=timezone.now()
                 )
             else:
                 incomes = Income.objects.none()
@@ -208,22 +212,18 @@ def expense_detail_api(request, pk):
     expense = get_object_or_404(Expense, pk=pk)
     
     if request.method == 'GET':
-        if request.user.role == 'admin':
-            return Response({'error': 'Admins cannot view expenses'}, status=status.HTTP_403_FORBIDDEN)
         if expense.club != request.user.club:
             return Response({'error': 'You can only view expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
-        if request.user.role not in ['owner'] and expense.paid_by != request.user:
+        if request.user.role not in ['owner', 'admin'] and expense.paid_by != request.user:
             return Response({'error': 'You can only view your own expenses'}, status=status.HTTP_403_FORBIDDEN)
         serializer = ExpenseSerializer(expense, context={'request': request})
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        if request.user.role == 'admin':
-            return Response({'error': 'Admins cannot update expenses'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role != 'owner':
+            return Response({'error': 'Only owners can update expenses'}, status=status.HTTP_403_FORBIDDEN)
         if expense.club != request.user.club:
             return Response({'error': 'You can only update expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
-        if request.user.role not in ['owner'] and expense.paid_by != request.user:
-            return Response({'error': 'You can only update your own expenses'}, status=status.HTTP_403_FORBIDDEN)
             
         serializer = ExpenseSerializer(expense, data=request.data, partial=True, context={'request': request})
         if serializer.is_valid():
@@ -240,7 +240,7 @@ def expense_detail_api(request, pk):
             return Response({'error': 'You can only delete expenses for your own club'}, status=status.HTTP_403_FORBIDDEN)
         expense.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
+        
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_detail_api(request, pk):
@@ -255,12 +255,10 @@ def income_detail_api(request, pk):
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        if request.user.role == 'admin':
-            return Response({'error': 'Admins cannot update incomes'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role != 'owner':
+            return Response({'error': 'Only owners can update incomes'}, status=status.HTTP_403_FORBIDDEN)
         if income.club != request.user.club:
             return Response({'error': 'You can only update incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
-        if request.user.role not in ['owner'] and income.received_by != request.user:
-            return Response({'error': 'You can only update your own incomes'}, status=status.HTTP_403_FORBIDDEN)
             
         serializer = IncomeSerializer(income, data=request.data, partial=True)
         if serializer.is_valid():
@@ -277,7 +275,7 @@ def income_detail_api(request, pk):
             return Response({'error': 'You can only delete incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
         income.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
+    
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def daily_summary_api(request):
@@ -376,31 +374,29 @@ def daily_summary_api(request):
     page = paginator.paginate_queryset(summary, request)
     return paginator.get_paginated_response(page)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_summary(request):
     try:
         if request.user.role in ['owner', 'admin']:
-            # Owner و Admin يشوفوا كل إيرادات النادي
             incomes = Income.objects.select_related('source', 'received_by').filter(
                 club=request.user.club
             )
         else:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
-                club=request.user.club
+                club=request.user.club,
+                check_out__isnull=True  
             ).order_by('-check_in').first()
             
             if not attendance:
-                return Response({'error': 'No open or recent shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
 
-            check_out = attendance.check_out if attendance.check_out else timezone.now()
             incomes = Income.objects.select_related('source', 'received_by').filter(
                 club=request.user.club,
                 received_by=request.user,
                 date__gte=attendance.check_in,
-                date__lte=check_out
+                date__lte=timezone.now()
             )
 
         date = request.query_params.get('date')
@@ -423,7 +419,7 @@ def income_summary(request):
                 end_date = datetime.strptime(end, '%Y-%m-%d').date()
                 # For Reception and Accountant, ensure date range is within their shift
                 if request.user.role not in ['owner', 'admin']:
-                    if start_date < attendance.check_in.date() or end_date > check_out.date():
+                    if start_date < attendance.check_in.date() or end_date > timezone.now().date():
                         return Response({'error': 'Date range must be within your shift.'}, status=status.HTTP_400_BAD_REQUEST)
                 incomes = incomes.filter(date__range=[start_date, end_date])
             except ValueError:
@@ -433,7 +429,7 @@ def income_summary(request):
 
         if user_param:
             user_obj = get_object_from_id_or_name(User, user_param, ['id', 'username'])
-            if user_obj and user_obj.user.club == request.user.user.club:
+            if user_obj and user_obj.club == request.user.club:
                 if request.user.role not in ['owner', 'admin'] and user_obj.id != request.user.id:
                     return Response({'error': 'You can only view your own income.'}, status=status.HTTP_403_FORBIDDEN)
                 incomes = incomes.filter(received_by=user_obj)
@@ -470,21 +466,20 @@ def expense_summary(request):
         else:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
-                club=request.user.club
+                club=request.user.club,
+                check_out__isnull=True  # التأكد إن الشيفت مفتوح
             ).order_by('-check_in').first()
             
             if not attendance:
-                return Response({'error': 'No open or recent shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
 
-            check_out = attendance.check_out if attendance.check_out else timezone.now()
             expenses = Expense.objects.select_related('category', 'paid_by').filter(
                 club=request.user.club,
                 paid_by=request.user,
                 date__gte=attendance.check_in,
-                date__lte=check_out
+                date__lte=timezone.now()
             )
 
-        # تطبيق الفلاتر
         date = request.query_params.get('date')
         start = request.query_params.get('start')
         end = request.query_params.get('end')
@@ -504,7 +499,7 @@ def expense_summary(request):
                 start_obj = datetime.strptime(start, '%Y-%m-%d').date()
                 end_obj = datetime.strptime(end, '%Y-%m-%d').date()
                 if request.user.role not in ['owner', 'admin']:
-                    if start_obj < attendance.check_in.date() or end_obj > check_out.date():
+                    if start_obj < attendance.check_in.date() or end_obj > timezone.now().date():
                         return Response({'error': 'Date range must be within your shift.'}, status=status.HTTP_400_BAD_REQUEST)
                 expenses = expenses.filter(date__range=[start_obj, end_obj])
             except ValueError:
@@ -528,11 +523,9 @@ def expense_summary(request):
             else:
                 return Response({'error': 'Expense category not found or not in your club.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # حساب إجمالي المصروفات
         total = expenses.aggregate(total_amount=Sum('amount'))['total_amount'] or 0
         response_data = {'total_expense': float(total)}
 
-        # إضافة التفاصيل إذا طُلبت
         if details:
             response_data['details'] = ExpenseDetailSerializer(expenses, many=True).data
 
@@ -541,7 +534,6 @@ def expense_summary(request):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def finance_overview(request):
@@ -622,46 +614,149 @@ def employee_daily_report_api(request):
     return Response(data, status=status_code)
 
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def generate_daily_report_pdf(request):
-    pass
-    # employee_id = request.query_params.get('employee_id')
-    # start_date = request.query_params.get('start_date')
-    # end_date = request.query_params.get('end_date')
+    try:
+        employee_id = request.query_params.get('employee_id')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
 
-    # if request.user.role not in ['owner', 'admin'] and (not start_date or not end_date):
-    #     attendance = StaffAttendance.objects.filter(
-    #         staff=request.user,
-    #         club=request.user.club,
-    #         check_out__isnull=True
-    #     ).order_by('-check_in').first()
-    #     if attendance:
-    #         start_date = attendance.check_in.isoformat()
-    #         end_date = timezone.now().isoformat()
+        # Check employee permissions
+        if request.user.role not in ['owner', 'admin']:
+            if employee_id and str(employee_id) != str(request.user.id):
+                return Response({'error': 'غير مسموح لك بمشاهدة تقارير موظف آخر'}, status=status.HTTP_403_FORBIDDEN)
+            employee_id = request.user.id 
 
-    # if employee_id:
-    #     employee = get_object_or_404(User, id=employee_id)
-    #     if employee.club != request.user.club:
-    #         return Response({'error': 'Employee not in your club'}, status=status.HTTP_403_FORBIDDEN)
+        # Validate employee existence
+        if employee_id:
+            employee = get_object_or_404(User, id=employee_id)
+            if employee.club != request.user.club:
+                return Response({'error': 'Employee not in your club'}, status=status.HTTP_403_FORBIDDEN)
+        else:
+            employee = None
 
-    # data, response_status = get_employee_report_data(
-    #     request.user,
-    #     employee_id,
-    #     start_date,
-    #     end_date
-    # )
-    # if response_status != status.HTTP_200_OK:
-    #     return Response(data, status=response_status)
+        # Determine time period and shift date
+        shift_date = "غير محدد"
+        if not start_date or not end_date:
+            if request.user.role in ['owner', 'admin']:
+                # Admin/Owner: Default to current day
+                start_date = timezone.now().date().isoformat()
+                end_date = timezone.now().isoformat()
+            else:
+                # Employee: Report for open shift
+                attendance = StaffAttendance.objects.filter(
+                    staff=request.user,
+                    club=request.user.club,
+                    check_out__isnull=True
+                ).order_by('-check_in').first()
+                if not attendance:
+                    return Response({'error': 'لا توجد وردية مفتوحة. يجب تسجيل حضور أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+                start_date = attendance.check_in.isoformat()
+                end_date = timezone.now().isoformat()
+                employee_id = request.user.id 
+                shift_date = f"من {attendance.check_in.strftime('%Y-%m-%d %H:%M:%S')} " + \
+                            (f"إلى {attendance.check_out.strftime('%Y-%m-%d %H:%M:%S')}" if attendance.check_out else "مستمر")
+        else:
+            # If Admin/Owner specified dates, fetch shift date if applicable
+            if employee_id:
+                attendance = StaffAttendance.objects.filter(
+                    staff=employee,
+                    club=request.user.club,
+                    check_in__lte=end_date,
+                    check_out__gte=start_date
+                ).order_by('-check_in').first()
+                if attendance:
+                    shift_date = f"من {attendance.check_in.strftime('%Y-%m-%d %H:%M:%S')} " + \
+                                (f"إلى {attendance.check_out.strftime('%Y-%m-%d %H:%M:%S')}" if attendance.check_out else "مستمر")
 
-    # data['report_date'] = timezone.localtime(timezone.now()).strftime('%Y-%m-%d')
+        # Convert dates to datetime objects
+        try:
+            start_date_obj = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+            end_date_obj = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use ISO format (e.g., 2025-06-04T00:00:00Z)'}, status=status.HTTP_400_BAD_REQUEST)
 
-  
-    # html_string = render_to_string("report_template.html", data)
+        # Fetch data
+        expenses = Expense.objects.select_related('category', 'paid_by').filter(
+            club=request.user.club,
+            date__gte=start_date_obj,
+            date__lte=end_date_obj
+        )
+        incomes = Income.objects.select_related('source', 'received_by').filter(
+            club=request.user.club,
+            date__gte=start_date_obj,
+            date__lte=end_date_obj
+        )
 
+        if employee_id:
+            expenses = expenses.filter(paid_by=employee)
+            incomes = incomes.filter(received_by=employee)
 
-    # pdf_file = HTML(string=html_string).write_pdf()
+        # Calculate totals and counts
+        total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or 0
+        total_incomes = incomes.aggregate(total=Sum('amount'))['total'] or 0
+        net_profit = total_incomes - total_expenses
+        expenses_count = expenses.count()
+        incomes_count = incomes.count()
 
-    # response = HttpResponse(pdf_file, content_type='application/pdf')
-    # response['Content-Disposition'] = 'attachment; filename="daily_report.pdf"'
-    # return response
+        # Prepare report data
+        report_data = {
+            'employee_name': employee.username if employee else 'جميع الموظفين',
+            'start_date': start_date_obj.strftime('%Y-%m-%d %H:%M:%S'),
+            'end_date': end_date_obj.strftime('%Y-%m-%d %H:%M:%S'),
+            'shift_date': shift_date,
+            'print_date': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'expenses': [
+                {
+                    'date': expense.date.strftime('%Y-%m-%d %H:%M:%S'),
+                    'category': expense.category.name,
+                    'amount': f"{expense.amount:.2f}"
+                } for expense in expenses
+            ],
+            'incomes': [
+                {
+                    'date': income.date.strftime('%Y-%m-%d %H:%M:%S'),
+                    'source': income.source.name,
+                    'amount': f"{income.amount:.2f}"
+                } for income in incomes
+            ],
+            'expenses_count': expenses_count,
+            'incomes_count': incomes_count,
+            'total_expenses': f"{total_expenses:.2f}",
+            'total_incomes': f"{total_incomes:.2f}",
+            'net_profit': f"{net_profit:.2f}"
+        }
+
+        # Load LaTeX template
+        latex_template_path = os.path.join(os.path.dirname(__file__), 'templates', 'daily_report.tex')
+        with open(latex_template_path, 'r', encoding='utf-8') as file:
+            template = Template(file.read())
+
+        # Render template with data
+        latex_content = template.render(**report_data)
+
+        # Create temporary LaTeX file
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            latex_file_path = os.path.join(tmpdirname, 'report.tex')
+            with open(latex_file_path, 'w', encoding='utf-8') as f:
+                f.write(latex_content)
+
+            # Run pdflatex to generate PDF
+            result = subprocess.run(
+                ['pdflatex', '-output-directory', tmpdirname, latex_file_path],
+                capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                return Response({'error': 'Failed to generate PDF: ' + result.stderr}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            # Return PDF file
+            pdf_file_path = os.path.join(tmpdirname, 'report.pdf')
+            with open(pdf_file_path, 'rb') as pdf_file:
+                response = FileResponse(pdf_file, content_type='application/pdf')
+                response['Content-Disposition'] = f'attachment; filename="daily_report_{employee_id or "all"}_{start_date_obj.strftime("%Y%m%d")}.pdf"'
+                return response
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
