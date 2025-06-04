@@ -4,11 +4,9 @@ import { fetchSubscriptionTypes, postSubscription } from "../../redux/slices/sub
 import { fetchUsers } from "../../redux/slices/memberSlice";
 import { Button } from "@/components/ui/button";
 import { FaUser } from 'react-icons/fa';
-
 import axios from 'axios';
 import BASE_URL from '../../config/api';
-
-
+import { toast } from "react-hot-toast";
 
 const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
@@ -33,11 +31,38 @@ const CreateSubscription = ({ onClose }) => {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [foundMember, setFoundMember] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [userClub, setUserClub] = useState(null);
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Fetch user club
+  useEffect(() => {
+    fetch(`${BASE_URL}/accounts/api/profile/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        "Content-Type": "application/json",
+      },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setUserClub({
+          id: data.club.id,
+          name: data.club.name,
+        });
+        setFormData(prev => ({
+          ...prev,
+          club: data.club.id.toString()
+        }));
+      })
+      .catch((err) => {
+        console.error("Failed to fetch user profile:", err);
+        toast.error("فشل في تحميل بيانات النادي");
+      });
+  }, []);
 
   const fetchAllCoaches = async () => {
     try {
@@ -218,7 +243,7 @@ const CreateSubscription = ({ onClose }) => {
     try {
       await dispatch(postSubscription(payload)).unwrap();
       setFormData({
-        club: "",
+        club: userClub?.id?.toString() || "",
         identifier: "",
         type: "",
         start_date: "",
@@ -276,203 +301,200 @@ const CreateSubscription = ({ onClose }) => {
       <form onSubmit={handleSubmit} className="space-y-5 max-w-[1000px] ">
         {/* Club & Identifier Inputs */}
         <div className="flex flex-col md:flex-row gap-4">
-        <div className="">
           <div className="">
+            <div className="">
 
-        <div className="flex flex-col md:flex-row gap-4">
-          
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-medium mb-2">النادي</label>
-            <select
-              value={formData.club}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  club: e.target.value,
-                  identifier: "",
-                })
-              }
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitting}
-            >
-              <option value="">اختر النادي</option>
-              {clubs.map((club) => (
-                <option key={club.club_id} value={club.club_id}>
-                  {club.club_name}
-                </option>
-              ))}
-            </select>
-          </div>
+              <div className="flex flex-col md:flex-row gap-4">
+                {/* Modified Club Input */}
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">النادي</label>
+                  <select
+                    name="club"
+                    value={formData.club}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        club: e.target.value,
+                        identifier: "",
+                      })
+                    }
+                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm"
+                    disabled={!userClub || isSubmitting}
+                    required
+                  >
+                    {userClub ? (
+                      <option value={userClub.id}>{userClub.name}</option>
+                    ) : (
+                      <option value="">جاري التحميل...</option>
+                    )}
+                  </select>
+                </div>
 
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-medium mb-2">RFID أو الاسم أو رقم الهاتف</label>
-            <input
-              type="text"
-              value={formData.identifier}
-              onChange={(e) =>
-                setFormData({ ...formData, identifier: e.target.value })
-              }
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
-              disabled={!formData.club || isSubmitting}
-            />
-          </div>
-        </div>
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">RFID أو الاسم أو رقم الهاتف</label>
+                  <input
+                    type="text"
+                    value={formData.identifier}
+                    onChange={(e) =>
+                      setFormData({ ...formData, identifier: e.target.value })
+                    }
+                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
+                    disabled={!formData.club || isSubmitting}
+                  />
+                </div>
+              </div>
 
-        {/* Loading and Errors */}
-        {searchLoading && (
-          <div className="text-center py-2">
-            <p>جاري البحث عن العضو...</p>
-          </div>
-        )}
-
-        {formData.identifier && !foundMember && !searchLoading && (
-          <div className="text-red-500 text-sm">
-            <p>
-              {formData.identifier.match(/[A-Za-z]/)
-                ? "لا يوجد عضو مسجل بهذا الكود RFID في النادي المحدد"
-                : "لا يوجد عضو مسجل بهذا الرقم أو الاسم في النادي المحدد"}
-            </p>
-          </div>
-        )}
-
-       
-
-        {/* Subscription Type & Coach */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
-            <select
-              value={formData.type}
-              onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitting || !foundMember}
-            >
-              <option value="">اختر النوع</option>
-              {allSubscriptionTypes
-                .filter((type) => type.club_details.id.toString() === formData.club?.toString())
-                .map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name} - {type.price} جنيها
-                  </option>
-                ))}
-            </select>
-          </div>
-          
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-medium mb-2">المدرب</label>
-            <select
-              value={formData.coach}
-              onChange={(e) => setFormData({ ...formData, coach: e.target.value })}
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              disabled={isSubmitting || !foundMember}
-            >
-              <option value="">اختر مدربًا</option>
-              {allCoaches.map((coach) => (
-                <option key={coach.id} value={coach.id}>
-                  {coach.username} 
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Start Date & Paid Amount */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-medium mb-2">تاريخ البدء</label>
-            <input
-              type="date"
-              value={formData.start_date}
-              onChange={(e) =>
-                setFormData({ ...formData, start_date: e.target.value })
-              }
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              min={new Date().toISOString().split("T")[0]}
-              disabled={isSubmitting || !foundMember}
-            />
-          </div>
-
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-medium mb-2">المبلغ المدفوع</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.paid_amount}
-              onChange={(e) =>
-                setFormData({ ...formData, paid_amount: e.target.value })
-              }
-              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-              placeholder="0.00"
-              disabled={isSubmitting || !foundMember}
-            />
-          </div>
-        </div>
-
-        {/* Private Training Price */}
-        <div className="w-full">
-          <label className="block text-sm font-medium mb-2">سعر التدريب الخاص</label>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={formData.private_training_price}
-            onChange={(e) =>
-              setFormData({ ...formData, private_training_price: e.target.value })
-            }
-            className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-            placeholder="0.00"
-            disabled={isSubmitting || !foundMember}
-          />
-        </div>
-        </div>
-
-
-       
-          </div>
-          <div className="">
-             {/* Member Info Display */}
-        {foundMember && (
-          <div className="border rounded-lg p-4 bg-gray-50">
-            <div className="flex items-start gap-4">
-              {foundMember.photo ? (
-                <img
-                  src={foundMember.photo}
-                  alt="Member"
-                  className="w-16 h-16 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-2xl">
-                  <FaUser />
+              {/* Loading and Errors */}
+              {searchLoading && (
+                <div className="text-center py-2">
+                  <p>جاري البحث عن العضو...</p>
                 </div>
               )}
-              <div className="flex-1">
-                <h3 className="font-bold text-lg">{foundMember.name}</h3>
-                <p className="text-gray-600">#{foundMember.membership_number}</p>
-                <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+
+              {formData.identifier && !foundMember && !searchLoading && (
+                <div className="text-red-500 text-sm">
                   <p>
-                    <span className="font-medium">الهاتف:</span> {foundMember.phone || "غير متوفر"}
-                  </p>
-                  <p>
-                    <span className="font-medium">RFID:</span> {foundMember.rfid_code || "غير مسجل"}
-                  </p>
-                  <p>
-                    <span className="font-medium">النادي:</span> {foundMember.club_name}
-                  </p>
-                  <p>
-                    <span className="font-medium">العنوان:</span> {foundMember.address || "غير متوفر"}
-                  </p>
-                  <p>
-                    <span className="font-medium">الرقم القومي:</span> {foundMember.national_id || "غير متوفر"}
+                    {formData.identifier.match(/[A-Za-z]/)
+                      ? "لا يوجد عضو مسجل بهذا الكود RFID في النادي المحدد"
+                      : "لا يوجد عضو مسجل بهذا الرقم أو الاسم في النادي المحدد"}
                   </p>
                 </div>
+              )}
+
+              {/* Subscription Type & Coach */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
+                  <select
+                    value={formData.type}
+                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    disabled={isSubmitting || !foundMember}
+                  >
+                    <option value="">اختر النوع</option>
+                    {allSubscriptionTypes
+                      .filter((type) => type.club_details.id.toString() === formData.club?.toString())
+                      .map((type) => (
+                        <option key={type.id} value={type.id}>
+                          {type.name} - {type.price} جنيها
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">المدرب</label>
+                  <select
+                    value={formData.coach}
+                    onChange={(e) => setFormData({ ...formData, coach: e.target.value })}
+                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    disabled={isSubmitting || !foundMember}
+                  >
+                    <option value="">اختر مدربًا</option>
+                    {allCoaches.map((coach) => (
+                      <option key={coach.id} value={coach.id}>
+                        {coach.username} 
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Start Date & Paid Amount */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">تاريخ البدء</label>
+                  <input
+                    type="date"
+                    value={formData.start_date}
+                    onChange={(e) =>
+                      setFormData({ ...formData, start_date: e.target.value })
+                    }
+                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    min={new Date().toISOString().split("T")[0]}
+                    disabled={isSubmitting || !foundMember}
+                  />
+                </div>
+
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">المبلغ المدفوع</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.paid_amount}
+                    onChange={(e) =>
+                      setFormData({ ...formData, paid_amount: e.target.value })
+                    }
+                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
+                    disabled={isSubmitting || !foundMember}
+                  />
+                </div>
+              </div>
+
+              {/* Private Training Price */}
+              <div className="w-full">
+                <label className="block text-sm font-medium mb-2">سعر التدريب الخاص</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.private_training_price}
+                  onChange={(e) =>
+                    setFormData({ ...formData, private_training_price: e.target.value })
+                  }
+                  className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                  placeholder="0.00"
+                  disabled={isSubmitting || !foundMember}
+                />
               </div>
             </div>
           </div>
-        )}
+          <div className="">
+            {/* Member Info Display */}
+            {foundMember && (
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex items-start gap-4">
+                  {foundMember.photo ? (
+                    <img
+                      src={foundMember.photo}
+                      alt="Member"
+                      className="w-16 h-16 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-2xl">
+                      <FaUser />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <h3 className="font-bold text-lg">{foundMember.name}</h3>
+                    <p className="text-gray-600">#{foundMember.membership_number}</p>
+                    <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                      <p>
+                        <span className="font-medium">الهاتف:</span> {foundMember.phone || "غير متوفر"}
+                      </p>
+                      <p>
+                        <span className="font-medium">RFID:</span> {foundMember.rfid_code || "غير مسجل"}
+                      </p>
+                      <p>
+                        <span className="font-medium">النادي:</span> {foundMember.club_name}
+                      </p>
+                      <p>
+                        <span className="font-medium">العنوان:</span> {foundMember.address || "غير متوفر"}
+                      </p>
+                      <p>
+                        <span className="font-medium">الرقم القومي:</span> {foundMember.national_id || "غير متوفر"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          </div>
+        </div>
+
         {/* Submit */}
         <Button
           type="submit"
