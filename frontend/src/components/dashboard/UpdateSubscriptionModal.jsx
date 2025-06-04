@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUsers } from '../../redux/slices/memberSlice';
-import { fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';
+import { fetchSubscriptionTypes, updateSubscription } from '../../redux/slices/subscriptionsSlice';
 import { FaUser } from 'react-icons/fa';
-
-
+import { toast } from 'react-hot-toast';
+import axios from 'axios';
+import BASE_URL from '../../config/api';
 
 const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) => {
   const dispatch = useDispatch();
@@ -19,16 +20,42 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
     start_date: '',
     end_date: '',
     paid_amount: '',
+    coach: '',
+    private_training_price: '',
   });
 
   const [clubs, setClubs] = useState([]);
   const [allMembers, setAllMembers] = useState({ results: [] });
+  const [allCoaches, setAllCoaches] = useState([]);
   const [foundMember, setFoundMember] = useState(null);
-  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false); // Fixed typo here
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // Fetch all coaches
+  const fetchAllCoaches = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = { Authorization: `Bearer ${token}` };
+      
+      let allCoaches = [];
+      let nextUrl = `${BASE_URL}/accounts/api/users/`;
+      
+      while (nextUrl) {
+        const response = await axios.get(nextUrl, { headers });
+        allCoaches = [...allCoaches, ...response.data.results];
+        nextUrl = response.data.next;
+      }
+      
+      return allCoaches.filter(user => user.role === 'coach');
+    } catch (error) {
+      console.error('Failed to fetch all coaches:', error);
+      toast.error('فشل في تحميل بيانات المدربين');
+      throw error;
+    }
+  };
 
   // Fetch all members across pages
   const fetchAllUsers = async () => {
@@ -52,12 +79,15 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
     }
   };
 
-  // Fetch users (members) and clubs on mount
+  // Fetch users, clubs, and coaches on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const membersResult = await fetchAllUsers();
-        
+        const [membersResult, coachesResult] = await Promise.all([
+          fetchAllUsers(),
+          fetchAllCoaches(),
+        ]);
+
         // Extract unique clubs
         const uniqueClubs = Array.from(
           new Map(
@@ -69,10 +99,11 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
         );
         setClubs(uniqueClubs);
         setAllMembers(membersResult);
+        setAllCoaches(coachesResult);
         setLoading(false);
       } catch (err) {
-        console.error("Failed to fetch members:", err);
-        setError("Failed to load members data");
+        console.error("Failed to fetch data:", err);
+        setError("Failed to load data");
         setLoading(false);
       }
     };
@@ -91,6 +122,8 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
         start_date: subscription.start_date || '',
         end_date: subscription.end_date || '',
         paid_amount: subscription.paid_amount || '',
+        coach: subscription.coach?.toString() || '',
+        private_training_price: subscription.private_training_price || '',
       });
 
       if (subscription.member_details) {
@@ -174,23 +207,44 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
       return;
     }
 
+    if (formData.private_training_price && isNaN(parseFloat(formData.private_training_price))) {
+      setErrorMessage("سعر التدريب الخاص يجب أن يكون رقمًا صحيحًا");
+      setIsModalOpen(true);
+      return;
+    }
+
     if (!foundMember) {
       setErrorMessage("يرجى اختيار عضو صالح");
       setIsModalOpen(true);
       return;
     }
 
-    if (onSubmit) {
-      onSubmit({
-        ...formData,
-        club: parseInt(formData.club),
-        member: foundMember.id,
-        type: parseInt(formData.type),
-        paid_amount: parseFloat(formData.paid_amount),
-        id: subscription.id,
-      });
+    const payload = {
+      club: parseInt(formData.club),
+      member: foundMember.id,
+      type: parseInt(formData.type),
+      start_date: formData.start_date,
+      end_date: formData.end_date,
+      paid_amount: parseFloat(formData.paid_amount),
+      coach: formData.coach ? parseInt(formData.coach) : null,
+      private_training_price: formData.private_training_price ? parseFloat(formData.private_training_price) : null,
+      id: subscription.id,
+    };
+
+    try {
+      await dispatch(updateSubscription(payload)).unwrap();
+      toast.success('تم تحديث الاشتراك بنجاح');
+      if (onSubmit) onSubmit(payload);
+      onClose();
+    } catch (error) {
+      let errorData = error.payload || error.data || error.response || error;
+      if (errorData?.non_field_errors && Array.isArray(errorData.non_field_errors)) {
+        setErrorMessage(errorData.non_field_errors[0]);
+      } else {
+        setErrorMessage(errorData?.message || error.message || "حدث خطأ غير متوقع");
+      }
+      setIsModalOpen(true);
     }
-    onClose();
   };
 
   if (!isOpen) return null;
@@ -353,26 +407,46 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
             </div>
           )}
 
-          {/* Type */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
-            <select
-              name="type"
-              value={formData.type}
-              onChange={handleInputChange}
-              className="w-full p-2 border border-gray-300 rounded"
-              disabled={!foundMember}
-              required
-            >
-              <option value="">اختر نوع الاشتراك</option>
-              {subscriptionTypes?.results
-                ?.filter((type) => type.club_details.id.toString() === formData.club?.toString())
-                .map((type) => (
-                  <option key={type.id} value={type.id}>
-                    {type.name} - {type.price} جنيها
+          {/* Type & Coach */}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="w-full md:w-1/2">
+              <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
+              <select
+                name="type"
+                value={formData.type}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded"
+                disabled={!foundMember}
+                required
+              >
+                <option value="">اختر نوع الاشتراك</option>
+                {subscriptionTypes?.results
+                  ?.filter((type) => type.club_details.id.toString() === formData.club?.toString())
+                  .map((type) => (
+                    <option key={type.id} value={type.id}>
+                      {type.name} - {type.price} جنيها
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div className="w-full md:w-1/2">
+              <label className="block text-sm font-medium mb-2">المدرب</label>
+              <select
+                name="coach"
+                value={formData.coach}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded"
+                disabled={!foundMember}
+              >
+                <option value="">اختر مدربًا</option>
+                {allCoaches.map((coach) => (
+                  <option key={coach.id} value={coach.id}>
+                    {coach.username}
                   </option>
                 ))}
-            </select>
+              </select>
+            </div>
           </div>
 
           {/* Start Date & End Date */}
@@ -403,20 +477,35 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
             </div>
           </div>
 
-          {/* Paid Amount */}
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-2">المبلغ المدفوع</label>
-            <input
-              type="number"
-              name="paid_amount"
-              step="0.01"
-              value={formData.paid_amount}
-              onChange={handleInputChange}
-              className="w-full p-2 border border-gray-300 rounded"
-              placeholder="0.00"
-              disabled={!foundMember}
-              required
-            />
+          {/* Paid Amount & Private Training Price */}
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="w-full md:w-1/2">
+              <label className="block text-sm font-medium mb-2">المبلغ المدفوع</label>
+              <input
+                type="number"
+                name="paid_amount"
+                step="0.01"
+                value={formData.paid_amount}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded"
+                placeholder="0.00"
+                disabled={!foundMember}
+                required
+              />
+            </div>
+            <div className="w-full md:w-1/2">
+              <label className="block text-sm font-medium mb-2">سعر التدريب الخاص</label>
+              <input
+                type="number"
+                name="private_training_price"
+                step="0.01"
+                value={formData.private_training_price}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded"
+                placeholder="0.00"
+                disabled={!foundMember}
+              />
+            </div>
           </div>
 
           {/* Submit Button */}
