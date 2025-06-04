@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
-import { addSubscriptionType } from '../../redux/slices/subscriptionsSlice';
 import { fetchClubs } from '../../redux/slices/clubSlice';
 import { toast } from "react-hot-toast";
 
-const CreateSubscriptionTypes = ({ onClose }) => {
+
+import { addSubscriptionType, fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';
+
+const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
   const dispatch = useDispatch();
 
   const [formData, setFormData] = useState({
@@ -17,8 +19,8 @@ const CreateSubscriptionTypes = ({ onClose }) => {
     club: '',
     is_active: true,
     max_entries: '',
-    max_freeze_days: 0, // new field for maximum freeze days
-    is_private_training: false, // new field for private training
+    max_freeze_days: 0,
+    is_private_training: false,
   });
 
   const [clubs, setClubs] = useState([]);
@@ -32,6 +34,7 @@ const CreateSubscriptionTypes = ({ onClose }) => {
         setClubs(res);
       } catch (error) {
         console.error('Error fetching clubs:', error);
+        toast.error('فشل في جلب الأندية');
       }
     };
 
@@ -86,8 +89,22 @@ const CreateSubscriptionTypes = ({ onClose }) => {
 
     try {
       await dispatch(addSubscriptionType(submissionData)).unwrap();
-      toast.success("تم إنشاء نوع الاشتراك بنجاح!");
+      toast.success('تم إنشاء نوع الاشتراك بنجاح!');
 
+      // Re-fetch subscription types with default filters and page 1
+      await dispatch(
+        fetchSubscriptionTypes({
+          page: 1,
+          searchQuery: '',
+          statusFilter: 'all',
+          durationFilter: '',
+          includesGym: '',
+          includesPool: '',
+          includesClasses: '',
+        })
+      ).unwrap();
+
+      // Reset form
       setFormData({
         name: '',
         price: '',
@@ -101,8 +118,9 @@ const CreateSubscriptionTypes = ({ onClose }) => {
         max_freeze_days: 0,
         is_private_training: false,
       });
-
-      if (onClose) onClose();
+     onClose();
+      // Notify parent component to reset page and close modal
+      if (onSuccess) onSuccess();
     } catch (err) {
       console.error('فشل في إنشاء نوع الاشتراك:', err);
       toast.error(err.message || 'فشل في إنشاء نوع الاشتراك');
@@ -110,7 +128,7 @@ const CreateSubscriptionTypes = ({ onClose }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto bg-white p-6 rounded shadow" dir="rtl">
+    <form onSubmit={handleSubmit} className="max-w-6xl mx-auto bg-white p-6 rounded shadow" dir="rtl">
       <h2 className="text-2xl font-bold text-center mb-6">إنشاء نوع اشتراك جديد</h2>
 
       {error && (
@@ -230,7 +248,7 @@ const CreateSubscriptionTypes = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Facilities Checkboxes - full width */}
+        {/* Facilities Checkboxes */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">المرافق المشمولة:</label>
           <div className="flex flex-wrap gap-4">
@@ -279,6 +297,3 @@ const CreateSubscriptionTypes = ({ onClose }) => {
 };
 
 export default CreateSubscriptionTypes;
-     
-
-
