@@ -81,25 +81,37 @@ def subscription_type_list(request):
 def subscription_list(request):
     if request.method == 'GET':
         search_term = request.GET.get('identifier', '')
+        # Check if any filter is applied (indicating a search query)
+        is_search_mode = (
+            search_term or
+            any(param in request.query_params for param in [
+                'member_id', 'type_id', 'club_id', 'club_name', 'start_date', 'end_date',
+                'paid_amount', 'remaining_amount', 'entry_count', 'status'
+            ]) or
+            any(param.endswith('_gte') or param.endswith('_lte') for param in request.query_params)
+        )
 
-        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
+        # Base queryset for subscriptions
+        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(
+            club=request.user.club
+        )
 
-        if request.user.role in ['reception', 'accountant']:
+        # Restrict non-admin users to their shift unless it's a search query
+        if request.user.role in ['reception', 'accountant'] and not is_search_mode:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club,
-                check_in__lte=timezone.now(),
-                check_out__gte=timezone.now()
-            ).first()
-            if attendance and attendance.shift:
-                subscriptions = subscriptions.filter(
-                    created_by=request.user,
-                    created_at__gte=attendance.check_in,
-                    created_at__lte=attendance.check_out if attendance.check_out else timezone.now()
-                )
-            else:
-                subscriptions = subscriptions.none()
+                check_out__isnull=True  # Current open shift
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+            subscriptions = subscriptions.filter(
+                created_by=request.user,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            )
 
+        # Apply filters
         filterable_fields = {
             'member_id': 'member_id',
             'type_id': 'type_id',
@@ -143,6 +155,7 @@ def subscription_list(request):
 
         subscriptions = subscriptions.order_by('-id')
 
+        # Apply status filter
         status_filter = request.query_params.get('status', '').lower()
         today = timezone.now().date()
 
@@ -162,6 +175,7 @@ def subscription_list(request):
         if status_filter in status_filters:
             subscriptions = subscriptions.filter(**status_filters[status_filter])
 
+        # Pagination
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page, many=True)
@@ -224,6 +238,7 @@ def subscription_list(request):
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -272,6 +287,19 @@ def subscription_detail(request, pk):
         return Response({'error': 'غير مخول للوصول إلى هذا الاشتراك'}, status=status.HTTP_403_FORBIDDEN)
 
     if request.method == 'GET':
+        if request.user.role in ['reception', 'accountant']:
+            identifier = request.GET.get('identifier', '')
+            is_search_mode = bool(identifier)  # Consider it a search if identifier is provided
+            if not is_search_mode:
+                # Restrict to subscriptions created during current shift
+                attendance = StaffAttendance.objects.filter(
+                    staff=request.user,
+                    club=request.user.club,
+                    check_out__isnull=True
+                ).order_by('-check_in').first()
+                if not attendance or subscription.created_by != request.user or \
+                   subscription.created_at < attendance.check_in or subscription.created_at > timezone.now():
+                    return Response({'error': 'You can only view your own subscriptions within your shift'}, status=status.HTTP_403_FORBIDDEN)
         serializer = SubscriptionSerializer(subscription)
         return Response(serializer.data)
     
@@ -291,7 +319,6 @@ def subscription_detail(request, pk):
                 return Response({'error': 'معرف غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
 
         with transaction.atomic():
-            # Handle SubscriptionType updates if type is provided
             type_id = mutable_data.get('type')
             if type_id:
                 subscription_type = get_object_or_404(SubscriptionType, pk=type_id, club=request.user.club)
@@ -313,14 +340,11 @@ def subscription_detail(request, pk):
             serializer = SubscriptionSerializer(subscription, data=mutable_data, partial=True, context={'request': request})
             if serializer.is_valid():
                 updated_subscription = serializer.save()
-
-                # Update income if paid_amount or private_training_price changes
                 if 'paid_amount' in mutable_data or 'private_training_price' in mutable_data:
                     old_paid_amount = subscription.paid_amount
                     old_private_training_price = subscription.private_training_price or Decimal('0')
                     new_paid_amount = updated_subscription.paid_amount
                     new_private_training_price = updated_subscription.private_training_price or Decimal('0')
-
                     additional_amount = (new_paid_amount - old_paid_amount) + (new_private_training_price - old_private_training_price)
                     if additional_amount > 0:
                         source, _ = IncomeSource.objects.get_or_create(
@@ -339,13 +363,13 @@ def subscription_detail(request, pk):
                             received_by=request.user
                         )
                         income.save()
-
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     elif request.method == 'DELETE':
         subscription.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -355,8 +379,25 @@ def active_subscriptions(request):
         start_date__lte=today,
         end_date__gte=today,
         club=request.user.club
-    ).order_by('-start_date')
-    
+    )
+
+    if request.user.role in ['reception', 'accountant']:
+        is_search_mode = bool(request.query_params)  # Any query params indicate a search
+        if not is_search_mode:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+            subscriptions = subscriptions.filter(
+                created_by=request.user,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            )
+
+    subscriptions = subscriptions.order_by('-start_date')
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
     serializer = SubscriptionSerializer(page, many=True)
@@ -366,7 +407,28 @@ def active_subscriptions(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expired_subscriptions(request):
     today = timezone.now().date()
-    subscriptions = Subscription.objects.filter(end_date__lt=today, club=request.user.club).order_by('-end_date')    
+    subscriptions = Subscription.objects.filter(
+        end_date__lt=today,
+        club=request.user.club
+    )
+
+    if request.user.role in ['reception', 'accountant']:
+        is_search_mode = bool(request.query_params)  # Any query params indicate a search
+        if not is_search_mode:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+            subscriptions = subscriptions.filter(
+                created_by=request.user,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            )
+
+    subscriptions = subscriptions.order_by('-end_date')
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
     serializer = SubscriptionSerializer(page, many=True)
@@ -376,8 +438,28 @@ def expired_subscriptions(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def upcoming_subscriptions(request):
     today = timezone.now().date()
-    subscriptions = Subscription.objects.filter(start_date__gt=today, club=request.user.club).order_by('start_date')    
+    subscriptions = Subscription.objects.filter(
+        start_date__gt=today,
+        club=request.user.club
+    )
 
+    if request.user.role in ['reception', 'accountant']:
+        is_search_mode = bool(request.query_params)  # Any query params indicate a search
+        if not is_search_mode:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+            subscriptions = subscriptions.filter(
+                created_by=request.user,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            )
+
+    subscriptions = subscriptions.order_by('start_date')
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
     serializer = SubscriptionSerializer(page, many=True)
@@ -466,9 +548,26 @@ def member_subscriptions(request):
         return Response({"error": "member_id parameter is required"}, status=status.HTTP_400_BAD_REQUEST)
     
     subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(
-            member_id=member_id, club=request.user.club
-        )    
-    
+        member_id=member_id,
+        club=request.user.club
+    )
+
+    if request.user.role in ['reception', 'accountant']:
+        is_search_mode = bool(search_term or request.query_params.get('member_id'))
+        if not is_search_mode:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+            subscriptions = subscriptions.filter(
+                created_by=request.user,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            )
+
     if search_term:
         subscriptions = subscriptions.filter(
             Q(member__name__icontains=search_term) |
@@ -481,6 +580,7 @@ def member_subscriptions(request):
     page = paginator.paginate_queryset(subscriptions, request)
     serializer = SubscriptionSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

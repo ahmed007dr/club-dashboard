@@ -7,41 +7,49 @@ from subscriptions.models import Subscription, SubscriptionType
 from members.models import Member
 from .serializers import ReceiptSerializer
 from rest_framework.permissions import IsAuthenticated
-from utils.permissions import IsOwnerOrRelatedToClub  
+from utils.permissions import IsOwnerOrRelatedToClub
 from finance.models import Income, IncomeSource
-from django.utils.timezone import now
+from django.utils import timezone
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
-from django.utils import timezone
 from staff.models import StaffAttendance
 from datetime import datetime, timedelta
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def receipt_list_api(request):
     identifier = request.query_params.get('identifier', None)
-    
+    is_search_mode = bool(identifier)  # Consider it a search if identifier is provided
+
     if request.user.role in ['owner', 'admin']:
-        receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').filter(club=request.user.club)
-    else:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club
-        ).order_by('-check_in').first()
-
-        if not attendance:
-            return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        check_out = attendance.check_out if attendance.check_out else timezone.now()
         receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').filter(
-            club=request.user.club,
-            date__range=(attendance.check_in, check_out)
+            club=request.user.club
         )
+    else:
+        if is_search_mode:
+            # Allow access to all receipts for search queries
+            receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').filter(
+                club=request.user.club
+            )
+        else:
+            # Restrict to receipts issued by the user in current shift
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_out__isnull=True  # Current open shift
+            ).order_by('-check_in').first()
+
+            if not attendance:
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+
+            receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').filter(
+                club=request.user.club,
+                issued_by=request.user,
+                date__gte=attendance.check_in,
+                date__lte=timezone.now()
+            )
 
     if identifier:
-        if request.user.role not in ['owner', 'admin']:
-            receipts = Receipt.objects.select_related('club', 'member', 'subscription', 'issued_by').filter(club=request.user.club)
         receipts = receipts.filter(
             member__in=Member.objects.filter(
                 Q(name__icontains=identifier) |
@@ -56,17 +64,65 @@ def receipt_list_api(request):
     serializer = ReceiptSerializer(paginated_receipts, many=True)
     return paginator.get_paginated_response(serializer.data)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def receipt_detail_api(request, receipt_id):
+    receipt = get_object_or_404(Receipt, id=receipt_id)
+    identifier = request.query_params.get('identifier', None)
+    is_search_mode = bool(identifier)  # Consider it a search if identifier is provided
 
+    if request.user.role not in ['owner', 'admin'] and not is_search_mode:
+        # Restrict to receipts issued by the user in current shift
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club,
+            check_out__isnull=True
+        ).order_by('-check_in').first()
+
+        if not attendance:
+            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if receipt.issued_by != request.user or receipt.date < attendance.check_in or receipt.date > timezone.now():
+            return Response({'error': 'This receipt is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = ReceiptSerializer(receipt)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def receipt_by_invoice_api(request, invoice_number):
+    receipt = get_object_or_404(Receipt, invoice_number=invoice_number)
+    is_search_mode = True  # Treat invoice number lookup as a search query
+
+    if request.user.role not in ['owner', 'admin'] and not is_search_mode:
+        # Restrict to receipts issued by the user in current shift
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club,
+            check_out__isnull=True
+        ).order_by('-check_in').first()
+
+        if not attendance:
+            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if receipt.issued_by != request.user or receipt.date < attendance.check_in or receipt.date > timezone.now():
+            return Response({'error': 'This receipt is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = ReceiptSerializer(receipt)
+    return Response(serializer.data)
+
+# باقي الـ APIs بدون تغيير
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_receipt_api(request):
     if request.user.role not in ['owner', 'admin']:
         attendance = StaffAttendance.objects.filter(
             staff=request.user,
-            club=request.user.club
+            club=request.user.club,
+            check_out__isnull=True
         ).order_by('-check_in').first()
 
-        if not attendance or (attendance.check_out and attendance.check_out < timezone.now()):
+        if not attendance:
             return Response({'error': 'You can only add receipts during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
 
     data = request.data.copy()
@@ -80,10 +136,10 @@ def add_receipt_api(request):
                 Q(name__icontains=identifier) |
                 Q(phone__icontains=identifier) |
                 Q(rfid_code__icontains=identifier)
-            ).first()  
+            ).first()
             if not member:
                 return Response({'error': 'No member found matching the provided identifier'}, status=status.HTTP_400_BAD_REQUEST)
-            data['member'] = member.id  
+            data['member'] = member.id
         except Member.DoesNotExist:
             return Response({'error': 'No member found matching the provided identifier'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -113,28 +169,6 @@ def add_receipt_api(request):
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def receipt_detail_api(request, receipt_id):
-    receipt = get_object_or_404(Receipt, id=receipt_id)
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club
-        ).order_by('-check_in').first()
-
-        if not attendance:
-            return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        check_out = attendance.check_out if attendance.check_out else timezone.now()
-        if not (attendance.check_in <= receipt.date <= check_out):
-            return Response({'error': 'This receipt is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
-
-    serializer = ReceiptSerializer(receipt)
-    return Response(serializer.data)
-
-
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def edit_receipt_api(request, receipt_id):
@@ -150,7 +184,6 @@ def edit_receipt_api(request, receipt_id):
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_receipt_api(request, receipt_id):
@@ -161,38 +194,17 @@ def delete_receipt_api(request, receipt_id):
     receipt.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def receipt_by_invoice_api(request, invoice_number):
-    receipt = get_object_or_404(Receipt, invoice_number=invoice_number)
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club
-        ).order_by('-check_in').first()
-
-        if not attendance:
-            return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        check_out = attendance.check_out if attendance.check_out else timezone.now()
-        if not (attendance.check_in <= receipt.date <= check_out):
-            return Response({'error': 'This receipt is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
-
-    serializer = ReceiptSerializer(receipt)
-    return Response(serializer.data)
-
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def validate_or_autocorrect_receipt(request):
     if request.user.role not in ['owner', 'admin']:
         attendance = StaffAttendance.objects.filter(
             staff=request.user,
-            club=request.user.club
+            club=request.user.club,
+            check_out__isnull=True
         ).order_by('-check_in').first()
 
-        if not attendance or (attendance.check_out and attendance.check_out < timezone.now()):
+        if not attendance:
             return Response({'error': 'You can only validate receipts during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
 
     data = request.data
@@ -200,7 +212,7 @@ def validate_or_autocorrect_receipt(request):
     member_id = data.get('member')
     subscription_id = data.get('subscription')
     amount = data.get('amount')
-    default_subscription_type_name = data.get('default_subscription_type') 
+    default_subscription_type_name = data.get('default_subscription_type')
 
     try:
         member = Member.objects.get(id=member_id)

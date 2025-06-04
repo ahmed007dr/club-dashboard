@@ -5,43 +5,48 @@ from rest_framework import status
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from rest_framework.pagination import PageNumberPagination
-from utils.permissions import IsOwnerOrRelatedToClub  
+from utils.permissions import IsOwnerOrRelatedToClub
 from .serializers import MemberSerializer
 from .models import Member
 from utils.generate_membership_number import generate_membership_number
 from django.db import IntegrityError
 from staff.models import StaffAttendance
 from django.utils import timezone
-from attendance.models import Attendance 
-
+from attendance.models import Attendance
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_list_api(request):
     search_term = request.GET.get('q', '')
-    
+    is_search_mode = bool(search_term)  # Consider it a search if q is provided
+
     if request.user.role in ['owner', 'admin']:
         members = Member.objects.filter(club=request.user.club).order_by('-id')
     else:
-        # الموظف يشوف الأعضاء اللي ليهم حضور في الشيفت بتاعه
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club
-        ).order_by('-check_in').first()
+        if is_search_mode:
+            # Allow access to all members for search queries
+            members = Member.objects.filter(club=request.user.club).order_by('-id')
+        else:
+            # Restrict to members with attendance in current shift
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_out__isnull=True  # Current open shift
+            ).order_by('-check_in').first()
 
-        if not attendance:
-            return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
+            if not attendance:
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
 
-        check_out = attendance.check_out if attendance.check_out else timezone.now()
-        member_ids = Attendance.objects.filter(
-            subscription__club=request.user.club,
-            attendance_date__range=(attendance.check_in, check_out)
-        ).values_list('subscription__member_id', flat=True).distinct()
+            member_ids = Attendance.objects.filter(
+                subscription__club=request.user.club,
+                attendance_date__gte=attendance.check_in,
+                attendance_date__lte=timezone.now()
+            ).values_list('subscription__member_id', flat=True).distinct()
 
-        members = Member.objects.filter(
-            id__in=member_ids,
-            club=request.user.club
-        ).order_by('-id')
+            members = Member.objects.filter(
+                id__in=member_ids,
+                club=request.user.club
+            ).order_by('-id')
 
     if search_term:
         members = members.filter(
@@ -49,13 +54,44 @@ def member_list_api(request):
             Q(phone__icontains=search_term) |
             Q(rfid_code__icontains=search_term)
         )
-    
+
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(members, request)
     serializer = MemberSerializer(result_page, many=True)
-    return paginator.get_paginated_response(serializer.data) 
+    return paginator.get_paginated_response(serializer.data)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def member_detail_api(request, member_id):
+    member = get_object_or_404(Member, id=member_id)
+    search_term = request.GET.get('q', '')
+    is_search_mode = bool(search_term)  # Consider it a search if q is provided
 
+    if request.user.role not in ['owner', 'admin'] and not is_search_mode:
+        # Restrict to members with attendance in current shift
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club,
+            check_out__isnull=True
+        ).order_by('-check_in').first()
+
+        if not attendance:
+            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+
+        has_interaction = Attendance.objects.filter(
+            subscription__club=request.user.club,
+            subscription__member_id=member_id,
+            attendance_date__gte=attendance.check_in,
+            attendance_date__lte=timezone.now()
+        ).exists()
+
+        if not has_interaction:
+            return Response({'error': 'This member is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = MemberSerializer(member)
+    return Response(serializer.data)
+
+# باقي الـ APIs بدون تغيير
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_search_api(request):
@@ -78,7 +114,6 @@ def member_search_api(request):
     serializer = MemberSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def api_user_profile(request):
@@ -89,22 +124,22 @@ def api_user_profile(request):
     }
     return Response(profile_data)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def create_member_api(request):
     if request.user.role not in ['owner', 'admin']:
         attendance = StaffAttendance.objects.filter(
             staff=request.user,
-            club=request.user.club
+            club=request.user.club,
+            check_out__isnull=True
         ).order_by('-check_in').first()
 
-        if not attendance or (attendance.check_out and attendance.check_out < timezone.now()):
+        if not attendance:
             return Response({'error': 'You can only create members during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
 
     membership_number = generate_membership_number()
     data = request.data.copy()
-    data['membership_number'] = membership_number  
+    data['membership_number'] = membership_number
 
     serializer = MemberSerializer(data=data, context={'request': request})
 
@@ -121,34 +156,6 @@ def create_member_api(request):
             return Response({'error': f'Error uploading file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def member_detail_api(request, member_id):
-    member = get_object_or_404(Member, id=member_id)
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club
-        ).order_by('-check_in').first()
-
-        if not attendance:
-            return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        check_out = attendance.check_out if attendance.check_out else timezone.now()
-        has_interaction = Attendance.objects.filter(
-            subscription__club=request.user.club,
-            subscription__member_id=member_id,
-            attendance_date__range=(attendance.check_in, check_out)
-        ).exists()
-
-        if not has_interaction:
-            return Response({'error': 'This member is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
-
-    serializer = MemberSerializer(member)
-    return Response(serializer.data)
-
-
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def update_member_api(request, member_id):
@@ -163,7 +170,6 @@ def update_member_api(request, member_id):
             return Response({'error': 'You do not have permission to update this member to this club'}, status=status.HTTP_403_FORBIDDEN)
         return Response(serializer.data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
