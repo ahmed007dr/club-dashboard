@@ -1,43 +1,54 @@
 from django.contrib import admin
-from import_export.admin import ImportExportModelAdmin
-from import_export import resources
-from .models import Ticket
-from django.utils.html import format_html
-from datetime import date
+from .models import Ticket, TicketType, TicketBook
 
+@admin.register(TicketType)
+class TicketTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'club', 'price', 'description')
+    list_filter = ('club',)
+    search_fields = ('name', 'description')
+    ordering = ('name',)
+    list_per_page = 20
 
-# Resource for import/export
-class TicketResource(resources.ModelResource):
-    class Meta:
-        model = Ticket
-        fields = (
-            'id', 'club__name', 'buyer_name', 'ticket_type', 'price',
-            'used', 'issue_date', 'used_by__name'
-        )
-        export_order = (
-            'id', 'club__name', 'buyer_name', 'ticket_type', 'price',
-            'used', 'issue_date', 'used_by__name'
-        )
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            return qs.filter(club=request.user.club)
+        return qs
 
+@admin.register(TicketBook)
+class TicketBookAdmin(admin.ModelAdmin):
+    list_display = ('serial_prefix', 'club', 'issued_date', 'issued_tickets', 'total_tickets')
+    list_filter = ('club', 'issued_date')
+    search_fields = ('serial_prefix',)
+    ordering = ('-issued_date',)
+    list_per_page = 20
+
+    def issued_tickets(self, obj):
+        return Ticket.objects.filter(book=obj).count()
+    issued_tickets.short_description = 'التذاكر المصدرة'
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            return qs.filter(club=request.user.club)
+        return qs
 
 @admin.register(Ticket)
-class TicketAdmin(ImportExportModelAdmin):
-    resource_class = TicketResource
-    list_display = (
-        'colored_buyer', 'ticket_type', 'price', 'used', 'club', 'issue_date', 'used_by'
-    )
-    list_filter = ('ticket_type', 'used', 'club', 'issue_date')
-    search_fields = ('buyer_name', 'club__name', 'used_by__name')
-    date_hierarchy = 'issue_date'
-    raw_id_fields = ('club', 'used_by')
-    actions = ['mark_as_used']
+class TicketAdmin(admin.ModelAdmin):
+    list_display = ('serial_number', 'ticket_type', 'notes', 'price', 'issue_datetime', 'issued_by', 'book')
+    list_filter = ('club', 'ticket_type', 'issue_datetime')
+    search_fields = ('serial_number', 'notes')
+    ordering = ('-issue_datetime',)
+    list_per_page = 20
+    readonly_fields = ('issue_datetime', 'price', 'serial_number', 'issued_by')
 
-    def colored_buyer(self, obj):
-        color = 'green' if not obj.used else 'red'
-        return format_html('<strong style="color: {};">{}</strong>', color, obj.buyer_name)
-    colored_buyer.short_description = 'Buyer'
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            return qs.filter(club=request.user.club)
+        return qs
 
-    def mark_as_used(self, request, queryset):
-        count = queryset.update(used=True)
-        self.message_user(request, f"{count} ticket(s) marked as used.")
-    mark_as_used.short_description = "Mark selected tickets as used"
+    def save_model(self, request, obj, form, change):
+        if not change and not obj.issued_by:
+            obj.issued_by = request.user
+        super().save_model(request, obj, form, change)

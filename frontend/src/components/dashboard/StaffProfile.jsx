@@ -69,7 +69,7 @@ const StaffProfile = () => {
                   {user.first_name} {user.last_name}
                 </h3>
                 <p className="text-sm text-gray-600">اسم المستخدم: {user.username}</p>
-                <p className="text-sm text-gray-600">البريد الإلكتروني: {user.email}</p>
+                {/* <p className="text-sm text-gray-600">البريد الإلكتروني: {user.email}</p> */}
               </div>
 
               <div className="w-full border-t border-gray-200 pt-6">

@@ -10,7 +10,7 @@ import {
 import DeleteSubscriptionModal from "./DeleteSubscriptionModal";
 import UpdateSubscriptionModal from "./UpdateSubscriptionModal";
 import { Link } from "react-router-dom";
-import { FaEdit, FaTrash, FaEye, FaRedo } from "react-icons/fa";
+import { FaEdit, FaTrash, FaEye, FaRedo, FaCalendarAlt } from "react-icons/fa";
 import { CiCircleList } from "react-icons/ci";
 import CreateSubscription from "./CreateSubscription";
 import { FaArrowRotateLeft } from "react-icons/fa6";
@@ -22,9 +22,10 @@ import {
 } from "../ui/DropdownMenu";
 import { MoreVertical } from "lucide-react";
 import usePermission from "@/hooks/usePermission";
-import { motion, AnimatePresence } from "framer-motion"; // للأنيميشن
-import { Tooltip } from "react-tooltip"; // لإضافة tooltips
-import { toast } from "react-hot-toast"; // لرسائل الإشعارات
+import { motion, AnimatePresence } from "framer-motion";
+import { Tooltip } from "react-tooltip";
+import { toast } from "react-hot-toast";
+import { debounce } from "lodash";
 
 const SubscriptionList = () => {
   const dispatch = useDispatch();
@@ -50,13 +51,8 @@ const SubscriptionList = () => {
     memberName: "",
     startDate: "",
     endDate: "",
-    clubName: "",
     entryCount: "",
     status: "",
-  });
-  const [tempFilters, setTempFilters] = useState({
-    memberName: "",
-    clubName: "",
   });
 
   // Normalize status values
@@ -74,14 +70,13 @@ const SubscriptionList = () => {
   const totalItems = pagination.count || 0;
   const itemsPerPage = pagination.page_size || 20;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
-
-  // Generate pagination range
+  
   const paginationRange = useMemo(() => {
     const maxButtons = 5;
     const sideButtons = Math.floor(maxButtons / 2);
     let start = Math.max(1, currentPage - sideButtons);
     let end = Math.min(totalPages, currentPage + sideButtons);
-
+  
     if (end - start + 1 < maxButtons) {
       if (currentPage <= sideButtons) {
         end = Math.min(totalPages, maxButtons);
@@ -89,10 +84,9 @@ const SubscriptionList = () => {
         start = Math.max(1, totalPages - maxButtons + 1);
       }
     }
-
+  
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   }, [currentPage, totalPages]);
-
   // Handlers
   const handlePageChange = useCallback((pageNumber) => {
     if (pageNumber >= 1 && pageNumber <= totalPages) {
@@ -106,35 +100,17 @@ const SubscriptionList = () => {
 
   const handleFilterChange = useCallback((e) => {
     const { name, value } = e.target;
-    if (name === "memberName" || name === "clubName") {
-      setTempFilters((prev) => ({ ...prev, [name]: value }));
-    } else {
-      setFilters((prev) => ({ ...prev, [name]: value }));
-      setCurrentPage(1);
-    }
-  }, []);
-
-  const handleSearch = useCallback(() => {
-    setFilters((prev) => ({
-      ...prev,
-      memberName: tempFilters.memberName,
-      clubName: tempFilters.clubName,
-    }));
+    setFilters((prev) => ({ ...prev, [name]: value }));
     setCurrentPage(1);
-  }, [tempFilters]);
+  }, []);
 
   const resetFilters = useCallback(() => {
     setFilters({
       memberName: "",
       startDate: "",
       endDate: "",
-      clubName: "",
       entryCount: "",
       status: "",
-    });
-    setTempFilters({
-      memberName: "",
-      clubName: "",
     });
     setCurrentPage(1);
   }, []);
@@ -283,31 +259,28 @@ const SubscriptionList = () => {
     [dispatch, currentPage, filters]
   );
 
+  // Debounced fetch subscriptions
+  const debouncedFetchSubscriptions = useCallback(
+    debounce((filters, page, pageSize) => {
+      dispatch(
+        fetchSubscriptions({
+          page,
+          pageSize,
+          searchTerm: filters.memberName,
+          startDate: filters.startDate,
+          endDate: filters.endDate,
+          entryCount: filters.entryCount,
+          status: filters.status,
+        })
+      );
+    }, 500),
+    [dispatch]
+  );
+
   // Fetch subscriptions
   useEffect(() => {
-    dispatch(
-      fetchSubscriptions({
-        page: currentPage,
-        pageSize: itemsPerPage,
-        searchTerm: filters.memberName,
-        clubName: filters.clubName,
-        startDate: filters.startDate,
-        endDate: filters.endDate,
-        entryCount: filters.entryCount,
-        status: filters.status,
-      })
-    );
-  }, [dispatch, currentPage, itemsPerPage, filters]);
-
-  // Handle Enter key for search
-  const handleKeyPress = useCallback(
-    (e) => {
-      if (e.key === "Enter") {
-        handleSearch();
-      }
-    },
-    [handleSearch]
-  );
+    debouncedFetchSubscriptions(filters, currentPage, itemsPerPage);
+  }, [filters, currentPage, itemsPerPage, debouncedFetchSubscriptions]);
 
   if (status === "loading") {
     return (
@@ -354,57 +327,64 @@ const SubscriptionList = () => {
       {/* Filters */}
       <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
+          <div className="lg:col-span-2">
             <label className="block text-sm font-medium text-gray-700 mb-1">
               اسم العضو
             </label>
-            <input
-              type="text"
-              name="memberName"
-              value={tempFilters.memberName}
-              onChange={handleFilterChange}
-              onKeyPress={handleKeyPress}
-              placeholder="بحث باسم العضو"
-              className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              اسم النادي
-            </label>
-            <input
-              type="text"
-              name="clubName"
-              value={tempFilters.clubName}
-              onChange={handleFilterChange}
-              onKeyPress={handleKeyPress}
-              placeholder="بحث باسم النادي"
-              className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400"
-            />
+            <div className="relative">
+              <input
+                type="text"
+                name="memberName"
+                value={filters.memberName}
+                onChange={handleFilterChange}
+                placeholder="ابحث باسم العضو..."
+                className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2.5 text-sm text-right shadow-sm placeholder-gray-400 pr-10"
+              />
+              <svg
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               تاريخ البدء
             </label>
-            <input
-              type="date"
-              name="startDate"
-              value={filters.startDate}
-              onChange={handleFilterChange}
-              className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm"
-            />
+            <div className="relative">
+              <input
+                type="date"
+                name="startDate"
+                value={filters.startDate}
+                onChange={handleFilterChange}
+                className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2.5 text-sm text-right shadow-sm appearance-none"
+              />
+              <FaCalendarAlt className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               تاريخ الانتهاء
             </label>
-            <input
-              type="date"
-              name="endDate"
-              value={filters.endDate}
-              onChange={handleFilterChange}
-              className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm"
-            />
+            <div className="relative">
+              <input
+                type="date"
+                name="endDate"
+                value={filters.endDate}
+                onChange={handleFilterChange}
+                className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2.5 text-sm text-right shadow-sm appearance-none"
+              />
+              <FaCalendarAlt className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -417,7 +397,7 @@ const SubscriptionList = () => {
               onChange={handleFilterChange}
               placeholder="تصفية حسب عدد الإدخالات"
               min="0"
-              className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm placeholder-gray-400"
+              className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2.5 text-sm text-right shadow-sm placeholder-gray-400"
             />
           </div>
           <div>
@@ -428,7 +408,7 @@ const SubscriptionList = () => {
               name="status"
               value={filters.status}
               onChange={handleFilterChange}
-              className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2 text-sm text-right shadow-sm"
+              className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2.5 text-sm text-right shadow-sm"
             >
               <option value="">كل الحالات</option>
               <option value="active">نشط</option>
@@ -437,14 +417,6 @@ const SubscriptionList = () => {
             </select>
           </div>
           <div className="flex items-end gap-2 col-span-1 sm:col-span-2 lg:col-span-4">
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={handleSearch}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-            >
-              بحث
-            </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
@@ -472,7 +444,6 @@ const SubscriptionList = () => {
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="py-3 px-4 text-right font-semibold">العضو</th>
-                    <th className="py-3 px-4 text-right font-semibold">اسم النادي</th>
                     <th className="py-3 px-4 text-right font-semibold">تاريخ البدء</th>
                     <th className="py-3 px-4 text-right font-semibold">تاريخ الانتهاء</th>
                     <th className="py-3 px-4 text-right font-semibold">عدد الإدخالات</th>
@@ -503,7 +474,6 @@ const SubscriptionList = () => {
                             {subscription.member_details.name}
                           </Link>
                         </td>
-                        <td className="py-3 px-4">{subscription.club_details.name}</td>
                         <td className="py-3 px-4">{subscription.start_date}</td>
                         <td className="py-3 px-4">{subscription.end_date}</td>
                         <td className="py-3 px-4">{subscription.entry_count}</td>
@@ -669,9 +639,6 @@ const SubscriptionList = () => {
                       <Tooltip id={`actions-mobile-${subscription.id}`} />
                     </div>
                     <div className="space-y-2 text-sm">
-                      <p>
-                        <strong>اسم النادي:</strong> {subscription.club_details.name}
-                      </p>
                       <p>
                         <strong>تاريخ البدء:</strong> {subscription.start_date}
                       </p>
@@ -919,10 +886,6 @@ const SubscriptionList = () => {
                   <div>
                     <p className="text-gray-600 font-medium">عدد الإدخالات:</p>
                     <p className="text-gray-800">{detailSubscription.entry_count}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600 font-medium">اسم النادي:</p>
-                    <p className="text-gray-800">{detailSubscription.club_details.name}</p>
                   </div>
                 </div>
               </div>

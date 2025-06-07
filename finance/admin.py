@@ -51,7 +51,7 @@ class ExpenseAdmin(ImportExportModelAdmin):
 
 @admin.register(IncomeSource)
 class IncomeSourceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'club', 'description')
+    list_display = ('name', 'price', 'description','club')
     search_fields = ('name',)
     list_filter = ('club',)
 

@@ -333,6 +333,8 @@ export const fetchIncomes = createAsyncThunk(
   }
 );
 
+
+
 export const addIncome = createAsyncThunk(
   'finance/addIncome',
   async (newIncome, { rejectWithValue }) => {
@@ -344,7 +346,10 @@ export const addIncome = createAsyncThunk(
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newIncome),
+        body: JSON.stringify({
+          source: newIncome.source,
+          description: newIncome.description || "",
+        }),
       });
 
       if (!response.ok) {
@@ -359,6 +364,7 @@ export const addIncome = createAsyncThunk(
   }
 );
 
+
 export const updateIncome = createAsyncThunk(
   'finance/updateIncome',
   async ({ id, updatedData }, { rejectWithValue }) => {
@@ -370,7 +376,10 @@ export const updateIncome = createAsyncThunk(
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updatedData),
+        body: JSON.stringify({
+          source: updatedData.source,
+          description: updatedData.description || "",
+        }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -382,6 +391,7 @@ export const updateIncome = createAsyncThunk(
     }
   }
 );
+
 
 export const deleteIncome = createAsyncThunk(
   'finance/deleteIncome',
@@ -415,6 +425,7 @@ const financeSlice = createSlice({
     expenses: [],
     expensesPagination: { count: 0, next: null, previous: null },
     incomeSources: [],
+    incomeSourcesPagination: { count: 0, next: null, previous: null },
     incomes: [],
     incomesPagination: { count: 0, next: null, previous: null },
     totalIncome: 0,
@@ -532,6 +543,7 @@ const financeSlice = createSlice({
     builder.addCase(fetchIncomeSources.fulfilled, (state, action) => {
       state.loading = false;
       state.incomeSources = action.payload.results || action.payload;
+      state.incomeSourcesPagination = { }
     });
     builder.addCase(fetchIncomeSources.rejected, (state, action) => {
       state.loading = false;

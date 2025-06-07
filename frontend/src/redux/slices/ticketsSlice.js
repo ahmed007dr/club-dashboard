@@ -1,14 +1,33 @@
-// src/redux/slices/ticketsSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 
-// Create the async thunk for fetching tickets with pagination
-export const fetchTickets = createAsyncThunk(
-  "tickets/fetchTickets",
-  async (params, thunkAPI) => {
-    const token = localStorage.getItem("token");
+export const fetchTicketTypes = createAsyncThunk(
+  'tickets/fetchTicketTypes',
+  async (_, { rejectWithValue }) => {
     try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+      const response = await axios.get(`${BASE_URL}/tickets/api/ticket-types/?price__gt=0`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      return response.data.results || [];
+    } catch (error) {
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to fetch ticket types';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+export const fetchTickets = createAsyncThunk(
+  'tickets/fetchTickets',
+  async (params, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
       const response = await axios.get(`${BASE_URL}/tickets/api/tickets/`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -17,17 +36,14 @@ export const fetchTickets = createAsyncThunk(
           page: params.page,
           page_size: params.page_size,
           club: params.club,
-          buyer_name: params.buyer_name,
           ticket_type: params.ticket_type,
-          used: params.used,
           issue_date: params.issue_date,
         },
       });
       return response.data;
     } catch (error) {
-      return thunkAPI.rejectWithValue(
-        error.response?.data || "An error occurred"
-      );
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to fetch tickets';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -35,9 +51,9 @@ export const fetchTickets = createAsyncThunk(
 export const addTicket = createAsyncThunk(
   'tickets/addTicket',
   async (ticketData, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
-    
     try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
       const response = await axios.post(
         `${BASE_URL}/tickets/api/tickets/add/`,
         ticketData,
@@ -50,7 +66,8 @@ export const addTicket = createAsyncThunk(
       );
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to add ticket';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -58,9 +75,9 @@ export const addTicket = createAsyncThunk(
 export const fetchTicketById = createAsyncThunk(
   'tickets/fetchTicketById',
   async (ticketId, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
-  
     try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
       const response = await axios.get(
         `${BASE_URL}/tickets/api/tickets/${ticketId}/`,
         {
@@ -70,10 +87,10 @@ export const fetchTicketById = createAsyncThunk(
           },
         }
       );
-      console.log(response.data)
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to fetch ticket';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -81,8 +98,9 @@ export const fetchTicketById = createAsyncThunk(
 export const deleteTicketById = createAsyncThunk(
   'tickets/deleteTicketById',
   async (ticketId, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
     try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
       await axios.delete(
         `${BASE_URL}/tickets/api/tickets/${ticketId}/delete/`,
         {
@@ -94,7 +112,8 @@ export const deleteTicketById = createAsyncThunk(
       );
       return ticketId;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to delete ticket';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -102,10 +121,11 @@ export const deleteTicketById = createAsyncThunk(
 export const editTicketById = createAsyncThunk(
   'tickets/editTicketById',
   async ({ ticketId, ticketData }, { rejectWithValue }) => {
-    const token = localStorage.getItem('token');
     try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
       const response = await axios.put(
-        `${BASE_URL}/tickets/api/tickets/${ticketId}/edit/`,
+        `${BASE_URL}/tickets/api/tickets/${ticketId}/`,
         ticketData,
         {
           headers: {
@@ -116,42 +136,80 @@ export const editTicketById = createAsyncThunk(
       );
       return response.data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || error.message);
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to edit ticket';
+      return rejectWithValue(errorMessage);
     }
   }
 );
 
-export const markTicketAsUsed = createAsyncThunk(
-  "tickets/markAsUsed",
-  async ({ ticketId, used, identifier }, { rejectWithValue }) => {
+export const fetchTicketBookReport = createAsyncThunk(
+  'tickets/fetchTicketBookReport',
+  async ({ date }, { rejectWithValue }) => {
     try {
-      const url = `${BASE_URL}/tickets/api/tickets/${ticketId}/mark-used/`;
-      console.log("Sending API request:", { url, payload: { used, identifier } });
-      const response = await fetch(url, {
-        method: "POST",
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+      const response = await axios.get(`${BASE_URL}/tickets/api/ticket-book-report/`, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ used, identifier }),
+        params: { date },
       });
-      console.log("Response status:", response.status, "OK:", response.ok);
-      if (!response.ok) {
-        const text = await response.text();
-        console.error("Backend response:", text.substring(0, 200)); // Log first 200 chars
-        try {
-          const errorData = JSON.parse(text);
-          return rejectWithValue(errorData);
-        } catch (e) {
-          return rejectWithValue({ error: `Invalid response: ${text.substring(0, 100)}` });
+      return response.data;
+    } catch (error) {
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to fetch ticket book report';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+export const createTicketBook = createAsyncThunk(
+  'tickets/createTicketBook',
+  async (bookData, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+      const response = await axios.post(
+        `${BASE_URL}/tickets/api/ticket-books/add/`,
+        bookData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
         }
-      }
-      const data = await response.json();
-      console.log("Response data:", data);
-      return data;
-    } catch (err) {
-      console.error("Network error:", err);
-      return rejectWithValue({ error: err.message });
+      );
+      return response.data;
+    } catch (error) {
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to create ticket book';
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+export const fetchCurrentTicketBook = createAsyncThunk(
+  'tickets/fetchCurrentTicketBook',
+  async ({ club, ticket_type }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('No authentication token found');
+      const response = await axios.get(
+        `${BASE_URL}/tickets/api/ticket-books/current/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          params: {
+            club,
+            ticket_type,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      const errorMessage = error.response?.data?.detail || error.message || 'Failed to fetch current ticket book';
+      return rejectWithValue(errorMessage);
     }
   }
 );
@@ -163,8 +221,11 @@ const ticketsSlice = createSlice({
       results: [],
       count: 0,
       next: null,
-      previous: null
+      previous: null,
     },
+    ticketTypes: [],
+    ticketBook: [],
+    ticketBookReport: [],
     currentTicket: null,
     loading: false,
     error: null,
@@ -172,7 +233,19 @@ const ticketsSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      // Fetch Tickets
+      .addCase(fetchTicketTypes.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchTicketTypes.fulfilled, (state, action) => {
+        state.loading = false;
+        state.ticketTypes = action.payload;
+      })
+      .addCase(fetchTicketTypes.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
       .addCase(fetchTickets.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -183,32 +256,28 @@ const ticketsSlice = createSlice({
           results: action.payload.results,
           count: action.payload.count,
           next: action.payload.next,
-          previous: action.payload.previous
+          previous: action.payload.previous,
         };
       })
       .addCase(fetchTickets.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      
-      // Add Ticket
+
       .addCase(addTicket.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(addTicket.fulfilled, (state, action) => {
         state.loading = false;
-        // Add new ticket to beginning of results
         state.tickets.results.unshift(action.payload);
-        // Increment total count
         state.tickets.count += 1;
       })
       .addCase(addTicket.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      
-      // Fetch Ticket By ID
+
       .addCase(fetchTicketById.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -221,34 +290,29 @@ const ticketsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
-      // Delete Ticket
+
       .addCase(deleteTicketById.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(deleteTicketById.fulfilled, (state, action) => {
         state.loading = false;
-        // Remove deleted ticket from results
         state.tickets.results = state.tickets.results.filter(
           (ticket) => ticket.id !== action.payload
         );
-        // Decrement total count
         state.tickets.count -= 1;
       })
       .addCase(deleteTicketById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      
-      // Edit Ticket
+
       .addCase(editTicketById.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(editTicketById.fulfilled, (state, action) => {
         state.loading = false;
-        // Update the ticket in results array
         const index = state.tickets.results.findIndex(
           (ticket) => ticket.id === action.payload.id
         );
@@ -260,29 +324,42 @@ const ticketsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
-      // Mark Ticket as Used
-      .addCase(markTicketAsUsed.pending, (state) => {
+
+      .addCase(fetchTicketBookReport.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(markTicketAsUsed.fulfilled, (state, action) => {
+      .addCase(fetchTicketBookReport.fulfilled, (state, action) => {
         state.loading = false;
-        // Find and update the ticket in results array
-        const index = state.tickets.results.findIndex(
-          (ticket) => ticket.id === action.payload.id
-        );
-        
-        if (index !== -1) {
-          state.tickets.results[index] = {
-            ...state.tickets.results[index],
-            used: action.payload.used,
-            used_by: action.payload.used_by,
-            ...action.payload
-          };
-        }
+        state.ticketBookReport = action.payload;
       })
-      .addCase(markTicketAsUsed.rejected, (state, action) => {
+      .addCase(fetchTicketBookReport.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(createTicketBook.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(createTicketBook.fulfilled, (state, action) => {
+        state.loading = false;
+        state.ticketBook = action.payload;
+      })
+      .addCase(createTicketBook.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+
+      .addCase(fetchCurrentTicketBook.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchCurrentTicketBook.fulfilled, (state, action) => {
+        state.loading = false;
+        state.ticketBook = action.payload;
+      })
+      .addCase(fetchCurrentTicketBook.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

@@ -280,15 +280,15 @@ const SubscriptionsTypes = () => {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse bg-white shadow-sm rounded-lg">
+        <table className="w-full border-collapse bg-white shadow-sm rounded-lg text-right">
           <thead>
-            <tr className="bg-gray-100 text-gray-700 text-right">
-              <th className="px-4 py-3 font-semibold">الاسم</th>
-              <th className="px-4 py-3 font-semibold">الحالة</th>
-              <th className="px-4 py-3 font-semibold">المشتركين</th>
-              <th className="px-4 py-3 font-semibold">أيام التجميد</th>
-              <th className="px-4 py-3 font-semibold">تدريب خاص</th>
-              <th className="px-4 py-3 font-semibold">الإجراءات</th>
+            <tr className="bg-gray-100 text-gray-700">
+              <th className="px-4 py-3 font-semibold w-[20%] min-w-[100px] text-center">الاسم</th>
+              <th className="px-4 py-3 font-semibold w-[15%] min-w-[100px] text-center">الحالة</th>
+              <th className="px-4 py-3 font-semibold w-[15%] min-w-[100px] text-center">المشتركين</th>
+              <th className="px-4 py-3 font-semibold w-[15%] min-w-[100px] text-center">أيام التجميد</th>
+              <th className="px-4 py-3 font-semibold w-[15%] min-w-[100px] text-center">تدريب خاص</th>
+              <th className="px-4 py-3 font-semibold w-[20%] min-w-[100px] text-center">الإجراءات</th>
             </tr>
           </thead>
           <tbody>
@@ -298,41 +298,35 @@ const SubscriptionsTypes = () => {
                   key={type.id}
                   className="border-b hover:bg-gray-50 transition-all duration-200"
                 >
-                  <td className="px-4 py-3 text-gray-800">{type.name}</td>
+                  <td className="px-4 py-3 text-gray-800 text-center">{type.name}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end">
-                      {type.is_active ? (
-                        <>
-                          <span className="w-2 h-2 bg-emerald-500 rounded-full ml-2"></span>
-                          <span className="text-sm text-gray-700">نشط</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-2 h-2 bg-rose-500 rounded-full ml-2"></span>
-                          <span className="text-sm text-gray-700">غير نشط</span>
-                        </>
-                      )}
+                    <div className="flex items-center justify-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          type.is_active ? 'bg-emerald-500' : 'bg-rose-500'
+                        }`}
+                      ></span>
+                      <span className="text-sm text-gray-700">
+                        {type.is_active ? 'نشط' : 'غير نشط'}
+                      </span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-700">{type.subscriptions_count}</td>
-                  <td className="px-4 py-3 text-gray-700">{type.max_freeze_days}</td>
+                  <td className="px-4 py-3 text-gray-700 text-center">{type.subscriptions_count}</td>
+                  <td className="px-4 py-3 text-gray-700 text-center">{type.max_freeze_days}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center justify-end">
-                      {type.is_private_training ? (
-                        <>
-                          <span className="w-2 h-2 bg-indigo-500 rounded-full ml-2"></span>
-                          <span className="text-sm text-gray-700">نعم</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-2 h-2 bg-gray-400 rounded-full ml-2"></span>
-                          <span className="text-sm text-gray-700">لا</span>
-                        </>
-                      )}
+                    <div className="flex items-center justify-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          type.is_private_training ? 'bg-indigo-500' : 'bg-gray-400'
+                        }`}
+                      ></span>
+                      <span className="text-sm text-gray-700">
+                        {type.is_private_training ? 'نعم' : 'لا'}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex justify-end space-x-2 rtl:space-x-reverse">
+                    <div className="flex justify-center space-x-2 rtl:space-x-reverse">
                       <button
                         onClick={() => openDetailsModal(type)}
                         className="p-2 text-gray-600 hover:bg-gray-100 hover:text-indigo-600 rounded-full transition-all duration-200 relative group"

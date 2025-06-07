@@ -47,9 +47,10 @@ class IncomeSource(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)  
 
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.price} جنيه)"
 
     class Meta:
         indexes = [
@@ -77,4 +78,4 @@ class Income(models.Model):
             models.Index(fields=['date']),
             models.Index(fields=['related_receipt']),
         ]
-        ordering = ['-date', 'id']  
+        ordering = ['-date', 'id']

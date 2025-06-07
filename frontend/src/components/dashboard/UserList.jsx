@@ -79,7 +79,6 @@ function UserList() {
 
   const startNumber = (currentPage - 1) * 20 + 1;
 
-  // Memoized users to prevent unnecessary re-renders
   const memoizedUsers = useMemo(() => users, [users]);
 
   if (!canViewUsers) {
@@ -100,13 +99,12 @@ function UserList() {
     <div className="container mx-auto p-6" dir="rtl">
       <h1 className="text-3xl font-bold mb-8 text-gray-800 text-center">تقارير الموظفين</h1>
 
-      {/* Search and Filter Section */}
       <div className="mb-6 flex items-center gap-4">
         <div className="relative flex-1">
           <FiSearch className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="ابحث عن مستخدم، بريد، دور، حالة، أو كود RFID"
+            placeholder="ابحث عن مستخدم، دور، حالة، أو كود RFID"
             className="w-full p-2.5 pr-10 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-400 focus:border-blue-400 text-sm transition-all"
             value={filter}
             onChange={(e) => {
@@ -124,7 +122,6 @@ function UserList() {
         </button>
       </div>
 
-      {/* Loading State */}
       {loading && (
         <div className="p-6 bg-blue-50 text-blue-700 rounded-xl shadow-sm mb-6 flex items-center justify-center animate-pulse">
           <FiRefreshCw className="animate-spin mr-2" />
@@ -132,7 +129,6 @@ function UserList() {
         </div>
       )}
 
-      {/* Error State */}
       {error && (
         <div className="p-6 bg-red-50 text-red-700 rounded-xl shadow-sm mb-6 flex items-center justify-between">
           <span className="font-medium">{error}</span>
@@ -146,10 +142,8 @@ function UserList() {
         </div>
       )}
 
-      {/* Table and Card View */}
       {!loading && !error && (
         <>
-          {/* Table View - Larger Screens */}
           <div className="hidden lg:block overflow-x-auto rounded-xl border border-gray-100 shadow-sm mb-6">
             <table className="min-w-full divide-y divide-gray-100 bg-white text-right">
               <thead className="bg-gray-50">
@@ -157,7 +151,6 @@ function UserList() {
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">#</th>
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">اسم المستخدم</th>
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">الاسم الكامل</th>
-                  <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">البريد الإلكتروني</th>
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">الدور</th>
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">الحالة</th>
                   <th className="px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">كود RFID</th>
@@ -178,7 +171,6 @@ function UserList() {
                       <td className="px-6 py-4 text-sm">
                         {user.first_name || user.last_name ? `${user.first_name} ${user.last_name}`.trim() : '—'}
                       </td>
-                      <td className="px-6 py-4 text-sm">{user.email || '—'}</td>
                       <td className="px-6 py-4 text-sm">{user.role || '—'}</td>
                       <td className="px-6 py-4 text-sm">
                         <span
@@ -205,7 +197,7 @@ function UserList() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="9" className="px-6 py-6 text-center text-gray-500">
+                    <td colSpan="8" className="px-6 py-6 text-center text-gray-500">
                       لا يوجد مستخدمين متطابقين مع بحثك
                     </td>
                   </tr>
@@ -214,7 +206,6 @@ function UserList() {
             </table>
           </div>
 
-          {/* Card View - Smaller Screens */}
           <div className="lg:hidden space-y-4 mb-6">
             {memoizedUsers.length > 0 ? (
               memoizedUsers.map((user, index) => (
@@ -232,10 +223,6 @@ function UserList() {
                     <div>
                       <p className="text-gray-500 text-xs">الاسم الكامل</p>
                       <p>{user.first_name || user.last_name ? `${user.first_name} ${user.last_name}`.trim() : '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-500 text-xs">البريد الإلكتروني</p>
-                      <p>{user.email || '—'}</p>
                     </div>
                     <div>
                       <p className="text-gray-500 text-xs">الدور</p>
@@ -279,7 +266,6 @@ function UserList() {
             )}
           </div>
 
-          {/* Pagination */}
           {count > 20 && (
             <div className="flex justify-center items-center gap-4 mt-8">
               <button

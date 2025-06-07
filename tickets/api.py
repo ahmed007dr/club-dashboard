@@ -1,71 +1,86 @@
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
-from rest_framework import status
 from django.shortcuts import get_object_or_404
-from .models import Ticket
-from .serializers import TicketSerializer
-from rest_framework.permissions import IsAuthenticated
-from utils.permissions import IsOwnerOrRelatedToClub
-from finance.models import Income, IncomeSource
 from django.utils import timezone
-from rest_framework.pagination import PageNumberPagination
-from members.models import Member
-from django.db.models import Q
+from django.db.models import Q,F
+from django.db import models
 from django.db import transaction
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.pagination import PageNumberPagination
+from .models import Ticket, TicketType, TicketBook
+from .serializers import TicketSerializer, TicketTypeSerializer, TicketBookSerializer
+from members.models import Member
 from staff.models import StaffAttendance
+from finance.models import Income, IncomeSource
+from utils.permissions import IsOwnerOrRelatedToClub
 from datetime import datetime
+
+class StandardPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 20
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def ticket_type_list_api(request):
+    ticket_types = TicketType.objects.filter(club=request.user.club, price__gt=0)
+    name = request.query_params.get('name')
+    if name:
+        ticket_types = ticket_types.filter(name__icontains=name)
+    
+    ticket_types = ticket_types.order_by('-id')
+    paginator = StandardPagination()
+    result_page = paginator.paginate_queryset(ticket_types, request)
+    serializer = TicketTypeSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def ticket_list_api(request):
     ticket_type = request.query_params.get('ticket_type')
-    used = request.query_params.get('used')
     issue_date = request.query_params.get('issue_date')
-    buyer_name = request.query_params.get('buyer_name')
-    is_search_mode = bool(ticket_type or used is not None or issue_date or buyer_name)  # Consider it a search if any filter is provided
+    notes = request.query_params.get('notes')
+    is_search_mode = bool(ticket_type or issue_date or notes)
 
     if request.user.role in ['owner', 'admin']:
-        tickets = Ticket.objects.select_related('club', 'used_by').filter(club=request.user.club)
+        tickets = Ticket.objects.select_related('club', 'ticket_type', 'issued_by').filter(club=request.user.club)
     else:
         if is_search_mode:
-            # Allow access to tickets issued by the user for search queries
-            tickets = Ticket.objects.select_related('club', 'used_by').filter(
+            tickets = Ticket.objects.select_related('club', 'ticket_type', 'issued_by').filter(
                 club=request.user.club,
-                issued_by=request.user  # Restrict to tickets issued by the user
+                issued_by=request.user
             )
         else:
-            # Restrict to tickets issued by the user in current shift
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club,
-                check_out__isnull=True  # Current open shift
+                check_out__isnull=True
             ).order_by('-check_in').first()
 
             if not attendance:
                 return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
 
-            tickets = Ticket.objects.select_related('club', 'used_by').filter(
+            tickets = Ticket.objects.select_related('club', 'ticket_type', 'issued_by').filter(
                 club=request.user.club,
-                issued_by=request.user,  # Restrict to tickets issued by the user
-                issue_date__gte=attendance.check_in,
-                issue_date__lte=timezone.now()
+                issued_by=request.user,
+                issue_datetime__gte=attendance.check_in,
+                issue_datetime__lte=timezone.now()
             )
 
     if ticket_type:
-        tickets = tickets.filter(ticket_type=ticket_type)
-    if used is not None:
-        tickets = tickets.filter(used=used.lower() == 'true')
+        tickets = tickets.filter(ticket_type__id=ticket_type)
     if issue_date:
         try:
             date_obj = datetime.strptime(issue_date, '%Y-%m-%d').date()
-            tickets = tickets.filter(issue_date=date_obj)
+            tickets = tickets.filter(issue_datetime__date=date_obj)
         except ValueError:
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
-    if buyer_name:
-        tickets = tickets.filter(buyer_name__icontains=buyer_name)
+    if notes:
+        tickets = tickets.filter(notes__icontains=notes)
 
     tickets = tickets.order_by('-id')
-    paginator = PageNumberPagination()
+    paginator = StandardPagination()
     result_page = paginator.paginate_queryset(tickets, request)
     serializer = TicketSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
@@ -74,14 +89,13 @@ def ticket_list_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def ticket_detail_api(request, ticket_id):
     ticket = get_object_or_404(Ticket, id=ticket_id)
-    ticket_type = request.query_params.get('ticket_type')
-    used = request.query_params.get('used')
-    issue_date = request.query_params.get('issue_date')
-    buyer_name = request.query_params.get('buyer_name')
-    is_search_mode = bool(ticket_type or used is not None or issue_date or buyer_name)  # Consider it a search if any filter is provided
+    is_search_mode = bool(
+        request.query_params.get('ticket_type') or
+        request.query_params.get('issue_date') or
+        request.query_params.get('notes')
+    )
 
     if request.user.role not in ['owner', 'admin'] and not is_search_mode:
-        # Restrict to tickets issued by the user in current shift
         attendance = StaffAttendance.objects.filter(
             staff=request.user,
             club=request.user.club,
@@ -91,13 +105,12 @@ def ticket_detail_api(request, ticket_id):
         if not attendance:
             return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if ticket.issued_by != request.user or ticket.issue_date < attendance.check_in or ticket.issue_date > timezone.now():
+        if ticket.issued_by != request.user or ticket.issue_datetime < attendance.check_in or ticket.issue_datetime > timezone.now():
             return Response({'error': 'This ticket is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
 
     serializer = TicketSerializer(ticket)
     return Response(serializer.data)
 
-# باقي الـ APIs بدون تغيير
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_ticket_api(request):
@@ -111,56 +124,60 @@ def add_ticket_api(request):
         if not attendance:
             return Response({'error': 'You can only add tickets during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
 
-    serializer = TicketSerializer(data=request.data)
+    data = request.data.copy()
+    data['issued_by'] = request.user.id
+    data['club'] = request.user.club.id
+
+    serializer = TicketSerializer(data=data)
     
     if serializer.is_valid():
         club = serializer.validated_data.get('club')
-        identifier = request.data.get('identifier')
-        used_by = None
-        if identifier:
-            try:
-                members = Member.objects.filter(
-                    Q(club=club) & 
-                    (
-                        Q(rfid_code=identifier) |
-                        Q(phone=identifier) |
-                        Q(name__iexact=identifier)
-                    )
-                )
-                if not members.exists():
-                    return Response(
-                        {'error': 'No member found with the provided identifier'},
-                        status=status.HTTP_404_NOT_FOUND
-                    )
-                if members.count() > 1:
-                    return Response(
-                        {'error': 'Multiple members found with the provided identifier. Please use a unique RFID or phone.'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-                used_by = members.first()
-            except Exception as e:
+        ticket_type = serializer.validated_data.get('ticket_type')
+
+        with transaction.atomic():
+            # Look for an open book with the same ticket_type
+            book = TicketBook.objects.filter(
+                club=club,
+                ticket_type=ticket_type,
+                total_tickets__gt=Ticket.objects.filter(book=models.F('id')).count()
+            ).order_by('issued_date').first()
+
+            if not book:
                 return Response(
-                    {'error': f'Error processing identifier: {str(e)}'},
+                    {'error': 'No open ticket book available for this ticket type. Please create a new ticket book.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-        with transaction.atomic():
-            ticket = serializer.save()
-            if used_by:
-                ticket.used_by = used_by
-                ticket.used = True
-                ticket.save()
+
+            if book.ticket_type != ticket_type:
+                return Response({'error': 'Ticket type does not match the book type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            ticket_count = Ticket.objects.filter(book=book).count()
+            ticket_number = ticket_count + 1
+            serial_number = f"{book.serial_prefix}-{str(ticket_number).zfill(3)}"
+
+            ticket = serializer.save(
+                serial_number=serial_number,
+                book=book
+            )
 
             if ticket.price > 0:
-                source, _ = IncomeSource.objects.get_or_create(
-                    club=ticket.club,
-                    name='Ticket',
-                    defaults={'description': 'ارباح بيع تذاكر'}
-                )
+                try:
+                    source = IncomeSource.objects.get(
+                        club=ticket.club, name='تذاكر', price=0
+                    )
+                except IncomeSource.DoesNotExist:
+                    source = IncomeSource.objects.create(
+                        club=ticket.club,
+                        name='تذاكر',
+                        description='إيرادات بيع التذاكر',
+                        price=0.00
+                    )
+
                 Income.objects.create(
                     club=ticket.club,
                     source=source,
                     amount=ticket.price,
-                    description=f"بيع تذكره بنوع {ticket.ticket_type}",
+                    description=f"بيع تذكرة {ticket.ticket_type.name} ({ticket.serial_number})",
                     date=timezone.now().date(),
                     received_by=request.user
                 )
@@ -169,64 +186,12 @@ def add_ticket_api(request):
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['PUT'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def edit_ticket_api(request, ticket_id):
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'Only owners or admins can edit tickets.'}, status=status.HTTP_403_FORBIDDEN)
-
-    ticket = get_object_or_404(Ticket, id=ticket_id)
-    identifier = request.data.get('identifier')
-    used_by = None
-    club = ticket.club
-
-    if identifier:
-        try:
-            members = Member.objects.filter(
-                Q(club=club) & 
-                (
-                    Q(rfid_code=identifier) |
-                    Q(phone=identifier) |
-                    Q(name__iexact=identifier)
-                )
-            )
-            if not members.exists():
-                return Response(
-                    {'error': 'No member found with the provided identifier'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
-            if members.count() > 1:
-                return Response(
-                    {'error': 'Multiple members found with the provided identifier. Please use a unique RFID or phone.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            used_by = members.first()
-        except Exception as e:
-            return Response(
-                {'error': f'Error processing identifier: {str(e)}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-    serializer = TicketSerializer(ticket, data=request.data)
-    if serializer.is_valid():
-        if used_by:
-            serializer.validated_data['used_by'] = used_by
-        updated_ticket = serializer.save()
-        return Response(serializer.data)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_ticket_api(request, ticket_id):
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'Only owners or admins can delete tickets.'}, status=status.HTTP_403_FORBIDDEN)
-
-    ticket = get_object_or_404(Ticket, id=ticket_id)
-    ticket.delete()
-    return Response(status=status.HTTP_204_NO_CONTENT)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def mark_ticket_used_api(request, ticket_id):
+    ticket = get_object_or_404(Ticket, id=ticket_id, club=request.user.club)
+    
     if request.user.role not in ['owner', 'admin']:
         attendance = StaffAttendance.objects.filter(
             staff=request.user,
@@ -235,62 +200,100 @@ def mark_ticket_used_api(request, ticket_id):
         ).order_by('-check_in').first()
 
         if not attendance:
-            return Response({'error': 'You can only mark tickets as used during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
 
-    ticket = get_object_or_404(Ticket, id=ticket_id)
-    if not IsOwnerOrRelatedToClub().has_object_permission(request, None, ticket):
-        return Response(
-            {'error': 'You do not have permission to mark this ticket as used'},
-            status=status.HTTP_403_FORBIDDEN
-        )
-    identifier = request.data.get('identifier')
-    
-    if not identifier:
-        return Response(
-            {'error': 'Identifier (rfid, phone, or name) is required'},
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        if ticket.issued_by != request.user or ticket.issue_datetime < attendance.check_in or ticket.issue_datetime > timezone.now():
+            return Response({'error': 'This ticket is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
 
-    try:
-        members = Member.objects.filter(
-            Q(club=ticket.club) & 
-            (
-                Q(rfid_code=identifier) |
-                Q(phone=identifier) |
-                Q(phone2=identifier) |
-                Q(name__iexact=identifier)
-            )
-        )
+    with transaction.atomic():
+        ticket.delete()
+        Income.objects.filter(
+            club=ticket.club,
+            description__contains=ticket.serial_number
+        ).delete()
 
-        if not members.exists():
+    return Response({'message': 'Ticket deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def ticket_book_report_api(request):
+    club = request.user.club
+    date = request.query_params.get('date')
+    if date:
+        try:
+            date_obj = datetime.strptime(date, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        date_obj = timezone.now().date()
+
+    books = TicketBook.objects.filter(club=club)
+    report = []
+
+    for book in books:
+        tickets = Ticket.objects.filter(
+            book=book,
+            issue_datetime__date=date_obj
+        ).order_by('serial_number')
+
+        issued_count = tickets.count()
+        serial_numbers = [ticket.serial_number for ticket in tickets]
+        total_issued = Ticket.objects.filter(book=book).count()
+        is_sequential = True
+
+        if serial_numbers:
+            first_number = int(serial_numbers[0].split('-')[-1])
+            for i, serial in enumerate(serial_numbers):
+                expected_number = first_number + i
+                actual_number = int(serial.split('-')[-1])
+                if actual_number != expected_number:
+                    is_sequential = False
+                    break
+
+        report.append({
+            'book_serial': book.serial_prefix,
+            'total_tickets': book.total_tickets,
+            'issued_tickets': issued_count,
+            'total_issued_tickets': total_issued,
+            'serial_numbers': serial_numbers,
+            'is_sequential': is_sequential,
+            'remaining_tickets': book.remaining_tickets(),
+            'ticket_type': TicketTypeSerializer(book.ticket_type).data,  
+        })
+
+    return Response(report, status=status.HTTP_200_OK)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def create_ticket_book_api(request):
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'Only owners or admins can create ticket books.'}, status=status.HTTP_403_FORBIDDEN)
+
+    data = request.data.copy()
+    data['club'] = request.user.club.id
+
+    serializer = TicketBookSerializer(data=data)
+    if serializer.is_valid():
+        club = request.user.club
+        ticket_type = serializer.validated_data.get('ticket_type')
+
+        # Check if there is an open book with the same ticket_type
+        existing_book = TicketBook.objects.filter(
+            club=club,
+            ticket_type=ticket_type,
+            total_tickets__gt=Ticket.objects.filter(book=models.F('id')).count()
+        ).first()
+
+        if existing_book:
             return Response(
-                {'error': 'No member found with the provided identifier'},
-                status=status.HTTP_404_NOT_FOUND
+                {'error': f'There is an open ticket book ({existing_book.serial_prefix}) with remaining tickets for this ticket type.'},
+                status=status.HTTP_400_BAD_REQUEST
             )
-        
-        if members.count() > 1:
-            if members.filter(name__iexact=identifier).exists():
-                return Response(
-                    {'error': 'Multiple members found with the same name. Please use RFID or phone for precision.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            else:
-                return Response(
-                    {'error': 'Multiple members found with the provided identifier'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
 
-        member = members.first()
-        
-        ticket.used = True
-        ticket.used_by = member
-        ticket.save()
-        
-        serializer = TicketSerializer(ticket)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    
-    except Exception as e:
-        return Response(
-            {'error': f'Error processing request: {str(e)}'},
-            status=status.HTTP_500_INTERNAL_SERVER_ERROR
-        )
+        with transaction.atomic():
+            book_count = TicketBook.objects.filter(club=club).count()
+            serial_prefix = f"TBK-{str(book_count + 1).zfill(3)}"
+            serializer.validated_data['serial_prefix'] = serial_prefix
+            book = serializer.save()
+        return Response(TicketBookSerializer(book).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

@@ -4,7 +4,8 @@ import logging
 import tempfile
 from datetime import datetime
 
-from django.db.models import Sum, Q
+from django.db.models import Sum, Q ,F
+from django.db import models
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -113,7 +114,9 @@ def expense_api(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_source_api(request):
     if request.method == 'GET':
-        sources = IncomeSource.objects.filter(club=request.user.club).order_by('-id')
+        sources = IncomeSource.objects.filter(club=request.user.club)
+
+        # sources = sources.filter(price__gt=0)
 
         name = request.query_params.get('name', None)
         description = request.query_params.get('description', None)
@@ -123,6 +126,7 @@ def income_source_api(request):
         if description:
             sources = sources.filter(description__icontains=description)
 
+        sources = sources.order_by('-id')
         paginator = StandardPagination()
         page = paginator.paginate_queryset(sources, request)
         serializer = IncomeSourceSerializer(page, many=True)
@@ -147,16 +151,14 @@ def income_source_api(request):
 def income_api(request):
     if request.method == 'GET':
         if request.user.role in ['owner', 'admin']:
-            # Owner و Admin يشوفوا بس إيرادات ناديهم
             incomes = Income.objects.select_related('source', 'received_by').filter(
                 club=request.user.club
             )
         else:
-            # Reception و Accountant يشوفوا إيراداتهم في الشيفت المفتوح فقط
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club,
-                check_out__isnull=True  # التأكد إن الشيفت مفتوح
+                check_out__isnull=True
             ).order_by('-check_in').first()
             
             if attendance:
@@ -174,14 +176,20 @@ def income_api(request):
         description = request.query_params.get('description')
 
         if source:
-            if not IncomeSource.objects.filter(name__icontains=source, club=request.user.club).exists():
-                return Response({"error": "No income source found with this name in your club"}, status=status.HTTP_400_BAD_REQUEST)
-            incomes = incomes.filter(source__name__icontains=source)
+            try:
+                source_id = int(source)
+                if not IncomeSource.objects.filter(id=source_id, club=request.user.club).exists():
+                    return Response({"error": "No income source found with this ID in your club"}, status=status.HTTP_400_BAD_REQUEST)
+                incomes = incomes.filter(source_id=source_id)
+            except ValueError:
+                return Response({"error": "Invalid source ID format"}, status=status.HTTP_400_BAD_REQUEST)
+        
         if amount:
             try:
                 incomes = incomes.filter(amount=float(amount))
             except ValueError:
                 return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
+        
         if description:
             incomes = incomes.filter(description__icontains=description)
 
@@ -195,17 +203,30 @@ def income_api(request):
     elif request.method == 'POST':
         data = request.data.copy()
         data['received_by'] = request.user.id
+        data['club'] = request.user.club.id
+        data['date'] = timezone.now().date().isoformat()  # إضافة التاريخ تلقائيًا
+
+        source_id = data.get('source')
+        if not source_id:
+            return Response({'error': 'Source is required'}, status=status.HTTP_400_BAD_REQUEST)
         
-        club_id = data.get('club')
-        if club_id and int(club_id) != request.user.club.id:
-            return Response({'error': 'You can only create incomes for your own club'}, status=status.HTTP_403_FORBIDDEN)
-        
+        try:
+            source = IncomeSource.objects.get(id=source_id, club=request.user.club)
+            data['amount'] = float(source.price)
+        except IncomeSource.DoesNotExist:
+            return Response({'error': 'Invalid source ID'}, status=status.HTTP_400_BAD_REQUEST)
+        except ValueError:
+            return Response({'error': 'Invalid price in source'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if 'description' not in data or not data['description']:
+            data['description'] = ''
+
         serializer = IncomeSerializer(data=data)
         if serializer.is_valid():
             income = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    
+    
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_detail_api(request, pk):

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -29,6 +29,7 @@ import {
 } from "../ui/DropdownMenu";
 import IncomeSourcesList from "./IncomeSourcesList";
 import usePermission from "@/hooks/usePermission";
+import { debounce } from "lodash";
 
 const labelMapping = {
   name: "الاسم",
@@ -102,19 +103,27 @@ const Income = () => {
       });
   }, []);
 
+  // Debounced fetch incomes
+  const debouncedFetchIncomes = useCallback(
+    debounce((filters, page) => {
+      dispatch(
+        fetchIncomes({
+          page,
+          filters: {
+            source: filters.source,
+            amount: filters.amount,
+            description: filters.description,
+          },
+        })
+      );
+    }, 300), // Reduced to 300ms for faster response
+    [dispatch]
+  );
+
   useEffect(() => {
-    dispatch(
-      fetchIncomes({
-        page: incomePage,
-        filters: {
-          source: incomeFilters.source,
-          amount: incomeFilters.amount,
-          description: incomeFilters.description,
-        },
-      })
-    );
+    debouncedFetchIncomes(incomeFilters, incomePage);
     dispatch(fetchIncomeSources());
-  }, [dispatch, incomeFilters, incomePage, summaryFilters, user.id]);
+  }, [incomeFilters, incomePage, debouncedFetchIncomes]);
 
   const incomePageCount = Math.ceil(incomesPagination.count / 20);
   const incomeSourcePageCount = Math.ceil(incomeSources.length / 20);
@@ -368,7 +377,28 @@ const Income = () => {
             <CardContent className="space-y-6">
               {/* Filters */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                {["source", "amount", "description"].map((field) => (
+                <div className="relative">
+                  <label className="block text-sm font-medium mb-1 text-right">
+                    {labelMapping.source}
+                  </label>
+                  <div className="relative">
+                    <FiList className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <select
+                      name="source"
+                      value={incomeFilters.source}
+                      onChange={handleIncomeFilterChange}
+                      className="w-full border border-gray-300 rounded-lg py-2.5 pr-10 pl-4 bg-white text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition-all duration-200 text-right"
+                    >
+                      <option value="">الكل</option>
+                      {incomeSources.map((source) => (
+                        <option key={source.id} value={source.id}>
+                          {source.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {["amount", "description"].map((field) => (
                   <div key={field} className="relative">
                     <label className="block text-sm font-medium mb-1 text-right">
                       {labelMapping[field] || field}
@@ -419,7 +449,6 @@ const Income = () => {
                   <thead>
                     <tr className="bg-gray-100 text-gray-700">
                       <th className="px-4 py-3 text-right text-sm font-semibold"></th>
-                      <th className="px-4 py-3 text-right text-sm font-semibold">المعرف</th>
                       <th className="px-4 py-3 text-right text-sm font-semibold">مصدر الدخل</th>
                       <th className="px-4 py-3 text-right text-sm font-semibold">المبلغ</th>
                       <th className="px-4 py-3 text-right text-sm font-semibold">الوصف</th>
@@ -434,7 +463,6 @@ const Income = () => {
                         <td className="px-4 py-3">
                           <FiDollarSign className="text-green-600 w-5 h-5" />
                         </td>
-                        <td className="px-4 py-3 text-sm text-gray-800">{income.id}</td>
                         <td className="px-4 py-3 text-sm text-gray-800">
                           {income.source_details?.name || "غير متاح"}
                         </td>
@@ -488,13 +516,6 @@ const Income = () => {
                   >
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-3">
-                        <div className="flex items-center gap-2">
-                          <FiDollarSign className="text-green-600 w-5 h-5" />
-                          <div>
-                            <p className="text-xs text-gray-500">المعرف</p>
-                            <p className="text-sm text-gray-800">{income.id}</p>
-                          </div>
-                        </div>
                         <div>
                           <p className="text-xs text-gray-500">مصدر الدخل</p>
                           <p className="text-sm text-gray-800">

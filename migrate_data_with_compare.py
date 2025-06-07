@@ -5,6 +5,7 @@ from django.apps import apps
 from django.core.management import call_command
 from django.db import models
 from datetime import datetime, time
+from django.utils import timezone
 
 def get_table_info(db_path, table_name):
     """Get the record count and columns of a table."""
@@ -68,6 +69,31 @@ def check_foreign_keys(table, row_data, new_db_path):
             cursor.execute("SELECT COUNT(*) FROM core_club WHERE id = ?", (club_id,))
             if cursor.fetchone()[0] == 0:
                 return False, f"Invalid club_id: {club_id}"
+        elif table == 'tickets_ticket':
+            club_id = row_data.get('club_id')
+            ticket_type_id = row_data.get('ticket_type_id')
+            used_by_id = row_data.get('used_by_id')
+            issued_by_id = row_data.get('issued_by_id')
+            book_id = row_data.get('book_id')
+            cursor.execute("SELECT COUNT(*) FROM core_club WHERE id = ?", (club_id,))
+            if cursor.fetchone()[0] == 0:
+                return False, f"Invalid club_id: {club_id}"
+            if ticket_type_id:
+                cursor.execute("SELECT COUNT(*) FROM tickets_tickettype WHERE id = ?", (ticket_type_id,))
+                if cursor.fetchone()[0] == 0:
+                    return False, f"Invalid ticket_type_id: {ticket_type_id}"
+            if used_by_id:
+                cursor.execute("SELECT COUNT(*) FROM members_member WHERE id = ?", (used_by_id,))
+                if cursor.fetchone()[0] == 0:
+                    return False, f"Invalid used_by_id: {used_by_id}"
+            if issued_by_id:
+                cursor.execute("SELECT COUNT(*) FROM accounts_user WHERE id = ?", (issued_by_id,))
+                if cursor.fetchone()[0] == 0:
+                    return False, f"Invalid issued_by_id: {issued_by_id}"
+            if book_id:
+                cursor.execute("SELECT COUNT(*) FROM tickets_ticketbook WHERE id = ?", (book_id,))
+                if cursor.fetchone()[0] == 0:
+                    return False, f"Invalid book_id: {book_id}"
         conn.close()
         return True, ""
     except sqlite3.OperationalError as e:
@@ -88,7 +114,6 @@ def get_table_size(db_path, table_name):
             cursor.execute(query)
             for row in cursor.fetchall():
                 size += sum(l or 0 for l in row)
-            # Add rough estimate for non-text columns
             cursor.execute(f"PRAGMA table_info(\"{table_name}\")")
             for col in cursor.fetchall():
                 col_type = col[2].lower()
@@ -117,7 +142,7 @@ def validate_migration(old_db_path, new_db_path):
     print(f"{'Table':<30} {'Old Records':<12} {'New Records':<12} {'Old Size (bytes)':<16} {'New Size (bytes)':<16}")
     print("-" * 90)
     for table in tables:
-        if table == 'django_migrations':  # Skip django_migrations due to expected differences
+        if table == 'django_migrations':
             continue
         cursor_old.execute(f"SELECT COUNT(*) FROM \"{table}\"")
         old_count = cursor_old.fetchone()[0]
@@ -144,16 +169,12 @@ def validate_migration(old_db_path, new_db_path):
 
 def migrate_data(old_db_path, new_db_path, default_values=None):
     """Migrate data from old database to new database."""
-    # Set the new database
     settings.DATABASES['default']['NAME'] = new_db_path
-
-    # Clear existing data
     print("Clearing data from the new database...")
     call_command('flush', interactive=False)
     print("Applying migrations...")
     call_command('migrate')
 
-    # Default values for new columns
     default_values = default_values or {
         'attendance.Attendance.entry_time': lambda: None,
         'invites.FreeInvite.created_at': lambda: datetime.now(),
@@ -178,10 +199,12 @@ def migrate_data(old_db_path, new_db_path, default_values=None):
         'finance.Expense.attachment': None,
         'finance.Income.related_receipt': None,
         'tickets.Ticket.used': False,
-
+        'tickets.Ticket.used_datetime': None,
+        'tickets.Ticket.issued_by': None,
+        'tickets.Ticket.book': None,
+        'tickets.Ticket.serial_number': lambda: f"TBK-DEFAULT-{int(timezone.now().timestamp())}",
     }
 
-    # Table order based on dependencies
     table_order = [
         'core_club',
         'django_content_type',
@@ -213,12 +236,23 @@ def migrate_data(old_db_path, new_db_path, default_values=None):
         'django_session',
         'staff_shift',
         'staff_staffattendance',
+        'tickets_tickettype',
+        'tickets_ticketbook',
         'tickets_ticket',
         'token_blacklist_outstandingtoken',
         'token_blacklist_blacklistedtoken',
         'sqlite_sequence',
-        'django_migrations',  # Last due to expected differences
+        'django_migrations',
     ]
+
+    # Map old ticket_type values to new TicketType instances
+    ticket_type_mapping = {
+        'day_pass': {'name': 'Day Pass', 'price': 100.00, 'description': 'One-day access'},
+        'session': {'name': 'Session', 'price': 50.00, 'description': 'Single session access'},
+    }
+
+    ticket_type_cache = {}  # Cache TicketType IDs by club_id and ticket_type
+    default_book_cache = {}  # Cache default TicketBook IDs by club_id
 
     for table in table_order:
         model = None
@@ -232,13 +266,64 @@ def migrate_data(old_db_path, new_db_path, default_values=None):
 
         model_name = f"{model._meta.app_label}.{model._meta.model_name}" if model else table
         old_columns, rows = get_table_data(old_db_path, table)
-        if not rows:
+        if not rows and table != 'tickets_tickettype' and table != 'tickets_ticketbook':
             print(f"Table {table} is empty")
             continue
 
         print(f"Migrating table {table} ({len(rows)} records)...")
+
+        if table == 'tickets_tickettype':
+            # Create TicketType entries for each old ticket_type value
+            old_tickets = get_table_data(old_db_path, 'tickets_ticket')[1]
+            club_ids = set(row[old_columns.index('club_id')] for row in old_tickets if 'club_id' in old_columns)
+            batch = []
+            for club_id in club_ids:
+                for ticket_type, details in ticket_type_mapping.items():
+                    batch.append(model(
+                        club_id=club_id,
+                        name=details['name'],
+                        price=details['price'],
+                        description=details['description']
+                    ))
+                    ticket_type_cache[(club_id, ticket_type)] = None  # Will update with ID after save
+            if batch:
+                try:
+                    created_objects = model.objects.bulk_create(batch)
+                    # Update cache with actual IDs
+                    for obj in created_objects:
+                        for ticket_type in ticket_type_mapping:
+                            if obj.name == ticket_type_mapping[ticket_type]['name'] and obj.club_id == club_id:
+                                ticket_type_cache[(obj.club_id, ticket_type)] = obj.id
+                    print(f"Table {table} migrated successfully with {len(batch)} records")
+                except Exception as e:
+                    print(f"Error migrating {table}: {e}")
+            continue
+
+        if table == 'tickets_ticketbook':
+            # Create a default TicketBook for each club
+            old_tickets = get_table_data(old_db_path, 'tickets_ticket')[1]
+            club_ids = set(row[old_columns.index('club_id')] for row in old_tickets if 'club_id' in old_columns)
+            batch = []
+            for club_id in club_ids:
+                batch.append(model(
+                    club_id=club_id,
+                    serial_prefix=f"TBK-{club_id}-{int(timezone.now().timestamp())}",
+                    issued_date=timezone.now().date(),
+                    total_tickets=1000,
+                    used_tickets=0
+                ))
+                default_book_cache[club_id] = None
+            if batch:
+                try:
+                    created_objects = model.objects.bulk_create(batch)
+                    for obj in created_objects:
+                        default_book_cache[obj.club_id] = obj.id
+                    print(f"Table {table} migrated successfully with {len(batch)} records")
+                except Exception as e:
+                    print(f"Error migrating {table}: {e}")
+            continue
+
         if table == 'sqlite_sequence':
-            # Handle sqlite_sequence directly with SQL
             try:
                 conn_new = sqlite3.connect(new_db_path)
                 cursor_new = conn_new.cursor()
@@ -259,11 +344,39 @@ def migrate_data(old_db_path, new_db_path, default_values=None):
 
         batch = []
         errors = []
-        for row in rows:
+        for row_index, row in enumerate(rows):
             row_data = dict(zip(old_columns, row))
 
-            # Check foreign keys for specific tables
-            if table in ['auth_group_permissions', 'accounts_user_groups', 'staff_shift']:
+            if table == 'tickets_ticket':
+                # Convert issue_date to issue_datetime
+                if 'issue_date' in row_data:
+                    issue_date = row_data['issue_date']
+                    if isinstance(issue_date, str):
+                        issue_date = datetime.strptime(issue_date, '%Y-%m-%d').date()
+                    row_data['issue_datetime'] = datetime.combine(issue_date, time(0, 0))
+                    del row_data['issue_date']
+
+                # Map old ticket_type to new TicketType ID
+                if 'ticket_type' in row_data:
+                    old_ticket_type = row_data['ticket_type']
+                    club_id = row_data.get('club_id')
+                    ticket_type_id = ticket_type_cache.get((club_id, old_ticket_type))
+                    if ticket_type_id is None:
+                        errors.append(f"Skipping record in {table}: No TicketType for {old_ticket_type}, club_id: {club_id}")
+                        continue
+                    row_data['ticket_type_id'] = ticket_type_id
+                    del row_data['ticket_type']
+
+                # Assign default TicketBook
+                club_id = row_data.get('club_id')
+                book_id = default_book_cache.get(club_id)
+                if book_id:
+                    row_data['book_id'] = book_id
+
+                # Generate unique serial_number
+                row_data['serial_number'] = f"TBK-{club_id}-{row_index:05d}"
+
+            if table in ['auth_group_permissions', 'accounts_user_groups', 'staff_shift', 'tickets_ticket']:
                 is_valid, error_msg = check_foreign_keys(table, row_data, new_db_path)
                 if not is_valid:
                     errors.append(f"Skipping record in {table}: {error_msg}, Data: {row_data}")
@@ -312,11 +425,10 @@ def migrate_data(old_db_path, new_db_path, default_values=None):
         else:
             print(f"Table {table} migrated successfully")
 
-    # Validate the migration
     validate_migration(old_db_path, new_db_path)
 
 if __name__ == "__main__":
-    OLD_DB_PATH = r"F:\club\club2\src\db_old.sqlite3"  
+    OLD_DB_PATH = r"F:\club\club2\src\db_old.sqlite3"
     NEW_DB_PATH = r"F:\club\club2\src\db.sqlite3"
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings")
     import django
