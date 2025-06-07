@@ -70,7 +70,7 @@ const Tickets = () => {
   });
   const [bookFormData, setBookFormData] = useState({
     ticket_type: "",
-    total_tickets: "",
+    total_tickets: "100",
   });
 
   useEffect(() => {
@@ -95,6 +95,7 @@ const Tickets = () => {
       })
       .catch((err) => {
         setLoadingProfile(false);
+        toast.error(`خطأ في جلب الملف الشخصي: ${err.message}`);
       });
   }, [canViewTickets]);
 
@@ -107,8 +108,8 @@ const Tickets = () => {
   useEffect(() => {
     if (userClub && ticketFormData.ticket_type) {
       dispatch(fetchCurrentTicketBook({
-        club: userClub.id,
-        ticket_type: ticketFormData.ticket_type,
+        club_id: userClub.id,
+        ticket_type_id: ticketFormData.ticket_type,
       }));
     }
   }, [dispatch, userClub, ticketFormData.ticket_type]);
@@ -273,7 +274,8 @@ const Tickets = () => {
       toast.error("خطأ: لا يمكن إضافة تذكرة بدون نادي مرتبط");
       return;
     }
-    let ticketBookId = ticketBook?.id || ticketBook;
+
+    let ticketBookId = ticketBook?.id;
     if (!ticketBookId) {
       const bookData = {
         club: userClub.id,
@@ -282,31 +284,31 @@ const Tickets = () => {
       };
       try {
         const result = await dispatch(createTicketBook(bookData)).unwrap();
-        ticketBookId = result.id || result;
+        ticketBookId = result.id;
         toast.success(`تم إنشاء دفتر جديد: ${result.serial_prefix}`);
       } catch (err) {
-        const errorMessage = typeof err === 'string' ? err : (err.detail || err.message || JSON.stringify(err));
-        setFormError(`فشل في إنشاء دفتر: ${errorMessage}`);
-        toast.error(`فشل في إنشاء دفتر: ${errorMessage}`);
+        toast.error(`فشل في إنشاء دفتر: ${err}`);
         return;
       }
     }
+
     const ticketData = {
       club: userClub.id,
       ticket_type: parseInt(ticketFormData.ticket_type),
-      ticket_book: parseInt(ticketBookId),
-      issue_date: new Date().toISOString().split('T')[0],
+      book: ticketBookId,
     };
+
     dispatch(addTicket(ticketData))
       .unwrap()
       .then((response) => {
-        const { serial_number, book } = response;
+        const { serial_number, book, price } = response;
         const remainingTickets = book.remaining_tickets;
+        const currentTime = new Date().toLocaleTimeString('ar-EG');
         toast.success(
-          `تم إضافة تذكرة ${serial_number} في دفتر ${book.serial_prefix}، باقي من الدفتر ${remainingTickets}`
+          `تم إضافة تذكرة ${serial_number} في دفتر ${book.serial_prefix} بقيمة ${price} جنيه عند الساعة ${currentTime}. باقي ${remainingTickets} تذكرة`
         );
         if (remainingTickets === 0) {
-          toast.info("الدفتر اكتمل، يرجى إنشاء دفتر جديد.");
+          toast.info("الدفتر اكتمل، سيتم إنشاء دفتر جديد عند إضافة تذكرة جديدة.");
         }
         dispatch(fetchTickets({
           page: 1,
@@ -316,17 +318,15 @@ const Tickets = () => {
           issue_date: filterIssueDate,
         }));
         dispatch(fetchCurrentTicketBook({
-          club: userClub.id,
-          ticket_type: ticketFormData.ticket_type,
+          club_id: userClub.id,
+          ticket_type_id: ticketFormData.ticket_type,
         }));
         setTicketFormData({ ticket_type: "" });
         setSelectedPrice(null);
         setSelectedTicketType(null);
       })
       .catch((err) => {
-        const errorMessage = typeof err === 'string' ? err : (err.detail || err.message || JSON.stringify(err));
-        setFormError(`فشل في إضافة التذكرة: ${errorMessage}`);
-        toast.error(`فشل في إضافة التذكرة: ${errorMessage}`);
+        toast.error(`فشل في إضافة التذكرة: ${err}`);
       });
   };
 
@@ -353,20 +353,18 @@ const Tickets = () => {
       .unwrap()
       .then((response) => {
         toast.success(`تم إنشاء دفتر ${response.serial_prefix} بنجاح!`);
-        setBookFormData({ ticket_type: "", total_tickets: "" });
+        setBookFormData({ ticket_type: "", total_tickets: "100" });
         setShowCreateBookModal(false);
         dispatch(fetchCurrentTicketBook({
-          club: userClub.id,
-          ticket_type: bookFormData.ticket_type,
+          club_id: userClub.id,
+          ticket_type_id: bookFormData.ticket_type,
         }));
       })
       .catch((err) => {
-        const errorMessage = typeof err === 'string' ? err : (err.detail || err.message || JSON.stringify(err));
-        setFormError(`فشل في إنشاء الدفتر: ${errorMessage}`);
-        toast.error(`فشل في إنشاء الدفتر: ${errorMessage}`);
+        toast.error(`فشل في إنشاء الدفتر: ${err}`);
       });
   };
-
+  
   const handleEditSave = (e) => {
     if (!selectedTicket || !userClub) {
       setFormError("خطأ: التذكرة أو النادي غير متاح");
@@ -394,9 +392,8 @@ const Tickets = () => {
         closeAllModals();
       })
       .catch((err) => {
-        const errorMessage = typeof err === 'string' ? err : (err.detail || err.message || JSON.stringify(err));
-        setFormError(`فشل في تعديل التذكرة: ${errorMessage}`);
-        toast.error(`فشل في تعديل التذكرة: ${errorMessage}`);
+        setFormError(`فشل في تعديل التذكرة: ${err}`);
+        toast.error(`فشل في تعديل التذكرة: ${err}`);
       });
   };
 
@@ -406,7 +403,7 @@ const Tickets = () => {
     }
     dispatch(deleteTicketById(selectedTicket.id))
       .unwrap()
-      .then((response) => {
+      .then(() => {
         toast.success("تم حذف التذكرة بنجاح!");
         dispatch(fetchTickets({
           page: currentPage,
@@ -418,8 +415,7 @@ const Tickets = () => {
         closeAllModals();
       })
       .catch((err) => {
-        const errorMessage = typeof err === 'string' ? err : (err.detail || err.message || JSON.stringify(err));
-        toast.error(`فشل في حذف التذكرة: ${errorMessage}`);
+        toast.error(`فشل في حذف التذكرة: ${err}`);
       });
   };
 
@@ -434,12 +430,11 @@ const Tickets = () => {
     }
     dispatch(fetchTicketBookReport({ date: reportDate }))
       .unwrap()
-      .then((response) => {
+      .then(() => {
         toast.success("تم جلب تقرير الدفاتر بنجاح!");
       })
       .catch((err) => {
-        const errorMessage = typeof err === 'string' ? err : (err.detail || err.message || JSON.stringify(err));
-        toast.error(`فشل في جلب تقرير الدفاتر: ${errorMessage}`);
+        toast.error(`فشل في جلب تقرير الدفاتر: ${err}`);
       });
   };
 
@@ -535,7 +530,7 @@ const Tickets = () => {
                   >
                     إلغاء
                   </Button>
-                  <Button type="submit" disabled={loading || !userClub}>
+                  <Button type="submit" disabled={loading || !userClub || !ticketFormData.ticket_type}>
                     {loading ? <Loader2 className="animate-spin h-4 w-4" /> : "إضافة"}
                   </Button>
                 </div>
@@ -602,7 +597,7 @@ const Tickets = () => {
                     {tickets.map((ticket) => (
                       <tr key={ticket.id} className="hover:bg-gray-50">
                         <td className="py-3 px-4 text-right text-sm">{ticket.serial_number}</td>
-                        <td className="py-3 px-4 text-right text-sm">{ticket.ticket_type_details?.name || ticket.ticket_type_display}</td>
+                        <td className="py-3 px-4 text-right text-sm">{ticket.ticket_type?.name || '-'}</td>
                         <td className="py-3 px-4 text-right text-sm">{ticket.price} جنيه</td>
                         <td className="py-3 px-4 text-right text-sm">
                           {new Date(ticket.issue_datetime).toLocaleString('ar-EG')}
@@ -664,7 +659,7 @@ const Tickets = () => {
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <p className="text-sm">نوع التذكرة: {ticket.ticket_type_details?.name || ticket.ticket_type_display}</p>
+                      <p className="text-sm">نوع التذكرة: {ticket.ticket_type?.name || '-'}</p>
                       <p className="text-sm">السعر: {ticket.price} جنيه</p>
                       <p className="text-sm">وقت الإصدار: {new Date(ticket.issue_datetime).toLocaleString('ar-EG')}</p>
                     </div>
@@ -847,7 +842,7 @@ const Tickets = () => {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  setBookFormData({ ticket_type: "", total_tickets: "" });
+                  setBookFormData({ ticket_type: "", total_tickets: "100" });
                   setFormError(null);
                   setShowCreateBookModal(false);
                 }}
@@ -944,7 +939,7 @@ const Tickets = () => {
           {selectedTicket && (
             <div className="space-y-2">
               <p><strong>الرقم التسلسلي:</strong> {selectedTicket.serial_number}</p>
-              <p><strong>نوع التذكرة:</strong> {selectedTicket.ticket_type_details?.name || selectedTicket.ticket_type_display}</p>
+              <p><strong>نوع التذكرة:</strong> {selectedTicket.ticket_type?.name || '-'}</p>
               <p><strong>السعر:</strong> {selectedTicket.price} جنيه</p>
               <p><strong>وقت الإصدار:</strong> {new Date(selectedTicket.issue_datetime).toLocaleString('ar-EG')}</p>
               <p><strong>رقم الدفتر:</strong> {selectedTicket.book?.serial_prefix || 'غير محدد'}</p>

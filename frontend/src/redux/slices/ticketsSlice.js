@@ -193,6 +193,7 @@ export const fetchCurrentTicketBook = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
       if (!token) throw new Error('No authentication token found');
+      console.log("Fetching current ticket book with params:", { club, ticket_type });
       const response = await axios.get(
         `${BASE_URL}/tickets/api/ticket-books/current/`,
         {
@@ -208,11 +209,13 @@ export const fetchCurrentTicketBook = createAsyncThunk(
       );
       return response.data;
     } catch (error) {
+      console.error("Fetch current ticket book error:", error.response?.data);
       const errorMessage = error.response?.data?.detail || error.message || 'Failed to fetch current ticket book';
       return rejectWithValue(errorMessage);
     }
   }
 );
+
 
 const ticketsSlice = createSlice({
   name: 'tickets',

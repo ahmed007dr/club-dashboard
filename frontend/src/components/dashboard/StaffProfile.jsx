@@ -2,13 +2,13 @@ import React, { useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useParams } from 'react-router-dom';
 import { getStaffById } from '@/redux/slices/staff';
-import { RiUserLine } from 'react-icons/ri';
+import { RiUserLine, RiPhoneLine, RiFileTextLine, RiBankCardLine, RiHomeLine } from 'react-icons/ri';
 
 const StaffProfile = () => {
   const dispatch = useDispatch();
   const { id } = useParams();
   const shifts = useSelector((state) => state.staff.user || []);
-  const { isloading, error } = useSelector((state) => state.staffslice || {});
+  const { isloading, error } = useSelector((state) => state.staff || {});
 
   useEffect(() => {
     if (id) {
@@ -48,7 +48,7 @@ const StaffProfile = () => {
   const user = shifts[0].staff_details;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg px-8" dir="rtl">
+    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8" dir="rtl">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center space-x-4 space-x-reverse mb-8">
           <RiUserLine className="text-blue-600 w-8 h-8" />
@@ -69,9 +69,45 @@ const StaffProfile = () => {
                   {user.first_name} {user.last_name}
                 </h3>
                 <p className="text-sm text-gray-600">اسم المستخدم: {user.username}</p>
-                {/* <p className="text-sm text-gray-600">البريد الإلكتروني: {user.email}</p> */}
+                <p className="text-sm text-gray-600">الدور: {user.role}</p>
               </div>
 
+              {/* قسم المعلومات الإضافية */}
+              <div className="w-full border-t border-gray-200 pt-6">
+                <h4 className="text-lg font-semibold text-gray-800 mb-4">معلومات إضافية</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-700">
+                  <div className="flex items-center space-x-2 space-x-reverse">
+                    <RiPhoneLine className="text-blue-600 w-5 h-5" />
+                    <p>
+                      <strong>رقم الهاتف:</strong>{' '}
+                      {user.phone_number || 'غير متوفر'}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2 space-x-reverse">
+                    <RiBankCardLine className="text-blue-600 w-5 h-5" />
+                    <p>
+                      <strong>رقم البطاقة:</strong>{' '}
+                      {user.card_number ? `****${user.card_number.slice(-4)}` : 'غير متوفر'}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2 space-x-reverse">
+                    <RiHomeLine className="text-blue-600 w-5 h-5" />
+                    <p>
+                      <strong>العنوان:</strong>{' '}
+                      {user.address || 'غير متوفر'}
+                    </p>
+                  </div>
+                  <div className="flex items-center space-x-2 space-x-reverse">
+                    <RiFileTextLine className="text-blue-600 w-5 h-5" />
+                    <p>
+                      <strong>ملاحظات:</strong>{' '}
+                      {user.notes || 'غير متوفر'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* قسم الورديات */}
               <div className="w-full border-t border-gray-200 pt-6">
                 <h4 className="text-lg font-semibold text-gray-800 mb-4">الورديات</h4>
                 <ul className="space-y-4">
@@ -97,7 +133,6 @@ const StaffProfile = () => {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-gray-700">
                           <p><strong>التاريخ:</strong> {new Date(shift.date).toLocaleDateString('ar-EG')}</p>
                           <p><strong>من:</strong> {formattedStart}</p>
-                         
                           <p><strong>النادي:</strong> {shift.club_details?.name}</p>
                           <p><strong>إلى:</strong> {formattedEnd}</p>
                           <p><strong>الموقع:</strong> {shift.club_details?.location}</p>
@@ -129,5 +164,3 @@ const StaffProfile = () => {
 };
 
 export default StaffProfile;
-
-

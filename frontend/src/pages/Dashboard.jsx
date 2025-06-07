@@ -21,9 +21,11 @@ import { TbReportAnalytics } from "react-icons/tb";
 import { GiReceiveMoney } from "react-icons/gi";
 import { MdCategory } from "react-icons/md";
 import { GiPayMoney } from "react-icons/gi";
+
 const Dashboard = () => {
   const dispatch = useDispatch();
   const sidebarOpen = useSelector((state) => state.ui.sidebarOpen);
+
   const navItems = [
     {
       name: 'لوحة التحكم',
@@ -48,9 +50,10 @@ const Dashboard = () => {
       name: 'الإدارة',
       icon: <FaRegBuilding />,
       children: [
-        { path: 'staff', name: 'الموظفون', icon: <RiUserLine /> },
-        { path: 'attendance-form', name: 'تسجيل الدخول والخروج', icon: <BiLogIn /> },
-        { path: 'shift-attendance', name: 'حضور موظفي الورديات', icon: <AiOutlineSchedule /> },
+        { path: 'staff', name: 'شيفت الموظفين', icon: <RiUserLine /> },
+        { path: 'manage-users', name: 'إدارة الموظفين', icon: <FiUsers /> }, // الرابط مضاف بدون شرط
+        { path: 'attendance-form', name: 'بصمه الدخول والخروج', icon: <BiLogIn /> },
+        { path: 'shift-attendance', name: 'بيان حضور الموظفي', icon: <AiOutlineSchedule /> },
         { path: 'club', name: 'النادي', icon: <HiOutlineDocumentReport /> },
         { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
       ],
@@ -60,7 +63,7 @@ const Dashboard = () => {
       icon: <TbReportAnalytics />,
       children: [
         { path: 'staff-reports', name: 'تقارير الموظفين', icon: <RiUserLine /> },
-        { path: 'reports', name: 'تقارير النظام', icon: <HiOutlineDocumentReport /> },
+        { path: 'reports', name: 'تقرير الايراد', icon: <HiOutlineDocumentReport /> },
       ],
     },
     {
@@ -73,8 +76,6 @@ const Dashboard = () => {
       ],
     },
   ];
-  
-  
 
   return (
     <div className="flex h-screen overflow-hidden">
