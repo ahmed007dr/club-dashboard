@@ -35,6 +35,8 @@ import CoachProfile from './components/dashboard/CoachProfile';
 import ReportsPage from './components/dashboard/Reports'; // استيراد ReportsPage
 import useTokenRefresh from './hooks/useTokenRefresh';
 import { Toaster } from 'react-hot-toast';
+import ManageUsers from './components/ManageUsers';
+
 
 // Route protection component
 const ProtectedRoute = ({ element }) => {
@@ -94,6 +96,7 @@ function App() {
           <Route path="income-sources" element={<IncomeSources />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="/coach-profile/:coachId" element={<CoachProfile />} />
+          <Route path="/manage-users" element={<ManageUsers />} />
         </Route>
       </Routes>
     </div>

@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Sidebar from '../components/dashboard/Sidebar';
 import { closeSidebar } from '../redux/slices/uiSlice';
+import usePermission from '@/hooks/usePermission';
 
 // استيراد الأيقونات
 import { MdOutlineDashboard } from 'react-icons/md';
@@ -21,9 +22,12 @@ import { TbReportAnalytics } from "react-icons/tb";
 import { GiReceiveMoney } from "react-icons/gi";
 import { MdCategory } from "react-icons/md";
 import { GiPayMoney } from "react-icons/gi";
+
 const Dashboard = () => {
   const dispatch = useDispatch();
   const sidebarOpen = useSelector((state) => state.ui.sidebarOpen);
+  const canManageUsers = usePermission('manage_users'); // إذن لإدارة الموظفين
+
   const navItems = [
     {
       name: 'لوحة التحكم',
@@ -49,6 +53,9 @@ const Dashboard = () => {
       icon: <FaRegBuilding />,
       children: [
         { path: 'staff', name: 'الموظفون', icon: <RiUserLine /> },
+        ...(canManageUsers
+          ? [{ path: 'manage-users', name: 'إدارة الموظفين', icon: <FiUsers /> }]
+          : []),
         { path: 'attendance-form', name: 'تسجيل الدخول والخروج', icon: <BiLogIn /> },
         { path: 'shift-attendance', name: 'حضور موظفي الورديات', icon: <AiOutlineSchedule /> },
         { path: 'club', name: 'النادي', icon: <HiOutlineDocumentReport /> },
@@ -73,8 +80,6 @@ const Dashboard = () => {
       ],
     },
   ];
-  
-  
 
   return (
     <div className="flex h-screen overflow-hidden">
