@@ -35,7 +35,7 @@ export const addUser = createAsyncThunk(
   async (newUser, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.post(`${BASE_URL}/accounts/api/users/`, newUser, {
+      const res = await axios.post(`${BASE_URL}/accounts/api/users/create/`, newUser, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -55,7 +55,7 @@ export const updateUser = createAsyncThunk(
     try {
       const token = localStorage.getItem("token");
       const res = await axios.put(
-        `${BASE_URL}/accounts/api/users/${id}/`,
+        `${BASE_URL}/accounts/api/users/${id}/update/`,
         updatedUser,
         {
           headers: {

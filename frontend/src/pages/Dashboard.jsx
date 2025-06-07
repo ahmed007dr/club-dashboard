@@ -3,7 +3,6 @@ import { Outlet } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Sidebar from '../components/dashboard/Sidebar';
 import { closeSidebar } from '../redux/slices/uiSlice';
-import usePermission from '@/hooks/usePermission';
 
 // استيراد الأيقونات
 import { MdOutlineDashboard } from 'react-icons/md';
@@ -26,7 +25,6 @@ import { GiPayMoney } from "react-icons/gi";
 const Dashboard = () => {
   const dispatch = useDispatch();
   const sidebarOpen = useSelector((state) => state.ui.sidebarOpen);
-  const canManageUsers = usePermission('manage_users'); // إذن لإدارة الموظفين
 
   const navItems = [
     {
@@ -52,12 +50,10 @@ const Dashboard = () => {
       name: 'الإدارة',
       icon: <FaRegBuilding />,
       children: [
-        { path: 'staff', name: 'الموظفون', icon: <RiUserLine /> },
-        ...(canManageUsers
-          ? [{ path: 'manage-users', name: 'إدارة الموظفين', icon: <FiUsers /> }]
-          : []),
-        { path: 'attendance-form', name: 'تسجيل الدخول والخروج', icon: <BiLogIn /> },
-        { path: 'shift-attendance', name: 'حضور موظفي الورديات', icon: <AiOutlineSchedule /> },
+        { path: 'staff', name: 'شيفت الموظفين', icon: <RiUserLine /> },
+        { path: 'manage-users', name: 'إدارة الموظفين', icon: <FiUsers /> }, // الرابط مضاف بدون شرط
+        { path: 'attendance-form', name: 'بصمه الدخول والخروج', icon: <BiLogIn /> },
+        { path: 'shift-attendance', name: 'بيان حضور الموظفي', icon: <AiOutlineSchedule /> },
         { path: 'club', name: 'النادي', icon: <HiOutlineDocumentReport /> },
         { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
       ],
@@ -67,7 +63,7 @@ const Dashboard = () => {
       icon: <TbReportAnalytics />,
       children: [
         { path: 'staff-reports', name: 'تقارير الموظفين', icon: <RiUserLine /> },
-        { path: 'reports', name: 'تقارير النظام', icon: <HiOutlineDocumentReport /> },
+        { path: 'reports', name: 'تقرير الايراد', icon: <HiOutlineDocumentReport /> },
       ],
     },
     {

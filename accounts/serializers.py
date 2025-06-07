@@ -20,7 +20,7 @@ class GroupSerializer(serializers.ModelSerializer):
     class Meta:
         model = Group
         fields = ['id', 'name', 'permissions']
- 
+
 class UserSerializer(serializers.ModelSerializer):
     club = ClubMiniSerializer(read_only=True)
     password = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -40,13 +40,29 @@ class UserSerializer(serializers.ModelSerializer):
             'address': {'required': False, 'allow_null': True, 'allow_blank': True},
         }
 
+    def validate_role(self, value):
+        """Prevent creating or updating users with 'owner' or 'admin' roles."""
+        if value in ['owner', 'admin']:
+            raise serializers.ValidationError("غير مسموح بإنشاء أو تعديل مستخدمين بدور 'مالك' أو 'أدمن'.")
+        if value not in ['reception', 'coach', 'accountant']:
+            raise serializers.ValidationError("الدور يجب أن يكون 'ريسبشن'، 'مدرب'، أو 'محاسب'.")
+        return value
+
+    def validate(self, data):
+        """Ensure password is provided for 'reception' role during creation."""
+        role = data.get('role', self.instance.role if self.instance else None)
+        password = data.get('password')
+        if role == 'reception' and not password and not self.instance:  # Creation mode
+            raise serializers.ValidationError({"password": "كلمة المرور مطلوبة لدور الريسبشن."})
+        return data
+
     def create(self, validated_data):
         password = validated_data.pop('password', None)
         user = User(**validated_data)
-        if password and user.role in ['owner', 'admin', 'reception']:
+        if user.role == 'reception' and password:
             user.set_password(password)
         else:
-            user.set_unusable_password()  
+            user.set_unusable_password()  # For coach, accountant
         user.save()
         return user
 
@@ -54,11 +70,10 @@ class UserSerializer(serializers.ModelSerializer):
         password = validated_data.pop('password', None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        if password and instance.role in ['owner', 'admin', 'reception']:
+        if password and instance.role == 'reception':
             instance.set_password(password)
         instance.save()
         return instance
-    
 
 class UserProfileSerializer(serializers.ModelSerializer):
     club = ClubMiniSerializer(read_only=True)
@@ -68,21 +83,9 @@ class UserProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id',
-            'username',
-            'email',
-            'first_name',
-            'last_name',
-            'role',
-            'club',
-            'rfid_code',
-            'phone_number',
-            'notes',
-            'card_number',
-            'address',
-            'is_active',
-            'permissions',
-            'groups',
+            'id', 'username', 'email', 'first_name', 'last_name', 'role', 'club',
+            'rfid_code', 'phone_number', 'notes', 'card_number', 'address', 'is_active',
+            'permissions', 'groups'
         ]
         extra_kwargs = {
             'rfid_code': {'required': False, 'allow_null': True},
@@ -117,7 +120,6 @@ class LoginSerializer(serializers.Serializer):
         if not user:
             raise serializers.ValidationError("Invalid credentials.")
 
-        # Restrict login to owner, admin, and reception roles
         if user.role not in ['owner', 'admin', 'reception']:
             raise serializers.ValidationError("This role cannot log in with username and password.")
 
@@ -142,4 +144,3 @@ class RFIDLoginSerializer(serializers.Serializer):
 
         data['user'] = user
         return data
-   

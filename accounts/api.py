@@ -1,15 +1,15 @@
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework import status, generics
+from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate 
+from django.contrib.auth import authenticate
 from .serializers import UserProfileSerializer, LoginSerializer, RFIDLoginSerializer, UserSerializer
 from utils.permissions import IsOwnerOrRelatedToClub
 from .models import User
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
-from django.contrib.auth.models import Permission
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -61,74 +61,98 @@ def api_user_profile(request):
     serializer = UserProfileSerializer(user)
     return Response(serializer.data)
 
-class UserListCreateView(generics.ListCreateAPIView):
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_user_list(request):
     """
-    List all users with search functionality and create new users.
-    Only accessible to admin or owner with appropriate permissions.
+    List users with search functionality, including new fields (phone_number, card_number).
+    Only accessible to users with 'owner' or 'admin' role.
     """
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrRelatedToClub]
-    pagination_class = PageNumberPagination
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'غير مسموح بالوصول إلى هذه الصفحة.'}, status=status.HTTP_403_FORBIDDEN)
 
-    def get_queryset(self):
-        search_query = self.request.query_params.get('search', '').strip()
-        if self.request.user.role == 'owner':
-            users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').all()
+    search_query = request.query_params.get('search', '').strip()
+
+    if request.user.role == 'owner':
+        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').all()
+    else:
+        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(club=request.user.club)
+
+    if search_query:
+        is_active_filter = None
+        if search_query.lower() in ['نشط', 'active', 'true', '1']:
+            is_active_filter = True
+        elif search_query.lower() in ['غير نشط', 'inactive', 'false', '0']:
+            is_active_filter = False
+
+        query = (
+            Q(username__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query) |
+            Q(role__icontains=search_query) |
+            Q(rfid_code__icontains=search_query) |
+            Q(phone_number__icontains=search_query) |
+            Q(card_number__icontains=search_query) |
+            Q(club__name__icontains=search_query)
+        )
+
+        if is_active_filter is not None:
+            query &= Q(is_active=is_active_filter)
+
+        users = users.filter(query)
+
+    paginator = PageNumberPagination()
+    paginator.page_size = 20
+    result_page = paginator.paginate_queryset(users, request)
+    serializer = UserProfileSerializer(result_page, many=True)
+    return paginator.get_paginated_response(serializer.data)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def api_user_create(request):
+    """
+    Create a new user with roles 'reception', 'coach', or 'accountant' only.
+    Only accessible to users with 'owner' or 'admin' role and 'add_user' permission.
+    """
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'غير مسموح بالوصول إلى هذه الصفحة.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if not request.user.has_perm('auth.add_user'):
+        return Response({'error': 'لا تملك الصلاحية لإنشاء مستخدمين.'}, status=status.HTTP_403_FORBIDDEN)
+
+    serializer = UserSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.save()
+        return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def api_user_update(request, pk):
+    """
+    Update an existing user with roles 'reception', 'coach', or 'accountant' only.
+    Only accessible to users with 'owner' or 'admin' role and 'change_user' permission.
+    """
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'غير مسموح بالوصول إلى هذه الصفحة.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if not request.user.has_perm('auth.change_user'):
+        return Response({'error': 'لا تملك الصلاحية لتعديل مستخدمين.'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        if request.user.role == 'owner':
+            user = User.objects.get(pk=pk)
         else:
-            users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(club=self.request.user.club)
+            user = User.objects.get(pk=pk, club=request.user.club)
+    except User.DoesNotExist:
+        return Response({'error': 'المستخدم غير موجود.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if search_query:
-            is_active_filter = None
-            if search_query.lower() in ['نشط', 'active', 'true', '1']:
-                is_active_filter = True
-            elif search_query.lower() in ['غير نشط', 'inactive', 'false', '0']:
-                is_active_filter = False
-
-            query = (
-                Q(username__icontains=search_query) |
-                Q(email__icontains=search_query) |
-                Q(first_name__icontains=search_query) |
-                Q(last_name__icontains=search_query) |
-                Q(role__icontains=search_query) |
-                Q(rfid_code__icontains=search_query) |
-                Q(phone_number__icontains=search_query) |
-                Q(card_number__icontains=search_query) |
-                Q(club__name__icontains=search_query)
-            )
-
-            if is_active_filter is not None:
-                query &= Q(is_active=is_active_filter)
-
-            users = users.filter(query)
-
-        return users
-
-    def perform_create(self, serializer):
-        # Ensure only admin or owner can create users
-        if not self.request.user.has_perm('auth.add_user'):
-            raise PermissionDenied("You do not have permission to create users.")
+    serializer = UserSerializer(user, data=request.data, partial=True)
+    if serializer.is_valid():
         serializer.save()
-
-class UserUpdateView(generics.RetrieveUpdateAPIView):
-    """
-    Retrieve and update user details.
-    Only accessible to admin or owner with appropriate permissions.
-    """
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-    permission_classes = [IsAuthenticated, IsOwnerOrRelatedToClub]
-
-    def get_queryset(self):
-        if self.request.user.role == 'owner':
-            return User.objects.all()
-        return User.objects.filter(club=self.request.user.club)
-
-    def perform_update(self, serializer):
-        # Ensure only admin or owner can update users
-        if not self.request.user.has_perm('auth.change_user'):
-            raise PermissionDenied("You do not have permission to update users.")
-        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
