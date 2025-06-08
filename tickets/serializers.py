@@ -36,18 +36,28 @@ class TicketSerializer(serializers.ModelSerializer):
     
 
 class TicketTypeSerializer(serializers.ModelSerializer):
+    club = serializers.PrimaryKeyRelatedField(
+        queryset=Club.objects.all(),
+        write_only=True,
+        required=True
+    )
+
     class Meta:
         model = TicketType
-        fields = ['id', 'name', 'price', 'description']  
-        read_only_fields = ['id']  
+        fields = ['id', 'name', 'price', 'description', 'club']
+        read_only_fields = ['id']
 
     def validate(self, data):
         if 'name' not in data or not data['name']:
             raise serializers.ValidationError({"name": "اسم نوع التذكرة مطلوب."})
         if 'price' not in data or data['price'] < 0:
             raise serializers.ValidationError({"price": "السعر يجب أن يكون أكبر من أو يساوي الصفر."})
+        if 'club' not in data:
+            raise serializers.ValidationError({"club": "النادي مطلوب."})
         return data
+
     def validate_name(self, value):
-        if TicketType.objects.filter(club=self.context['request'].user.club, name=value).exists():
+        club = self.context['request'].user.club
+        if club and TicketType.objects.filter(club=club, name=value).exclude(id=self.instance.id if self.instance else None).exists():
             raise serializers.ValidationError("نوع التذكرة بهذا الاسم موجود بالفعل.")
         return value

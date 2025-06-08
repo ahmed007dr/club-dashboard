@@ -225,16 +225,18 @@ def delete_ticket_api(request, ticket_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_ticket_type_api(request):
+    # Check if user is associated with a club
+    if not request.user.club:
+        return Response(
+            {'error': 'User is not associated with any club.'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Prepare data
     data = request.data.copy()
     data['club'] = request.user.club.id
-    
-    if request.user.role not in ['owner', 'admin']:
-        return Response(
-            {'error': 'Only owners or admins can add ticket types.'},
-            status=status.HTTP_403_FORBIDDEN
-        )
-    
-    serializer = TicketTypeSerializer(data=data)
+
+    serializer = TicketTypeSerializer(data=data, context={'request': request})
     
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -243,7 +245,6 @@ def add_ticket_type_api(request):
         with transaction.atomic():
             ticket_type = serializer.save()
             return Response(TicketTypeSerializer(ticket_type).data, status=status.HTTP_201_CREATED)
-
     except Exception as e:
         return Response(
             {'error': str(e)},
