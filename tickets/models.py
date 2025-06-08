@@ -27,9 +27,24 @@ class Ticket(models.Model):
     serial_number = models.CharField(max_length=30, unique=True)
 
     def __str__(self):
-        return f"{self.ticket_type.name} - {self.notes} ({self.serial_number})"
+        return f"{self.ticket_type.name if self.ticket_type else 'No Type'} - {self.notes} ({self.serial_number})"
 
     def save(self, *args, **kwargs):
+        if not self.serial_number:
+            today = timezone.now().date()
+            date_prefix = today.strftime('%Y%m%d')
+            ticket_count = Ticket.objects.filter(
+                club=self.club,
+                ticket_type=self.ticket_type,
+                issue_datetime__date=today
+            ).count()
+            if ticket_count >= 999:  
+                raise ValueError("Maximum tickets for today reached.")
+            serial_number = f"{date_prefix}-{str(ticket_count + 1).zfill(3)}"
+            while Ticket.objects.filter(serial_number=serial_number).exists():
+                ticket_count += 1
+                serial_number = f"{date_prefix}-{str(ticket_count + 1).zfill(3)}"
+            self.serial_number = serial_number
         if self.ticket_type and not self.price:
             self.price = self.ticket_type.price
         super().save(*args, **kwargs)

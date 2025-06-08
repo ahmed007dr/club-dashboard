@@ -5,7 +5,6 @@ import { fetchClubs } from '../../redux/slices/clubSlice';
 import { toast } from "react-hot-toast";
 
 
-import { addSubscriptionType, fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';
 
 const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
   const dispatch = useDispatch();

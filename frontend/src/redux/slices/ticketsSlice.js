@@ -51,25 +51,34 @@ export const fetchTicketTypes = createAsyncThunk(
   }
 );
 
-// Add a new ticket
+
 export const addTicket = createAsyncThunk(
   'tickets/addTicket',
   async (ticketData, { rejectWithValue }) => {
     try {
+      const token = localStorage.getItem('token');
+      console.log('Token for addTicket:', token); 
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
       const response = await fetch(`${BASE_URL}/tickets/api/tickets/add/`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(ticketData),
       });
       if (!response.ok) {
         const errorData = await response.json();
+        console.log('addTicket error response:', errorData); // تسجيل الرد
         throw new Error(errorData.error || `Failed to add ticket: ${response.status}`);
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('addTicket success response:', data); // تسجيل النجاح
+      return data;
     } catch (error) {
+      console.error('addTicket error:', error.message); // تسجيل الخطأ
       return rejectWithValue(error.message);
     }
   }

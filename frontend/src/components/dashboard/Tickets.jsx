@@ -1,3 +1,4 @@
+// src/components/dashboard/Tickets.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchTicketTypes, fetchTickets } from '../../redux/slices/ticketsSlice';
@@ -35,6 +36,7 @@ const Tickets = () => {
   const [showViewModal, setShowViewModal] = useState(false);
   const [showAddTicketTypeModal, setShowAddTicketTypeModal] = useState(false);
   const [userClub, setUserClub] = useState(null);
+  const [userId, setUserId] = useState(null); // تعريف userId
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [filterTicketType, setFilterTicketType] = useState('');
   const [filterIssueDate, setFilterIssueDate] = useState('');
@@ -59,10 +61,14 @@ const Tickets = () => {
         return response.json();
       })
       .then((data) => {
+        console.log('Profile data:', data);
         setUserClub({ id: data.club.id, name: data.club.name });
+        setUserId(data.id); // تعيين userId من الرد
+        localStorage.setItem('userId', data.id); // تخزين userId
         setLoadingProfile(false);
       })
       .catch((err) => {
+        console.error('Profile fetch error:', err);
         setLoadingProfile(false);
         toast.error(`خطأ في جلب الملف الشخصي: ${err.message}`);
       });
@@ -179,6 +185,7 @@ const Tickets = () => {
       />
       <TicketForm
         userClub={userClub}
+        userId={userId} // تمرير userId
         canAddTickets={canAddTickets}
         itemsPerPage={itemsPerPage}
         filterTicketType={filterTicketType}

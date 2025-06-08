@@ -24,7 +24,7 @@ def generate_entry_time():
 
 def distribute_attendance_records():
     # Define the year, target date, and distribution period
-    target_date = datetime(2025, 5, 24).date()
+    target_date = datetime(2025, 6, 9).date()
     year = 2025
     min_entries_per_day = 50
     max_entries_per_day = 110

@@ -12,6 +12,7 @@ from .serializers import TicketSerializer, TicketTypeSerializer
 from finance.models import Income, IncomeSource
 from utils.permissions import IsOwnerOrRelatedToClub
 from datetime import datetime
+from staff.models import StaffAttendance
 
 class StandardPagination(PageNumberPagination):
     page_size = 20
@@ -106,31 +107,27 @@ def ticket_detail_api(request, ticket_id):
     serializer = TicketSerializer(ticket)
     return Response(serializer.data)
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_ticket_api(request):
-    # التحقق من نوبة العمل للموظفين
     if request.user.role not in ['owner', 'admin']:
-        from staff.models import StaffAttendance
         attendance = StaffAttendance.objects.filter(
             staff=request.user,
             club=request.user.club,
             check_out__isnull=True
         ).order_by('-check_in').first()
-
         if not attendance:
             return Response(
-                {'error': 'You can only add tickets during an active shift.'}, 
+                {'error': 'You can only add tickets during an active shift.'},
                 status=status.HTTP_403_FORBIDDEN
             )
 
-    # إعداد البيانات الأساسية
     data = request.data.copy()
     data['issued_by'] = request.user.id
     data['club'] = request.user.club.id
 
     serializer = TicketSerializer(data=data)
-    
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -139,7 +136,7 @@ def add_ticket_api(request):
             club = request.user.club
             ticket_type = serializer.validated_data['ticket_type']
             today = timezone.now().date()
-            date_prefix = today.strftime('%Y%m%d')  
+            date_prefix = today.strftime('%Y%m%d')
 
             ticket_count = Ticket.objects.filter(
                 club=club,
@@ -147,25 +144,25 @@ def add_ticket_api(request):
                 issue_datetime__date=today
             ).count()
 
-            if ticket_count >= 100:
-                ticket_count = 0  
-
-            serial_number = f"{date_prefix}-{str(ticket_count + 1).zfill(3)}"  # مثل 20250607-001
-
-            # التحقق من عدم تكرار serial_number
-            if Ticket.objects.filter(serial_number=serial_number).exists():
+            max_attempts = 999  # الحد الأقصى للتذاكر اليومية
+            attempt = 0
+            while attempt < max_attempts:
+                serial_number = f"{date_prefix}-{str(ticket_count + 1).zfill(3)}"
+                if not Ticket.objects.filter(serial_number=serial_number).exists():
+                    break
+                ticket_count += 1
+                attempt += 1
+            else:
                 return Response(
-                    {'error': f'Serial number {serial_number} already exists.'},
+                    {'error': 'Maximum tickets for today reached.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # حفظ التذكرة
             ticket = serializer.save(
                 serial_number=serial_number,
                 price=ticket_type.price
             )
 
-            # تسجيل الإيراد إذا كان السعر أكبر من الصفر
             if ticket.price > 0:
                 source, _ = IncomeSource.objects.get_or_create(
                     club=ticket.club,
@@ -175,7 +172,6 @@ def add_ticket_api(request):
                         'price': 0.00
                     }
                 )
-
                 Income.objects.create(
                     club=ticket.club,
                     source=source,
@@ -192,7 +188,8 @@ def add_ticket_api(request):
             {'error': str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
+    
+    
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_ticket_api(request, ticket_id):
