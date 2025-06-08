@@ -139,18 +139,16 @@ def add_ticket_api(request):
             club = request.user.club
             ticket_type = serializer.validated_data['ticket_type']
             today = timezone.now().date()
-            date_prefix = today.strftime('%Y%m%d')  # مثل 20250607
+            date_prefix = today.strftime('%Y%m%d')  
 
-            # احسب عدد التذاكر لهذا النوع في اليوم الحالي
             ticket_count = Ticket.objects.filter(
                 club=club,
                 ticket_type=ticket_type,
                 issue_datetime__date=today
             ).count()
 
-            # إذا وصل العد لـ 100، أعد العد من 1
             if ticket_count >= 100:
-                ticket_count = 0  # ابدأ من جديد
+                ticket_count = 0  
 
             serial_number = f"{date_prefix}-{str(ticket_count + 1).zfill(3)}"  # مثل 20250607-001
 
@@ -222,3 +220,32 @@ def delete_ticket_api(request, ticket_id):
         ).delete()
 
     return Response({'message': 'Ticket deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def add_ticket_type_api(request):
+    data = request.data.copy()
+    data['club'] = request.user.club.id
+    
+    if request.user.role not in ['owner', 'admin']:
+        return Response(
+            {'error': 'Only owners or admins can add ticket types.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    serializer = TicketTypeSerializer(data=data)
+    
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        with transaction.atomic():
+            ticket_type = serializer.save()
+            return Response(TicketTypeSerializer(ticket_type).data, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
