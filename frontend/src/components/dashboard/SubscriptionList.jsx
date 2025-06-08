@@ -314,7 +314,7 @@ const SubscriptionList = () => {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={() => setCreateModalOpen(true)}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            className="btn"
             data-tooltip-id="create-tooltip"
             data-tooltip-content="إضافة اشتراك جديد"
           >
@@ -794,7 +794,7 @@ const SubscriptionList = () => {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              className="bg-white p-6 rounded-lg relative max-w-lg w-full"
+              className="bg-white p-6 rounded-lg relative max-w-[900 px] w-full"
             >
               <button
                 onClick={() => setCreateModalOpen(false)}

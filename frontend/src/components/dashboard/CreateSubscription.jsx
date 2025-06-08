@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { fetchSubscriptionTypes, postSubscription } from "../../redux/slices/subscriptionsSlice";
+import { fetchSubscriptionTypes, postSubscription, fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
 import { fetchUsers } from "../../redux/slices/memberSlice";
 import { Button } from "@/components/ui/button";
 import { FaUser } from 'react-icons/fa';
@@ -205,6 +205,7 @@ const CreateSubscription = ({ onClose }) => {
   }, [formData.identifier, formData.club, allMembers.results]);
 
   // Handle form submission
+ // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { club, identifier, type, start_date, paid_amount, coach, private_training_price } = formData;
@@ -242,6 +243,23 @@ const CreateSubscription = ({ onClose }) => {
 
     try {
       await dispatch(postSubscription(payload)).unwrap();
+      toast.success("تم إنشاء الاشتراك بنجاح!");
+
+      // Re-fetch subscriptions with default filters and page 1
+      await dispatch(
+        fetchSubscriptions({
+          page: 1,
+          pageSize: 20,
+          searchTerm: "",
+          clubName: "",
+          startDate: "",
+          endDate: "",
+          entryCount: "",
+          status: ""
+        })
+      ).unwrap();
+
+      // Reset form
       setFormData({
         club: userClub?.id?.toString() || "",
         identifier: "",
@@ -251,26 +269,25 @@ const CreateSubscription = ({ onClose }) => {
         coach: "",
         private_training_price: ""
       });
-      if (onClose) onClose();
+      setFoundMember(null);
+
+      // Close modal and notify parent
+      onClose();
+      if (onSuccess) onSuccess();
     } catch (error) {
       console.log("Full error object:", JSON.stringify(error, null, 2));
       let errorData = error.payload || error.data || error.response || error;
-      if (
-        errorData?.non_field_errors &&
-        Array.isArray(errorData.non_field_errors)
-      ) {
+      if (errorData?.non_field_errors && Array.isArray(errorData.non_field_errors)) {
         setErrorMessage(errorData.non_field_errors[0]);
-        setIsModalOpen(true);
       } else {
-        setErrorMessage(
-          errorData?.message || error.message || "حدث خطأ غير متوقع"
-        );
-        setIsModalOpen(true);
+        setErrorMessage(errorData?.message || error.message || "حدث خطأ غير متوقع");
       }
+      setIsModalOpen(true);
     } finally {
       setIsSubmitting(false);
     }
   };
+
 
   // Error handling
   const handleError = (error, defaultMessage) => {
@@ -281,11 +298,11 @@ const CreateSubscription = ({ onClose }) => {
   };
 
   return (
-    <div className="container max-w-[1000px] mx-auto p-4" dir="rtl">
+    <div className="container w-full mx-auto p-4 " dir="rtl">
       <h2 className="text-xl font-bold mb-6">إنشاء اشتراك جديد</h2>
 
       {isModalOpen && (
-        <div className="fixed top-1/4 left-0 right-0 bg-black bg-opacity-50 flex items-start justify-center z-50">
+        <div className="fixed top-1/4 left-0 right-0  flex items-start justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full max-h-[70vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">حدث خطأ</h3>
             <p className="text-red-600">{errorMessage}</p>
@@ -298,13 +315,13 @@ const CreateSubscription = ({ onClose }) => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5 max-w-[1000px] ">
+      <form onSubmit={handleSubmit} className="space-y-5 w-full ">
         {/* Club & Identifier Inputs */}
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="">
+        <div className="flex flex-col md:flex-row gap-8 ">
+          <div className=" w-full flex-1">
             <div className="">
 
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex  flex-col md:flex-row gap-4">
                 {/* Modified Club Input */}
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium mb-2">النادي</label>

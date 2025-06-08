@@ -423,7 +423,7 @@ const Attendance = () => {
                 <Button
                   onClick={() => setIsAttendanceDialogOpen(true)}
                   disabled={isInitialLoad || !userClub}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="btn"
                 >
                   <FiPlus className="mr-2 h-5 w-5" />
                   إضافة حضور
@@ -586,7 +586,7 @@ const Attendance = () => {
                 <Button
                   onClick={() => setIsEntryLogDialogOpen(true)}
                   disabled={isInitialLoad}
-                  className="bg-green-600 hover:bg-green-700 text-white"
+                  className="btn"
                 >
                   <FiPlus className="mr-2 h-5 w-5" />
                   إضافة سجل دخول

@@ -194,14 +194,9 @@ const Main = () => {
     <div className="main-content p-4 sm:p-6" dir="rtl">
       <div className="flex items-center justify-between mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-700 dark:text-white">
-          لوحة التحكم - {isTodayView ? "بيانات اليوم" : "الإجمالي الكلي"}
+          لوحة التحكم 
         </h2>
-        <button
-          onClick={() => setIsTodayView((prev) => !prev)}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-sm shadow"
-        >
-          {isTodayView ? "عرض الإجمالي الكلي" : "عرض بيانات اليوم"}
-        </button>
+     
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">

@@ -8,6 +8,8 @@ import {
 } from 'react-icons/fa';
 import { CiShoppingTag } from 'react-icons/ci';
 
+
+
 const MemberSubscriptions = () => {
   const { memberId } = useParams();
   const dispatch = useDispatch();
@@ -106,26 +108,27 @@ const MemberSubscriptions = () => {
     return dateString ? new Date(dateString).toLocaleDateString('ar-EG', options) : 'غير متوفر';
   };
 
-  const getStatusDisplay = (status) => {
-    const normalizedStatus = (status || '').trim().toLowerCase();
-    switch (normalizedStatus) {
-      case 'upcoming':
-        return { text: 'قادم', className: 'bg-blue-100 text-blue-600' };
-      case 'active':
-        return { text: 'نشط', className: 'bg-green-100 text-green-600' };
-      case 'expired':
-        return { text: 'منتهي', className: 'bg-red-100 text-red-600' };
-      default:
-        return { text: 'غير معروف', className: 'bg-gray-100 text-gray-600' };
-    }
-  };
-
   const getErrorMessage = (error) => {
     if (typeof error !== 'object' || !error) return error || 'حدث خطأ';
     if (error.error?.includes('exceeds maximum allowed')) return 'عدد أيام التجميد يتجاوز الحد الأقصى المسموح';
     if (error.error?.includes('not active')) return 'طلب التجميد غير نشط';
     if (error.error?.includes('permission')) return 'ليس لديك الصلاحية لإلغاء التجميد';
     return error.error || 'حدث خطأ';
+  };
+
+  // Simple status mapping
+  const getStatusText = (status) => {
+    const normalizedStatus = (status || '').trim().toLowerCase();
+    switch (normalizedStatus) {
+      case 'upcoming':
+        return 'قادم';
+      case 'active':
+        return 'نشط';
+      case 'expired':
+        return 'منتهي';
+      default:
+        return 'غير معروف';
+    }
   };
 
   if (status === 'loading') return (
@@ -229,15 +232,12 @@ const MemberSubscriptions = () => {
                 {results.map((sub) => {
                   const activeFreeze = Array.isArray(sub.freeze_requests) ? 
                     sub.freeze_requests.find(fr => fr.is_active) : null;
-                  const statusDisplay = getStatusDisplay(sub.status);
 
                   return (
                     <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-end gap-2">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusDisplay.className}`}>
-                            {statusDisplay.text}
-                          </span>
+                          
                           <div>
                             <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
                               <CiShoppingTag className="text-blue-500" />
@@ -287,15 +287,15 @@ const MemberSubscriptions = () => {
                         <div className="text-sm space-y-1">
                           <div className="flex items-center gap-1">
                             <FaMoneyBillAlt className="text-gray-400 text-sm" />
-                            السعر: {sub.type_details?.price} ج.م
+                            السعر: {sub.type_details?.price || 0} ج.م
                           </div>
                           <div className="flex items-center gap-1">
                             <FaCheck className="text-gray-400 text-sm" />
-                            المدفوع: {sub.paid_amount} ج.م
+                            المدفوع: {sub.paid_amount || 0} ج.م
                           </div>
-                          <div className={`flex items-center gap-1 ${parseFloat(sub.remaining_amount) < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                          <div className={`flex items-center gap-1 ${parseFloat(sub.remaining_amount || 0) < 0 ? 'text-red-500' : 'text-green-500'}`}>
                             <FaExclamation className="text-sm" />
-                            المتبقي: {sub.remaining_amount} ج.م
+                            المتبقي: {sub.remaining_amount || 0} ج.م
                           </div>
                         </div>
                       </td>
@@ -372,13 +372,12 @@ const MemberSubscriptions = () => {
             {results.map((sub) => {
               const activeFreeze = Array.isArray(sub.freeze_requests) ? 
                 sub.freeze_requests.find(fr => fr.is_active) : null;
-              const statusDisplay = getStatusDisplay(sub.status);
 
               return (
                 <div key={sub.id} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-center mb-3">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusDisplay.className}`}>
-                      {statusDisplay.text}
+                    <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                      {getStatusText(sub.status)}
                     </span>
                     <div className="flex items-center gap-2 text-blue-600 font-medium">
                       <CiShoppingTag className="text-lg" />
@@ -399,7 +398,7 @@ const MemberSubscriptions = () => {
                       {sub.coach_details ? (
                         <div>
                           <p>{sub.coach_details.username}</p>
-                          <p className="text-xs text-gray-500">الحد: {sub.coach_details.max_traines}</p>
+                          <p className="text-xs text-gray-500">الحد: {sub.coach_details.max_trainees}</p>
                         </div>
                       ) : (
                         <p className="text-gray-500">بدون مدرب</p>
@@ -435,16 +434,16 @@ const MemberSubscriptions = () => {
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-1">السعر</p>
-                      <p>{sub.type_details?.price} ج.م</p>
+                      <p>{sub.type_details?.price || 0} ج.م</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-500 mb-1">المدفوع</p>
-                      <p>{sub.paid_amount} ج.م</p>
+                      <p>{sub.paid_amount || 0} ج.م</p>
                     </div>
                     <div className="col-span-2">
                       <p className="text-xs text-gray-500 mb-1">الرصيد</p>
-                      <p className={parseFloat(sub.remaining_amount) < 0 ? 'text-red-500' : 'text-green-500'}>
-                        {sub.remaining_amount} ج.م
+                      <p className={parseFloat(sub.remaining_amount || 0) < 0 ? 'text-red-500' : 'text-green-500'}>
+                        {sub.remaining_amount || 0} ج.م
                       </p>
                     </div>
                   </div>

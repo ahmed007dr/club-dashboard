@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
+import { addSubscriptionType, fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';
 import { fetchClubs } from '../../redux/slices/clubSlice';
 import { toast } from "react-hot-toast";
 
@@ -92,6 +93,19 @@ const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
       toast.success('تم إنشاء نوع الاشتراك بنجاح!');
 
       // Re-fetch subscription types with default filters and page 1
+      await dispatch(
+        fetchSubscriptionTypes({
+          page: 1,
+          searchQuery: '',
+          statusFilter: 'all',
+          durationFilter: '',
+          includesGym: '',
+          includesPool: '',
+          includesClasses: '',
+        })
+      ).unwrap();
+      toast.success("تم إنشاء نوع الاشتراك بنجاح!");
+      // Re-fetch subscription types to update the list
       await dispatch(
         fetchSubscriptionTypes({
           page: 1,
