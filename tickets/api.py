@@ -3,13 +3,12 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db.models import Q, F
-from django.db import models
+from django.db.models import Q
 from django.db import transaction
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
-from .models import Ticket, TicketType, TicketBook
-from .serializers import TicketSerializer, TicketTypeSerializer, TicketBookSerializer
+from .models import Ticket, TicketType
+from .serializers import TicketSerializer, TicketTypeSerializer
 from finance.models import Income, IncomeSource
 from utils.permissions import IsOwnerOrRelatedToClub
 from datetime import datetime
@@ -107,7 +106,6 @@ def ticket_detail_api(request, ticket_id):
     serializer = TicketSerializer(ticket)
     return Response(serializer.data)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_ticket_api(request):
@@ -131,18 +129,6 @@ def add_ticket_api(request):
     data['issued_by'] = request.user.id
     data['club'] = request.user.club.id
 
-    # التحقق من وجود book_id في البيانات
-    book_id = data.get('book_id')
-    if book_id:
-        try:
-            book = TicketBook.objects.get(id=book_id, club=request.user.club)
-            data['book'] = book.id  # استخدام ID بدلاً من الكائن
-        except TicketBook.DoesNotExist:
-            return Response(
-                {'error': 'Ticket book not found or not accessible'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
     serializer = TicketSerializer(data=data)
     
     if not serializer.is_valid():
@@ -152,49 +138,32 @@ def add_ticket_api(request):
         with transaction.atomic():
             club = request.user.club
             ticket_type = serializer.validated_data['ticket_type']
-            book = serializer.validated_data.get('book')
+            today = timezone.now().date()
+            date_prefix = today.strftime('%Y%m%d')  # مثل 20250607
 
-            # البحث عن كتاب تذاكر متاح إذا لم يتم تحديده
-            if not book:
-                book = TicketBook.objects.filter(
-                    club=club,
-                    ticket_type=ticket_type,
-                    total_tickets__gt=Ticket.objects.filter(book=models.F('id')).count()
-                ).order_by('issued_date').first()
+            # احسب عدد التذاكر لهذا النوع في اليوم الحالي
+            ticket_count = Ticket.objects.filter(
+                club=club,
+                ticket_type=ticket_type,
+                issue_datetime__date=today
+            ).count()
 
-                # إنشاء كتاب جديد إذا كان المستخدم لديه الصلاحية
-                if not book and request.user.role in ['owner', 'admin']:
-                    book_data = {
-                        'club': club.id,
-                        'ticket_type': ticket_type.id,
-                        'total_tickets': 100,
-                    }
-                    book_serializer = TicketBookSerializer(data=book_data)
-                    if book_serializer.is_valid():
-                        book_count = TicketBook.objects.filter(club=club).count()
-                        book_serializer.validated_data['serial_prefix'] = f"TBK-{str(book_count + 1).zfill(3)}"
-                        book = book_serializer.save()
-                    else:
-                        return Response(
-                            book_serializer.errors,
-                            status=status.HTTP_400_BAD_REQUEST
-                        )
+            # إذا وصل العد لـ 100، أعد العد من 1
+            if ticket_count >= 100:
+                ticket_count = 0  # ابدأ من جديد
 
-            # التحقق من توافق نوع التذكرة مع الكتاب
-            if book and book.ticket_type != ticket_type:
+            serial_number = f"{date_prefix}-{str(ticket_count + 1).zfill(3)}"  # مثل 20250607-001
+
+            # التحقق من عدم تكرار serial_number
+            if Ticket.objects.filter(serial_number=serial_number).exists():
                 return Response(
-                    {'error': 'Ticket type does not match the book type.'},
+                    {'error': f'Serial number {serial_number} already exists.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
-
-            # توليد الرقم التسلسلي
-            ticket_count = Ticket.objects.filter(book=book).count()
-            serial_number = f"{book.serial_prefix}-{str(ticket_count + 1).zfill(3)}"
 
             # حفظ التذكرة
             ticket = serializer.save(
                 serial_number=serial_number,
-                book=book,
                 price=ticket_type.price
             )
 
@@ -214,7 +183,7 @@ def add_ticket_api(request):
                     source=source,
                     amount=ticket.price,
                     description=f"بيع تذكرة {ticket.ticket_type.name} ({ticket.serial_number})",
-                    date=timezone.now().date(),
+                    date=today,
                     received_by=request.user
                 )
 
@@ -225,8 +194,7 @@ def add_ticket_api(request):
             {'error': str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-    
-    
+
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_ticket_api(request, ticket_id):
@@ -254,116 +222,3 @@ def delete_ticket_api(request, ticket_id):
         ).delete()
 
     return Response({'message': 'Ticket deleted successfully.'}, status=status.HTTP_204_NO_CONTENT)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def ticket_book_report_api(request):
-    club = request.user.club
-    date = request.query_params.get('date')
-    if date:
-        try:
-            date_obj = datetime.strptime(date, '%Y-%m-%d').date()
-        except ValueError:
-            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
-    else:
-        date_obj = timezone.now().date()
-
-    books = TicketBook.objects.filter(club=club)
-    report = []
-
-    for book in books:
-        tickets = Ticket.objects.filter(
-            book=book,
-            issue_datetime__date=date_obj
-        ).order_by('serial_number')
-
-        issued_count = tickets.count()
-        serial_numbers = [ticket.serial_number for ticket in tickets]
-        total_issued = Ticket.objects.filter(book=book).count()
-        is_sequential = True
-
-        if serial_numbers:
-            first_number = int(serial_numbers[0].split('-')[-1])
-            for i, serial in enumerate(serial_numbers):
-                expected_number = first_number + i
-                actual_number = int(serial.split('-')[-1])
-                if actual_number != expected_number:
-                    is_sequential = False
-                    break
-
-        report.append({
-            'book_serial': book.serial_prefix,
-            'total_tickets': book.total_tickets,
-            'issued_tickets': issued_count,
-            'total_issued_tickets': total_issued,
-            'serial_numbers': serial_numbers,
-            'is_sequential': is_sequential,
-            'remaining_tickets': book.remaining_tickets(),
-            'ticket_type': TicketTypeSerializer(book.ticket_type).data,
-        })
-
-    return Response(report, status=status.HTTP_200_OK)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def create_ticket_book_api(request):
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'Only owners or admins can create ticket books.'}, status=status.HTTP_403_FORBIDDEN)
-
-    data = request.data.copy()
-    data['club'] = request.user.club.id
-
-    serializer = TicketBookSerializer(data=data)
-    if serializer.is_valid():
-        club = request.user.club
-        ticket_type = serializer.validated_data.get('ticket_type')
-
-        existing_book = TicketBook.objects.filter(
-            club=club,
-            ticket_type=ticket_type,
-            total_tickets__gt=Ticket.objects.filter(book=models.F('id')).count()
-        ).first()
-
-        if existing_book:
-            return Response(
-                {'error': f'There is an open ticket book ({existing_book.serial_prefix}) with remaining tickets for this ticket type.'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        with transaction.atomic():
-            book_count = TicketBook.objects.filter(club=club).count()
-            serial_prefix = f"TBK-{str(book_count + 1).zfill(3)}"
-            serializer.validated_data['serial_prefix'] = serial_prefix
-            book = serializer.save()
-        return Response(TicketBookSerializer(book).data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def current_ticket_book_api(request):
-    club_id = request.query_params.get('club_id')
-    ticket_type_id = request.query_params.get('ticket_type_id')
-
-    if not club_id or not ticket_type_id:
-        return Response({'error': 'Club ID and Ticket Type ID are required.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    try:
-        club_id = int(club_id)
-        ticket_type_id = int(ticket_type_id)
-    except ValueError:
-        return Response({'error': 'Invalid Club ID or Ticket Type ID.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    if request.user.club.id != club_id:
-        return Response({'error': 'You do not have access to this club.'}, status=status.HTTP_403_FORBIDDEN)
-
-    book = TicketBook.objects.filter(
-        club_id=club_id,
-        ticket_type_id=ticket_type_id,
-        total_tickets__gt=Ticket.objects.filter(book=models.F('id')).count()
-    ).order_by('issued_date').first()
-
-    if not book:
-        return Response({'error': 'No open ticket book found for the specified club and ticket type.'}, status=status.HTTP_404_NOT_FOUND)
-
-    serializer = TicketBookSerializer(book)
-    return Response(serializer.data)

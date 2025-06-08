@@ -1,4 +1,3 @@
-
 from django.urls import path
 from . import api
 
@@ -7,8 +6,5 @@ urlpatterns = [
     path('api/tickets/add/', api.add_ticket_api, name='api-add-ticket'),
     path('api/tickets/<int:ticket_id>/', api.ticket_detail_api, name='api-ticket-detail'),
     path('api/tickets/<int:ticket_id>/delete/', api.delete_ticket_api, name='api-delete-ticket'),
-    path('api/ticket-types/', api.ticket_type_list_api, name='api-ticket-type-list'),  
-    path('api/ticket-book-report/', api.ticket_book_report_api, name='api-ticket-book-report'), 
-    path('api/ticket-books/add/', api.create_ticket_book_api, name='api-create-ticket-book'),
-    path('api/ticket-books/current/', api.current_ticket_book_api, name='api-current-ticket-book'),  # إضافة المسار
+    path('api/ticket-types/', api.ticket_type_list_api, name='api-ticket-type-list'),
 ]

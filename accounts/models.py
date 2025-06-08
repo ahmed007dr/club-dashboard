@@ -13,9 +13,9 @@ class User(AbstractUser):
     ]
     role = models.CharField(max_length=50, choices=ROLE_CHOICES, default='reception')
     rfid_code = models.CharField(max_length=32, unique=True, null=True, blank=True, help_text="RFID tag or card code")
-    phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True, help_text="User's phone number")
+    phone_number = models.CharField(max_length=15, null=True, blank=True, help_text="User's phone number")
     notes = models.TextField(null=True, blank=True, help_text="Additional notes about the user")
-    card_number = models.CharField(max_length=50, unique=True, null=True, blank=True, help_text="User's card number")
+    card_number = models.CharField(max_length=50, null=True, blank=True, help_text="User's card number")
     address = models.TextField(null=True, blank=True, help_text="User's address")
     groups = models.ManyToManyField(
         Group,

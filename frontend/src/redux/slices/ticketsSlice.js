@@ -66,7 +66,7 @@ export const addTicket = createAsyncThunk(
       );
       return response.data;
     } catch (error) {
-      const errorMessage = error.response?.data?.detail || error.message || 'Failed to add ticket';
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to add ticket';
       return rejectWithValue(errorMessage);
     }
   }
@@ -142,81 +142,6 @@ export const editTicketById = createAsyncThunk(
   }
 );
 
-export const fetchTicketBookReport = createAsyncThunk(
-  'tickets/fetchTicketBookReport',
-  async ({ date }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No authentication token found');
-      const response = await axios.get(`${BASE_URL}/tickets/api/ticket-book-report/`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        params: { date },
-      });
-      return response.data;
-    } catch (error) {
-      const errorMessage = error.response?.data?.detail || error.message || 'Failed to fetch ticket book report';
-      return rejectWithValue(errorMessage);
-    }
-  }
-);
-
-export const createTicketBook = createAsyncThunk(
-  'tickets/createTicketBook',
-  async (bookData, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No authentication token found');
-      const response = await axios.post(
-        `${BASE_URL}/tickets/api/ticket-books/add/`,
-        bookData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-      return response.data;
-    } catch (error) {
-      const errorMessage = error.response?.data?.detail || error.message || 'Failed to create ticket book';
-      return rejectWithValue(errorMessage);
-    }
-  }
-);
-
-export const fetchCurrentTicketBook = createAsyncThunk(
-  'tickets/fetchCurrentTicketBook',
-  async ({ club, ticket_type }, { rejectWithValue }) => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('No authentication token found');
-      console.log("Fetching current ticket book with params:", { club, ticket_type });
-      const response = await axios.get(
-        `${BASE_URL}/tickets/api/ticket-books/current/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          params: {
-            club,
-            ticket_type,
-          },
-        }
-      );
-      return response.data;
-    } catch (error) {
-      console.error("Fetch current ticket book error:", error.response?.data);
-      const errorMessage = error.response?.data?.detail || error.message || 'Failed to fetch current ticket book';
-      return rejectWithValue(errorMessage);
-    }
-  }
-);
-
-
 const ticketsSlice = createSlice({
   name: 'tickets',
   initialState: {
@@ -227,8 +152,6 @@ const ticketsSlice = createSlice({
       previous: null,
     },
     ticketTypes: [],
-    ticketBook: [],
-    ticketBookReport: [],
     currentTicket: null,
     loading: false,
     error: null,
@@ -317,52 +240,13 @@ const ticketsSlice = createSlice({
       .addCase(editTicketById.fulfilled, (state, action) => {
         state.loading = false;
         const index = state.tickets.results.findIndex(
-          (ticket) => ticket.id === action.payload.id
+          (ticket) => ticket.id === action.payload.ticketId
         );
         if (index !== -1) {
           state.tickets.results[index] = action.payload;
         }
       })
       .addCase(editTicketById.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-
-      .addCase(fetchTicketBookReport.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchTicketBookReport.fulfilled, (state, action) => {
-        state.loading = false;
-        state.ticketBookReport = action.payload;
-      })
-      .addCase(fetchTicketBookReport.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-
-      .addCase(createTicketBook.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(createTicketBook.fulfilled, (state, action) => {
-        state.loading = false;
-        state.ticketBook = action.payload;
-      })
-      .addCase(createTicketBook.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload;
-      })
-
-      .addCase(fetchCurrentTicketBook.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchCurrentTicketBook.fulfilled, (state, action) => {
-        state.loading = false;
-        state.ticketBook = action.payload;
-      })
-      .addCase(fetchCurrentTicketBook.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
