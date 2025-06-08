@@ -40,7 +40,7 @@ const TicketForm = ({ userClub, canAddTickets, itemsPerPage, filterTicketType, f
       toast.error('خطأ: لا يمكن إضافة تذكرة بدون نادي مرتبط');
       return;
     }
-
+  
     const userId = localStorage.getItem('userId') || userClub.id;
     const ticketData = {
       club: userClub.id,
@@ -48,7 +48,7 @@ const TicketForm = ({ userClub, canAddTickets, itemsPerPage, filterTicketType, f
       notes: ticketFormData.notes,
       issued_by: userId,
     };
-
+  
     dispatch(addTicket(ticketData))
       .unwrap()
       .then((response) => {
@@ -73,6 +73,7 @@ const TicketForm = ({ userClub, canAddTickets, itemsPerPage, filterTicketType, f
       });
   };
 
+  
   if (!canAddTickets) return null;
 
   return (
