@@ -19,6 +19,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from jinja2 import Template
+from decimal import Decimal
+
 
 from accounts.models import User
 from staff.models import StaffAttendance
@@ -920,6 +922,8 @@ def generate_daily_report_pdf(request):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
+from django.db.models.functions import TruncDay, TruncWeek, TruncMonth, TruncYear
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def financial_analysis_api(request):
@@ -927,7 +931,6 @@ def financial_analysis_api(request):
         if request.user.role not in ['owner', 'admin']:
             return Response({'error': 'Only owners and admins can view financial analysis'}, status=status.HTTP_403_FORBIDDEN)
 
-        # Get query parameters
         period_type = request.query_params.get('period_type', 'monthly')
         start = request.query_params.get('start')
         end = request.query_params.get('end')
@@ -936,12 +939,10 @@ def financial_analysis_api(request):
         source_param = request.query_params.get('source')
         details = request.query_params.get('details', 'false').lower() == 'true'
 
-        # Validate period_type
         valid_periods = ['daily', 'weekly', 'monthly', 'yearly']
         if period_type not in valid_periods:
             return Response({'error': f'Invalid period_type. Use one of: {", ".join(valid_periods)}'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Set date range
         if start and end:
             try:
                 start_date = datetime.strptime(start, '%Y-%m-%d').date()
@@ -961,7 +962,6 @@ def financial_analysis_api(request):
             else:
                 start_date = end_date - relativedelta(years=5)
 
-        # Base querysets
         income_qs = Income.objects.select_related('source', 'received_by').filter(
             club=request.user.club,
             date__range=[start_date, end_date]
@@ -971,7 +971,6 @@ def financial_analysis_api(request):
             date__range=[start_date, end_date]
         )
 
-        # Apply filters
         if user_param:
             user_obj = get_object_from_id_or_name(User, user_param, ['id', 'username'])
             if user_obj and user_obj.club == request.user.club:
@@ -996,35 +995,21 @@ def financial_analysis_api(request):
             else:
                 return Response({'error': 'Income source not found or not in your club.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Period-based aggregation for SQLite
-        if period_type == 'daily':
-            period_format = '%Y-%m-%d'
-            income_period_expr = "strftime('%Y-%m-%d', date)"
-            expense_period_expr = "strftime('%Y-%m-%d', date)"
-        elif period_type == 'weekly':
-            period_format = '%Y-%W'
-            income_period_expr = "strftime('%Y-%W', date)"
-            expense_period_expr = "strftime('%Y-%W', date)"
-        elif period_type == 'monthly':
-            period_format = '%Y-%m'
-            income_period_expr = "strftime('%Y-%m', date)"
-            expense_period_expr = "strftime('%Y-%m', date)"
-        else:  # yearly
-            period_format = '%Y'
-            income_period_expr = "strftime('%Y', date)"
-            expense_period_expr = "strftime('%Y', date)"
+        trunc_func = {
+            'daily': TruncDay,
+            'weekly': TruncWeek,
+            'monthly': TruncMonth,
+            'yearly': TruncYear
+        }[period_type]
 
-        # Aggregate incomes by period
-        income_by_period = income_qs.values(period=RawSQL(income_period_expr, [])).annotate(
+        income_by_period = income_qs.annotate(period=trunc_func('date')).values('period').annotate(
             total_income=Sum('amount')
         ).order_by('period')
 
-        # Aggregate expenses by period
-        expense_by_period = expense_qs.values(period=RawSQL(expense_period_expr, [])).annotate(
+        expense_by_period = expense_qs.annotate(period=trunc_func('date')).values('period').annotate(
             total_expense=Sum('amount')
         ).order_by('period')
 
-        # Combine income and expense data
         periods = {}
         for item in income_by_period:
             period_str = item['period']
@@ -1045,48 +1030,45 @@ def financial_analysis_api(request):
                     'net_profit': -float(item['total_expense'])
                 }
 
-        # Financial position
-        total_income = income_qs.aggregate(total=Sum('amount'))['total'] or 0
-        total_expense = expense_qs.aggregate(total=Sum('amount'))['total'] or 0
+        total_income = income_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
+        total_expense = expense_qs.aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         net_profit = total_income - total_expense
+
         financial_position = {
             'total_income': float(total_income),
             'total_expense': float(total_expense),
             'net_profit': float(net_profit),
-            'cash_balance': float(total_income - total_expense),
+            'cash_balance': float(net_profit),
             'liabilities': float(total_expense)
         }
 
-        # Results: Compare with previous period
         prev_start_date = start_date - (end_date - start_date)
         prev_end_date = start_date - timedelta(days=1)
         prev_income = Income.objects.filter(
             club=request.user.club,
             date__range=[prev_start_date, prev_end_date]
-        ).aggregate(total=Sum('amount'))['total'] or 0
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         prev_expense = Expense.objects.filter(
             club=request.user.club,
             date__range=[prev_start_date, prev_end_date]
-        ).aggregate(total=Sum('amount'))['total'] or 0
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00')
         prev_net = prev_income - prev_expense
 
         results = {
-            'income_growth': float(total_income - prev_income) / prev_income * 100 if prev_income else 0,
-            'expense_growth': float(total_expense - prev_expense) / prev_expense * 100 if prev_expense else 0,
-            'net_profit_growth': float(net_profit - prev_net) / prev_net * 100 if prev_net else 0
+            'income_growth': float((total_income - prev_income) / prev_income * 100) if prev_income else 0,
+            'expense_growth': float((total_expense - prev_expense) / prev_expense * 100) if prev_expense else 0,
+            'net_profit_growth': float((net_profit - prev_net) / prev_net * 100) if prev_net else 0
         }
 
-        # Forecasts: Simple moving average for next period
-        period_count = len(periods)
-        avg_income = total_income / period_count if period_count else 0
-        avg_expense = total_expense / period_count if period_count else 0
+        period_count = Decimal(len(periods)) or Decimal('1')
+        avg_income = total_income / period_count
+        avg_expense = total_expense / period_count
         forecasts = {
             'next_period_income': float(avg_income),
             'next_period_expense': float(avg_expense),
             'next_period_net': float(avg_income - avg_expense)
         }
 
-        # Expense Categories Analysis
         expense_by_category = expense_qs.values('category__name').annotate(
             total_amount=Sum('amount')
         ).order_by('-total_amount')
@@ -1094,11 +1076,10 @@ def financial_analysis_api(request):
             {
                 'category': item['category__name'],
                 'total_amount': float(item['total_amount']),
-                'percentage': float(item['total_amount'] / total_expense * 100) if total_expense else 0
+                'percentage': float(Decimal(item['total_amount']) / total_expense * 100) if total_expense else 0
             } for item in expense_by_category
         ]
 
-        # Income Sources Analysis
         income_by_source = income_qs.values('source__name').annotate(
             total_amount=Sum('amount')
         ).order_by('-total_amount')
@@ -1106,21 +1087,19 @@ def financial_analysis_api(request):
             {
                 'source': item['source__name'],
                 'total_amount': float(item['total_amount']),
-                'percentage': float(item['total_amount'] / total_income * 100) if total_income else 0
+                'percentage': float(Decimal(item['total_amount']) / total_income * 100) if total_income else 0
             } for item in income_by_source
         ]
 
-        # Top 5 Expense Categories and Income Sources
         top_expense_categories = expense_category_analysis[:5]
         top_income_sources = income_source_analysis[:5]
 
-        # Alerts
         alerts = []
-        expense_ratio = total_expense / total_income if total_income else 1
-        if expense_ratio > 0.9:
-            alerts.append('تحذير: المصروفات تقترب من الإيرادات أو تتجاوزها (نسبة المصروفات: {:.2%})'.format(expense_ratio))
+        expense_ratio = total_expense / total_income if total_income > 0 else None
+        if expense_ratio is not None and expense_ratio > Decimal('0.9'):
+            alerts.append(f'تحذير: المصروفات تقترب من الإيرادات أو تتجاوزها (نسبة المصروفات: {float(expense_ratio):.2%})')
         if net_profit < 0:
-            alerts.append('تحذير: صافي الربح سلبي ({:.2f})'.format(net_profit))
+            alerts.append(f'تحذير: صافي الربح سلبي ({float(net_profit):.2f})')
         for cat in expense_category_analysis:
             if cat['percentage'] > 30:
                 alerts.append(f'تنبيه: فئة المصروفات "{cat["category"]}" تمثل {cat["percentage"]:.2f}% من إجمالي المصروفات')
@@ -1128,20 +1107,24 @@ def financial_analysis_api(request):
             if src['percentage'] < 10:
                 alerts.append(f'تنبيه: مصدر الإيراد "{src["source"]}" يساهم بأقل من 10% ({src["percentage"]:.2f}%) من الإيرادات')
 
-        # Recommendations
         recommendations = []
-        if expense_ratio > 0.7:
-            recommendations.append('اقتراح: حاول تقليل المصروفات، خاصة في الفئات ذات النسبة العالية مثل {}'.format(
-                ', '.join([cat['category'] for cat in top_expense_categories])
-            ))
-        if any(src['percentage'] < 10 for src in income_source_analysis):
-            recommendations.append('اقتراح: ركز على زيادة الإيرادات من مصادر ضعيفة مثل {}'.format(
-                ', '.join([src['source'] for src in income_source_analysis if src['percentage'] < 10])
-            ))
-        if net_profit < 0:
-            recommendations.append('اقتراح: راجع استراتيجيات التسعير أو قلل المصروفات الغير ضرورية لتحسين صافي الربح')
+        if expense_ratio is not None and expense_ratio > Decimal('0.7'):
+            high_expense_categories = [cat["category"] if cat["category"] else "غير مصنف" for cat in top_expense_categories]
+            recommendations.append(
+                f'اقتراح: حاول تقليل المصروفات، خاصة في الفئات ذات النسبة العالية مثل {", ".join(high_expense_categories)}'
+            )
 
-        # Response data
+        low_income_sources = [src["source"] if src["source"] else "غير معروف" for src in income_source_analysis if src["percentage"] < 10]
+        if low_income_sources:
+            recommendations.append(
+                f'اقتراح: ركز على زيادة الإيرادات من مصادر ضعيفة مثل {", ".join(low_income_sources)}'
+            )
+
+        if net_profit < 0:
+            recommendations.append(
+                'اقتراح: راجع استراتيجيات التسعير أو قلل المصروفات الغير ضرورية لتحسين صافي الربح'
+            )
+
         response_data = {
             'period_analysis': [
                 {
