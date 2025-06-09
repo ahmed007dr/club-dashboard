@@ -6,7 +6,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Tab } from '@headlessui/react';
 import BASE_URL from '../../config/api';
-import "./analytics.css";
+import './analytics.css';
 
 const SubscriptionAnalytics = () => {
   const [analytics, setAnalytics] = useState(null);
@@ -18,28 +18,31 @@ const SubscriptionAnalytics = () => {
   const [selectedCoach, setSelectedCoach] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   // Fetch subscription types and coaches
   const fetchFilters = async () => {
     try {
       const [typesResponse, coachesResponse] = await Promise.all([
-        axios.get(`${BASE_URL}subscriptions/api/subscriptions/active-subscription-types/`, {
+        axios.get(`${BASE_URL}/subscriptions/api/subscription-types/active/`, { 
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         }),
-        axios.get(`${BASE_URL}accounts/api/accounts/coaches/`, {
+        axios.get(`${BASE_URL}/accounts/api/coaches/`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         }),
       ]);
-      setSubscriptionTypes(typesResponse.data.results || typesResponse.data);
-      setCoaches(coachesResponse.data.results || coachesResponse.data);
+      setSubscriptionTypes(Array.isArray(typesResponse.data.results) ? typesResponse.data.results : typesResponse.data || []);
+      setCoaches(Array.isArray(coachesResponse.data.results) ? coachesResponse.data.results : coachesResponse.data || []);
     } catch (error) {
       console.error('Error fetching filters:', error);
+      setError('فشل في جلب بيانات الفلاتر');
     }
   };
 
   // Fetch analytics data
   const fetchAnalytics = async () => {
     setLoading(true);
+    setError(null);
     try {
       const response = await axios.get(`${BASE_URL}subscriptions/api/subscriptions/analytics/`, {
         params: {
@@ -50,9 +53,10 @@ const SubscriptionAnalytics = () => {
         },
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
-      setAnalytics(response.data);
+      setAnalytics(response.data || {});
     } catch (error) {
       console.error('Error fetching analytics:', error);
+      setError('فشل في جلب بيانات التحليلات');
     } finally {
       setLoading(false);
     }
@@ -63,11 +67,14 @@ const SubscriptionAnalytics = () => {
     fetchAnalytics();
   }, [startDate, endDate, selectedType, selectedCoach]);
 
-  // Sorting function
+  // Sorting function with null checks
   const sortData = (data, key, direction) => {
+    if (!Array.isArray(data)) return [];
     return [...data].sort((a, b) => {
-      if (a[key] < b[key]) return direction === 'asc' ? -1 : 1;
-      if (a[key] > b[key]) return direction === 'asc' ? 1 : -1;
+      const aValue = a?.[key] ?? '';
+      const bValue = b?.[key] ?? '';
+      if (aValue < bValue) return direction === 'asc' ? -1 : 1;
+      if (aValue > bValue) return direction === 'asc' ? 1 : -1;
       return 0;
     });
   };
@@ -79,132 +86,205 @@ const SubscriptionAnalytics = () => {
     }));
   };
 
-  // Prepare CSV data
+  // Prepare CSV data with defensive checks
   const getCsvData = () => {
     if (!analytics) return [];
+
     const data = [];
 
     // Popular Types
     data.push(['أكثر أنواع الاشتراكات شعبية']);
     data.push(['النوع', 'عدد الاشتراكات', 'النسبة (%)']);
-    const sortedPopularTypes = sortConfig.key && sortConfig.key.includes('popular')
-      ? sortData(analytics.popular_subscription_types, sortConfig.key.split('.')[1], sortConfig.direction)
-      : analytics.popular_subscription_types;
+    const popularTypes = Array.isArray(analytics.popular_subscription_types) ? analytics.popular_subscription_types : [];
+    const sortedPopularTypes = sortConfig.key?.includes('popular')
+      ? sortData(popularTypes, sortConfig.key.split('.')[1], sortConfig.direction)
+      : popularTypes;
     sortedPopularTypes.forEach((type) => {
-      data.push([type.name, type.total_subscriptions, type.percentage]);
+      if (type) {
+        data.push([type.name ?? 'غير معروف', type.total_subscriptions ?? 0, type.percentage ?? 0]);
+      }
     });
 
     // Attendance Analysis
     data.push([], ['أعلى أنواع الاشتراكات حضورًا']);
     data.push(['النوع', 'متوسط الحضور', 'إجمالي الحضور']);
-    const sortedAttendanceTypes = sortConfig.key && sortConfig.key.includes('attendance')
-      ? sortData(analytics.attendance_analysis.highest_attendance_types, sortConfig.key.split('.')[1], sortConfig.direction)
-      : analytics.attendance_analysis.highest_attendance_types;
+    const attendanceTypes = Array.isArray(analytics.attendance_analysis?.highest_attendance_types)
+      ? analytics.attendance_analysis.highest_attendance_types
+      : [];
+    const sortedAttendanceTypes = sortConfig.key?.includes('attendance')
+      ? sortData(attendanceTypes, sortConfig.key.split('.')[1], sortConfig.direction)
+      : attendanceTypes;
     sortedAttendanceTypes.forEach((type) => {
-      data.push([type.type__name, type.avg_attendance.toFixed(2), type.total_attendance]);
+      if (type) {
+        data.push([
+          type.type__name ?? 'غير معروف',
+          type.avg_attendance ? Number(type.avg_attendance).toFixed(2) : '0.00',
+          type.total_attendance ?? 0,
+        ]);
+      }
     });
     data.push([], ['الحضور حسب أيام الأسبوع']);
     data.push(['اليوم', 'إجمالي الحضور']);
-    analytics.attendance_analysis.by_day_of_week.forEach((day) => {
-      data.push([day.day, day.total_entries]);
+    const byDayOfWeek = Array.isArray(analytics.attendance_analysis?.by_day_of_week)
+      ? analytics.attendance_analysis.by_day_of_week
+      : [];
+    byDayOfWeek.forEach((day) => {
+      if (day) {
+        data.push([day.day ?? 'غير معروف', day.total_entries ?? 0]);
+      }
     });
 
     // Freeze Analysis
     data.push([], ['تحليل التجميد']);
     data.push(['النوع', 'عدد طلبات التجميد', 'الاشتراكات المتجمدة', 'نسبة التجميد (%)']);
-    const sortedFreeze = sortConfig.key && sortConfig.key.includes('freeze')
-      ? sortData(analytics.freeze_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-      : analytics.freeze_analysis;
+    const freezeAnalysis = Array.isArray(analytics.freeze_analysis) ? analytics.freeze_analysis : [];
+    const sortedFreeze = sortConfig.key?.includes('freeze')
+      ? sortData(freezeAnalysis, sortConfig.key.split('.')[1], sortConfig.direction)
+      : freezeAnalysis;
     sortedFreeze.forEach((freeze) => {
-      data.push([freeze.name, freeze.total_freezes, freeze.frozen_subscriptions, freeze.freeze_percentage]);
+      if (freeze) {
+        data.push([
+          freeze.name ?? 'غير معروف',
+          freeze.total_freezes ?? 0,
+          freeze.frozen_subscriptions ?? 0,
+          freeze.freeze_percentage ?? 0,
+        ]);
+      }
     });
 
     // Revenue Analysis
     data.push([], ['الإيرادات حسب نوع الاشتراك']);
     data.push(['النوع', 'إجمالي الإيرادات', 'إيرادات التدريب الخاص', 'المبالغ المتبقية']);
-    const sortedRevenue = sortConfig.key && sortConfig.key.includes('revenue')
-      ? sortData(analytics.revenue_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-      : analytics.revenue_analysis;
+    const revenueAnalysis = Array.isArray(analytics.revenue_analysis) ? analytics.revenue_analysis : [];
+    const sortedRevenue = sortConfig.key?.includes('revenue')
+      ? sortData(revenueAnalysis, sortConfig.key.split('.')[1], sortConfig.direction)
+      : revenueAnalysis;
     sortedRevenue.forEach((type) => {
-      data.push([type.name, type.total_revenue, type.private_revenue, type.remaining_amount]);
+      if (type) {
+        data.push([
+          type.name ?? 'غير معروف',
+          type.total_revenue ?? 0,
+          type.private_revenue ?? 0,
+          type.remaining_amount ?? 0,
+        ]);
+      }
     });
 
     // Member Behavior
     data.push([], ['الأعضاء الأكثر نشاطًا']);
     data.push(['اسم العضو', 'عدد مرات الحضور', 'عدد الاشتراكات', 'منتظم', 'متكرر']);
-    const sortedMembers = sortConfig.key && sortConfig.key.includes('member')
-      ? sortData(analytics.member_behavior.active_members, sortConfig.key.split('.')[1], sortConfig.direction)
-      : analytics.member_behavior.active_members;
+    const activeMembers = Array.isArray(analytics.member_behavior?.active_members)
+      ? analytics.member_behavior.active_members
+      : [];
+    const sortedMembers = sortConfig.key?.includes('member')
+      ? sortData(activeMembers, sortConfig.key.split('.')[1], sortConfig.direction)
+      : activeMembers;
     sortedMembers.forEach((member) => {
-      data.push([
-        member.member.name,
-        member.attendance_count,
-        member.subscription_count,
-        member.is_regular ? 'نعم' : 'لا',
-        member.is_repeated ? 'نعم' : 'لا'
-      ]);
+      if (member?.member) {
+        data.push([
+          member.member.name ?? 'غير معروف',
+          member.attendance_count ?? 0,
+          member.subscription_count ?? 0,
+          member.is_regular ? 'نعم' : 'لا',
+          member.is_repeated ? 'نعم' : 'لا',
+        ]);
+      }
     });
     data.push([], ['الأعضاء غير النشطين']);
     data.push(['اسم العضو', 'عدد الاشتراكات']);
-    analytics.member_behavior.inactive_members.forEach((member) => {
-      data.push([member.member__name, member.subscription_count]);
+    const inactiveMembers = Array.isArray(analytics.member_behavior?.inactive_members)
+      ? analytics.member_behavior.inactive_members
+      : [];
+    inactiveMembers.forEach((member) => {
+      if (member) {
+        data.push([member.member__name ?? 'غير معروف', member.subscription_count ?? 0]);
+      }
     });
 
     // Coach Analysis
     data.push([], ['تحليل الكباتن']);
     data.push(['اسم الكابتن', 'عدد العملاء', 'إجمالي الحضور', 'إجمالي الإيرادات']);
-    const sortedCoaches = sortConfig.key && sortConfig.key.includes('coach')
-      ? sortData(analytics.coach_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-      : analytics.coach_analysis;
+    const coachAnalysis = Array.isArray(analytics.coach_analysis) ? analytics.coach_analysis : [];
+    const sortedCoaches = sortConfig.key?.includes('coach')
+      ? sortData(coachAnalysis, sortConfig.key.split('.')[1], sortConfig.direction)
+      : coachAnalysis;
     sortedCoaches.forEach((coach) => {
-      data.push([coach.username, coach.total_clients, coach.total_attendance, coach.total_revenue || 0]);
+      if (coach) {
+        data.push([
+          coach.username ?? 'غير معروف',
+          coach.total_clients ?? 0,
+          coach.total_attendance ?? 0,
+          coach.total_revenue ?? 0,
+        ]);
+      }
     });
 
     // Temporal Analysis
     data.push([], ['تحليل زمني']);
     data.push(['الشهر', 'عدد الاشتراكات', 'إجمالي الإيرادات']);
-    const sortedTemporal = sortConfig.key && sortConfig.key.includes('temporal')
-      ? sortData(analytics.temporal_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-      : analytics.temporal_analysis;
+    const temporalAnalysis = Array.isArray(analytics.temporal_analysis) ? analytics.temporal_analysis : [];
+    const sortedTemporal = sortConfig.key?.includes('temporal')
+      ? sortData(temporalAnalysis, sortConfig.key.split('.')[1], sortConfig.direction)
+      : temporalAnalysis;
     sortedTemporal.forEach((temp) => {
-      data.push([temp.month, temp.total_subscriptions, temp.total_revenue]);
+      if (temp) {
+        data.push([temp.month ?? 'غير معروف', temp.total_subscriptions ?? 0, temp.total_revenue ?? 0]);
+      }
     });
 
     // Renewal Rate
     data.push([], ['معدل التجديد حسب نوع الاشتراك']);
     data.push(['النوع', 'الاشتراكات المنتهية', 'الاشتراكات المتجددة', 'معدل التجديد (%)']);
-    const sortedRenewal = sortConfig.key && sortConfig.key.includes('renewal')
-      ? sortData(analytics.renewal_rate_by_type, sortConfig.key.split('.')[1], sortConfig.direction)
-      : analytics.renewal_rate_by_type;
+    const renewalRate = Array.isArray(analytics.renewal_rate_by_type) ? analytics.renewal_rate_by_type : [];
+    const sortedRenewal = sortConfig.key?.includes('renewal')
+      ? sortData(renewalRate, sortConfig.key.split('.')[1], sortConfig.direction)
+      : renewalRate;
     sortedRenewal.forEach((stat) => {
-      data.push([stat.name, stat.expired_subscriptions, stat.renewed_subscriptions, stat.renewal_rate]);
+      if (stat) {
+        data.push([
+          stat.name ?? 'غير معروف',
+          stat.expired_subscriptions ?? 0,
+          stat.renewed_subscriptions ?? 0,
+          stat.renewal_rate ?? 0,
+        ]);
+      }
     });
 
     // Nearing Expiry
     data.push([], ['الاشتراكات القريبة من الانتهاء']);
     data.push(['اسم العضو', 'تاريخ الانتهاء']);
-    analytics.nearing_expiry.forEach((sub) => {
-      data.push([sub.member.name, sub.end_date]);
+    const nearingExpiry = Array.isArray(analytics.nearing_expiry) ? analytics.nearing_expiry : [];
+    nearingExpiry.forEach((sub) => {
+      if (sub?.member) {
+        data.push([sub.member.name ?? 'غير معروف', sub.end_date ?? 'غير معروف']);
+      }
     });
 
     return data;
   };
 
-  // Export to PDF
+  // Export to PDF with defensive checks
   const exportToPDF = () => {
     const doc = new jsPDF();
     doc.setFont('Amiri');
     doc.setFontSize(16);
     doc.text('تحليل الاشتراكات', 10, 10, { align: 'right' });
 
+    if (!analytics) return;
+
     // Popular Types
     doc.text('أكثر أنواع الاشتراكات شعبية', 10, 20, { align: 'right' });
     autoTable(doc, {
       startY: 25,
       head: [['النوع', 'عدد الاشتراكات', 'النسبة (%)']],
-      body: sortConfig.key && sortConfig.key.includes('popular')
-        ? sortData(analytics.popular_subscription_types, sortConfig.key.split('.')[1], sortConfig.direction)
-        : analytics.popular_subscription_types.map((type) => [type.name, type.total_subscriptions, type.percentage]),
+      body: (sortConfig.key?.includes('popular')
+        ? sortData(analytics.popular_subscription_types || [], sortConfig.key.split('.')[1], sortConfig.direction)
+        : analytics.popular_subscription_types || []
+      ).map((type) => [
+        type?.name ?? 'غير معروف',
+        type?.total_subscriptions ?? 0,
+        type?.percentage ?? 0,
+      ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
 
@@ -213,20 +293,24 @@ const SubscriptionAnalytics = () => {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['النوع', 'متوسط الحضور', 'إجمالي الحضور']],
-      body: sortConfig.key && sortConfig.key.includes('attendance')
-        ? sortData(analytics.attendance_analysis.highest_attendance_types, sortConfig.key.split('.')[1], sortConfig.direction)
-        : analytics.attendance_analysis.highest_attendance_types.map((type) => [
-            type.type__name,
-            type.avg_attendance.toFixed(2),
-            type.total_attendance
-          ]),
+      body: (sortConfig.key?.includes('attendance')
+        ? sortData(analytics.attendance_analysis?.highest_attendance_types || [], sortConfig.key.split('.')[1], sortConfig.direction)
+        : analytics.attendance_analysis?.highest_attendance_types || []
+      ).map((type) => [
+        type?.type__name ?? 'غير معروف',
+        type?.avg_attendance ? Number(type.avg_attendance).toFixed(2) : '0.00',
+        type?.total_attendance ?? 0,
+      ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
     doc.text('الحضور حسب أيام الأسبوع', 10, doc.lastAutoTable.finalY + 10, { align: 'right' });
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['اليوم', 'إجمالي الحضور']],
-      body: analytics.attendance_analysis.by_day_of_week.map((day) => [day.day, day.total_entries]),
+      body: (analytics.attendance_analysis?.by_day_of_week || []).map((day) => [
+        day?.day ?? 'غير معروف',
+        day?.total_entries ?? 0,
+      ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
 
@@ -235,14 +319,15 @@ const SubscriptionAnalytics = () => {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['النوع', 'عدد طلبات التجميد', 'الاشتراكات المتجمدة', 'نسبة التجميد (%)']],
-      body: sortConfig.key && sortConfig.key.includes('freeze')
-        ? sortData(analytics.freeze_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-        : analytics.freeze_analysis.map((freeze) => [
-            freeze.name,
-            freeze.total_freezes,
-            freeze.frozen_subscriptions,
-            freeze.freeze_percentage
-          ]),
+      body: (sortConfig.key?.includes('freeze')
+        ? sortData(analytics.freeze_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
+        : analytics.freeze_analysis || []
+      ).map((freeze) => [
+        freeze?.name ?? 'غير معروف',
+        freeze?.total_freezes ?? 0,
+        freeze?.frozen_subscriptions ?? 0,
+        freeze?.freeze_percentage ?? 0,
+      ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
 
@@ -251,14 +336,15 @@ const SubscriptionAnalytics = () => {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['النوع', 'إجمالي الإيرادات', 'إيرادات التدريب الخاص', 'المبالغ المتبقية']],
-      body: sortConfig.key && sortConfig.key.includes('revenue')
-        ? sortData(analytics.revenue_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-        : analytics.revenue_analysis.map((type) => [
-            type.name,
-            type.total_revenue,
-            type.private_revenue,
-            type.remaining_amount
-          ]),
+      body: (sortConfig.key?.includes('revenue')
+        ? sortData(analytics.revenue_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
+        : analytics.revenue_analysis || []
+      ).map((type) => [
+        type?.name ?? 'غير معروف',
+        type?.total_revenue ?? 0,
+        type?.private_revenue ?? 0,
+        type?.remaining_amount ?? 0,
+      ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
 
@@ -267,24 +353,25 @@ const SubscriptionAnalytics = () => {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['اسم العضو', 'عدد مرات الحضور', 'عدد الاشتراكات', 'منتظم', 'متكرر']],
-      body: sortConfig.key && sortConfig.key.includes('member')
-        ? sortData(analytics.member_behavior.active_members, sortConfig.key.split('.')[1], sortConfig.direction)
-        : analytics.member_behavior.active_members.map((member) => [
-            member.member.name,
-            member.attendance_count,
-            member.subscription_count,
-            member.is_regular ? 'نعم' : 'لا',
-            member.is_repeated ? 'نعم' : 'لا'
-          ]),
+      body: (sortConfig.key?.includes('member')
+        ? sortData(analytics.member_behavior?.active_members || [], sortConfig.key.split('.')[1], sortConfig.direction)
+        : analytics.member_behavior?.active_members || []
+      ).map((member) => [
+        member?.member?.name ?? 'غير معروف',
+        member?.attendance_count ?? 0,
+        member?.subscription_count ?? 0,
+        member?.is_regular ? 'نعم' : 'لا',
+        member?.is_repeated ? 'نعم' : 'لا',
+      ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
     doc.text('الأعضاء غير النشطين', 10, doc.lastAutoTable.finalY + 10, { align: 'right' });
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['اسم العضو', 'عدد الاشتراكات']],
-      body: analytics.member_behavior.inactive_members.map((member) => [
-        member.member__name,
-        member.subscription_count
+      body: (analytics.member_behavior?.inactive_members || []).map((member) => [
+        member?.member__name ?? 'غير معروف',
+        member?.subscription_count ?? 0,
       ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
@@ -294,14 +381,15 @@ const SubscriptionAnalytics = () => {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['اسم الكابتن', 'عدد العملاء', 'إجمالي الحضور', 'إجمالي الإيرادات']],
-      body: sortConfig.key && sortConfig.key.includes('coach')
-        ? sortData(analytics.coach_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-        : analytics.coach_analysis.map((coach) => [
-            coach.username,
-            coach.total_clients,
-            coach.total_attendance,
-            coach.total_revenue || 0
-          ]),
+      body: (sortConfig.key?.includes('coach')
+        ? sortData(analytics.coach_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
+        : analytics.coach_analysis || []
+      ).map((coach) => [
+        coach?.username ?? 'غير معروف',
+        coach?.total_clients ?? 0,
+        coach?.total_attendance ?? 0,
+        coach?.total_revenue ?? 0,
+      ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
 
@@ -310,13 +398,14 @@ const SubscriptionAnalytics = () => {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['الشهر', 'عدد الاشتراكات', 'إجمالي الإيرادات']],
-      body: sortConfig.key && sortConfig.key.includes('temporal')
-        ? sortData(analytics.temporal_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-        : analytics.temporal_analysis.map((temp) => [
-            temp.month,
-            temp.total_subscriptions,
-            temp.total_revenue
-          ]),
+      body: (sortConfig.key?.includes('temporal')
+        ? sortData(analytics.temporal_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
+        : analytics.temporal_analysis || []
+      ).map((temp) => [
+        temp?.month ?? 'غير معروف',
+        temp?.total_subscriptions ?? 0,
+        temp?.total_revenue ?? 0,
+      ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
 
@@ -325,14 +414,15 @@ const SubscriptionAnalytics = () => {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['النوع', 'الاشتراكات المنتهية', 'الاشتراكات المتجددة', 'معدل التجديد (%)']],
-      body: sortConfig.key && sortConfig.key.includes('renewal')
-        ? sortData(analytics.renewal_rate_by_type, sortConfig.key.split('.')[1], sortConfig.direction)
-        : analytics.renewal_rate_by_type.map((stat) => [
-            stat.name,
-            stat.expired_subscriptions,
-            stat.renewed_subscriptions,
-            stat.renewal_rate
-          ]),
+      body: (sortConfig.key?.includes('renewal')
+        ? sortData(analytics.renewal_rate_by_type || [], sortConfig.key.split('.')[1], sortConfig.direction)
+        : analytics.renewal_rate_by_type || []
+      ).map((stat) => [
+        stat?.name ?? 'غير معروف',
+        stat?.expired_subscriptions ?? 0,
+        stat?.renewed_subscriptions ?? 0,
+        stat?.renewal_rate ?? 0,
+      ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
 
@@ -341,7 +431,10 @@ const SubscriptionAnalytics = () => {
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['اسم العضو', 'تاريخ الانتهاء']],
-      body: analytics.nearing_expiry.map((sub) => [sub.member.name, sub.end_date]),
+      body: (analytics.nearing_expiry || []).map((sub) => [
+        sub?.member?.name ?? 'غير معروف',
+        sub?.end_date ?? 'غير معروف',
+      ]),
       styles: { font: 'Amiri', halign: 'right' },
     });
 
@@ -382,7 +475,9 @@ const SubscriptionAnalytics = () => {
             >
               <option value="">الكل</option>
               {subscriptionTypes.map((type) => (
-                <option key={type.id} value={type.id}>{type.name}</option>
+                <option key={type.id} value={type.id}>
+                  {type.name ?? 'غير معروف'}
+                </option>
               ))}
             </select>
           </div>
@@ -395,7 +490,9 @@ const SubscriptionAnalytics = () => {
             >
               <option value="">الكل</option>
               {coaches.map((coach) => (
-                <option key={coach.id} value={coach.id}>{coach.username}</option>
+                <option key={coach.id} value={coach.id}>
+                  {coach.username ?? 'غير معروف'}
+                </option>
               ))}
             </select>
           </div>
@@ -408,17 +505,15 @@ const SubscriptionAnalytics = () => {
           >
             تصدير كـ Excel
           </CSVLink>
-          <button
-            onClick={exportToPDF}
-            className="button export-pdf"
-          >
+          <button onClick={exportToPDF} className="button export-pdf">
             تصدير كـ PDF
           </button>
         </div>
       </div>
 
       {loading && <p className="loading">جاري التحميل...</p>}
-      {!loading && analytics && (
+      {error && <p className="error">{error}</p>}
+      {!loading && !error && analytics && (
         <Tab.Group>
           <Tab.List className="tab-list">
             {[
@@ -430,13 +525,11 @@ const SubscriptionAnalytics = () => {
               'الكباتن',
               'زمني',
               'التجديد',
-              'الانتهاء قريبًا'
+              'الانتهاء قريبًا',
             ].map((tab) => (
               <Tab
                 key={tab}
-                className={({ selected }) =>
-                  `tab ${selected ? 'tab-selected' : ''}`
-                }
+                className={({ selected }) => `tab ${selected ? 'tab-selected' : ''}`}
               >
                 {tab}
               </Tab>
@@ -452,8 +545,13 @@ const SubscriptionAnalytics = () => {
                     <th className="table-header" onClick={() => handleSort('popular.name')}>
                       النوع {sortConfig.key === 'popular.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('popular.total_subscriptions')}>
-                      عدد الاشتراكات {sortConfig.key === 'popular.total_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('popular.total_subscriptions')}
+                    >
+                      عدد الاشتراكات{' '}
+                      {sortConfig.key === 'popular.total_subscriptions' &&
+                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('popular.percentage')}>
                       النسبة (%) {sortConfig.key === 'popular.percentage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -461,14 +559,14 @@ const SubscriptionAnalytics = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('popular')
-                    ? sortData(analytics.popular_subscription_types, sortConfig.key.split('.')[1], sortConfig.direction)
-                    : analytics.popular_subscription_types
+                  {(sortConfig.key?.includes('popular')
+                    ? sortData(analytics.popular_subscription_types || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    : analytics.popular_subscription_types || []
                   ).map((type, index) => (
-                    <tr key={index}>
-                      <td className="table-cell">{type.name}</td>
-                      <td className="table-cell">{type.total_subscriptions}</td>
-                      <td className="table-cell">{type.percentage}</td>
+                    <tr key={`popular-${index}`}>
+                      <td className="table-cell">{type?.name ?? 'غير معروف'}</td>
+                      <td className="table-cell">{type?.total_subscriptions ?? 0}</td>
+                      <td className="table-cell">{type?.percentage ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -485,22 +583,29 @@ const SubscriptionAnalytics = () => {
                       النوع {sortConfig.key === 'attendance.type__name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('attendance.avg_attendance')}>
-                      متوسط الحضور {sortConfig.key === 'attendance.avg_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      متوسط الحضور{' '}
+                      {sortConfig.key === 'attendance.avg_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('attendance.total_attendance')}>
-                      إجمالي الحضور {sortConfig.key === 'attendance.total_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('attendance.total_attendance')}
+                    >
+                      إجمالي الحضور{' '}
+                      {sortConfig.key === 'attendance.total_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('attendance')
-                    ? sortData(analytics.attendance_analysis.highest_attendance_types, sortConfig.key.split('.')[1], sortConfig.direction)
-                    : analytics.attendance_analysis.highest_attendance_types
+                  {(sortConfig.key?.includes('attendance')
+                    ? sortData(analytics.attendance_analysis?.highest_attendance_types || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    : analytics.attendance_analysis?.highest_attendance_types || []
                   ).map((type, index) => (
-                    <tr key={index}>
-                      <td className="table-cell">{type.type__name}</td>
-                      <td className="table-cell">{type.avg_attendance.toFixed(2)}</td>
-                      <td className="table-cell">{type.total_attendance}</td>
+                    <tr key={`attendance-${index}`}>
+                      <td className="table-cell">{type?.type__name ?? 'غير معروف'}</td>
+                      <td className="table-cell">
+                        {type?.avg_attendance ? Number(type.avg_attendance).toFixed(2) : '0.00'}
+                      </td>
+                      <td className="table-cell">{type?.total_attendance ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -510,19 +615,24 @@ const SubscriptionAnalytics = () => {
                 <thead>
                   <tr>
                     <th className="table-header">اليوم</th>
-                    <th className="table-header" onClick={() => handleSort('attendance.day.total_entries')}>
-                      إجمالي الحضور {sortConfig.key === 'attendance.day.total_entries' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('attendance.day.total_entries')}
+                    >
+                      إجمالي الحضور{' '}
+                      {sortConfig.key === 'attendance.day.total_entries' &&
+                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('attendance.day')
-                    ? sortData(analytics.attendance_analysis.by_day_of_week, 'total_entries', sortConfig.direction)
-                    : analytics.attendance_analysis.by_day_of_week
+                  {(sortConfig.key?.includes('attendance.day')
+                    ? sortData(analytics.attendance_analysis?.by_day_of_week || [], 'total_entries', sortConfig.direction)
+                    : analytics.attendance_analysis?.by_day_of_week || []
                   ).map((day, index) => (
-                    <tr key={index}>
-                      <td className="table-cell">{day.day}</td>
-                      <td className="table-cell">{day.total_entries}</td>
+                    <tr key={`day-${index}`}>
+                      <td className="table-cell">{day?.day ?? 'غير معروف'}</td>
+                      <td className="table-cell">{day?.total_entries ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -539,26 +649,36 @@ const SubscriptionAnalytics = () => {
                       النوع {sortConfig.key === 'freeze.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('freeze.total_freezes')}>
-                      عدد طلبات التجميد {sortConfig.key === 'freeze.total_freezes' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      عدد طلبات التجميد{' '}
+                      {sortConfig.key === 'freeze.total_freezes' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('freeze.frozen_subscriptions')}>
-                      الاشتراكات المتجمدة {sortConfig.key === 'freeze.frozen_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('freeze.frozen_subscriptions')}
+                    >
+                      الاشتراكات المتجمدة{' '}
+                      {sortConfig.key === 'freeze.frozen_subscriptions' &&
+                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('freeze.freeze_percentage')}>
-                      نسبة التجميد (%) {sortConfig.key === 'freeze.freeze_percentage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('freeze.freeze_percentage')}
+                    >
+                      نسبة التجميد (%){' '}
+                      {sortConfig.key === 'freeze.freeze_percentage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('freeze')
-                    ? sortData(analytics.freeze_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-                    : analytics.freeze_analysis
+                  {(sortConfig.key?.includes('freeze')
+                    ? sortData(analytics.freeze_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    : analytics.freeze_analysis || []
                   ).map((freeze, index) => (
-                    <tr key={index}>
-                      <td className="table-cell">{freeze.name}</td>
-                      <td className="table-cell">{freeze.total_freezes}</td>
-                      <td className="table-cell">{freeze.frozen_subscriptions}</td>
-                      <td className="table-cell">{freeze.freeze_percentage}</td>
+                    <tr key={`freeze-${index}`}>
+                      <td className="table-cell">{freeze?.name ?? 'غير معروف'}</td>
+                      <td className="table-cell">{freeze?.total_freezes ?? 0}</td>
+                      <td className="table-cell">{freeze?.frozen_subscriptions ?? 0}</td>
+                      <td className="table-cell">{freeze?.freeze_percentage ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -575,26 +695,35 @@ const SubscriptionAnalytics = () => {
                       النوع {sortConfig.key === 'revenue.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('revenue.total_revenue')}>
-                      إجمالي الإيرادات {sortConfig.key === 'revenue.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      إجمالي الإيرادات{' '}
+                      {sortConfig.key === 'revenue.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('revenue.private_revenue')}>
-                      إيرادات التدريب الخاص {sortConfig.key === 'revenue.private_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('revenue.private_revenue')}
+                    >
+                      إيرادات التدريب الخاص{' '}
+                      {sortConfig.key === 'revenue.private_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('revenue.remaining_amount')}>
-                      المبالغ المتبقية {sortConfig.key === 'revenue.remaining_amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('revenue.remaining_amount')}
+                    >
+                      المبالغ المتبقية{' '}
+                      {sortConfig.key === 'revenue.remaining_amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('revenue')
-                    ? sortData(analytics.revenue_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-                    : analytics.revenue_analysis
+                  {(sortConfig.key?.includes('revenue')
+                    ? sortData(analytics.revenue_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    : analytics.revenue_analysis || []
                   ).map((type, index) => (
-                    <tr key={index}>
-                      <td className="table-cell">{type.name}</td>
-                      <td className="table-cell">{type.total_revenue}</td>
-                      <td className="table-cell">{type.private_revenue}</td>
-                      <td className="table-cell">{type.remaining_amount}</td>
+                    <tr key={`revenue-${index}`}>
+                      <td className="table-cell">{type?.name ?? 'غير معروف'}</td>
+                      <td className="table-cell">{type?.total_revenue ?? 0}</td>
+                      <td className="table-cell">{type?.private_revenue ?? 0}</td>
+                      <td className="table-cell">{type?.remaining_amount ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -608,29 +737,38 @@ const SubscriptionAnalytics = () => {
                 <thead>
                   <tr>
                     <th className="table-header" onClick={() => handleSort('member.member.name')}>
-                      اسم العضو {sortConfig.key === 'member.member.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      اسم العضو{' '}
+                      {sortConfig.key === 'member.member.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('member.attendance_count')}>
-                      عدد مرات الحضور {sortConfig.key === 'member.attendance_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('member.attendance_count')}
+                    >
+                      عدد مرات الحضور{' '}
+                      {sortConfig.key === 'member.attendance_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('member.subscription_count')}>
-                      عدد الاشتراكات {sortConfig.key === 'member.subscription_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('member.subscription_count')}
+                    >
+                      عدد الاشتراكات{' '}
+                      {sortConfig.key === 'member.subscription_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header">منتظم</th>
                     <th className="table-header">متكرر</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('member')
-                    ? sortData(analytics.member_behavior.active_members, sortConfig.key.split('.')[1], sortConfig.direction)
-                    : analytics.member_behavior.active_members
-                  ).map((member) => (
-                    <tr key={member.id}>
-                      <td className="table-cell">{member.member.name}</td>
-                      <td className="table-cell">{member.attendance_count}</td>
-                      <td className="table-cell">{member.subscription_count}</td>
-                      <td className="table-cell">{member.is_regular ? 'نعم' : 'لا'}</td>
-                      <td className="table-cell">{member.is_repeated ? 'نعم' : 'لا'}</td>
+                  {(sortConfig.key?.includes('member')
+                    ? sortData(analytics.member_behavior?.active_members || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    : analytics.member_behavior?.active_members || []
+                  ).map((member, index) => (
+                    <tr key={member?.id ?? `member-${index}`}>
+                      <td className="table-cell">{member?.member?.name ?? 'غير معروف'}</td>
+                      <td className="table-cell">{member?.attendance_count ?? 0}</td>
+                      <td className="table-cell">{member?.subscription_count ?? 0}</td>
+                      <td className="table-cell">{member?.is_regular ? 'نعم' : 'لا'}</td>
+                      <td className="table-cell">{member?.is_repeated ? 'نعم' : 'لا'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -639,22 +777,32 @@ const SubscriptionAnalytics = () => {
               <table className="table">
                 <thead>
                   <tr>
-                    <th className="table-header" onClick={() => handleSort('member.inactive.member__name')}>
-                      اسم العضو {sortConfig.key === 'member.inactive.member__name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('member.inactive.member__name')}
+                    >
+                      اسم العضو{' '}
+                      {sortConfig.key === 'member.inactive.member__name' &&
+                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('member.inactive.subscription_count')}>
-                      عدد الاشتراكات {sortConfig.key === 'member.inactive.subscription_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('member.inactive.subscription_count')}
+                    >
+                      عدد الاشتراكات{' '}
+                      {sortConfig.key === 'member.inactive.subscription_count' &&
+                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('member.inactive')
-                    ? sortData(analytics.member_behavior.inactive_members, sortConfig.key.split('.')[2], sortConfig.direction)
-                    : analytics.member_behavior.inactive_members
+                  {(sortConfig.key?.includes('member.inactive')
+                    ? sortData(analytics.member_behavior?.inactive_members || [], sortConfig.key.split('.')[2], sortConfig.direction)
+                    : analytics.member_behavior?.inactive_members || []
                   ).map((member, index) => (
-                    <tr key={index}>
-                      <td className="table-cell">{member.member__name}</td>
-                      <td className="table-cell">{member.subscription_count}</td>
+                    <tr key={`inactive-${index}`}>
+                      <td className="table-cell">{member?.member__name ?? 'غير معروف'}</td>
+                      <td className="table-cell">{member?.subscription_count ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -671,26 +819,32 @@ const SubscriptionAnalytics = () => {
                       اسم الكابتن {sortConfig.key === 'coach.username' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('coach.total_clients')}>
-                      عدد العملاء {sortConfig.key === 'coach.total_clients' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      عدد العملاء{' '}
+                      {sortConfig.key === 'coach.total_clients' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('coach.total_attendance')}>
-                      إجمالي الحضور {sortConfig.key === 'coach.total_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('coach.total_attendance')}
+                    >
+                      إجمالي الحضور{' '}
+                      {sortConfig.key === 'coach.total_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('coach.total_revenue')}>
-                      إجمالي الإيرادات {sortConfig.key === 'coach.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      إجمالي الإيرادات{' '}
+                      {sortConfig.key === 'coach.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('coach')
-                    ? sortData(analytics.coach_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-                    : analytics.coach_analysis
+                  {(sortConfig.key?.includes('coach')
+                    ? sortData(analytics.coach_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    : analytics.coach_analysis || []
                   ).map((coach, index) => (
-                    <tr key={index}>
-                      <td className="table-cell">{coach.username}</td>
-                      <td className="table-cell">{coach.total_clients}</td>
-                      <td className="table-cell">{coach.total_attendance}</td>
-                      <td className="table-cell">{coach.total_revenue || 0}</td>
+                    <tr key={`coach-${index}`}>
+                      <td className="table-cell">{coach?.username ?? 'غير معروف'}</td>
+                      <td className="table-cell">{coach?.total_clients ?? 0}</td>
+                      <td className="table-cell">{coach?.total_attendance ?? 0}</td>
+                      <td className="table-cell">{coach?.total_revenue ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -706,23 +860,29 @@ const SubscriptionAnalytics = () => {
                     <th className="table-header" onClick={() => handleSort('temporal.month')}>
                       الشهر {sortConfig.key === 'temporal.month' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('temporal.total_subscriptions')}>
-                      عدد الاشتراكات {sortConfig.key === 'temporal.total_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('temporal.total_subscriptions')}
+                    >
+                      عدد الاشتراكات{' '}
+                      {sortConfig.key === 'temporal.total_subscriptions' &&
+                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('temporal.total_revenue')}>
-                      إجمالي الإيرادات {sortConfig.key === 'temporal.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      إجمالي الإيرادات{' '}
+                      {sortConfig.key === 'temporal.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('temporal')
-                    ? sortData(analytics.temporal_analysis, sortConfig.key.split('.')[1], sortConfig.direction)
-                    : analytics.temporal_analysis
+                  {(sortConfig.key?.includes('temporal')
+                    ? sortData(analytics.temporal_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    : analytics.temporal_analysis || []
                   ).map((temp, index) => (
-                    <tr key={index}>
-                      <td className="table-cell">{temp.month}</td>
-                      <td className="table-cell">{temp.total_subscriptions}</td>
-                      <td className="table-cell">{temp.total_revenue}</td>
+                    <tr key={`temporal-${index}`}>
+                      <td className="table-cell">{temp?.month ?? 'غير معروف'}</td>
+                      <td className="table-cell">{temp?.total_subscriptions ?? 0}</td>
+                      <td className="table-cell">{temp?.total_revenue ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -738,27 +898,38 @@ const SubscriptionAnalytics = () => {
                     <th className="table-header" onClick={() => handleSort('renewal.name')}>
                       النوع {sortConfig.key === 'renewal.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('renewal.expired_subscriptions')}>
-                      الاشتراكات المنتهية {sortConfig.key === 'renewal.expired_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('renewal.expired_subscriptions')}
+                    >
+                      الاشتراكات المنتهية{' '}
+                      {sortConfig.key === 'renewal.expired_subscriptions' &&
+                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('renewal.renewed_subscriptions')}>
-                      الاشتراكات المتجددة {sortConfig.key === 'renewal.renewed_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th
+                      className="table-header"
+                      onClick={() => handleSort('renewal.renewed_subscriptions')}
+                    >
+                      الاشتراكات المتجددة{' '}
+                      {sortConfig.key === 'renewal.renewed_subscriptions' &&
+                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('renewal.renewal_rate')}>
-                      معدل التجديد (%) {sortConfig.key === 'renewal.renewal_rate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      معدل التجديد (%){' '}
+                      {sortConfig.key === 'renewal.renewal_rate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('renewal')
-                    ? sortData(analytics.renewal_rate_by_type, sortConfig.key.split('.')[1], sortConfig.direction)
-                    : analytics.renewal_rate_by_type
+                  {(sortConfig.key?.includes('renewal')
+                    ? sortData(analytics.renewal_rate_by_type || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    : analytics.renewal_rate_by_type || []
                   ).map((stat, index) => (
-                    <tr key={index}>
-                      <td className="table-cell">{stat.name}</td>
-                      <td className="table-cell">{stat.expired_subscriptions}</td>
-                      <td className="table-cell">{stat.renewed_subscriptions}</td>
-                      <td className="table-cell">{stat.renewal_rate}</td>
+                    <tr key={`renewal-${index}`}>
+                      <td className="table-cell">{stat?.name ?? 'غير معروف'}</td>
+                      <td className="table-cell">{stat?.expired_subscriptions ?? 0}</td>
+                      <td className="table-cell">{stat?.renewed_subscriptions ?? 0}</td>
+                      <td className="table-cell">{stat?.renewal_rate ?? 0}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -772,21 +943,23 @@ const SubscriptionAnalytics = () => {
                 <thead>
                   <tr>
                     <th className="table-header" onClick={() => handleSort('nearing.member.name')}>
-                      اسم العضو {sortConfig.key === 'nearing.member.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      اسم العضو{' '}
+                      {sortConfig.key === 'nearing.member.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('nearing.end_date')}>
-                      تاريخ الانتهاء {sortConfig.key === 'nearing.end_date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      تاريخ الانتهاء{' '}
+                      {sortConfig.key === 'nearing.end_date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key && sortConfig.key.includes('nearing')
-                    ? sortData(analytics.nearing_expiry, sortConfig.key.split('.')[1], sortConfig.direction)
-                    : analytics.nearing_expiry
-                  ).map((sub) => (
-                    <tr key={sub.id}>
-                      <td className="table-cell">{sub.member.name}</td>
-                      <td className="table-cell">{sub.end_date}</td>
+                  {(sortConfig.key?.includes('nearing')
+                    ? sortData(analytics.nearing_expiry || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    : analytics.nearing_expiry || []
+                  ).map((sub, index) => (
+                    <tr key={sub?.id ?? `nearing-${index}`}>
+                      <td className="table-cell">{sub?.member?.name ?? 'غير معروف'}</td>
+                      <td className="table-cell">{sub?.end_date ?? 'غير معروف'}</td>
                     </tr>
                   ))}
                 </tbody>
