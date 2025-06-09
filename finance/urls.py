@@ -26,4 +26,6 @@ urlpatterns = [
     path('api/finance-overview/', api.finance_overview, name='api-finance-overview'),
     path('api/employee/daily-report/', api.employee_daily_report_api, name='employee_daily_report'),
     path('api/employee/daily-report/pdf/', api.generate_daily_report_pdf, name='generate_daily_report_pdf'),
+    path('api/expense/all/', api.expense_all_api, name='expense_all_api'),
+    path('api/income/all/', api.income_all_api, name='income_all_api'),
     ]

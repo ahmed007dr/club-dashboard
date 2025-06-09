@@ -634,7 +634,143 @@ def employee_daily_report_api(request):
     )
     return Response(data, status=status_code)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def expense_all_api(request):
+    try:
+        if request.user.role in ['owner', 'admin']:
+            expenses = Expense.objects.select_related('category', 'paid_by').filter(
+                club=request.user.club
+            ).order_by('-id')
+        else:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_out__isnull=True
+            ).order_by('-check_in').first()
+            
+            if attendance:
+                expenses = Expense.objects.select_related('category', 'paid_by').filter(
+                    club=request.user.club,
+                    paid_by=request.user,
+                    date__gte=attendance.check_in,
+                    date__lte=timezone.now()
+                ).order_by('-date')
+            else:
+                expenses = Expense.objects.none()
 
+        # تطبيق الفلاتر
+        start = request.query_params.get('start')
+        end = request.query_params.get('end')
+        category = request.query_params.get('category')
+
+        if start and end:
+            try:
+                start_obj = datetime.strptime(start, '%Y-%m-%d').date()
+                end_obj = datetime.strptime(end, '%Y-%m-%d').date()
+                if request.user.role not in ['owner', 'admin']:
+                    if start_obj < attendance.check_in.date() or end_obj > timezone.now().date():
+                        return Response(
+                            {'error': 'Date range must be within your shift.'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                expenses = expenses.filter(date__range=[start_obj, end_obj])
+            except ValueError:
+                return Response(
+                    {'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        elif start or end:
+            return Response(
+                {'error': 'Both start and end dates are required.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if category:
+            category_obj = get_object_from_id_or_name(ExpenseCategory, category, ['id', 'name'])
+            if category_obj and category_obj.club == request.user.club:
+                expenses = expenses.filter(category=category_obj)
+            else:
+                return Response(
+                    {'error': 'Expense category not found or not in your club.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+        serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def income_all_api(request):
+    try:
+        if request.user.role in ['owner', 'admin']:
+            incomes = Income.objects.select_related('source', 'received_by').filter(
+                club=request.user.club
+            )
+        else:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_out__isnull=True
+            ).order_by('-check_in').first()
+            
+            if attendance:
+                incomes = Income.objects.select_related('source', 'received_by').filter(
+                    club=request.user.club,
+                    received_by=request.user,
+                    date__gte=attendance.check_in,
+                    date__lte=timezone.now()
+                )
+            else:
+                incomes = Income.objects.none()
+
+        # Apply filters
+        source = request.query_params.get('source')
+        amount = request.query_params.get('amount')
+        description = request.query_params.get('description')
+        start = request.query_params.get('start')
+        end = request.query_params.get('end')
+
+        if source:
+            try:
+                source_id = int(source)
+                if not IncomeSource.objects.filter(id=source_id, club=request.user.club).exists():
+                    return Response({"error": "No income source found with this ID in your club"}, status=status.HTTP_400_BAD_REQUEST)
+                incomes = incomes.filter(source_id=source_id)
+            except ValueError:
+                return Response({"error": "Invalid source ID format"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if amount:
+            try:
+                incomes = incomes.filter(amount=float(amount))
+            except ValueError:
+                return Response({"error": "Invalid amount format"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if description:
+            incomes = incomes.filter(description__icontains=description)
+
+        if start and end:
+            try:
+                start_date = datetime.strptime(start, '%Y-%m-%d').date()
+                end_date = datetime.strptime(end, '%Y-%m-%d').date()
+                if request.user.role not in ['owner', 'admin']:
+                    if start_date < attendance.check_in.date() or end_date > timezone.now().date():
+                        return Response({'error': 'Date range must be within your shift.'}, status=status.HTTP_400_BAD_REQUEST)
+                incomes = incomes.filter(date__range=[start_date, end_date])
+            except ValueError:
+                return Response({'error': 'Invalid date format for start or end. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+        elif start or end:
+            return Response({'error': 'Both start and end dates are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        incomes = incomes.order_by('-id')
+        serializer = IncomeSerializer(incomes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

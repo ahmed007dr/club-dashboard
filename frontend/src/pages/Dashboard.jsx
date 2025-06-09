@@ -44,6 +44,7 @@ const Dashboard = () => {
         { path: 'attendance', name: 'الحضور', icon: <AiOutlineSchedule /> },
         { path: 'free-invites', name: 'الدعوات المجانية', icon: <RiVipCrown2Line /> },
         { path: 'tickets', name: 'التذاكر', icon: <GiTicket /> },
+        { path: '/dashboard/subscription-report', name: 'تقرير الاشتراكات', icon: <HiOutlineDocumentReport /> },
       ],
     },
     {
@@ -51,7 +52,7 @@ const Dashboard = () => {
       icon: <FaRegBuilding />,
       children: [
         { path: 'staff', name: 'شيفت الموظفين', icon: <RiUserLine /> },
-        { path: 'manage-users', name: 'إدارة الموظفين', icon: <FiUsers /> }, // الرابط مضاف بدون شرط
+        { path: 'manage-users', name: 'إدارة الموظفين', icon: <FiUsers /> },
         { path: 'attendance-form', name: 'بصمه الدخول والخروج', icon: <BiLogIn /> },
         { path: 'shift-attendance', name: 'بيان حضور الموظفي', icon: <AiOutlineSchedule /> },
         { path: 'club', name: 'النادي', icon: <HiOutlineDocumentReport /> },
@@ -70,8 +71,7 @@ const Dashboard = () => {
       name: 'المالية',
       icon: <GiMoneyStack />,
       children: [
-        { path: 'income-sources', name: 'مصادر الدخل', icon: <GiReceiveMoney /> },
-        { path: 'expense-category', name: 'فئات المصروفات', icon: <MdCategory /> },
+        { path: 'income-sources', name: 'الايرادات', icon: <GiReceiveMoney /> },
         { path: 'expense', name: 'المصروفات', icon: <GiPayMoney /> },
       ],
     },

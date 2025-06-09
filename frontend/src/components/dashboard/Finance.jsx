@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react"; // لمؤشر التحميل
 // تحميل المكونات بشكل كسول (Lazy Loading)
 const ExpenseCategory = lazy(() => import("./ExpenseCategory"));
 const Expense = lazy(() => import("./Expense"));
-const IncomeSources = lazy(() => import("./IncomeSources"));
+const IncomeSources = lazy(() => import("./Incomes"));
 
 const Finance = () => {
   return (

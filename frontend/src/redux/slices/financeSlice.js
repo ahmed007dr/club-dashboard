@@ -9,7 +9,6 @@ export const fetchExpenseSummary = createAsyncThunk(
       const token = localStorage.getItem("token");
       
       const urlParams = new URLSearchParams();
-      // Add only defined parameters
       Object.entries(params).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
           urlParams.append(key, value);
@@ -42,7 +41,6 @@ export const fetchExpenseSummary = createAsyncThunk(
   }
 );
 
-// Async Thunks for Expense Categories
 export const fetchExpenseCategories = createAsyncThunk(
   'finance/fetchExpenseCategories',
   async ({page} = {}, { rejectWithValue }) => {
@@ -97,7 +95,6 @@ export const addExpenseCategory = createAsyncThunk(
   }
 );
 
-// Async Thunks for Expenses
 export const fetchExpenses = createAsyncThunk(
   "finance/fetchExpenses",
   async ({ page = 1, startDate, endDate }, { rejectWithValue }) => {
@@ -203,6 +200,79 @@ export const deleteExpense = createAsyncThunk(
   }
 );
 
+export const fetchAllExpenses = createAsyncThunk(
+  "finance/fetchAllExpenses",
+  async ({ startDate, endDate, categoryId }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem("token");
+      const params = new URLSearchParams();
+      if (startDate) params.append('start', startDate);
+      if (endDate) params.append('end', endDate);
+      if (categoryId) params.append('category', categoryId);
+
+      const response = await fetch(
+        `${BASE_URL}/finance/api/expense/all/?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(
+          errorData.error || "Failed to fetch all expenses"
+        );
+      }
+      return await response.json();
+    } catch (error) {
+      toast.error(error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const fetchAllIncomes = createAsyncThunk(
+  "finance/fetchAllIncomes",
+  async ({ startDate, endDate, sourceId, source, amount, description }, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem("token");
+      const params = new URLSearchParams();
+      if (startDate) params.append('start', startDate);
+      if (endDate) params.append('end', endDate);
+      if (sourceId) params.append('source', sourceId);
+      if (source) params.append('source', source);
+      if (amount) params.append('amount', amount);
+      if (description) params.append('description', description);
+
+      const response = await fetch(
+        `${BASE_URL}/finance/api/income/all/?${params.toString()}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(
+          errorData.error || "Failed to fetch all incomes"
+        );
+      }
+      return await response.json();
+    } catch (error) {
+      toast.error(error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
 export const fetchIncomeSummary = createAsyncThunk(
   "finance/fetchIncomeSummary",
   async (params, { rejectWithValue }) => {
@@ -210,7 +280,6 @@ export const fetchIncomeSummary = createAsyncThunk(
       const token = localStorage.getItem("token");
       const urlParams = new URLSearchParams();
 
-      // Add only defined parameters
       Object.entries(params).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
           urlParams.append(key, value);
@@ -243,7 +312,6 @@ export const fetchIncomeSummary = createAsyncThunk(
   }
 );
 
-// Async Thunks for Income Sources
 export const fetchIncomeSources = createAsyncThunk(
   'finance/fetchIncomeSources',
   async (_, { rejectWithValue }) => {
@@ -293,7 +361,6 @@ export const addIncomeSource = createAsyncThunk(
   }
 );
 
-// Async Thunks for Incomes
 export const fetchIncomes = createAsyncThunk(
   "finance/fetchIncomes",
   async ({ page = 1, filters = {} } = {}, { rejectWithValue }) => {
@@ -301,7 +368,6 @@ export const fetchIncomes = createAsyncThunk(
       const token = localStorage.getItem("token");
       if (!token) throw new Error("No token found");
 
-      // Construct query parameters matching the API expectations
       const params = new URLSearchParams({
         page: page,
         source: filters.source || "",
@@ -333,8 +399,6 @@ export const fetchIncomes = createAsyncThunk(
   }
 );
 
-
-
 export const addIncome = createAsyncThunk(
   'finance/addIncome',
   async (newIncome, { rejectWithValue }) => {
@@ -364,7 +428,6 @@ export const addIncome = createAsyncThunk(
   }
 );
 
-
 export const updateIncome = createAsyncThunk(
   'finance/updateIncome',
   async ({ id, updatedData }, { rejectWithValue }) => {
@@ -392,7 +455,6 @@ export const updateIncome = createAsyncThunk(
   }
 );
 
-
 export const deleteIncome = createAsyncThunk(
   'finance/deleteIncome',
   async (id, { rejectWithValue }) => {
@@ -416,7 +478,6 @@ export const deleteIncome = createAsyncThunk(
   }
 );
 
-// Finance Slice Definition
 const financeSlice = createSlice({
   name: 'finance',
   initialState: {
@@ -432,12 +493,13 @@ const financeSlice = createSlice({
     totalCount: 0,
     totalExpenses: 0,
     totalExpensesCount: 0,
+    allExpenses: [],
+    allIncomes: [], // Added for all incomes
     loading: false,
     error: null,
   },
   reducers: {},
   extraReducers: (builder) => {
-    // Fetch Expense Categories
     builder.addCase(fetchExpenseCategories.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -456,7 +518,6 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Add Expense Category
     builder.addCase(addExpenseCategory.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -470,7 +531,6 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Fetch Expenses
     builder.addCase(fetchExpenses.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -489,7 +549,6 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Add Expense
     builder.addCase(addExpense.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -503,7 +562,6 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Update Expense
     builder.addCase(updateExpense.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -520,7 +578,6 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Delete Expense
     builder.addCase(deleteExpense.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -535,7 +592,32 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Fetch Income Sources
+    builder.addCase(fetchAllExpenses.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchAllExpenses.fulfilled, (state, action) => {
+      state.loading = false;
+      state.allExpenses = action.payload;
+    });
+    builder.addCase(fetchAllExpenses.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload;
+    });
+
+    builder.addCase(fetchAllIncomes.pending, (state) => {
+      state.loading = true;
+      state.error = null;
+    });
+    builder.addCase(fetchAllIncomes.fulfilled, (state, action) => {
+      state.loading = false;
+      state.allIncomes = action.payload;
+    });
+    builder.addCase(fetchAllIncomes.rejected, (state, action) => {
+      state.loading = false;
+      state.error = action.payload;
+    });
+
     builder.addCase(fetchIncomeSources.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -543,14 +625,13 @@ const financeSlice = createSlice({
     builder.addCase(fetchIncomeSources.fulfilled, (state, action) => {
       state.loading = false;
       state.incomeSources = action.payload.results || action.payload;
-      state.incomeSourcesPagination = { }
+      state.incomeSourcesPagination = { };
     });
     builder.addCase(fetchIncomeSources.rejected, (state, action) => {
       state.loading = false;
       state.error = action.payload;
     });
 
-    // Add Income Source
     builder.addCase(addIncomeSource.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -564,7 +645,6 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Fetch Incomes
     builder.addCase(fetchIncomes.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -583,7 +663,6 @@ const financeSlice = createSlice({
       state.error = action.payload || 'An unknown error occurred';
     });
 
-    // Add Income
     builder.addCase(addIncome.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -597,7 +676,6 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Update Income
     builder.addCase(updateIncome.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -614,7 +692,6 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Delete Income
     builder.addCase(deleteIncome.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -629,7 +706,6 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Total Income
     builder.addCase(fetchIncomeSummary.pending, (state) => {
       state.loading = true;
       state.error = null;
@@ -644,7 +720,6 @@ const financeSlice = createSlice({
       state.error = action.payload;
     });
 
-    // Total Expenses
     builder.addCase(fetchExpenseSummary.pending, (state) => {
       state.loading = true;
       state.error = null;

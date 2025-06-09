@@ -29,7 +29,7 @@ import UserList from './components/dashboard/UserList';
 import ShiftAttendanceList from './components/dashboard/ShiftAttendanceList';
 import ExpenseCategory from './components/dashboard/ExpenseCategory';
 import Expense from './components/dashboard/Expense';
-import IncomeSources from './components/dashboard/IncomeSources';
+import IncomeSources from './components/dashboard/Incomes';
 import CoachProfile from './components/dashboard/CoachProfile';
 import ManageUsers from './components/dashboard/ManageUsers'; 
 import ReportsPage from './components/dashboard/Reports';
