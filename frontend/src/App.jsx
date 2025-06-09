@@ -35,7 +35,7 @@ import ManageUsers from './components/dashboard/ManageUsers';
 import ReportsPage from './components/dashboard/Reports';
 import useTokenRefresh from './hooks/useTokenRefresh';
 import { Toaster } from 'react-hot-toast';
-
+import MemberSubscriptionReport from './components/dashboard/MemberSubscriptionReport';
 // Route protection component
 const ProtectedRoute = ({ element }) => {
   const accessToken = localStorage.getItem('token');
@@ -90,6 +90,7 @@ function App() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="coach-profile/:coachId" element={<CoachProfile />} />
           <Route path="manage-users" element={<ManageUsers />} />
+          <Route path="/dashboard/subscription-report" element={<MemberSubscriptionReport />} />
         </Route>
       </Routes>
     </div>

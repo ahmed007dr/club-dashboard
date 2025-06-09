@@ -1,18 +1,23 @@
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
-from django.shortcuts import get_object_or_404
-from django.db.models import Q
-from rest_framework.pagination import PageNumberPagination
-from utils.permissions import IsOwnerOrRelatedToClub
-from .serializers import MemberSerializer
-from .models import Member
-from utils.generate_membership_number import generate_membership_number
+from datetime import timedelta
+
 from django.db import IntegrityError
-from staff.models import StaffAttendance
+from django.db.models import Exists, OuterRef, Q
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
+
+from rest_framework import status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+
+from .models import Member
+from subscriptions.models import Subscription
+from .serializers import MemberSerializer
 from attendance.models import Attendance
+from staff.models import StaffAttendance
+from utils.generate_membership_number import generate_membership_number
+from utils.permissions import IsOwnerOrRelatedToClub
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -91,7 +96,7 @@ def member_detail_api(request, member_id):
     serializer = MemberSerializer(member)
     return Response(serializer.data)
 
-# باقي الـ APIs بدون تغيير
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_search_api(request):
@@ -180,3 +185,122 @@ def delete_member_api(request, member_id):
     member = get_object_or_404(Member, id=member_id)
     member.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def member_subscription_report_api(request):
+    club_id = request.user.club.id if hasattr(request.user, 'club') else None
+    if not club_id:
+        return Response({'error': 'لا يوجد نادي مرتبط بالمستخدم'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        expiry_days = int(request.GET.get('days', 7))
+        inactive_days = int(request.GET.get('inactive_days', 7))
+        name = request.GET.get('name')
+        membership_number = request.GET.get('membership_number')
+        subscription_status = request.GET.get('subscription_status')
+        if expiry_days < 1 or inactive_days < 1:
+            raise ValueError
+    except ValueError:
+        return Response({'error': 'يجب أن تكون أيام الانتهاء وعدم الحضور قيمًا صحيحة وموجبة'}, status=status.HTTP_400_BAD_REQUEST)
+
+    today = timezone.now().date()
+    expiry_threshold = today + timedelta(days=expiry_days)
+    inactive_threshold = today - timedelta(days=inactive_days)
+
+    # Base query
+    base_query = Member.objects.filter(club_id=club_id)
+    
+    # Apply name filter
+    if name:
+        base_query = base_query.filter(name__icontains=name)
+    
+    # Apply membership number filter
+    if membership_number:
+        base_query = base_query.filter(membership_number__icontains=membership_number)
+
+    # Subscription status filtering
+    members_without_subscriptions = base_query.annotate(
+        has_subscription=Exists(Subscription.objects.filter(member=OuterRef('pk')))
+    ).filter(has_subscription=False)
+    
+    members_with_expired_subscriptions = base_query.filter(
+        subscription__isnull=False,
+        subscription__end_date__lt=today
+    ).distinct()
+    
+    members_with_near_expiry = base_query.filter(
+        subscription__end_date__gte=today,
+        subscription__end_date__lte=expiry_threshold
+    ).distinct()
+    
+    members_inactive = base_query.filter(
+        subscription__end_date__gte=today
+    ).exclude(
+        subscription__attendance_attendances__attendance_date__gt=inactive_threshold
+    ).distinct()
+
+    # Apply subscription status filter
+    if subscription_status:
+        if subscription_status == 'without_subscriptions':
+            members_without_subscriptions = members_without_subscriptions
+            members_with_expired_subscriptions = members_with_expired_subscriptions.none()
+            members_with_near_expiry = members_with_near_expiry.none()
+            members_inactive = members_inactive.none()
+        elif subscription_status == 'expired_subscriptions':
+            members_without_subscriptions = members_without_subscriptions.none()
+            members_with_expired_subscriptions = members_with_expired_subscriptions
+            members_with_near_expiry = members_with_near_expiry.none()
+            members_inactive = members_inactive.none()
+        elif subscription_status == 'near_expiry_subscriptions':
+            members_without_subscriptions = members_without_subscriptions.none()
+            members_with_expired_subscriptions = members_with_expired_subscriptions.none()
+            members_with_near_expiry = members_with_near_expiry
+            members_inactive = members_inactive.none()
+        elif subscription_status == 'inactive_members':
+            members_without_subscriptions = members_without_subscriptions.none()
+            members_with_expired_subscriptions = members_with_expired_subscriptions.none()
+            members_with_near_expiry = members_with_near_expiry.none()
+            members_inactive = members_inactive
+
+    paginator = PageNumberPagination()
+    paginator.page_size = 20
+
+    serializer_without = MemberSerializer(paginator.paginate_queryset(members_without_subscriptions, request), many=True)
+    serializer_expired = MemberSerializer(paginator.paginate_queryset(members_with_expired_subscriptions, request), many=True)
+    serializer_near_expiry = MemberSerializer(paginator.paginate_queryset(members_with_near_expiry, request), many=True)
+    serializer_inactive = MemberSerializer(paginator.paginate_queryset(members_inactive, request), many=True)
+
+    response_data = {
+        'without_subscriptions': {
+            'count': members_without_subscriptions.count(),
+            'results': serializer_without.data,
+            'next': paginator.get_next_link(),
+            'previous': paginator.get_previous_link(),
+        },
+        'expired_subscriptions': {
+            'count': members_with_expired_subscriptions.count(),
+            'results': serializer_expired.data,
+            'next': paginator.get_next_link(),
+            'previous': paginator.get_previous_link(),
+        },
+        'near_expiry_subscriptions': {
+            'count': members_with_near_expiry.count(),
+            'results': serializer_near_expiry.data,
+            'next': paginator.get_next_link(),
+            'previous': paginator.get_previous_link(),
+        },
+        'inactive_members': {
+            'count': members_inactive.count(),
+            'results': serializer_inactive.data,
+            'next': paginator.get_next_link(),
+            'previous': paginator.get_previous_link(),
+        },
+        'days': expiry_days,
+        'inactive_days': inactive_days,
+    }
+
+    return Response(response_data, status=status.HTTP_200_OK)

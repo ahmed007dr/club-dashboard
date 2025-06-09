@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/members/<int:member_id>/delete/', api.delete_member_api, name='api-delete-member'),
 
     path('api/members/search/', api.member_search_api, name='api-member-search'),
-
     path('api/user/profile/', api.api_user_profile, name='api-user-profile'),
+    path('api/members/subscription-report/', api.member_subscription_report_api, name='member_subscription_report_api'),
+
 ]
