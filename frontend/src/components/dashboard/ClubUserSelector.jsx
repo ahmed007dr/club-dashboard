@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import BASE_URL from '@/config/api';
 
 const ClubUserSelector = () => {
   const [clubs, setClubs] = useState([]);
@@ -14,16 +15,16 @@ const ClubUserSelector = () => {
         const headers = {
           Authorization: `Bearer ${token}`,
         };
-  
-        const response = await axios.get('http://127.0.0.1:8000/accounts/api/users/', { headers });
+
+        const response = await axios.get(`${BASE_URL}accounts/api/users/`, { headers });
         const users = response.data;
-  
+
         const clubsMap = {};
-  
+
         users.forEach(user => {
           const { club } = user;
           if (!club) return;
-  
+
           if (!clubsMap[club.id]) {
             clubsMap[club.id] = {
               club_id: club.id,
@@ -32,24 +33,23 @@ const ClubUserSelector = () => {
               users: []
             };
           }
-  
+
           clubsMap[club.id].users.push({
             id: user.id,
             username: user.username
           });
         });
-  
+
         const clubArray = Object.values(clubsMap);
-        console.log('Grouped Club Data:', clubArray); // 👈 Console log here
+        console.log('Grouped Club Data:', clubArray);
         setClubs(clubArray);
       } catch (error) {
         console.error('Failed to fetch users:', error);
       }
     };
-  
+
     fetchUsersGroupedByClub();
   }, []);
-  
 
   const handleClubChange = (e) => {
     const clubId = e.target.value;
@@ -94,4 +94,3 @@ const ClubUserSelector = () => {
 };
 
 export default ClubUserSelector;
-

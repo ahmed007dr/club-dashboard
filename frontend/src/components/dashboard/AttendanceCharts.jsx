@@ -9,6 +9,7 @@ import {
   Tooltip,
   Legend
 } from 'chart.js';
+import BASE_URL from '@/config/api';
 
 ChartJS.register(
   CategoryScale,
@@ -30,31 +31,31 @@ const AttendanceDashboard = () => {
   });
   const [error, setError] = useState({});
 
-const fetchData = async (endpoint, setter, key) => {
-  try {
-    const token = localStorage.getItem('token');
-    const response = await fetch(`http://127.0.0.1:8000/attendance/api/attendances/${endpoint}/`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
+  const fetchData = async (endpoint, setter, key) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}attendance/api/attendances/${endpoint}/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error(`Failed to fetch ${key} data`);
+
+      const result = await response.json();
+      setter(result || []);
+
+      // Log specifically for hourly data
+      if (key === 'hourly') {
+        console.log('Hourly Data:', result);
       }
-    });
-
-    if (!response.ok) throw new Error(`Failed to fetch ${key} data`);
-
-    const result = await response.json();
-    setter(result || []);
-    
-    // Log specifically for hourly data
-    if (key === 'hourly') {
-      console.log('Hourly Data:', result);
+    } catch (err) {
+      setError(prev => ({ ...prev, [key]: err.message }));
+      setter([]);
+    } finally {
+      setLoading(prev => ({ ...prev, [key]: false }));
     }
-  } catch (err) {
-    setError(prev => ({ ...prev, [key]: err.message }));
-    setter([]);
-  } finally {
-    setLoading(prev => ({ ...prev, [key]: false }));
-  }
-};
+  };
 
   useEffect(() => {
     fetchData('monthly', setMonthlyData, 'monthly');
@@ -85,37 +86,36 @@ const fetchData = async (endpoint, setter, key) => {
       ],
     };
 
-   const options = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    title: {
-      display: true,
-      text: title,
-      color: '#6b46c1', // Keep title purple
-      font: { size: 18, weight: 'bold' },
-      padding: { top: 10, bottom: 20 }
-    },
-    tooltip: {
-      callbacks: {
-        label: (context) => `${context.raw} حضور`,
+    const options = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        title: {
+          display: true,
+          text: title,
+          color: '#6b46c1', // Keep title purple
+          font: { size: 18, weight: 'bold' },
+          padding: { top: 10, bottom: 20 }
+        },
+        tooltip: {
+          callbacks: {
+            label: (context) => `${context.raw} حضور`,
+          },
+        },
       },
-    },
-  },
-  scales: {
-    x: {
-      grid: { display: false },
-      ticks: { color: '#6b7280', font: { weight: 'bold' } } // Gray: Tailwind slate-500
-    },
-    y: {
-      beginAtZero: true,
-      grid: { display: false },
-      ticks: { color: '#6b7280', font: { weight: 'bold' } } // Gray: Tailwind slate-500
-    },
-  },
-};
-
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#6b7280', font: { weight: 'bold' } } // Gray: Tailwind slate-500
+        },
+        y: {
+          beginAtZero: true,
+          grid: { display: false },
+          ticks: { color: '#6b7280', font: { weight: 'bold' } } // Gray: Tailwind slate-500
+        },
+      },
+    };
 
     return (
       <div className="w-full bg-white dark:bg-gray-900 rounded-3xl p-6 shadow-lg mb-6" style={{ height: '400px' }}>
@@ -171,4 +171,3 @@ const fetchData = async (endpoint, setter, key) => {
 };
 
 export default AttendanceDashboard;
-

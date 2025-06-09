@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect, useMemo } from "react";
+import BASE_URL from '@/config/api';
 
 const AttendanceContributionsChart = () => {
   const [data, setData] = useState([]);
@@ -18,7 +19,7 @@ const AttendanceContributionsChart = () => {
           throw new Error("لم يتم العثور على رمز المصادقة");
         }
 
-        const response = await fetch("http://127.0.0.1:8000/attendance/api/attendances/heatmap/", {
+        const response = await fetch(`${BASE_URL}attendance/api/attendances/heatmap/`, {
           headers: {
             "Authorization": `Bearer ${token}`,
             "Content-Type": "application/json",
@@ -99,7 +100,7 @@ const AttendanceContributionsChart = () => {
   };
 
   // GitHub-like green color classes
-   const getColorClass = (count, maxCount) => {
+  const getColorClass = (count, maxCount) => {
     const level = getIntensityLevel(count, maxCount);
     const colorClasses = {
       0: "bg-gray-200 dark:bg-gray-800",
@@ -110,7 +111,7 @@ const AttendanceContributionsChart = () => {
     };
     return colorClasses[level];
   };
-  
+
   // Handle mouse events for tooltip
   const handleMouseEnter = (day, event) => {
     if (day.date) {
@@ -207,10 +208,9 @@ const AttendanceContributionsChart = () => {
   // Define all days of the week in Arabic
   const daysOfWeek = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
- return (
-  
+  return (
     <div className="relative w-full flex flex-col font-sans">
-      {/* Header Stats - keep exactly the same */}
+      {/* Header Stats */}
       <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
         <div className="flex items-center space-x-6 space-x-reverse">
           <div className="text-center">
@@ -223,7 +223,7 @@ const AttendanceContributionsChart = () => {
           </div>
         </div>
 
-        {/* Legend - keep exactly the same */}
+        {/* Legend */}
         <div className="flex items-center space-x-2 space-x-reverse">
           <span className="text-xs text-gray-600 dark:text-gray-400">أقل</span>
           {[0, 1, 2, 3, 4].map((level) => (
@@ -239,10 +239,10 @@ const AttendanceContributionsChart = () => {
         </div>
       </div>
 
-      {/* Chart Grid - modified to move days to side */}
+      {/* Chart Grid */}
       <div className="overflow-x-auto">
         <div className="flex items-start gap-1" dir="ltr">
-          {/* Day Labels - moved to left side */}
+          {/* Day Labels */}
           <div className="flex flex-col gap-0.5 mr-4">
             {daysOfWeek.map((day, index) => (
               <div
@@ -255,9 +255,9 @@ const AttendanceContributionsChart = () => {
             ))}
           </div>
 
-          {/* Grid Container - keep exactly the same */}
-          <div className="flex flex-col ">
-            {/* Grid - keep exactly the same */}
+          {/* Grid Container */}
+          <div className="flex flex-col">
+            {/* Grid */}
             <div className="flex gap-0.5">
               {grid.map((week, weekIndex) => (
                 <div key={weekIndex} className="flex flex-col gap-0.5">
@@ -281,7 +281,7 @@ const AttendanceContributionsChart = () => {
               ))}
             </div>
 
-            {/* Month Labels - keep exactly the same */}
+            {/* Month Labels */}
             <div className="flex justify-between mt-1 text-xs text-gray-500 dark:text-gray-400">
               {Array.from({ length: 12 }, (_, i) => {
                 const date = new Date();
@@ -297,7 +297,7 @@ const AttendanceContributionsChart = () => {
         </div>
       </div>
 
-      {/* Tooltip - keep exactly the same */}
+      {/* Tooltip */}
       {hoveredCell && (
         <div
           className="fixed z-50 pointer-events-none transform -translate-x-1/2 -translate-y-full"
@@ -318,7 +318,7 @@ const AttendanceContributionsChart = () => {
         </div>
       )}
 
-      {/* Animation Styles - keep exactly the same */}
+      {/* Animation Styles */}
       <style jsx>{`
         @keyframes fadeIn {
           from {
