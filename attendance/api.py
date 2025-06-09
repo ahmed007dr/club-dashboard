@@ -20,10 +20,10 @@ from staff.models import StaffAttendance
 
 logger = logging.getLogger(__name__)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_heatmap_api(request):
+    """Get heatmap data for club attendance over the past year."""
     one_year_ago = timezone.now().date() - timedelta(days=365)
     
     if request.user.role in ['owner', 'admin']:
@@ -41,7 +41,6 @@ def attendance_heatmap_api(request):
         if not attendance:
             return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
         
-        # Use the later of check_in or one_year_ago
         effective_start = max(attendance.check_in.date(), one_year_ago)
         attendances = Attendance.objects.filter(
             subscription__club=request.user.club,
@@ -66,7 +65,61 @@ def attendance_heatmap_api(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def member_attendance_heatmap_api(request):
+    """Get heatmap data for a specific member's attendance over the past year."""
+    member_id = request.query_params.get('member_id')
+    if not member_id:
+        logger.error('Member ID is required for member attendance heatmap')
+        return Response({'error': 'Member ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    one_year_ago = timezone.now().date() - timedelta(days=365)
+
+    if request.user.role in ['owner', 'admin']:
+        attendances = Attendance.objects.filter(
+            subscription__member_id=member_id,
+            subscription__club=request.user.club,
+            attendance_date__gte=one_year_ago
+        )
+    else:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club,
+            check_out__isnull=True
+        ).order_by('-check_in').first()
+        
+        if not attendance:
+            logger.error('No open shift found for user')
+            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        effective_start = max(attendance.check_in.date(), one_year_ago)
+        attendances = Attendance.objects.filter(
+            subscription__member_id=member_id,
+            subscription__club=request.user.club,
+            approved_by=request.user,
+            attendance_date__gte=effective_start,
+            attendance_date__lte=timezone.now()
+        )
+
+    logger.info(f'Found {attendances.count()} attendance records for member ID {member_id}')
+
+    daily_counts = (
+        attendances
+        .values('attendance_date')
+        .annotate(count=Count('id'))
+        .order_by('attendance_date')
+    )
+
+    heatmap_data = [
+        {'date': entry['attendance_date'].isoformat(), 'count': entry['count']}
+        for entry in daily_counts
+    ]
+
+    return Response(heatmap_data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_list_api(request):
+    """Get paginated list of attendances with optional filters."""
     rfid = request.GET.get('rfid', '')
     attendance_date = request.GET.get('attendance_date', '')
     member_name = request.GET.get('member_name', '')
@@ -80,20 +133,18 @@ def attendance_list_api(request):
         )
     else:
         if is_search_mode:
-            # Allow access to historical data for search queries
             attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(
                 subscription__club=request.user.club
             )
         else:
-            # Restrict to current shift only
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club,
-                check_out__isnull=True  # Current open shift
+                check_out__isnull=True
             ).order_by('-check_in').first()
 
             if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=404)
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
 
             attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(
                 subscription__club=request.user.club,
@@ -110,7 +161,7 @@ def attendance_list_api(request):
             date_obj = datetime.strptime(attendance_date, '%Y-%m-%d').date()
             attendances = attendances.filter(attendance_date=date_obj)
         except ValueError:
-            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=400)
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
 
     if member_name:
         attendances = attendances.filter(subscription__member__name__icontains=member_name)
@@ -126,20 +177,20 @@ def attendance_list_api(request):
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_attendance_api(request, attendance_id):    
+    """Delete an attendance record and update subscription entry count."""
     attendance = get_object_or_404(Attendance, id=attendance_id)
 
     subscription = attendance.subscription
-
-    subscription.entry_count = max(0, subscription.entry_count - 1)  # Decrease entry count
+    subscription.entry_count = max(0, subscription.entry_count - 1)
     subscription.save()
 
     attendance.delete()
-
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def entry_log_list_api(request):    
+    """Get paginated list of entry logs with optional filters."""
     club = request.GET.get('club', '')
     rfid = request.GET.get('rfid', '')
     member = request.GET.get('member', '')
@@ -155,12 +206,10 @@ def entry_log_list_api(request):
         )
     else:
         if is_search_mode:
-            # Allow historical data for search queries
             logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
                 club=request.user.club
             )
         else:
-            # Restrict to current shift only
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club,
@@ -168,7 +217,7 @@ def entry_log_list_api(request):
             ).order_by('-check_in').first()
 
             if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=404)
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
 
             logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
                 club=request.user.club,
@@ -188,7 +237,7 @@ def entry_log_list_api(request):
             date_obj = datetime.strptime(timestamp, '%Y-%m-%d').date()
             logs = logs.filter(timestamp__date=date_obj)
         except ValueError:
-            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=400)
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
 
     logs = logs.order_by('-timestamp')
     paginator = PageNumberPagination()
@@ -198,11 +247,10 @@ def entry_log_list_api(request):
 
     return paginator.get_paginated_response(serializer.data)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_attendance_api(request):
-    
+    """Add a new attendance record and update subscription entry count."""
     serializer = AttendanceSerializer(data=request.data)
 
     if serializer.is_valid():
@@ -216,7 +264,6 @@ def add_attendance_api(request):
             )
 
         subscription = attendance.subscription
-
         if not subscription.can_enter():
             attendance.delete()
             return Response(
@@ -231,11 +278,10 @@ def add_attendance_api(request):
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def create_entry_log_api(request):
-    
+    """Create a new entry log record."""
     data = request.data.copy()
     data['approved_by'] = request.user.id
 
@@ -260,12 +306,11 @@ def create_entry_log_api(request):
                     status=status.HTTP_400_BAD_REQUEST
                 )
         else:
-            print("تم تنفيذ خطوة: لا يوجد اشتراك مرتبط بسجل الدخول")
+            logger.info('No subscription linked to entry log')
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -274,9 +319,8 @@ def attendance_hourly_api(request):
     logger.info(f"Request params: {request.GET}")
     logger.info(f"User: {request.user}, Role: {request.user.role}, Club: {request.user.club}")
 
-    # Check if user has associated club
     if not hasattr(request.user, 'club') or not request.user.club:
-        logger.error("User has no associated club")
+        logger.error('User has no associated club')
         return Response({'error': 'User has no associated club.'}, status=status.HTTP_403_FORBIDDEN)
 
     date_str = request.GET.get('date', timezone.now().date().isoformat())
@@ -292,13 +336,12 @@ def attendance_hourly_api(request):
             attendance_date=target_date
         )
     else:
-        # Find the latest staff attendance record
         staff_attendance = StaffAttendance.objects.filter(
             staff=request.user,
             club=request.user.club
         ).order_by('-check_in').first()
         if not staff_attendance:
-            logger.error("No open or recent shift found for user")
+            logger.error('No open or recent shift found for user')
             return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
         
         check_out = staff_attendance.check_out if staff_attendance.check_out else timezone.now()
@@ -306,23 +349,20 @@ def attendance_hourly_api(request):
             logger.error(f"Date {target_date} is outside user's shift")
             return Response({'error': 'Date must be within your shift.'}, status=status.HTTP_400_BAD_REQUEST)
         
-        # Staff can see all attendances for the club on the target date
         attendances = Attendance.objects.filter(
             subscription__club=request.user.club,
             attendance_date=target_date
         )
 
-    # SQLite-compatible way to extract hour from entry_time
     hourly_counts = (
         attendances
-        .filter(entry_time__isnull=False)  # Exclude records with null entry_time
+        .filter(entry_time__isnull=False)
         .annotate(hour=ExtractHour('entry_time'))
         .values('hour')
         .annotate(count=Count('id'))
         .order_by('hour')
     )
 
-    # Initialize array for 24 hours
     hourly_data = [0] * 24
     for entry in hourly_counts:
         hour = entry['hour']
@@ -330,20 +370,17 @@ def attendance_hourly_api(request):
 
     return Response(hourly_data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_weekly_api(request):
     """Get daily attendance data for the last 7 days (Saturday to Friday)."""
     today = timezone.now().date()
-    # Find the last Friday (end of week)
     end_date = today
-    while end_date.weekday() != 4:  # Friday is 4
+    while end_date.weekday() != 4:
         end_date -= timedelta(days=1)
-    start_date = end_date - timedelta(days=6)  # Start from Saturday
-
-    # Generate list of 7 days from Saturday to Friday
+    start_date = end_date - timedelta(days=6)
     week_days = [start_date + timedelta(days=i) for i in range(7)]
+
     if request.user.role in ['owner', 'admin']:
         attendances = Attendance.objects.filter(
             subscription__club=request.user.club,
@@ -358,7 +395,6 @@ def attendance_weekly_api(request):
         if not attendance:
             return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
         check_out = attendance.check_out if attendance.check_out else timezone.now()
-        # Calculate the effective date range (intersection of week and shift)
         effective_start = max(start_date, attendance.check_in.date())
         effective_end = min(end_date, check_out.date())
         attendances = Attendance.objects.filter(
@@ -368,7 +404,6 @@ def attendance_weekly_api(request):
             attendance_date__lte=effective_end
         )
 
-    # Aggregate attendance by date
     daily_counts = (
         attendances
         .values('attendance_date')
@@ -376,7 +411,6 @@ def attendance_weekly_api(request):
         .order_by('attendance_date')
     )
 
-    # Map counts to week days
     daily_data = [{'date': date.isoformat(), 'count': 0} for date in week_days]
     for entry in daily_counts:
         date_str = entry['attendance_date'].isoformat()
@@ -387,15 +421,13 @@ def attendance_weekly_api(request):
 
     return Response(daily_data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_monthly_api(request):
     """Get daily attendance data for the last 30 consecutive days."""
     today = timezone.now().date()
-    # Get the last 30 consecutive days (including weekends)
-    start_date = today - timedelta(days=29)  # 30 days back from today
-    days = [start_date + timedelta(days=i) for i in range(30)]  # List of 30 consecutive days
+    start_date = today - timedelta(days=29)
+    days = [start_date + timedelta(days=i) for i in range(30)]
 
     if request.user.role in ['owner', 'admin']:
         attendances = Attendance.objects.filter(
@@ -411,7 +443,6 @@ def attendance_monthly_api(request):
         if not attendance:
             return Response({'error': 'No open or recent shift found.'}, status=status.HTTP_404_NOT_FOUND)
         check_out = attendance.check_out if attendance.check_out else timezone.now()
-        # Calculate the effective date range (intersection of 30 days and shift)
         effective_start = max(start_date, attendance.check_in.date())
         effective_end = min(today, check_out.date())
         attendances = Attendance.objects.filter(
@@ -421,7 +452,6 @@ def attendance_monthly_api(request):
             attendance_date__lte=effective_end
         )
 
-    # Aggregate attendance by date
     daily_counts = (
         attendances
         .values('attendance_date')
@@ -429,7 +459,6 @@ def attendance_monthly_api(request):
         .order_by('attendance_date')
     )
 
-    # Map counts to the 30 days
     daily_data = [{'date': date.isoformat(), 'count': 0} for date in days]
     for entry in daily_counts:
         date_str = entry['attendance_date'].isoformat()
@@ -439,5 +468,3 @@ def attendance_monthly_api(request):
                 break
 
     return Response(daily_data)
-
-

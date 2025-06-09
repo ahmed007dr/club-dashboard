@@ -19,7 +19,6 @@ const ManageUsers = () => {
     username: '',
     first_name: '',
     last_name: '',
-    email: '',
     phone_number: '',
     card_number: '',
     address: '',
@@ -60,7 +59,6 @@ const ManageUsers = () => {
       username: '',
       first_name: '',
       last_name: '',
-      email: '',
       phone_number: '',
       card_number: '',
       address: '',
@@ -79,7 +77,6 @@ const ManageUsers = () => {
       username: user.username,
       first_name: user.first_name || '',
       last_name: user.last_name || '',
-      email: user.email || '',
       phone_number: user.phone_number || '',
       card_number: user.card_number || '',
       address: user.address || '',
@@ -99,7 +96,6 @@ const ManageUsers = () => {
       username: '',
       first_name: '',
       last_name: '',
-      email: '',
       phone_number: '',
       card_number: '',
       address: '',
@@ -127,9 +123,6 @@ const ManageUsers = () => {
     }
     if (!['reception', 'coach', 'accountant'].includes(formData.role)) {
       errors.role = 'غير مسموح بإنشاء أو تعديل هذا الدور';
-    }
-    if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = 'البريد الإلكتروني غير صحيح';
     }
     if (formData.phone_number && !/^\d{9,15}$/.test(formData.phone_number)) {
       errors.phone_number = 'رقم الهاتف غير صحيح';
@@ -171,12 +164,12 @@ const ManageUsers = () => {
   ];
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8 min-h-screen bg-gray-50" dir="rtl">
+    <div className="p-4 sm:p-6 lg:p-8 min-h-screen bg-gray-50 dark:bg-gray-900" dir="rtl">
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
           <div className="flex items-center space-x-3 space-x-reverse">
             <FaUserPlus className="text-blue-600 w-8 h-8" />
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-800">إدارة الموظفين</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white">إدارة الموظفين</h1>
           </div>
           <button
             onClick={openCreateModal}
@@ -193,7 +186,7 @@ const ManageUsers = () => {
             placeholder="بحث بالاسم أو الدور"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="border border-gray-300 px-3 py-2 rounded-md w-full text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="border border-gray-300 dark:border-gray-600 px-3 py-2 rounded-md w-full text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
           />
           <button
             onClick={handleSearch}
@@ -207,24 +200,23 @@ const ManageUsers = () => {
         {loading && (
           <div className="flex justify-center items-center my-8">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-600"></div>
-            <p className="text-gray-600 mr-3 text-sm sm:text-base">جاري التحميل...</p>
+            <p className="text-gray-600 dark:text-gray-400 mr-3 text-sm sm:text-base">جاري التحميل...</p>
           </div>
         )}
 
         {error && (
-          <div className="bg-red-100 p-4 rounded-lg text-red-600 text-center mb-6 text-sm sm:text-base">
+          <div className="bg-red-100 dark:bg-red-900 p-4 rounded-lg text-red-600 dark:text-red-400 text-center mb-6 text-sm sm:text-base">
             خطأ: {error}
           </div>
         )}
 
-        <div className="overflow-x-auto bg-white shadow-md rounded-lg">
+        <div className="overflow-x-auto bg-white dark:bg-gray-800 shadow-md rounded-lg">
           <table className="w-full border-collapse text-right text-sm sm:text-base">
             <thead>
-              <tr className="bg-gray-100 text-gray-700">
+              <tr className="bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
                 <th className="px-4 py-3 font-semibold">الاسم</th>
                 <th className="px-4 py-3 font-semibold">الدور</th>
                 <th className="px-4 py-3 font-semibold">رقم الهاتف</th>
-                <th className="px-4 py-3 font-semibold">البريد الإلكتروني</th>
                 <th className="px-4 py-3 font-semibold">النادي</th>
                 <th className="px-4 py-3 font-semibold">نشط</th>
                 <th className="px-4 py-3 font-semibold">الإجراءات</th>
@@ -235,28 +227,27 @@ const ManageUsers = () => {
                 users.map((user) => (
                   <tr
                     key={user.id}
-                    className="border-b hover:bg-gray-50 transition-all duration-200"
+                    className="border-b hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200"
                   >
-                    <td className="px-4 py-3 text-gray-800">
+                    <td className="px-4 py-3 text-gray-800 dark:text-white">
                       {user.first_name} {user.last_name}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">
                       {allowedRoles.find((r) => r.value === user.role)?.label || user.role}
                     </td>
-                    <td className="px-4 py-3 text-gray-700">{user.phone_number || '-'}</td>
-                    <td className="px-4 py-3 text-gray-700">{user.email || '-'}</td>
-                    <td className="px-4 py-3 text-gray-700">{user.club?.name || '-'}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{user.phone_number || '-'}</td>
+                    <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{user.club?.name || '-'}</td>
                     <td className="px-4 py-3">
                       {user.is_active ? (
-                        <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">نعم</span>
+                        <span className="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-400 px-2 py-1 rounded text-xs">نعم</span>
                       ) : (
-                        <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs">لا</span>
+                        <span className="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-400 px-2 py-1 rounded text-xs">لا</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       <button
                         onClick={() => openEditModal(user)}
-                        className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-all duration-200"
+                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900 rounded-full transition-all duration-200"
                         disabled={['owner', 'admin'].includes(user.role)}
                       >
                         <FaEdit className="w-4 h-4" />
@@ -266,7 +257,7 @@ const ManageUsers = () => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="text-center text-gray-600 py-8">
+                  <td colSpan="6" className="text-center text-gray-600 dark:text-gray-400 py-8">
                     لا توجد بيانات موظفين
                   </td>
                 </tr>
@@ -278,39 +269,39 @@ const ManageUsers = () => {
         {/* نموذج إنشاء/تعديل موظف */}
         {(isCreateModalOpen || isEditModalOpen) && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-            <div className="bg-white p-6 rounded-lg w-full max-w-2xl relative">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-2xl relative">
               <button
-                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700 text-lg"
+                className="absolute top-2 right-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 text-lg"
                 onClick={isCreateModalOpen ? closeCreateModal : closeEditModal}
               >
                 ✕
               </button>
-              <h2 className="text-xl font-semibold mb-6 text-right">
+              <h2 className="text-xl font-semibold mb-6 text-right text-gray-800 dark:text-white">
                 {isCreateModalOpen ? 'إنشاء موظف جديد' : 'تعديل بيانات الموظف'}
               </h2>
               <form onSubmit={isCreateModalOpen ? handleCreateSubmit : handleEditSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 text-right">اسم المستخدم</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">اسم المستخدم</label>
                     <input
                       type="text"
                       name="username"
                       value={formData.username}
                       onChange={handleInputChange}
-                      className={`mt-1 block w-full border rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formErrors.username ? 'border-red-500' : 'border-gray-300'}`}
+                      className={`mt-1 block w-full border rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formErrors.username ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
                       required
                     />
                     {formErrors.username && (
-                      <p className="text-red-600 text-xs mt-1 text-right">{formErrors.username}</p>
+                      <p className="text-red-600 dark:text-red-400 text-xs mt-1 text-right">{formErrors.username}</p>
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 text-right">الدور</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">الدور</label>
                     <select
                       name="role"
                       value={formData.role}
                       onChange={handleInputChange}
-                      className={`mt-1 block w-full border rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formErrors.role ? 'border-red-500' : 'border-gray-300'}`}
+                      className={`mt-1 block w-full border rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formErrors.role ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
                       required
                     >
                       {allowedRoles.map((role) => (
@@ -318,72 +309,59 @@ const ManageUsers = () => {
                       ))}
                     </select>
                     {formErrors.role && (
-                      <p className="text-red-600 text-xs mt-1 text-right">{formErrors.role}</p>
+                      <p className="text-red-600 dark:text-red-400 text-xs mt-1 text-right">{formErrors.role}</p>
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 text-right">الاسم الأول</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">الاسم الأول</label>
                     <input
                       type="text"
                       name="first_name"
                       value={formData.first_name}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 text-right">اسم العائلة</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">اسم العائلة</label>
                     <input
                       type="text"
                       name="last_name"
                       value={formData.last_name}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 text-right">البريد الإلكتروني</label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      className={`mt-1 block w-full border rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formErrors.email ? 'border-red-500' : 'border-gray-300'}`}
-                    />
-                    {formErrors.email && (
-                      <p className="text-red-600 text-xs mt-1 text-right">{formErrors.email}</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 text-right">رقم الهاتف</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">رقم الهاتف</label>
                     <input
                       type="text"
                       name="phone_number"
                       value={formData.phone_number}
                       onChange={handleInputChange}
-                      className={`mt-1 block w-full border rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formErrors.phone_number ? 'border-red-500' : 'border-gray-300'}`}
+                      className={`mt-1 block w-full border rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formErrors.phone_number ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
                     />
                     {formErrors.phone_number && (
-                      <p className="text-red-600 text-xs mt-1 text-right">{formErrors.phone_number}</p>
+                      <p className="text-red-600 dark:text-red-400 text-xs mt-1 text-right">{formErrors.phone_number}</p>
                     )}
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 text-right">رقم البطاقة</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">رقم البطاقة</label>
                     <input
                       type="text"
                       name="card_number"
                       value={formData.card_number}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 text-right">النادي</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">النادي</label>
                     <select
                       name="club"
                       value={formData.club}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
                       <option value="">اختر نادي</option>
                       {clubs.map((club) => (
@@ -392,49 +370,49 @@ const ManageUsers = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 text-right">كود RFID</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">كود RFID</label>
                     <input
                       type="text"
                       name="rfid_code"
                       value={formData.rfid_code}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     />
                   </div>
                   {(formData.role === 'reception' || (isEditModalOpen && ['owner', 'admin'].includes(formData.role))) && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 text-right">كلمة المرور</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">كلمة المرور</label>
                       <input
                         type="password"
                         name="password"
                         value={formData.password}
                         onChange={handleInputChange}
-                        className={`mt-1 block w-full border rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formErrors.password ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`mt-1 block w-full border rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${formErrors.password ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} bg-white dark:bg-gray-700 text-gray-900 dark:text-white`}
                         placeholder={isEditModalOpen ? 'أدخل كلمة مرور جديدة (اختياري)' : 'أدخل كلمة المرور'}
                         required={formData.role === 'reception' && !isEditModalOpen}
                       />
                       {formErrors.password && (
-                        <p className="text-red-600 text-xs mt-1 text-right">{formErrors.password}</p>
+                        <p className="text-red-600 dark:text-red-400 text-xs mt-1 text-right">{formErrors.password}</p>
                       )}
                     </div>
                   )}
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 text-right">العنوان</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">العنوان</label>
                     <textarea
                       name="address"
                       value={formData.address}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       rows="3"
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 text-right">ملاحظات</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">ملاحظات</label>
                     <textarea
                       name="notes"
                       value={formData.notes}
                       onChange={handleInputChange}
-                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="mt-1 block w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 text-right text-sm sm:text-base focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                       rows="3"
                     />
                   </div>
@@ -449,7 +427,7 @@ const ManageUsers = () => {
                   <button
                     type="button"
                     onClick={isCreateModalOpen ? closeCreateModal : closeEditModal}
-                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors duration-200 text-sm sm:text-base"
+                    className="px-4 py-2 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors duration-200 text-sm sm:text-base"
                   >
                     إلغاء
                   </button>
