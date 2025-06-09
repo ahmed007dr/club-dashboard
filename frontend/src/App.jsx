@@ -35,6 +35,7 @@ import ManageUsers from './components/dashboard/ManageUsers';
 import ReportsPage from './components/dashboard/Reports';
 import FinancialDashboard from './components/dashboard/FinancialDashboard';
 import MemberSubscriptionReport from './components/dashboard/MemberSubscriptionReport';
+import SubscriptionAnalytics from './components/dashboard/SubscriptionAnalytics'; 
 import useTokenRefresh from './hooks/useTokenRefresh';
 import StaffAttendanceReport from './components/dashboard/StaffAttendanceReport.jsx';
 import { Toaster } from 'react-hot-toast';
@@ -95,6 +96,7 @@ function App() {
           <Route path="manage-users" element={<ManageUsers />} />
           <Route path="dashboard/subscription-report" element={<MemberSubscriptionReport />} />
           <Route path="dashboard/financial-analysis" element={<FinancialDashboard />} />
+          <Route path="dashboard/subscription-analytics" element={<SubscriptionAnalytics />} /> {/* المسار الجديد */}
           <Route path="attendance-report/:staffId?" element={<StaffAttendanceReport />} />
         </Route>
       </Routes>

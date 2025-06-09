@@ -215,6 +215,13 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         return Subscription.objects.create(**validated_data)
 
 
+class MemberBehaviorSerializer(serializers.Serializer):
+    member_name = serializers.CharField(source='member__name')
+    attendance_count = serializers.IntegerField()
+    subscription_count = serializers.IntegerField()
+    is_regular = serializers.BooleanField()
+    is_repeated = serializers.BooleanField()
+
 class CoachReportSerializer(serializers.Serializer):
     coach_id = serializers.IntegerField()
     coach_username = serializers.CharField()

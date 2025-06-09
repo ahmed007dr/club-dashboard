@@ -26,8 +26,9 @@ urlpatterns = [
     path('api/subscriptions/<int:pk>/make-payment/', api.make_payment, name='api-make-payment'),
     path('api/subscriptions/member/', api.member_subscriptions, name='api-member-subscriptions'),
     path('api/subscriptions/stats/', api.subscription_stats, name='api-subscription-stats'),
-    
-    # Freeze Requests
+    path('api/subscriptions/analytics/', api.subscription_analytics, name='subscription-analytics'),
+
+    # Freeze Requests 
     path('api/subscriptions/<int:pk>/request-freeze/', api.request_freeze, name='api-request-freeze'),
     path('api/freeze-requests/<int:freeze_id>/cancel/', api.cancel_freeze, name='api-cancel-freeze'),
     path('api/coach-report/<int:coach_id>/', api.coach_report, name='coach-report'),

@@ -15,4 +15,5 @@ urlpatterns = [
     path('api/users/<int:pk>/update/', api.api_user_update, name='api-user-update'),
     path('api/login/rfid/', api.api_rfid_login, name='api-rfid-login'),
     path('api/active-users/', api.active_users_api, name='api-active-users'),
+    path('api/coaches/', api.coach_list, name='coach_list'),
 ]

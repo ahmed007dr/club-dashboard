@@ -1,0 +1,161 @@
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px;
+    direction: rtl;
+    font-family: Arial, sans-serif;
+  }
+  
+  .title {
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 16px;
+  }
+  
+  .subtitle {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  
+  .filters {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  
+  @media (min-width: 640px) {
+    .filters {
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+  }
+  
+  .filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  @media (min-width: 640px) {
+    .filter-group {
+      flex-direction: row;
+    }
+  }
+  
+  .filter-item {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .label {
+    font-size: 14px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  
+  .input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .button-group {
+    display: flex;
+    gap: 8px;
+  }
+  
+  .button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    color: white;
+    text-decoration: none;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+  }
+  
+  .export-csv {
+    background-color: #22c55e;
+  }
+  
+  .export-csv:hover {
+    background-color: #16a34a;
+  }
+  
+  .export-pdf {
+    background-color: #3b82f6;
+  }
+  
+  .export-pdf:hover {
+    background-color: #2563eb;
+  }
+  
+  .loading {
+    font-size: 16px;
+    text-align: center;
+    margin: 16px 0;
+  }
+  
+  .tab-list {
+    display: flex;
+    gap: 4px;
+    background-color: #f3f4f6;
+    padding: 4px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  
+  .tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: #4b5563;
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  
+  .tab:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #111827;
+  }
+  
+  .tab-selected {
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .tab-panels {
+    margin-top: 8px;
+  }
+  
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid #e5e7eb;
+  }
+  
+  .table-margin {
+    margin-bottom: 16px;
+  }
+  
+  .table-header {
+    padding: 8px;
+    border: 1px solid #e5e7eb;
+    background-color: #f9fafb;
+    text-align: right;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  
+  .table-cell {
+    padding: 8px;
+    border: 1px solid #e5e7eb;
+    text-align: right;
+  }
