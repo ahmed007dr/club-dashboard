@@ -169,7 +169,7 @@ const MemberSubscriptionReport = () => {
             initialData={reportData.without_subscriptions}
             columns={[
               { header: 'الاسم', accessor: 'name' },
-              { header: 'رقم العضوية', accessor: 'membership_number' },
+              { header: 'RFID', accessor: 'rfid_code' },
               { header: 'الهاتف', accessor: 'phone' },
             ]}
             params={{ days, inactive_days: inactiveDays, name: memberName, membership_number: membershipNumber, subscription_status: subscriptionStatus }}
@@ -180,7 +180,7 @@ const MemberSubscriptionReport = () => {
             initialData={reportData.expired_subscriptions}
             columns={[
               { header: 'الاسم', accessor: 'name' },
-              { header: 'رقم العضوية', accessor: 'membership_number' },
+              { header: 'RFID', accessor: 'rfid_code' }, 
               { header: 'الهاتف', accessor: 'phone' },
             ]}
             params={{ days, inactive_days: inactiveDays, name: memberName, membership_number: membershipNumber, subscription_status: subscriptionStatus }}
@@ -191,7 +191,7 @@ const MemberSubscriptionReport = () => {
             initialData={reportData.near_expiry_subscriptions}
             columns={[
               { header: 'الاسم', accessor: 'name' },
-              { header: 'رقم العضوية', accessor: 'membership_number' },
+              { header: 'RFID', accessor: 'rfid_code' }, 
               { header: 'الهاتف', accessor: 'phone' },
               { header: 'تاريخ الانتهاء', accessor: 'near_expiry_date' },
             ]}
@@ -203,7 +203,7 @@ const MemberSubscriptionReport = () => {
             initialData={reportData.inactive_members}
             columns={[
               { header: 'الاسم', accessor: 'name' },
-              { header: 'رقم العضوية', accessor: 'membership_number' },
+              { header: 'RFID', accessor: 'rfid_code' },
               { header: 'الهاتف', accessor: 'phone' },
               { header: 'آخر حضور', accessor: 'last_attendance_date' },
             ]}

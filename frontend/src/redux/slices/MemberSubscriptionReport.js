@@ -13,6 +13,9 @@ import { cn } from '../../lib/utils';
 const MemberSubscriptionReport = () => {
   const [days, setDays] = useState(7);
   const [inactiveDays, setInactiveDays] = useState(7);
+  const [memberName, setMemberName] = useState('');
+  const [rfidCode, setRfidCode] = useState('');
+  const [subscriptionStatus, setSubscriptionStatus] = useState('');
   const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -23,8 +26,15 @@ const MemberSubscriptionReport = () => {
     setError('');
     setIsErrorModalOpen(false);
     try {
-      console.log('Fetching report with params:', { days, inactive_days: inactiveDays });
-      const data = await fetchSubscriptionReport({ days, inactive_days: inactiveDays });
+      const params = {
+        days,
+        inactive_days: inactiveDays,
+        name: memberName || undefined,
+        rfid_code: rfidCode || undefined,
+        subscription_status: subscriptionStatus || undefined,
+      };
+      console.log('Fetching report with params:', params);
+      const data = await fetchSubscriptionReport(params);
       console.log('Received report data:', data);
       setReportData(data);
     } catch (err) {
@@ -88,6 +98,50 @@ const MemberSubscriptionReport = () => {
               min="1"
             />
           </div>
+          <div>
+            <Label htmlFor="memberName" className="block text-sm font-medium text-gray-700 mb-2">
+              اسم العضو
+            </Label>
+            <Input
+              id="memberName"
+              type="text"
+              value={memberName}
+              onChange={(e) => setMemberName(e.target.value)}
+              className="w-full"
+              disabled={loading}
+            />
+          </div>
+          <div>
+            <Label htmlFor="rfidCode" className="block text-sm font-medium text-gray-700 mb-2">
+              RFID
+            </Label>
+            <Input
+              id="rfidCode"
+              type="text"
+              value={rfidCode}
+              onChange={(e) => setRfidCode(e.target.value)}
+              className="w-full"
+              disabled={loading}
+            />
+          </div>
+          <div>
+            <Label htmlFor="subscriptionStatus" className="block text-sm font-medium text-gray-700 mb-2">
+              حالة الاشتراك
+            </Label>
+            <select
+              id="subscriptionStatus"
+              value={subscriptionStatus}
+              onChange={(e) => setSubscriptionStatus(e.target.value)}
+              className="w-full p-2 border rounded"
+              disabled={loading}
+            >
+              <option value="">الكل</option>
+              <option value="without_subscriptions">بدون اشتراك</option>
+              <option value="expired_subscriptions">اشتراك منتهي</option>
+              <option value="near_expiry_subscriptions">قريب الانتهاء</option>
+              <option value="inactive_members">غير متردد</option>
+            </select>
+          </div>
         </div>
         <div className="flex justify-end">
           <Button
@@ -121,7 +175,7 @@ const MemberSubscriptionReport = () => {
               { header: 'RFID', accessor: 'rfid_code' },
               { header: 'الهاتف', accessor: 'phone' },
             ]}
-            params={{ days, inactive_days: inactiveDays }}
+            params={{ days, inactive_days: inactiveDays, name: memberName, rfid_code: rfidCode, subscription_status: subscriptionStatus }}
           />
           <SubscriptionReportTable
             title="الأعضاء باشتراكات منتهية"
@@ -132,7 +186,7 @@ const MemberSubscriptionReport = () => {
               { header: 'RFID', accessor: 'rfid_code' },
               { header: 'الهاتف', accessor: 'phone' },
             ]}
-            params={{ days, inactive_days: inactiveDays }}
+            params={{ days, inactive_days: inactiveDays, name: memberName, rfid_code: rfidCode, subscription_status: subscriptionStatus }}
           />
           <SubscriptionReportTable
             title="الأعضاء باشتراكات قاربة على الانتهاء"
@@ -144,7 +198,7 @@ const MemberSubscriptionReport = () => {
               { header: 'الهاتف', accessor: 'phone' },
               { header: 'تاريخ الانتهاء', accessor: 'near_expiry_date' },
             ]}
-            params={{ days, inactive_days: inactiveDays }}
+            params={{ days, inactive_days: inactiveDays, name: memberName, rfid_code: rfidCode, subscription_status: subscriptionStatus }}
           />
           <SubscriptionReportTable
             title="الأعضاء النشطين الغير مترددين"
@@ -155,9 +209,8 @@ const MemberSubscriptionReport = () => {
               { header: 'RFID', accessor: 'rfid_code' },
               { header: 'الهاتف', accessor: 'phone' },
               { header: 'آخر حضور', accessor: 'last_attendance_date' },
-              { header: 'تاريخ الانتهاء', accessor: 'near_expiry_date' },
             ]}
-            params={{ days, inactive_days: inactiveDays }}
+            params={{ days, inactive_days: inactiveDays, name: memberName, rfid_code: rfidCode, subscription_status: subscriptionStatus }}
           />
         </div>
       )}

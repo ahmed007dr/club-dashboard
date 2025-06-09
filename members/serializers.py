@@ -7,28 +7,15 @@ class MemberSerializer(serializers.ModelSerializer):
     referred_by_name = serializers.CharField(source='referred_by.name', read_only=True)
     club_name = serializers.CharField(source='club.name', read_only=True)
     last_attendance_date = serializers.SerializerMethodField()
+    near_expiry_date = serializers.SerializerMethodField()
 
     class Meta:
         model = Member
         fields = [
-            'id',
-            'club',
-            'club_name',
-            'name',
-            'membership_number',
-            'rfid_code',
-            'national_id',
-            'birth_date',
-            'phone',
-            'phone2',
-            'photo',
-            'job',
-            'address',
-            'note',
-            'created_at',
-            'referred_by',
-            'referred_by_name',
-            'last_attendance_date',
+            'id', 'club', 'club_name', 'name', 'membership_number', 'rfid_code',
+            'national_id', 'birth_date', 'phone', 'phone2', 'photo', 'job',
+            'address', 'note', 'created_at', 'referred_by', 'referred_by_name',
+            'last_attendance_date', 'near_expiry_date'
         ]
         extra_kwargs = {
             'photo': {'required': False, 'allow_null': True},
@@ -47,3 +34,9 @@ class MemberSerializer(serializers.ModelSerializer):
             subscription__end_date__gte=timezone.now().date()
         ).order_by('-attendance_date').first()
         return last_attendance.attendance_date if last_attendance else None
+
+    def get_near_expiry_date(self, obj):
+        subscription = obj.subscription_set.filter(
+            end_date__gte=timezone.now().date()
+        ).order_by('-end_date').first()
+        return subscription.end_date if subscription else None

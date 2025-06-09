@@ -20,5 +20,6 @@ urlpatterns = [
     path('api/members/search/', api.member_search_api, name='api-member-search'),
     path('api/user/profile/', api.api_user_profile, name='api-user-profile'),
     path('api/members/subscription-report/', api.member_subscription_report_api, name='member_subscription_report_api'),
+    path('api/members/export-subscription-report/', api.member_subscription_report_api, name='member_subscription_report_api'),
 
 ]
