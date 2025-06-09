@@ -73,6 +73,7 @@ const Dashboard = () => {
       children: [
         { path: 'income-sources', name: 'الايرادات', icon: <GiReceiveMoney /> },
         { path: 'expense', name: 'المصروفات', icon: <GiPayMoney /> },
+        { path: 'dashboard/financial-analysis', name: 'التحليل المالي', icon: <TbReportAnalytics /> },
       ],
     },
   ];

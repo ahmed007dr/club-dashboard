@@ -28,4 +28,5 @@ urlpatterns = [
     path('api/employee/daily-report/pdf/', api.generate_daily_report_pdf, name='generate_daily_report_pdf'),
     path('api/expense/all/', api.expense_all_api, name='expense_all_api'),
     path('api/income/all/', api.income_all_api, name='income_all_api'),
+    path('api/financial-analysis/', api.financial_analysis_api, name='financial_analysis_api'),
     ]

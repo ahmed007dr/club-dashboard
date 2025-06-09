@@ -31,11 +31,14 @@ import ExpenseCategory from './components/dashboard/ExpenseCategory';
 import Expense from './components/dashboard/Expense';
 import IncomeSources from './components/dashboard/Incomes';
 import CoachProfile from './components/dashboard/CoachProfile';
-import ManageUsers from './components/dashboard/ManageUsers'; 
+import ManageUsers from './components/dashboard/ManageUsers';
 import ReportsPage from './components/dashboard/Reports';
-import useTokenRefresh from './hooks/useTokenRefresh';
-import { Toaster } from 'react-hot-toast';
+import FinancialDashboard from './components/dashboard/FinancialDashboard';
 import MemberSubscriptionReport from './components/dashboard/MemberSubscriptionReport';
+import useTokenRefresh from './hooks/useTokenRefresh';
+import StaffAttendanceReport from './components/dashboard/StaffAttendanceReport.jsx';
+import { Toaster } from 'react-hot-toast';
+
 // Route protection component
 const ProtectedRoute = ({ element }) => {
   const accessToken = localStorage.getItem('token');
@@ -90,7 +93,9 @@ function App() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="coach-profile/:coachId" element={<CoachProfile />} />
           <Route path="manage-users" element={<ManageUsers />} />
-          <Route path="/dashboard/subscription-report" element={<MemberSubscriptionReport />} />
+          <Route path="dashboard/subscription-report" element={<MemberSubscriptionReport />} />
+          <Route path="dashboard/financial-analysis" element={<FinancialDashboard />} />
+          <Route path="attendance-report/:staffId?" element={<StaffAttendanceReport />} />
         </Route>
       </Routes>
     </div>

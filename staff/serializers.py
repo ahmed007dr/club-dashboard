@@ -97,9 +97,8 @@ class StaffAttendanceSerializer(serializers.ModelSerializer):
         return obj.duration_hours()
     
 
-
 class MonthlyDataSerializer(serializers.Serializer):
-    month = serializers.DateTimeField(format='%B %Y')
+    month = serializers.CharField()
     total_hours = serializers.FloatField()
     attendance_days = serializers.IntegerField()
     hours_change = serializers.FloatField()

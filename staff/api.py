@@ -273,19 +273,19 @@ def staff_attendance_analysis_api(request, attendance_id):
         "expected_hours": round(expected_hours, 2)
     })
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def staff_attendance_report_api(request, staff_id=None):
+    """Generate a monthly attendance report for all staff or a specific staff member."""
     if request.user.role not in ['owner', 'admin']:
         return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
+    # Base queryset for completed attendances
     attendances = StaffAttendance.objects.filter(
         check_out__isnull=False,
         club=request.user.club
     )
 
-    year = request.query_params.get('year', None)
     if staff_id:
         try:
             staff_id = int(staff_id)
@@ -293,12 +293,23 @@ def staff_attendance_report_api(request, staff_id=None):
         except ValueError:
             return Response({'error': 'Invalid staff_id'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Filter by year if provided
+    year = request.query_params.get('year', None)
     if year:
         try:
             year = int(year)
             attendances = attendances.filter(check_in__year=year)
         except ValueError:
             return Response({'error': 'Invalid year format'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Filter by month if provided (format: YYYY-MM)
+    month = request.query_params.get('month', None)
+    if month:
+        try:
+            year, month = map(int, month.split('-'))
+            attendances = attendances.filter(check_in__year=year, check_in__month=month)
+        except ValueError:
+            return Response({'error': 'Invalid month format. Use YYYY-MM'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Aggregate data by staff and month
     monthly_data = attendances.annotate(
@@ -319,19 +330,19 @@ def staff_attendance_report_api(request, staff_id=None):
             TruncDate('check_in'),
             distinct=True
         )
-    ).order_by('staff__id', 'month')
+    ).order_by('-month', 'staff__id')
 
     # Group data by staff
     staff_data = {}
     staff_monthly_map = {}
     for entry in monthly_data:
         staff_id = entry['staff__id']
-        total_hours = entry['total_hours'].total_seconds() / 3600
+        total_hours = entry['total_hours'].total_seconds() / 3600  # Convert to hours
         prev_month = entry['month'] - relativedelta(months=1)
         prev_hours = staff_monthly_map.get(staff_id, {}).get(prev_month, 0)
 
         month_entry = {
-            'month': entry['month'],
+            'month': entry['month'].strftime('%Y-%m'),  # Format as YYYY-MM
             'total_hours': round(total_hours, 2),
             'attendance_days': entry['attendance_days'],
             'hours_change': round(total_hours - prev_hours, 2),
@@ -341,7 +352,7 @@ def staff_attendance_report_api(request, staff_id=None):
         if staff_id not in staff_data:
             staff_data[staff_id] = {
                 'staff_id': staff_id,
-                'staff_name': entry['staff__username'],
+                'staff_name': entry['staff__username'],  # Use username as name
                 'rfid_code': entry['staff__rfid_code'],
                 'monthly_data': []
             }
@@ -352,10 +363,24 @@ def staff_attendance_report_api(request, staff_id=None):
             staff_monthly_map[staff_id] = {}
         staff_monthly_map[staff_id][entry['month']] = total_hours
 
-    # Convert staff_data to list for serialization
+    # Convert to list for serialization
     staff_list = list(staff_data.values())
     serializer = StaffMonthlyHoursSerializer(staff_list, many=True)
     return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def staff_list_api(request):
+    """Retrieve a list of active staff members for the user's club."""
+    staff = User.objects.filter(
+        club=request.user.club,
+        is_active=True
+    ).values(
+        'id',
+        'username',
+        'rfid_code'
+    )
+    return Response(list(staff))
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -395,3 +420,4 @@ def attendance_list_api(request):
     
     serializer = StaffAttendanceSerializer(attendances, many=True)
     return Response(serializer.data)
+

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { Loader2 } from "lucide-react";
-import { FiDollarSign, FiAlertTriangle } from "react-icons/fi";
+import { FiDollarSign, FiAlertTriangle, FiPlus } from "react-icons/fi";
 import { useDispatch, useSelector } from "react-redux";
 import {
   fetchExpenseSummary,
@@ -475,12 +475,35 @@ const Expenses = () => {
                   handleReset={handleResetFilters}
                   handleCalculateTotal={handleCalculateTotal}
                 />
-                <Button
-                  onClick={exportToExcel}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm"
-                >
-                  تصدير إلى إكسيل
-                </Button>
+                <div className="flex gap-4">
+                  {canAddExpense && (
+                    <Button
+                      onClick={() => {
+                        setCurrentExpense(null);
+                        setNewExpense({
+                          club: userClub?.id.toString() || "",
+                          category: "",
+                          amount: "",
+                          description: "",
+                          date: "",
+                          invoice_number: "",
+                          attachment: null,
+                        });
+                        setShowModal(true);
+                      }}
+                      className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 text-sm"
+                    >
+                      <FiPlus className="ml-2 w-5 h-5" />
+                      إضافة مصروف
+                    </Button>
+                  )}
+                  <Button
+                    onClick={exportToExcel}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm"
+                  >
+                    تصدير إلى إكسيل
+                  </Button>
+                </div>
               </div>
 
               {summaryCard}

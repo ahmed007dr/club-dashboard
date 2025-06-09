@@ -97,7 +97,15 @@ function UserList() {
 
   return (
     <div className="container mx-auto p-6" dir="rtl">
-      <h1 className="text-3xl font-bold mb-8 text-gray-800 text-center">تقارير الموظفين</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-gray-800">تقارير الموظفين</h1>
+        <Link
+          to="/attendance-report"
+          className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          تقرير شامل لجميع الموظفين
+        </Link>
+      </div>
 
       <div className="mb-6 flex items-center gap-4">
         <div className="relative flex-1">
@@ -183,7 +191,13 @@ function UserList() {
                       </td>
                       <td className="px-6 py-4 text-sm">{user.rfid_code || '—'}</td>
                       <td className="px-6 py-4 text-sm">{user.club?.name || '—'}</td>
-                      <td className="px-6 py-4 text-sm">
+                      <td className="px-6 py-4 text-sm flex gap-2">
+                        <Link
+                          to={`/attendance-report/${user.id}`}
+                          className="inline-block bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                        >
+                          تقرير الحضور
+                        </Link>
                         {user.role === 'coach' && (
                           <Link
                             to={`/coach-profile/${user.id}`}
@@ -247,16 +261,22 @@ function UserList() {
                       <p>{user.club?.name || '—'}</p>
                     </div>
                   </div>
-                  {user.role === 'coach' && (
-                    <div className="mt-4 text-left">
+                  <div className="mt-4 text-left flex gap-2">
+                    <Link
+                      to={`/attendance-report/${user.id}`}
+                      className="inline-block bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                    >
+                      تقرير الحضور
+                    </Link>
+                    {user.role === 'coach' && (
                       <Link
                         to={`/coach-profile/${user.id}`}
                         className="inline-block bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
                       >
                         بروفايل
                       </Link>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               ))
             ) : (
