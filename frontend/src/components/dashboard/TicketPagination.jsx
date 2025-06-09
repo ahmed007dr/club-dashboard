@@ -8,12 +8,12 @@ const TicketPagination = ({
   itemsPerPage,
   setCurrentPage,
   setItemsPerPage,
-  itemsPerPageOptions = [5, 10, 15],
+  itemsPerPageOptions = [10, 20, 50], 
 }) => {
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
   const getPageNumbers = () => {
-    const maxPagesToShow = 5;
+    const maxPagesToShow = 20;
     const halfPages = Math.floor(maxPagesToShow / 2);
     let startPage = Math.max(1, currentPage - halfPages);
     let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
