@@ -23,8 +23,9 @@ const SubscriptionAnalytics = () => {
   // Fetch subscription types and coaches
   const fetchFilters = async () => {
     try {
+      console.log('Fetching filters from:', `${BASE_URL}/subscriptions/api/subscription-types/active/`, `${BASE_URL}/accounts/api/coaches/`);
       const [typesResponse, coachesResponse] = await Promise.all([
-        axios.get(`${BASE_URL}/subscriptions/api/subscription-types/active/`, { 
+        axios.get(`${BASE_URL}/subscriptions/api/subscription-types/active/`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         }),
         axios.get(`${BASE_URL}/accounts/api/coaches/`, {
@@ -34,8 +35,8 @@ const SubscriptionAnalytics = () => {
       setSubscriptionTypes(Array.isArray(typesResponse.data.results) ? typesResponse.data.results : typesResponse.data || []);
       setCoaches(Array.isArray(coachesResponse.data.results) ? coachesResponse.data.results : coachesResponse.data || []);
     } catch (error) {
-      console.error('Error fetching filters:', error);
-      setError('فشل في جلب بيانات الفلاتر');
+      console.error('Error fetching filters:', error.message, error.response?.status);
+      setError(`فشل في جلب بيانات الفلاتر: ${error.message}`);
     }
   };
 
@@ -44,7 +45,7 @@ const SubscriptionAnalytics = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${BASE_URL}subscriptions/api/subscriptions/analytics/`, {
+      const response = await axios.get(`${BASE_URL}/subscriptions/api/subscriptions/analytics/`, {
         params: {
           start_date: startDate,
           end_date: endDate,
@@ -53,10 +54,11 @@ const SubscriptionAnalytics = () => {
         },
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
+      console.log('Analytics response:', response.data);
       setAnalytics(response.data || {});
     } catch (error) {
-      console.error('Error fetching analytics:', error);
-      setError('فشل في جلب بيانات التحليلات');
+      console.error('Error fetching analytics:', error.message, error.response?.status);
+      setError(`فشل في جلب بيانات التحليلات: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -71,8 +73,14 @@ const SubscriptionAnalytics = () => {
   const sortData = (data, key, direction) => {
     if (!Array.isArray(data)) return [];
     return [...data].sort((a, b) => {
-      const aValue = a?.[key] ?? '';
-      const bValue = b?.[key] ?? '';
+      let aValue, bValue;
+      if (key === 'member_details.name') {
+        aValue = a?.member_details?.name ?? '';
+        bValue = b?.member_details?.name ?? '';
+      } else {
+        aValue = a?.[key] ?? '';
+        bValue = b?.[key] ?? '';
+      }
       if (aValue < bValue) return direction === 'asc' ? -1 : 1;
       if (aValue > bValue) return direction === 'asc' ? 1 : -1;
       return 0;
@@ -176,13 +184,14 @@ const SubscriptionAnalytics = () => {
     const activeMembers = Array.isArray(analytics.member_behavior?.active_members)
       ? analytics.member_behavior.active_members
       : [];
+    console.log('Active members:', activeMembers);
     const sortedMembers = sortConfig.key?.includes('member')
       ? sortData(activeMembers, sortConfig.key.split('.')[1], sortConfig.direction)
       : activeMembers;
     sortedMembers.forEach((member) => {
-      if (member?.member) {
+      if (member && typeof member === 'object' && member.member_details) {
         data.push([
-          member.member.name ?? 'غير معروف',
+          member.member_details.name ?? 'غير معروف',
           member.attendance_count ?? 0,
           member.subscription_count ?? 0,
           member.is_regular ? 'نعم' : 'لا',
@@ -255,8 +264,8 @@ const SubscriptionAnalytics = () => {
     data.push(['اسم العضو', 'تاريخ الانتهاء']);
     const nearingExpiry = Array.isArray(analytics.nearing_expiry) ? analytics.nearing_expiry : [];
     nearingExpiry.forEach((sub) => {
-      if (sub?.member) {
-        data.push([sub.member.name ?? 'غير معروف', sub.end_date ?? 'غير معروف']);
+      if (sub?.member_details) {
+        data.push([sub.member_details.name ?? 'غير معروف', sub.end_date ?? 'غير معروف']);
       }
     });
 
@@ -270,7 +279,11 @@ const SubscriptionAnalytics = () => {
     doc.setFontSize(16);
     doc.text('تحليل الاشتراكات', 10, 10, { align: 'right' });
 
-    if (!analytics) return;
+    if (!analytics) {
+      doc.text('لا توجد بيانات متاحة', 10, 20, { align: 'right' });
+      doc.save('subscription_analytics.pdf');
+      return;
+    }
 
     // Popular Types
     doc.text('أكثر أنواع الاشتراكات شعبية', 10, 20, { align: 'right' });
@@ -357,7 +370,7 @@ const SubscriptionAnalytics = () => {
         ? sortData(analytics.member_behavior?.active_members || [], sortConfig.key.split('.')[1], sortConfig.direction)
         : analytics.member_behavior?.active_members || []
       ).map((member) => [
-        member?.member?.name ?? 'غير معروف',
+        member?.member_details?.name ?? 'غير معروف',
         member?.attendance_count ?? 0,
         member?.subscription_count ?? 0,
         member?.is_regular ? 'نعم' : 'لا',
@@ -432,7 +445,7 @@ const SubscriptionAnalytics = () => {
       startY: doc.lastAutoTable.finalY + 15,
       head: [['اسم العضو', 'تاريخ الانتهاء']],
       body: (analytics.nearing_expiry || []).map((sub) => [
-        sub?.member?.name ?? 'غير معروف',
+        sub?.member_details?.name ?? 'غير معروف',
         sub?.end_date ?? 'غير معروف',
       ]),
       styles: { font: 'Amiri', halign: 'right' },
@@ -545,13 +558,8 @@ const SubscriptionAnalytics = () => {
                     <th className="table-header" onClick={() => handleSort('popular.name')}>
                       النوع {sortConfig.key === 'popular.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('popular.total_subscriptions')}
-                    >
-                      عدد الاشتراكات{' '}
-                      {sortConfig.key === 'popular.total_subscriptions' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('popular.total_subscriptions')}>
+                      عدد الاشتراكات {sortConfig.key === 'popular.total_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('popular.percentage')}>
                       النسبة (%) {sortConfig.key === 'popular.percentage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -583,15 +591,10 @@ const SubscriptionAnalytics = () => {
                       النوع {sortConfig.key === 'attendance.type__name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('attendance.avg_attendance')}>
-                      متوسط الحضور{' '}
-                      {sortConfig.key === 'attendance.avg_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      متوسط الحضور {sortConfig.key === 'attendance.avg_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('attendance.total_attendance')}
-                    >
-                      إجمالي الحضور{' '}
-                      {sortConfig.key === 'attendance.total_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('attendance.total_attendance')}>
+                      إجمالي الحضور {sortConfig.key === 'attendance.total_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
@@ -602,9 +605,7 @@ const SubscriptionAnalytics = () => {
                   ).map((type, index) => (
                     <tr key={`attendance-${index}`}>
                       <td className="table-cell">{type?.type__name ?? 'غير معروف'}</td>
-                      <td className="table-cell">
-                        {type?.avg_attendance ? Number(type.avg_attendance).toFixed(2) : '0.00'}
-                      </td>
+                      <td className="table-cell">{type?.avg_attendance ? Number(type.avg_attendance).toFixed(2) : '0.00'}</td>
                       <td className="table-cell">{type?.total_attendance ?? 0}</td>
                     </tr>
                   ))}
@@ -615,13 +616,8 @@ const SubscriptionAnalytics = () => {
                 <thead>
                   <tr>
                     <th className="table-header">اليوم</th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('attendance.day.total_entries')}
-                    >
-                      إجمالي الحضور{' '}
-                      {sortConfig.key === 'attendance.day.total_entries' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('attendance.day.total_entries')}>
+                      إجمالي الحضور {sortConfig.key === 'attendance.day.total_entries' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
@@ -649,23 +645,13 @@ const SubscriptionAnalytics = () => {
                       النوع {sortConfig.key === 'freeze.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('freeze.total_freezes')}>
-                      عدد طلبات التجميد{' '}
-                      {sortConfig.key === 'freeze.total_freezes' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      عدد طلبات التجميد {sortConfig.key === 'freeze.total_freezes' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('freeze.frozen_subscriptions')}
-                    >
-                      الاشتراكات المتجمدة{' '}
-                      {sortConfig.key === 'freeze.frozen_subscriptions' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('freeze.frozen_subscriptions')}>
+                      الاشتراكات المتجمدة {sortConfig.key === 'freeze.frozen_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('freeze.freeze_percentage')}
-                    >
-                      نسبة التجميد (%){' '}
-                      {sortConfig.key === 'freeze.freeze_percentage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('freeze.freeze_percentage')}>
+                      نسبة التجميد (%) {sortConfig.key === 'freeze.freeze_percentage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
@@ -695,22 +681,13 @@ const SubscriptionAnalytics = () => {
                       النوع {sortConfig.key === 'revenue.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('revenue.total_revenue')}>
-                      إجمالي الإيرادات{' '}
-                      {sortConfig.key === 'revenue.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      إجمالي الإيرادات {sortConfig.key === 'revenue.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('revenue.private_revenue')}
-                    >
-                      إيرادات التدريب الخاص{' '}
-                      {sortConfig.key === 'revenue.private_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('revenue.private_revenue')}>
+                      إيرادات التدريب الخاص {sortConfig.key === 'revenue.private_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('revenue.remaining_amount')}
-                    >
-                      المبالغ المتبقية{' '}
-                      {sortConfig.key === 'revenue.remaining_amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('revenue.remaining_amount')}>
+                      المبالغ المتبقية {sortConfig.key === 'revenue.remaining_amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
@@ -733,38 +710,32 @@ const SubscriptionAnalytics = () => {
             {/* Member Behavior */}
             <Tab.Panel>
               <h2 className="subtitle">الأعضاء الأكثر نشاطًا</h2>
+              {analytics.member_behavior?.active_members?.length === 0 && (
+                <p>لا توجد بيانات للأعضاء النشطين حاليًا.</p>
+              )}
               <table className="table table-margin">
                 <thead>
                   <tr>
-                    <th className="table-header" onClick={() => handleSort('member.member.name')}>
-                      اسم العضو{' '}
-                      {sortConfig.key === 'member.member.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('member_details.name')}>
+                      اسم العضو {sortConfig.key === 'member_details.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('member.attendance_count')}
-                    >
-                      عدد مرات الحضور{' '}
-                      {sortConfig.key === 'member.attendance_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('attendance_count')}>
+                      عدد مرات الحضور {sortConfig.key === 'attendance_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('member.subscription_count')}
-                    >
-                      عدد الاشتراكات{' '}
-                      {sortConfig.key === 'member.subscription_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('subscription_count')}>
+                      عدد الاشتراكات {sortConfig.key === 'subscription_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header">منتظم</th>
                     <th className="table-header">متكرر</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key?.includes('member')
-                    ? sortData(analytics.member_behavior?.active_members || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                  {(sortConfig.key?.includes('member_details') || sortConfig.key?.includes('attendance_count') || sortConfig.key?.includes('subscription_count')
+                    ? sortData(analytics.member_behavior?.active_members || [], sortConfig.key, sortConfig.direction)
                     : analytics.member_behavior?.active_members || []
                   ).map((member, index) => (
                     <tr key={member?.id ?? `member-${index}`}>
-                      <td className="table-cell">{member?.member?.name ?? 'غير معروف'}</td>
+                      <td className="table-cell">{member?.member_details?.name ?? 'غير معروف'}</td>
                       <td className="table-cell">{member?.attendance_count ?? 0}</td>
                       <td className="table-cell">{member?.subscription_count ?? 0}</td>
                       <td className="table-cell">{member?.is_regular ? 'نعم' : 'لا'}</td>
@@ -774,30 +745,23 @@ const SubscriptionAnalytics = () => {
                 </tbody>
               </table>
               <h2 className="subtitle">الأعضاء غير النشطين</h2>
+              {analytics.member_behavior?.inactive_members?.length === 0 && (
+                <p>لا توجد بيانات للأعضاء غير النشطين حاليًا.</p>
+              )}
               <table className="table">
                 <thead>
                   <tr>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('member.inactive.member__name')}
-                    >
-                      اسم العضو{' '}
-                      {sortConfig.key === 'member.inactive.member__name' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('member__name')}>
+                      اسم العضو {sortConfig.key === 'member__name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('member.inactive.subscription_count')}
-                    >
-                      عدد الاشتراكات{' '}
-                      {sortConfig.key === 'member.inactive.subscription_count' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('subscription_count')}>
+                      عدد الاشتراكات {sortConfig.key === 'subscription_count' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {(sortConfig.key?.includes('member.inactive')
-                    ? sortData(analytics.member_behavior?.inactive_members || [], sortConfig.key.split('.')[2], sortConfig.direction)
+                  {(sortConfig.key?.includes('member__name') || sortConfig.key?.includes('subscription_count')
+                    ? sortData(analytics.member_behavior?.inactive_members || [], sortConfig.key, sortConfig.direction)
                     : analytics.member_behavior?.inactive_members || []
                   ).map((member, index) => (
                     <tr key={`inactive-${index}`}>
@@ -815,29 +779,23 @@ const SubscriptionAnalytics = () => {
               <table className="table">
                 <thead>
                   <tr>
-                    <th className="table-header" onClick={() => handleSort('coach.username')}>
-                      اسم الكابتن {sortConfig.key === 'coach.username' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('username')}>
+                      اسم الكابتن {sortConfig.key === 'username' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('coach.total_clients')}>
-                      عدد العملاء{' '}
-                      {sortConfig.key === 'coach.total_clients' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('total_clients')}>
+                      عدد العملاء {sortConfig.key === 'total_clients' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('coach.total_attendance')}
-                    >
-                      إجمالي الحضور{' '}
-                      {sortConfig.key === 'coach.total_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('total_attendance')}>
+                      إجمالي الحضور {sortConfig.key === 'total_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('coach.total_revenue')}>
-                      إجمالي الإيرادات{' '}
-                      {sortConfig.key === 'coach.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('total_revenue')}>
+                      إجمالي الإيرادات {sortConfig.key === 'total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {(sortConfig.key?.includes('coach')
-                    ? sortData(analytics.coach_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    ? sortData(analytics.coach_analysis || [], sortConfig.key, sortConfig.direction)
                     : analytics.coach_analysis || []
                   ).map((coach, index) => (
                     <tr key={`coach-${index}`}>
@@ -857,26 +815,20 @@ const SubscriptionAnalytics = () => {
               <table className="table">
                 <thead>
                   <tr>
-                    <th className="table-header" onClick={() => handleSort('temporal.month')}>
-                      الشهر {sortConfig.key === 'temporal.month' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('month')}>
+                      الشهر {sortConfig.key === 'month' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('temporal.total_subscriptions')}
-                    >
-                      عدد الاشتراكات{' '}
-                      {sortConfig.key === 'temporal.total_subscriptions' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('total_subscriptions')}>
+                      عدد الاشتراكات {sortConfig.key === 'total_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('temporal.total_revenue')}>
-                      إجمالي الإيرادات{' '}
-                      {sortConfig.key === 'temporal.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('total_revenue')}>
+                      إجمالي الإيرادات {sortConfig.key === 'total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {(sortConfig.key?.includes('temporal')
-                    ? sortData(analytics.temporal_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    ? sortData(analytics.temporal_analysis || [], sortConfig.key, sortConfig.direction)
                     : analytics.temporal_analysis || []
                   ).map((temp, index) => (
                     <tr key={`temporal-${index}`}>
@@ -895,34 +847,23 @@ const SubscriptionAnalytics = () => {
               <table className="table">
                 <thead>
                   <tr>
-                    <th className="table-header" onClick={() => handleSort('renewal.name')}>
-                      النوع {sortConfig.key === 'renewal.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('name')}>
+                      النوع {sortConfig.key === 'name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('renewal.expired_subscriptions')}
-                    >
-                      الاشتراكات المنتهية{' '}
-                      {sortConfig.key === 'renewal.expired_subscriptions' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('expired_subscriptions')}>
+                      الاشتراكات المنتهية {sortConfig.key === 'expired_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th
-                      className="table-header"
-                      onClick={() => handleSort('renewal.renewed_subscriptions')}
-                    >
-                      الاشتراكات المتجددة{' '}
-                      {sortConfig.key === 'renewal.renewed_subscriptions' &&
-                        (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('renewed_subscriptions')}>
+                      الاشتراكات المتجددة {sortConfig.key === 'renewed_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('renewal.renewal_rate')}>
-                      معدل التجديد (%){' '}
-                      {sortConfig.key === 'renewal.renewal_rate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('renewal_rate')}>
+                      معدل التجديد (%) {sortConfig.key === 'renewal_rate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {(sortConfig.key?.includes('renewal')
-                    ? sortData(analytics.renewal_rate_by_type || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    ? sortData(analytics.renewal_rate_by_type || [], sortConfig.key, sortConfig.direction)
                     : analytics.renewal_rate_by_type || []
                   ).map((stat, index) => (
                     <tr key={`renewal-${index}`}>
@@ -942,23 +883,21 @@ const SubscriptionAnalytics = () => {
               <table className="table">
                 <thead>
                   <tr>
-                    <th className="table-header" onClick={() => handleSort('nearing.member.name')}>
-                      اسم العضو{' '}
-                      {sortConfig.key === 'nearing.member.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('member_details.name')}>
+                      اسم العضو {sortConfig.key === 'member_details.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('nearing.end_date')}>
-                      تاريخ الانتهاء{' '}
-                      {sortConfig.key === 'nearing.end_date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('end_date')}>
+                      تاريخ الانتهاء {sortConfig.key === 'end_date' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {(sortConfig.key?.includes('nearing')
-                    ? sortData(analytics.nearing_expiry || [], sortConfig.key.split('.')[1], sortConfig.direction)
+                    ? sortData(analytics.nearing_expiry || [], sortConfig.key, sortConfig.direction)
                     : analytics.nearing_expiry || []
                   ).map((sub, index) => (
                     <tr key={sub?.id ?? `nearing-${index}`}>
-                      <td className="table-cell">{sub?.member?.name ?? 'غير معروف'}</td>
+                      <td className="table-cell">{sub?.member_details?.name ?? 'غير معروف'}</td>
                       <td className="table-cell">{sub?.end_date ?? 'غير معروف'}</td>
                     </tr>
                   ))}
