@@ -92,7 +92,7 @@ export const fetchClubList = createAsyncThunk(
     try {
       const token = localStorage.getItem('token'); // ✅ Define token here
 
-      const response = await fetch(`${BASE_URL}/core/api/clubs-list/`, {
+      const response = await fetch(`${BASE_URL}core/api/clubs-list/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -293,6 +293,8 @@ def staff_attendance_report_api(request, staff_id=None):
         except ValueError:
             return Response({'error': 'Invalid staff_id'}, status=status.HTTP_400_BAD_REQUEST)
 
+
+
     # Filter by year if provided
     year = request.query_params.get('year', None)
     if year:

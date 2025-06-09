@@ -18,10 +18,10 @@ import toast, { Toaster } from 'react-hot-toast';
 import { FiFilter, FiDownload } from 'react-icons/fi';
 import BASE_URL from '@/config/api';
 
-// Register Chart.js components
+// تسجيل مكونات Chart.js
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend);
 
-// Error Boundary Component
+// مكون ErrorBoundary للتعامل مع الأخطاء غير المتوقعة
 class ErrorBoundary extends React.Component {
   state = { hasError: false, error: null };
 
@@ -30,13 +30,13 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error('ErrorBoundary: ', error, errorInfo);
   }
 
   render() {
     if (this.state.hasError) {
       return (
-        <div className="text-center text-red-600 p-4">
+        <div className="text-center text-right text-red-600 p-4" dir="rtl">
           <h2 className="text-lg font-semibold">حدث خطأ</h2>
           <p>{this.state.error?.message || 'يرجى إعادة تحميل الصفحة أو التواصل مع الدعم.'}</p>
         </div>
@@ -70,41 +70,27 @@ const FinancialDashboard = () => {
     { value: 'yearly', label: 'سنوي' },
   ];
 
-  // Fetch users, categories, and sources for filters
+  // جلب بيانات المستخدمين، الفئات، والمصادر للفلاتر
   const fetchFilterData = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('لا يوجد رمز توثيق. يرجى تسجيل الدخول.');
-      }
+      if (!token) throw new Error('لا يوجد رمز توثيق. يرجى تسجيل الدخول.');
 
       const [usersRes, categoriesRes, sourcesRes] = await Promise.all([
-        axios.get(`${BASE_URL}accounts/api/users/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`${BASE_URL}finance/api/expense-categories/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`${BASE_URL}finance/api/income-sources/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        axios.get(`${BASE_URL}accounts/api/users/`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${BASE_URL}finance/api/expense-categories/`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${BASE_URL}finance/api/income-sources/`, { headers: { Authorization: `Bearer ${token}` } }),
       ]);
 
-      // Handle paginated responses
+      // التعامل مع استجابات تحتوي على results
       const usersData = usersRes.data.results || usersRes.data;
       const categoriesData = categoriesRes.data.results || categoriesRes.data;
       const sourcesData = sourcesRes.data.results || sourcesRes.data;
 
-      // Validate data is array
-      if (!Array.isArray(usersData)) {
-        throw new Error('بيانات المستخدمين ليست قائمة');
-      }
-      if (!Array.isArray(categoriesData)) {
-        throw new Error('بيانات الفئات ليست قائمة');
-      }
-      if (!Array.isArray(sourcesData)) {
-        throw new Error('بيانات المصادر ليست قائمة');
-      }
+      // التحقق من أن البيانات عبارة عن قوائم
+      if (!Array.isArray(usersData)) throw new Error('بيانات المستخدمين ليست قائمة');
+      if (!Array.isArray(categoriesData)) throw new Error('بيانات الفئات ليست قائمة');
+      if (!Array.isArray(sourcesData)) throw new Error('بيانات المصادر ليست قائمة');
 
       setUsers(usersData.map(user => ({ value: user.id, label: user.username })));
       setCategories(categoriesData.map(cat => ({ value: cat.id, label: cat.name })));
@@ -115,12 +101,12 @@ const FinancialDashboard = () => {
     }
   }, []);
 
-  // Fetch financial analysis data
+  // جلب بيانات التحليل المالي
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error('لا يوجد رمز توثيق');
+      if (!token) throw new Error('لا يوجد رمز توثيق. يرجى تسجيل الدخول.');
 
       const params = {
         period_type: filters.periodType,
@@ -140,7 +126,18 @@ const FinancialDashboard = () => {
       setData(response.data);
       setError(null);
     } catch (err) {
-      const errorMessage = err.response?.data?.error || err.message || 'حدث خطأ أثناء جلب البيانات';
+      let errorMessage = 'حدث خطأ أثناء جلب البيانات';
+      if (err.response) {
+        if (err.response.status === 400) {
+          errorMessage = err.response.data.error || 'طلب غير صحيح. تحقق من البيانات المدخلة.';
+        } else if (err.response.status === 500) {
+          errorMessage = 'خطأ في الخادم. حاول لاحقًا أو تواصل مع الدعم.';
+        } else {
+          errorMessage = err.response.data.error || err.message;
+        }
+      } else {
+        errorMessage = err.message;
+      }
       console.error('خطأ في جلب البيانات:', err);
       setError(errorMessage);
       toast.error('فشل جلب البيانات: ' + errorMessage);
@@ -154,16 +151,16 @@ const FinancialDashboard = () => {
   }, [fetchFilterData]);
 
   useEffect(() => {
-    const timer = setTimeout(fetchData, 500); // Debounce API calls
+    const timer = setTimeout(fetchData, 500); // تأخير لتقليل الطلبات
     return () => clearTimeout(timer);
   }, [fetchData]);
 
-  // Handle filter changes
+  // التعامل مع تغييرات الفلاتر
   const handleFilterChange = (name, value) => {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
 
-  // Chart data preparation
+  // تحضير بيانات الرسوم البيانية
   const prepareLineChartData = () => {
     if (!data?.period_analysis) return { labels: [], datasets: [] };
     const labels = data.period_analysis.map(item => item.period);
@@ -172,20 +169,8 @@ const FinancialDashboard = () => {
     return {
       labels,
       datasets: [
-        {
-          label: 'الإيرادات',
-          data: incomeData,
-          borderColor: '#4CAF50',
-          backgroundColor: 'rgba(76, 175, 80, 0.2)',
-          fill: true,
-        },
-        {
-          label: 'المصروفات',
-          data: expenseData,
-          borderColor: '#F44336',
-          backgroundColor: 'rgba(244, 67, 54, 0.2)',
-          fill: true,
-        },
+        { label: 'الإيرادات', data: incomeData, borderColor: '#4CAF50', backgroundColor: 'rgba(76, 175, 80, 0.2)', fill: true },
+        { label: 'المصروفات', data: expenseData, borderColor: '#F44336', backgroundColor: 'rgba(244, 67, 54, 0.2)', fill: true },
       ],
     };
   };
@@ -207,11 +192,10 @@ const FinancialDashboard = () => {
   };
 
   const preparePieChartData = (type) => {
-    if (!data?.[type === 'income' ? 'income_source_analysis' : 'expense_category_analysis'])
-      return { labels: [], datasets: [] };
+    if (!data?.[type === 'income' ? 'income_source_analysis' : 'expense_category_analysis']) return { labels: [], datasets: [] };
     const analysis = data[type === 'income' ? 'income_source_analysis' : 'expense_category_analysis'];
     return {
-      labels: analysis.map(item => (type === 'income' ? item.source || 'غير معروف' : item.category)),
+      labels: analysis.map(item => (type === 'income' ? (item.source || 'غير معروف') : item.category)),
       datasets: [
         {
           data: analysis.map(item => item.percentage),
@@ -221,90 +205,98 @@ const FinancialDashboard = () => {
     };
   };
 
-  // Export report (placeholder)
+  // تصدير التقرير (مؤقت)
   const exportReport = () => {
     toast.success('تم تصدير التقرير (غير مدعوم حاليًا)');
   };
 
+  // تنسيق الأعداد بفواصل
+  const formatNumber = (number) => {
+    if (number === null || number === undefined) return '0.00';
+    return Number(number).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4 sm:p-6">
+      <div className="min-h-screen bg-gray-100 dark:bg-gray-900 p-4 sm:p-6" dir="rtl">
         <Toaster position="top-center" />
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
+          {/* العنوان */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white">لوحة التحليل المالي</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white text-right">
+              لوحة التحليل المالي
+            </h1>
             <button
               onClick={exportReport}
               className="mt-4 sm:mt-0 flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              <FiDownload className="mr-2" /> تصدير التقرير
+              <FiDownload className="ml-2" /> تصدير التقرير
             </button>
           </div>
 
-          {/* Filters */}
+          {/* الفلاتر */}
           <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center">
-              <FiFilter className="mr-2" /> فلاتر
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 flex items-center text-right">
+              <FiFilter className="ml-2" /> فلاتر
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">نوع الفترة</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">نوع الفترة</label>
                 <Select
                   options={periodOptions}
                   value={periodOptions.find(opt => opt.value === filters.periodType)}
                   onChange={opt => handleFilterChange('periodType', opt.value)}
-                  className="mt-1"
+                  className="mt-1 text-right"
                   classNamePrefix="select"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">تاريخ البداية</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">تاريخ البداية</label>
                 <input
                   type="date"
                   value={filters.startDate}
                   onChange={e => handleFilterChange('startDate', e.target.value)}
-                  className="mt-1 block w-full p-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                  className="mt-1 block w-full p-2 border rounded-lg dark:bg-gray-700 dark:text-white text-right"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">تاريخ النهاية</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">تاريخ النهاية</label>
                 <input
                   type="date"
                   value={filters.endDate}
                   onChange={e => handleFilterChange('endDate', e.target.value)}
-                  className="mt-1 block w-full p-2 border rounded-lg dark:bg-gray-700 dark:text-white"
+                  className="mt-1 block w-full p-2 border rounded-lg dark:bg-gray-700 dark:text-white text-right"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">المستخدم</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">المستخدم</label>
                 <Select
                   options={users}
                   value={filters.user}
                   onChange={opt => handleFilterChange('user', opt)}
-                  className="mt-1"
+                  className="mt-1 text-right"
                   classNamePrefix="select"
                   isClearable
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">فئة المصروفات</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">فئة المصروفات</label>
                 <Select
                   options={categories}
                   value={filters.category}
                   onChange={opt => handleFilterChange('category', opt)}
-                  className="mt-1"
+                  className="mt-1 text-right"
                   classNamePrefix="select"
                   isClearable
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">مصدر الإيرادات</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 text-right">مصدر الإيرادات</label>
                 <Select
                   options={sources}
                   value={filters.source}
                   onChange={opt => handleFilterChange('source', opt)}
-                  className="mt-1"
+                  className="mt-1 text-right"
                   classNamePrefix="select"
                   isClearable
                 />
@@ -312,44 +304,44 @@ const FinancialDashboard = () => {
             </div>
           </div>
 
-          {/* Overview Cards */}
+          {/* بطاقات النظرة العامة */}
           {data?.financial_position && (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">إجمالي الإيرادات</h3>
-                <p className="text-2xl font-bold text-green-600">
-                  {data.financial_position.total_income.toFixed(2)} ج.م
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">إجمالي الإيرادات</h3>
+                <p className="text-2xl font-bold text-green-600 text-right">
+                  {formatNumber(data.financial_position.total_income)} جنيه
                 </p>
               </div>
               <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">إجمالي المصروفات</h3>
-                <p className="text-2xl font-bold text-red-600">
-                  {data.financial_position.total_expense.toFixed(2)} ج.م
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">إجمالي المصروفات</h3>
+                <p className="text-2xl font-bold text-red-600 text-right">
+                  {formatNumber(data.financial_position.total_expense)} جنيه
                 </p>
               </div>
               <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">صافي الربح</h3>
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">صافي الربح</h3>
                 <p
-                  className={`text-2xl font-bold ${
+                  className={`text-2xl font-bold text-right ${
                     data.financial_position.net_profit >= 0 ? 'text-green-600' : 'text-red-600'
                   }`}
                 >
-                  {data.financial_position.net_profit.toFixed(2)} ج.م
+                  {formatNumber(data.financial_position.net_profit)} جنيه
                 </p>
               </div>
               <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">الرصيد النقدي</h3>
-                <p className="text-2xl font-bold text-blue-600">
-                  {data.financial_position.cash_balance.toFixed(2)} ج.م
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">الرصيد النقدي</h3>
+                <p className="text-2xl font-bold text-blue-600 text-right">
+                  {formatNumber(data.financial_position.cash_balance)} جنيه
                 </p>
               </div>
             </div>
           )}
 
-          {/* Charts */}
+          {/* الرسوم البيانية */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
                 الإيرادات والمصروفات حسب الفترة
               </h2>
               <div className="h-80">
@@ -357,31 +349,39 @@ const FinancialDashboard = () => {
               </div>
             </div>
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">صافي الربح حسب الفترة</h2>
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
+                صافي الربح حسب الفترة
+              </h2>
               <div className="h-80">
                 <Bar data={prepareBarChartData()} options={{ responsive: true, maintainAspectRatio: false }} />
               </div>
             </div>
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">توزيع الإيرادات حسب المصادر</h2>
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
+                توزيع الإيرادات حسب المصادر
+              </h2>
               <div className="h-80">
                 <Pie data={preparePieChartData('income')} options={{ responsive: true, maintainAspectRatio: false }} />
               </div>
             </div>
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">توزيع المصروفات حسب الفئات</h2>
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
+                توزيع المصروفات حسب الفئات
+              </h2>
               <div className="h-80">
                 <Pie data={preparePieChartData('expense')} options={{ responsive: true, maintainAspectRatio: false }} />
               </div>
             </div>
           </div>
 
-          {/* Top 5 Categories and Sources */}
+          {/* أعلى 5 فئات ومصادر */}
           {(data?.top_expense_categories || data?.top_income_sources) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {data.top_expense_categories && (
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">أعلى 5 فئات مصروفات</h2>
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
+                    أعلى 5 فئات مصروفات
+                  </h2>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                       <thead className="bg-gray-50 dark:bg-gray-700">
@@ -401,8 +401,10 @@ const FinancialDashboard = () => {
                         {data.top_expense_categories.map((item, index) => (
                           <tr key={index}>
                             <td className="px-6 py-4 text-right">{item.category}</td>
-                            <td className="px-6 py-4 text-right text-red-600">{item.total_amount.toFixed(2)} ج.م</td>
-                            <td className="px-6 py-4 text-right">{item.percentage.toFixed(2)}%</td>
+                            <td className="px-6 py-4 text-right text-red-600">
+                              {formatNumber(item.total_amount)} جنيه
+                            </td>
+                            <td className="px-6 py-4 text-right">{formatNumber(item.percentage)}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -412,7 +414,9 @@ const FinancialDashboard = () => {
               )}
               {data.top_income_sources && (
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">أعلى 5 مصادر إيرادات</h2>
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
+                    أعلى 5 مصادر إيرادات
+                  </h2>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                       <thead className="bg-gray-50 dark:bg-gray-700">
@@ -432,8 +436,10 @@ const FinancialDashboard = () => {
                         {data.top_income_sources.map((item, index) => (
                           <tr key={index}>
                             <td className="px-6 py-4 text-right">{item.source || 'غير معروف'}</td>
-                            <td className="px-6 py-4 text-right text-green-600">{item.total_amount.toFixed(2)} ج.م</td>
-                            <td className="px-6 py-4 text-right">{item.percentage.toFixed(2)}%</td>
+                            <td className="px-6 py-4 text-right text-green-600">
+                              {formatNumber(item.total_amount)} جنيه
+                            </td>
+                            <td className="px-6 py-4 text-right">{formatNumber(item.percentage)}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -444,12 +450,14 @@ const FinancialDashboard = () => {
             </div>
           )}
 
-          {/* Expense and Income Analysis Tables */}
+          {/* تحليل فئات المصروفات ومصادر الإيرادات */}
           {(data?.expense_category_analysis || data?.income_source_analysis) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {data.expense_category_analysis && (
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">تحليل فئات المصروفات</h2>
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
+                    تحليل فئات المصروفات
+                  </h2>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                       <thead className="bg-gray-50 dark:bg-gray-700">
@@ -469,8 +477,10 @@ const FinancialDashboard = () => {
                         {data.expense_category_analysis.map((item, index) => (
                           <tr key={index}>
                             <td className="px-6 py-4 text-right">{item.category}</td>
-                            <td className="px-6 py-4 text-right text-red-600">{item.total_amount.toFixed(2)} ج.م</td>
-                            <td className="px-6 py-4 text-right">{item.percentage.toFixed(2)}%</td>
+                            <td className="px-6 py-4 text-right text-red-600">
+                              {formatNumber(item.total_amount)} جنيه
+                            </td>
+                            <td className="px-6 py-4 text-right">{formatNumber(item.percentage)}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -480,7 +490,9 @@ const FinancialDashboard = () => {
               )}
               {data.income_source_analysis && (
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">تحليل مصادر الإيرادات</h2>
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
+                    تحليل مصادر الإيرادات
+                  </h2>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                       <thead className="bg-gray-50 dark:bg-gray-700">
@@ -500,8 +512,10 @@ const FinancialDashboard = () => {
                         {data.income_source_analysis.map((item, index) => (
                           <tr key={index}>
                             <td className="px-6 py-4 text-right">{item.source || 'غير معروف'}</td>
-                            <td className="px-6 py-4 text-right text-green-600">{item.total_amount.toFixed(2)} ج.م</td>
-                            <td className="px-6 py-4 text-right">{item.percentage.toFixed(2)}%</td>
+                            <td className="px-6 py-4 text-right text-green-600">
+                              {formatNumber(item.total_amount)} جنيه
+                            </td>
+                            <td className="px-6 py-4 text-right">{formatNumber(item.percentage)}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -512,10 +526,10 @@ const FinancialDashboard = () => {
             </div>
           )}
 
-          {/* Period Analysis Table */}
+          {/* تحليل الفترات */}
           {data?.period_analysis && (
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">تحليل الفترات</h2>
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">تحليل الفترات</h2>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-700">
@@ -538,14 +552,18 @@ const FinancialDashboard = () => {
                     {data.period_analysis.map((item, index) => (
                       <tr key={index}>
                         <td className="px-6 py-4 text-right">{item.period}</td>
-                        <td className="px-6 py-4 text-right text-green-600">{item.total_income.toFixed(2)} ج.م</td>
-                        <td className="px-6 py-4 text-right text-red-600">{item.total_expense.toFixed(2)} ج.م</td>
+                        <td className="px-6 py-4 text-right text-green-600">
+                          {formatNumber(item.total_income)} جنيه
+                        </td>
+                        <td className="px-6 py-4 text-right text-red-600">
+                          {formatNumber(item.total_expense)} جنيه
+                        </td>
                         <td
                           className={`px-6 py-4 text-right ${
                             item.net_profit >= 0 ? 'text-green-600' : 'text-red-600'
                           }`}
                         >
-                          {item.net_profit.toFixed(2)} ج.م
+                          {formatNumber(item.net_profit)} جنيه
                         </td>
                       </tr>
                     ))}
@@ -555,13 +573,13 @@ const FinancialDashboard = () => {
             </div>
           )}
 
-          {/* Alerts and Recommendations */}
+          {/* التنبيهات والتوصيات */}
           {(data?.alerts?.length > 0 || data?.recommendations?.length > 0) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {data.alerts?.length > 0 && (
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">التنبيهات</h2>
-                  <ul className="list-disc pr-5">
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">التنبيهات</h2>
+                  <ul className="list-disc pr-5 text-right">
                     {data.alerts.map((alert, index) => (
                       <li key={index} className="text-red-600 mb-2">{alert}</li>
                     ))}
@@ -570,8 +588,8 @@ const FinancialDashboard = () => {
               )}
               {data.recommendations?.length > 0 && (
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">التوجيهات</h2>
-                  <ul className="list-disc pr-5">
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">التوجيهات</h2>
+                  <ul className="list-disc pr-5 text-right">
                     {data.recommendations.map((rec, index) => (
                       <li key={index} className="text-blue-600 mb-2">{rec}</li>
                     ))}
@@ -581,43 +599,53 @@ const FinancialDashboard = () => {
             </div>
           )}
 
-          {/* Forecasts */}
+          {/* التوقعات */}
           {data?.forecasts && (
             <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow mb-6">
-              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">التوقعات للفترة القادمة</h2>
+              <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
+                التوقعات للفترة القادمة
+              </h2>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">الإيرادات المتوقعة</h3>
-                  <p className="text-xl font-bold text-green-600">
-                    {data.forecasts.next_period_income.toFixed(2)} ج.م
+                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">
+                    الإيرادات المتوقعة
+                  </h3>
+                  <p className="text-xl font-bold text-green-600 text-right">
+                    {formatNumber(data.forecasts.next_period_income)} جنيه
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">المصروفات المتوقعة</h3>
-                  <p className="text-xl font-bold text-red-600">
-                    {data.forecasts.next_period_expense.toFixed(2)} ج.م
+                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">
+                    المصروفات المتوقعة
+                  </h3>
+                  <p className="text-xl font-bold text-red-600 text-right">
+                    {formatNumber(data.forecasts.next_period_expense)} جنيه
                   </p>
                 </div>
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">صافي الربح المتوقع</h3>
+                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 text-right">
+                    صافي الربح المتوقع
+                  </h3>
                   <p
-                    className={`text-xl font-bold ${
+                    className={`text-xl font-bold text-right ${
                       data.forecasts.next_period_net >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}
                   >
-                    {data.forecasts.next_period_net.toFixed(2)} ج.م
+                    {formatNumber(data.forecasts.next_period_net)} جنيه
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Detailed Tables (Income and Expenses) */}
+          {/* تفاصيل الإيرادات والمصروفات */}
           {(data?.income_details || data?.expense_details) && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {data.income_details && (
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">تفاصيل الإيرادات</h2>
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
+                    تفاصيل الإيرادات
+                  </h2>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                       <thead className="bg-gray-50 dark:bg-gray-700">
@@ -644,7 +672,7 @@ const FinancialDashboard = () => {
                             </td>
                             <td className="px-6 py-4 text-right">{item.source_name || 'غير معروف'}</td>
                             <td className="px-6 py-4 text-right text-green-600">
-                              {parseFloat(item.amount).toFixed(2)} ج.م
+                              {formatNumber(item.amount)} جنيه
                             </td>
                             <td className="px-6 py-4 text-right">-</td>
                           </tr>
@@ -656,7 +684,9 @@ const FinancialDashboard = () => {
               )}
               {data.expense_details && (
                 <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">تفاصيل المصروفات</h2>
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-right">
+                    تفاصيل المصروفات
+                  </h2>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                       <thead className="bg-gray-50 dark:bg-gray-700">
@@ -681,9 +711,9 @@ const FinancialDashboard = () => {
                             <td className="px-6 py-4 text-right">
                               {new Date(item.date).toLocaleDateString('ar-EG')}
                             </td>
-                            <td className="px-6 py-4 text-right">{item.category_name}</td>
+                            <td className="px-6 py-4 text-right">{item.category_name || 'غير معروف'}</td>
                             <td className="px-6 py-4 text-right text-red-600">
-                              {parseFloat(item.amount).toFixed(2)} ج.م
+                              {formatNumber(item.amount)} جنيه
                             </td>
                             <td className="px-6 py-4 text-right">-</td>
                           </tr>
@@ -696,8 +726,8 @@ const FinancialDashboard = () => {
             </div>
           )}
 
-          {loading && <p className="text-center text-gray-600 dark:text-gray-300">جارٍ التحميل...</p>}
-          {error && <p className="text-center text-red-600">{error}</p>}
+          {loading && <p className="text-center text-gray-600 dark:text-gray-300 text-right">جارٍ التحميل...</p>}
+          {error && <p className="text-center text-red-600 text-right">{error}</p>}
         </div>
       </div>
     </ErrorBoundary>

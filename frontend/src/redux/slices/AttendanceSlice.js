@@ -183,7 +183,7 @@ export const fetchShiftAttendances = createAsyncThunk(
   'shiftAttendance/fetchShiftAttendances',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${BASE_URL}/staff/attendance/`, {
+      const response = await axios.get(`${BASE_URL}/staff/api/attendance/`, {
         headers: {
           Authorization: getToken(),
           'Content-Type': 'application/json',

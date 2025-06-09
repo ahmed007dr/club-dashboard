@@ -21,38 +21,59 @@ function StaffAttendanceReport() {
     const fetchStaffList = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`${BASE_URL}/api/staff-list/`, {
+        if (!token) {
+          setError('يرجى تسجيل الدخول لعرض البيانات.');
+          return;
+        }
+        const response = await axios.get(`${BASE_URL}staff/api/staff-list/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setStaffList(response.data);
       } catch (err) {
-        setError('حدث خطأ أثناء جلب قائمة الموظفين.');
+        if (err.response?.status === 401) {
+          setError('غير مصرح لك. يرجى تسجيل الدخول مرة أخرى.');
+        } else if (err.response?.status === 404) {
+          setError('لم يتم العثور على قائمة الموظفين.');
+        } else {
+          setError('حدث خطأ أثناء جلب قائمة الموظفين.');
+        }
       }
     };
     fetchStaffList();
   }, []);
 
-  // Define fetchReport in component scope
+  // Fetch report data
   const fetchReport = async () => {
     try {
       setLoading(true);
       setError(null);
       const token = localStorage.getItem('token');
+      if (!token) {
+        setError('يرجى تسجيل الدخول لعرض البيانات.');
+        setLoading(false);
+        return;
+      }
       const url = selectedStaff === 'all'
         ? `${BASE_URL}staff/api/attendance-report/?month=${selectedMonth}`
-        : `${BASE_URL}staff/api/attendance-report/${selectedStaff}/?month=${selectedMonth}`;
+        : `${BASE_URL}staff/api/staff/${selectedStaff}/attendance/report/?month=${selectedMonth}`;
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setReportData(response.data);
+      setReportData(Array.isArray(response.data) ? response.data : [response.data]);
       setLoading(false);
     } catch (err) {
-      setError('حدث خطأ أثناء جلب تقرير الحضور.');
+      if (err.response?.status === 401) {
+        setError('غير مصرح لك. يرجى تسجيل الدخول مرة أخرى.');
+      } else if (err.response?.status === 404) {
+        setError('لم يتم العثور على بيانات الحضور لهذا الشهر أو الموظف.');
+      } else {
+        setError('حدث خطأ أثناء جلب تقرير الحضور.');
+      }
       setLoading(false);
     }
   };
 
-  // Fetch report data
+  // Fetch report when month or staff changes
   useEffect(() => {
     fetchReport();
   }, [selectedMonth, selectedStaff]);
@@ -129,7 +150,7 @@ function StaffAttendanceReport() {
         <div className="p-6 bg-red-50 text-red-700 rounded-xl shadow-sm mb-6 flex items-center justify-between">
           <span className="font-medium">{error}</span>
           <button
-            onClick={() => fetchReport()} // Now fetchReport is defined
+            onClick={fetchReport}
             className="flex items-center px-4 py-2 bg-red-100 hover:bg-red-200 rounded-lg text-sm transition-colors"
           >
             <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">

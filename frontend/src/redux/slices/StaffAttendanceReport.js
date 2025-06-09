@@ -21,7 +21,7 @@ function StaffAttendanceReport() {
     const fetchStaffList = async () => {
       try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`${BASE_URL}api/staff-list/`, {
+        const response = await axios.get(`${BASE_URL}staff/api/staff-list/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setStaffList(response.data);
