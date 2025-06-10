@@ -38,6 +38,7 @@ import MemberSubscriptionReport from './components/dashboard/MemberSubscriptionR
 import SubscriptionAnalytics from './components/dashboard/SubscriptionAnalytics'; 
 import useTokenRefresh from './hooks/useTokenRefresh';
 import StaffAttendanceReport from './components/dashboard/StaffAttendanceReport.jsx';
+import StockAnalytics from './components/dashboard/StockAnalytics.jsx';
 import { Toaster } from 'react-hot-toast';
 
 // Route protection component
@@ -95,8 +96,9 @@ function App() {
           <Route path="coach-profile/:coachId" element={<CoachProfile />} />
           <Route path="manage-users" element={<ManageUsers />} />
           <Route path="dashboard/subscription-report" element={<MemberSubscriptionReport />} />
+          <Route path="dashboard/StockAnalytics" element={<StockAnalytics />} />
           <Route path="dashboard/financial-analysis" element={<FinancialDashboard />} />
-          <Route path="dashboard/subscription-analytics" element={<SubscriptionAnalytics />} /> {/* المسار الجديد */}
+          <Route path="dashboard/subscription-analytics" element={<SubscriptionAnalytics />} /> 
           <Route path="attendance-report/:staffId?" element={<StaffAttendanceReport />} />
         </Route>
       </Routes>

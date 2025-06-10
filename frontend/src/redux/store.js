@@ -14,6 +14,8 @@ import usersReducer from "./slices/users";
 import entryLogsSlice from './slices/EntryLogsSlice';
 import staffSlice from './slices/staff';
 import financeSlice from './slices/financeSlice';
+import stockSlice from './slices/stockSlice';
+import stockReducer from './slices/stockSlice'; 
 const store = configureStore({
   reducer: {
     ui: uiReducer, 
@@ -30,6 +32,8 @@ const store = configureStore({
     finance:financeSlice.reducer,
     auth: authReducer,
     users: usersReducer,
+    stock: stockSlice.reducer,
+    stock: stockReducer,
   },
 });
 
