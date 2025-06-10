@@ -8,7 +8,6 @@ from staff.models import StaffAttendance
 import logging
 
 logger = logging.getLogger(__name__)
-
 def get_employee_report_data(user, employee_id=None, start_date=None, end_date=None):
     if employee_id and user.role in ['owner', 'admin']:
         try:
@@ -16,11 +15,17 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
             if user.role == 'admin':
                 query = query.filter(club=user.club)
             employee = query.first()
+            if not employee:
+                logger.error("Employee not found: employee_id=%s", employee_id)
+                return {'error': 'الموظف غير موجود أو لا ينتمي إلى النادي'}, status.HTTP_404_NOT_FOUND
         except User.DoesNotExist:
             logger.error("Employee not found: employee_id=%s", employee_id)
             return {'error': 'الموظف غير موجود أو لا ينتمي إلى النادي'}, status.HTTP_404_NOT_FOUND
     else:
         employee = user
+        if user.role not in ['owner', 'admin'] and employee_id:
+            logger.warning("Non-admin user attempted to access another employee's report: user=%s, employee_id=%s", user.username, employee_id)
+            return {'error': 'غير مسموح لك بمشاهدة تقارير موظف آخر'}, status.HTTP_403_FORBIDDEN
 
     # تحديد الفترة الزمنية
     if user.role in ['owner', 'admin']:
@@ -48,22 +53,22 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
         start = attendance.check_in
         end = timezone.now()
 
-    incomes = Income.objects.filter(
-        received_by=employee,
-        club=employee.club,
-        date__gte=start,
-        date__lte=end
-    ).values('source__name').annotate(
+    income_filters = {'club': employee.club, 'date__gte': start, 'date__lte': end}
+    expense_filters = {'club': employee.club, 'date__gte': start, 'date__lte': end}
+
+    if employee_id or user.role not in ['owner', 'admin']:
+        income_filters['received_by'] = employee
+        expense_filters['paid_by'] = employee
+    elif employee_id is None and user.role not in ['owner', 'admin']:
+        logger.warning("Non-admin user attempted to access club-wide report: user=%s", user.username)
+        return {'error': 'غير مسموح لك بمشاهدة تقرير النادي بالكامل'}, status.HTTP_403_FORBIDDEN
+
+    incomes = Income.objects.filter(**income_filters).values('source__name').annotate(
         count=Count('id'),
         total=Sum('amount')
     )
 
-    expenses = Expense.objects.filter(
-        paid_by=employee,
-        club=employee.club,
-        date__gte=start,
-        date__lte=end
-    ).values('category__name', 'description').annotate(
+    expenses = Expense.objects.filter(**expense_filters).values('category__name', 'description').annotate(
         total=Sum('amount')
     )
 
@@ -72,7 +77,7 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
     net_profit = total_income - total_expenses
 
     report_data = {
-        'employee_name': employee.username,
+        'employee_name': employee.username if employee_id else 'جميع الموظفين',
         'club_name': employee.club.name if employee.club else 'غير محدد',
         'check_in': timezone.localtime(start).isoformat(),
         'check_out': timezone.localtime(end).isoformat(),
@@ -96,4 +101,3 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
     }
 
     return report_data, status.HTTP_200_OK
-

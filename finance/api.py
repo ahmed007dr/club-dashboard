@@ -596,7 +596,6 @@ def finance_overview(request):
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def employee_daily_report_api(request):
@@ -628,11 +627,11 @@ def employee_daily_report_api(request):
     if employee_id:
         employee = get_object_or_404(User, id=employee_id)
         if employee.club != request.user.club:
-            return Response({'error': 'Employee not in your club'}, status=status.HTTP_403_FORBIDDEN)
+            return Response({'error': 'الموظف ليس في ناديك'}, status=status.HTTP_403_FORBIDDEN)
 
     data, status_code = get_employee_report_data(
         user=request.user,
-        employee_id=employee_id,
+        employee_id=employee_id if employee_id else None,  
         start_date=start_date,
         end_date=end_date
     )
