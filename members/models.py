@@ -27,8 +27,8 @@ class Member(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['club']),              # For filtering by club
-            models.Index(fields=['membership_number']), # For fast lookup by membership
-            models.Index(fields=['rfid_code']),        # For fast lookup by RFID
-            models.Index(fields=['created_at']),       # For sorting by creation date
+            models.Index(fields=['club']),             
+            models.Index(fields=['membership_number']),
+            models.Index(fields=['rfid_code']),        
+            models.Index(fields=['created_at']),       
         ]
