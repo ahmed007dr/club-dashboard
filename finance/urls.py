@@ -29,4 +29,9 @@ urlpatterns = [
     path('api/expense/all/', api.expense_all_api, name='expense_all_api'),
     path('api/income/all/', api.income_all_api, name='income_all_api'),
     path('api/financial-analysis/', api.financial_analysis_api, name='financial_analysis_api'),
+    
+    path('api/stock-items/', api.stock_item_api, name='api-stock-item'),
+    path('api/stock-inventory/', api.stock_inventory_api, name='api-stock-inventory'),
+    path('api/stock-profit/', api.stock_profit_api, name='api-stock-profit'),
+    path('api/stock-sales-analysis/', api.stock_sales_analysis_api, name='api-stock-sales-analysis'),
     ]

@@ -44,7 +44,8 @@ const Dashboard = () => {
         { path: 'attendance', name: 'الحضور', icon: <AiOutlineSchedule /> },
         { path: 'free-invites', name: 'الدعوات المجانية', icon: <RiVipCrown2Line /> },
         { path: 'tickets', name: 'التذاكر', icon: <GiTicket /> },
-        { path: '/dashboard/subscription-report', name: 'تقرير الاشتراكات', icon: <HiOutlineDocumentReport /> },
+        { path: 'dashboard/subscription-report', name: 'تقرير الاشتراكات', icon: <HiOutlineDocumentReport /> },
+        { path: 'dashboard/subscription-analytics', name: 'تحليل الاشتراكات الشامل', icon: <IoMdAnalytics /> }, // العنصر الجديد
       ],
     },
     {
@@ -74,6 +75,7 @@ const Dashboard = () => {
         { path: 'income-sources', name: 'الايرادات', icon: <GiReceiveMoney /> },
         { path: 'expense', name: 'المصروفات', icon: <GiPayMoney /> },
         { path: 'dashboard/financial-analysis', name: 'التحليل المالي', icon: <TbReportAnalytics /> },
+        { path: 'dashboard/StockAnalytics', name: 'تحليل المخزون', icon: <IoMdAnalytics /> }, 
       ],
     },
   ];

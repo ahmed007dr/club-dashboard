@@ -36,7 +36,7 @@ const ManageUsers = () => {
     const fetchClubs = async () => {
       try {
         const token = localStorage.getItem('token');
-        const res = await axios.get(`${BASE_URL}/core/api/clubs/`, {
+        const res = await axios.get(`${BASE_URL}core/api/clubs/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         setClubs(res.data.results || []);

@@ -2,7 +2,10 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Q, Count, Sum
+from django.db.models import (
+    Count, Sum, Avg, Q, Case, When, F, Max, IntegerField, FloatField, Value, ExpressionWrapper
+)
+from django.db.models.functions import TruncMonth, TruncWeek
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
@@ -12,13 +15,16 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
-from .models import Subscription, SubscriptionType
-from .serializers import SubscriptionSerializer, FreezeRequest, SubscriptionTypeSerializer,CoachReportSerializer
+from subscriptions.models import Subscription, SubscriptionType, FreezeRequest
+from subscriptions.serializers import (
+    SubscriptionSerializer, SubscriptionTypeSerializer, CoachReportSerializer,MemberBehaviorSerializer
+)
 
 from finance.models import Income, IncomeSource
 from members.models import Member
 from staff.models import StaffAttendance
 from accounts.models import User
+from attendance.models import Attendance
 
 from utils.permissions import IsOwnerOrRelatedToClub
 
@@ -35,9 +41,8 @@ def subscription_type_list(request):
 
         types = SubscriptionType.objects.filter(club=request.user.club).annotate(
             active_subscriptions_count=Count(
-                'subscription',
-                filter=Q(subscription__end_date__gte=timezone.now().date())
-            )
+                'subscriptions', 
+                filter=Q(subscriptions__end_date__gte=timezone.now().date())            )
         )
 
         if search_term:
@@ -746,3 +751,301 @@ def coach_report(request, coach_id):
     serializer = CoachReportSerializer(report)
     return Response(serializer.data)
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def subscription_analytics(request):
+    """
+    API endpoint to retrieve analytics for subscriptions, including popular types, attendance,
+    freeze stats, revenue, member behavior, coach performance, and more.
+    """
+    # Initialize parameters
+    today = timezone.now().date()
+    club = request.user.club
+
+    # Get query parameters
+    start = request.query_params.get('start_date')
+    end = request.query_params.get('end_date')
+    s_type = request.query_params.get('subscription_type')
+    coach = request.query_params.get('coach')
+
+    # Validate and parse dates
+    try:
+        start_date = datetime.strptime(start, '%Y-%m-%d').date() if start else today - timedelta(days=90)
+        end_date = datetime.strptime(end, '%Y-%m-%d').date() if end else today
+    except ValueError:
+        return Response(
+            {'error': 'Invalid date format. Use YYYY-MM-DD'},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Define base filter for Subscription model
+    base_filter = {
+        'club': club,
+        'start_date__lte': end_date,
+        'end_date__gte': start_date
+    }
+    if s_type:
+        base_filter['type_id'] = s_type
+    if coach:
+        base_filter['coach_id'] = coach
+
+    # Base queryset for subscriptions
+    base_qs = Subscription.objects.filter(**base_filter).select_related('type', 'member', 'coach')
+    total_subs = base_qs.count()
+
+    # 1. Popular Subscription Types
+    popular_qs = SubscriptionType.objects.filter(club=club).annotate(
+        total=Count(
+            'subscriptions',
+            filter=Q(
+                subscriptions__start_date__gte=start_date,
+                subscriptions__start_date__lte=end_date
+            )
+        )
+    ).values('name', 'total').order_by('-total')[:5]
+
+    # 2. Attendance Analysis
+    att_qs = base_qs.prefetch_related('attendance_attendances')
+    att_stats = att_qs.values('type__name').annotate(
+        total_attendance=Count(
+            'attendance_attendances',
+            filter=Q(
+                attendance_attendances__attendance_date__range=(start_date, end_date)
+            )
+        )
+    )
+    for item in att_stats:
+        matching_subs = att_qs.filter(type__name=item['type__name'])
+        total_att = sum(
+            matching_subs.filter(
+                attendance_attendances__attendance_date__range=(start_date, end_date)
+            ).count()
+            for s in matching_subs
+        )
+        item['avg_attendance'] = round(total_att / len(matching_subs) if matching_subs else 0, 2)
+
+    # 3. Attendance by Day of Week
+    att_by_day = Attendance.objects.filter(
+        subscription__club=club,
+        attendance_date__range=(start_date, end_date)
+    )
+    if s_type:
+        att_by_day = att_by_day.filter(subscription__type_id=s_type)
+    if coach:
+        att_by_day = att_by_day.filter(subscription__coach_id=coach)
+
+    att_by_day = att_by_day.annotate(
+        day_of_week=Case(
+            When(attendance_date__week_day=2, then=0),  # Monday
+            When(attendance_date__week_day=3, then=1),  # Tuesday
+            When(attendance_date__week_day=4, then=2),  # Wednesday
+            When(attendance_date__week_day=5, then=3),  # Thursday
+            When(attendance_date__week_day=6, then=4),  # Friday
+            When(attendance_date__week_day=7, then=5),  # Saturday
+            When(attendance_date__week_day=1, then=6),  # Sunday
+            output_field=IntegerField()
+        )
+    ).values('day_of_week').annotate(total_entries=Count('id')).order_by('day_of_week')
+
+    # 4. Freeze Analysis
+    freeze_filter = {
+        'subscriptions__start_date__gte': start_date,
+        'subscriptions__start_date__lte': end_date,
+        **({'subscriptions__type_id': s_type} if s_type else {}),
+        **({'subscriptions__coach_id': coach} if coach else {})
+    }
+    freeze_stats = SubscriptionType.objects.filter(club=club).prefetch_related('subscriptions__freeze_requests').annotate(
+        total=Count('subscriptions', filter=Q(**freeze_filter)),
+        total_freezes=Count(
+            'subscriptions__freeze_requests',
+            filter=Q(
+                subscriptions__freeze_requests__start_date__gte=start_date,
+                subscriptions__freeze_requests__end_date__lte=end_date,
+                subscriptions__freeze_requests__is_active=True,
+                **({'subscriptions__type_id': s_type} if s_type else {}),
+                **({'subscriptions__coach_id': coach} if coach else {})
+            )
+        ),
+        frozen_subscriptions=Count(
+            'subscriptions',
+            filter=Q(
+                subscriptions__freeze_requests__start_date__gte=start_date,
+                subscriptions__freeze_requests__end_date__lte=end_date,
+                subscriptions__freeze_requests__is_active=True,
+                **({'subscriptions__type_id': s_type} if s_type else {}),
+                **({'subscriptions__coach_id': coach} if coach else {})
+            )
+        )
+    ).annotate(
+        freeze_percentage=ExpressionWrapper(
+            100.0 * F('frozen_subscriptions') / Case(
+                When(total__gt=0, then=F('total')),
+                default=Value(1),
+                output_field=FloatField()
+            ),
+            output_field=FloatField()
+        )
+    ).values('name', 'total', 'total_freezes', 'frozen_subscriptions', 'freeze_percentage').order_by('-total_freezes')
+
+    # 5. Revenue Analysis
+    revenue_filter = {
+        'subscriptions__club': club,
+        'subscriptions__start_date__lte': end_date,
+        'subscriptions__end_date__gte': start_date,
+        **({'subscriptions__type_id': s_type} if s_type else {}),
+        **({'subscriptions__coach_id': coach} if coach else {})
+    }
+    revenue_stats = SubscriptionType.objects.filter(club=club).prefetch_related('subscriptions').annotate(
+        total_revenue=Sum('subscriptions__paid_amount', filter=Q(**revenue_filter)),
+        private_revenue=Sum(
+            'subscriptions__private_training_price',
+            filter=Q(subscriptions__type__is_private_training=True, **revenue_filter)
+        ),
+        remaining_amount=Sum('subscriptions__remaining_amount', filter=Q(**revenue_filter))
+    ).values('name', 'total_revenue', 'private_revenue', 'remaining_amount').order_by('-total_revenue')
+
+    # 6. Member Behavior
+    member_behavior = base_qs.annotate(
+        attendance_count=Count(
+            'attendance_attendances',
+            filter=Q(attendance_attendances__attendance_date__range=(start_date, end_date))
+        ),
+        subscription_count=Count('member__subscription')
+    ).values('member__name', 'attendance_count', 'subscription_count').annotate(
+        is_regular=Case(
+            When(attendance_count__gte=10, then=True),
+            default=False,
+            output_field=IntegerField()
+        ),
+        is_repeated=Case(
+            When(subscription_count__gte=2, then=True),
+            default=False,
+            output_field=IntegerField()
+        )
+    ).order_by('-attendance_count')[:10]
+
+    # 7. Inactive Members
+    inactive_members = base_qs.annotate(
+        last_attendance=Max('attendance_attendances__attendance_date')
+    ).filter(
+        Q(last_attendance__lte=today - timedelta(days=30)) | Q(last_attendance__isnull=True)
+    ).values('member__name').annotate(subscription_count=Count('id'))[:10]
+
+    # 8. Coach Analysis
+    coach_stats = User.objects.filter(role='coach', is_active=True, club=club).annotate(
+        total_clients=Count(
+            'private_subscriptions',
+            filter=Q(
+                private_subscriptions__start_date__lte=end_date,
+                private_subscriptions__end_date__gte=start_date,
+                private_subscriptions__type__is_private_training=True,
+                **({'private_subscriptions__type_id': s_type} if s_type else {})
+            )
+        ),
+        total_attendance=Count(
+            'private_subscriptions__attendance_attendances',
+            filter=Q(
+                private_subscriptions__attendance_attendances__attendance_date__range=(start_date, end_date),
+                **({'private_subscriptions__type_id': s_type} if s_type else {})
+            )
+        ),
+        total_revenue=Sum(
+            'private_subscriptions__private_training_price',
+            filter=Q(
+                private_subscriptions__start_date__lte=end_date,
+                private_subscriptions__end_date__gte=start_date,
+                private_subscriptions__type__is_private_training=True,
+                **({'private_subscriptions__type_id': s_type} if s_type else {})
+            )
+        )
+    ).values('username', 'total_clients', 'total_attendance', 'total_revenue').order_by('-total_clients')
+
+    # 9. Temporal Analysis
+    temporal_stats = base_qs.annotate(month=TruncMonth('start_date')).values('month').annotate(
+        total_subscriptions=Count('id'),
+        total_revenue=Sum('paid_amount')
+    ).order_by('month')
+
+    # 10. Renewal Rate
+    renewal_filter = {
+        'subscriptions__end_date__lt': end_date,
+        'subscriptions__start_date__gte': start_date,
+        **({'subscriptions__type_id': s_type} if s_type else {}),
+        **({'subscriptions__coach_id': coach} if coach else {})
+    }
+    renewal_stats = SubscriptionType.objects.filter(club=club).annotate(
+        expired_subscriptions=Count('subscriptions', filter=Q(**renewal_filter)),
+        renewed_subscriptions=Count(
+            'subscriptions',
+            filter=Q(
+                subscriptions__end_date__lt=end_date,
+                subscriptions__start_date__gte=start_date,
+                subscriptions__member__subscription__start_date__gt=F('subscriptions__end_date'),
+                subscriptions__member__subscription__start_date__lte=F('subscriptions__end_date') + timedelta(days=30),
+                subscriptions__member__subscription__type=F('subscriptions__type'),
+                **({'subscriptions__type_id': s_type} if s_type else {}),
+                **({'subscriptions__coach_id': coach} if coach else {})
+            )
+        )
+    ).annotate(
+        renewal_rate=ExpressionWrapper(
+            100.0 * F('renewed_subscriptions') / Case(
+                When(expired_subscriptions__gt=0, then=F('expired_subscriptions')),
+                default=Value(1),
+                output_field=FloatField()
+            ),
+            output_field=FloatField()
+        )
+    ).values('name', 'expired_subscriptions', 'renewed_subscriptions', 'renewal_rate').order_by('-renewal_rate')
+
+    # 11. Subscriptions Nearing Expiry
+    nearing_expiry = Subscription.objects.filter(
+        club=club,
+        end_date__range=(today, today + timedelta(days=7)),
+        **({'type_id': s_type} if s_type else {}),
+        **({'coach_id': coach} if coach else {})
+    ).order_by('end_date')
+
+    # Construct response
+    response = {
+        'popular_subscription_types': list(popular_qs),
+        'attendance_analysis': {
+            'highest_attendance_types': list(att_stats),
+            'by_day_of_week': [
+                {
+                    'day': ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'][d['day_of_week']],
+                    'total_entries': d['total_entries']
+                }
+                for d in att_by_day
+            ]
+        },
+        'freeze_analysis': list(freeze_stats),
+        'revenue_analysis': list(revenue_stats),
+        'member_behavior': {
+            'active_members': MemberBehaviorSerializer(member_behavior, many=True).data,  # Fixed: Use MemberBehaviorSerializer
+            'inactive_members': list(inactive_members)
+        },
+        'coach_analysis': list(coach_stats),
+        'temporal_analysis': [
+            {
+                'month': t['month'].strftime('%Y-%m'),
+                'total_subscriptions': t['total_subscriptions'],
+                'total_revenue': t['total_revenue'] or 0
+            }
+            for t in temporal_stats
+        ],
+        'renewal_rate_by_type': [
+            {
+                'name': r['name'],
+                'expired_subscriptions': r['expired_subscriptions'],
+                'renewed_subscriptions': r['renewed_subscriptions'],
+                'renewal_rate': round(r['renewal_rate'], 2)
+            }
+            for r in renewal_stats
+        ],
+        'nearing_expiry': SubscriptionSerializer(nearing_expiry, many=True).data,
+        'date_range': {'start_date': str(start_date), 'end_date': str(end_date)}
+    }
+
+    return Response(response)

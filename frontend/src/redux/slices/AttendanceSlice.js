@@ -52,7 +52,7 @@ export const addAttendance = createAsyncThunk(
       console.log('Sending attendance data:', newAttendance); // Log the data being sent
 
       const token = localStorage.getItem('token');
-      const response = await axios.post(`${BASE_URL}/attendance/api/attendances/add/`, newAttendance, {
+      const response = await axios.post(`${BASE_URL}attendance/api/attendances/add/`, newAttendance, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',

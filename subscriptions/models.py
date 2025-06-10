@@ -37,7 +37,8 @@ class SubscriptionType(models.Model):
 class Subscription(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     member = models.ForeignKey('members.Member', on_delete=models.CASCADE)
-    type = models.ForeignKey(SubscriptionType, on_delete=models.CASCADE)
+    type = models.ForeignKey(SubscriptionType, on_delete=models.CASCADE, related_name='subscriptions')
+
     coach = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, 
                             related_name='private_subscriptions', 
                             limit_choices_to={'role': 'coach', 'is_active': True})
