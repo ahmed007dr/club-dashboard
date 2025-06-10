@@ -5,6 +5,7 @@ class ExpenseCategory(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
+    is_stock_related = models.BooleanField(default=False)  
 
     def __str__(self):
         return self.name
@@ -14,7 +15,7 @@ class ExpenseCategory(models.Model):
             models.Index(fields=['club']),
             models.Index(fields=['name']),
         ]
-        ordering = ['name']  
+        ordering = ['name']
 
 class Expense(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
@@ -25,11 +26,29 @@ class Expense(models.Model):
     paid_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     invoice_number = models.CharField(max_length=100, blank=True, null=True)
     attachment = models.FileField(upload_to='expenses/', null=True, blank=True)
+    stock_item = models.ForeignKey('StockItem', on_delete=models.SET_NULL, null=True, blank=True)
+    stock_quantity = models.PositiveIntegerField(null=True, blank=True)  
 
     def save(self, *args, **kwargs):
         if not self.invoice_number:
             self.invoice_number = generate_invoice_number(invoice_date=self.date)
-        super(Expense, self).save(*args, **kwargs)
+
+        if self.category and self.category.is_stock_related:
+            if self.stock_item and self.stock_quantity:
+                StockTransaction.objects.create(
+                    stock_item=self.stock_item,
+                    transaction_type='ADD',
+                    quantity=self.stock_quantity,
+                    description=f'شراء عبر المصروف #{self.invoice_number}',
+                    related_expense=self
+                )
+            else:
+                raise ValueError('يجب تحديد عنصر المخزون والكمية لفئة المصروفات المرتبطة بالمخزون')
+        else:
+            self.stock_item = None
+            self.stock_quantity = None
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.category.name} - {self.amount}"
@@ -41,14 +60,14 @@ class Expense(models.Model):
             models.Index(fields=['date']),
             models.Index(fields=['invoice_number']),
         ]
-        ordering = ['-date', 'id'] 
+        ordering = ['-date', 'id']
 
 class IncomeSource(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)  
-
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    stock_item = models.ForeignKey('StockItem', on_delete=models.SET_NULL, null=True, blank=True)  
     def __str__(self):
         return f"{self.name} ({self.price} جنيه)"
 
@@ -57,16 +76,17 @@ class IncomeSource(models.Model):
             models.Index(fields=['club']),
             models.Index(fields=['name']),
         ]
-        ordering = ['name'] 
+        ordering = ['name']
 
 class Income(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
-    source = models.ForeignKey(IncomeSource, on_delete=models.SET_NULL, null=True)
+    source = models.ForeignKey('IncomeSource', on_delete=models.SET_NULL, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True)
     date = models.DateField()
     received_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     related_receipt = models.ForeignKey('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True)
+    stock_transaction = models.ForeignKey('StockTransaction', on_delete=models.SET_NULL, null=True, blank=True)  # ربط بحركة المخزون
 
     def __str__(self):
         return f"{self.source.name} - {self.amount}"
@@ -79,3 +99,57 @@ class Income(models.Model):
             models.Index(fields=['related_receipt']),
         ]
         ordering = ['-date', 'id']
+
+class StockItem(models.Model):
+    club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    unit = models.CharField(max_length=50, default='water')  
+    initial_quantity = models.PositiveIntegerField(default=0)  
+    current_quantity = models.PositiveIntegerField(default=0)  
+    is_sellable = models.BooleanField(default=True)  
+    
+    def __str__(self):
+        return f"{self.name} ({self.current_quantity} {self.unit})"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['club']),
+            models.Index(fields=['name']),
+        ]
+        ordering = ['name']
+
+class StockTransaction(models.Model):
+    TRANSACTION_TYPES = (
+        ('ADD', 'إضافة'),
+        ('CONSUME', 'استهلاك'),
+    )
+
+    stock_item = models.ForeignKey('StockItem', on_delete=models.CASCADE, related_name='transactions')
+    transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
+    quantity = models.PositiveIntegerField()
+    date = models.DateTimeField(auto_now_add=True)
+    description = models.TextField(blank=True)
+    related_expense = models.ForeignKey('Expense', on_delete=models.SET_NULL, null=True, blank=True)
+    related_income = models.ForeignKey('Income', on_delete=models.SET_NULL, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        # تحديث الكمية الحالية في StockItem
+        if self.transaction_type == 'ADD':
+            self.stock_item.current_quantity += self.quantity
+        elif self.transaction_type == 'CONSUME':
+            if self.quantity > self.stock_item.current_quantity:
+                raise ValueError('الكمية المستهلكة أكبر من الكمية المتاحة')
+            self.stock_item.current_quantity -= self.quantity
+        self.stock_item.save()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.transaction_type} - {self.stock_item.name} ({self.quantity})"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['stock_item']),
+            models.Index(fields=['date']),
+        ]
+        ordering = ['-date']

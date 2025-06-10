@@ -1,114 +1,59 @@
-import React, { useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import { fetchIncomeSources } from "../../redux/slices/financeSlice";
-import IncomeSourceForm from "./IncomeSourceForm";
-import usePermission from "@/hooks/usePermission";
-import { Button } from "@/components/ui/button";
+
+import React from 'react';
+import { useSelector } from 'react-redux';
+import { FiAlertTriangle } from 'react-icons/fi';
 
 const IncomeSourcesList = () => {
-  const dispatch = useDispatch();
-  const { incomeSources, loading, error, incomeSourcesPagination } = useSelector((state) => state.finance);
-
-  const canViewIncomeSources = usePermission("view_incomesource");
-  const canAddIncomeSources = usePermission("add_incomesource");
-
-  useEffect(() => {
-    dispatch(fetchIncomeSources());
-  }, [dispatch]);
-
-  if (!canViewIncomeSources) {
-    return (
-      <div className="max-w-2xl mx-auto mt-10 p-6 rounded-lg" dir="rtl">
-        <p className="text-red-500">ليس لديك صلاحية عرض مصادر الدخل</p>
-      </div>
-    );
-  }
+  const { incomeSources, loading, error } = useSelector((state) => state.finance || {});
 
   return (
-    <div className="max-w-2xl mx-auto mt-10 p-6 rounded-lg" dir="rtl">
-      {canAddIncomeSources && (
-        <div className="flex justify-end mb-6">
-          <IncomeSourceForm />
+    <div className="rounded-md border border-gray-200 overflow-x-auto" dir="rtl">
+      {error && (
+        <div className="bg-red-50 p-4 rounded-lg flex items-center gap-3 text-right mb-4">
+          <FiAlertTriangle className="text-red-600 w-6 h-6" />
+          <p className="text-red-600">{error}</p>
         </div>
       )}
-
-      {loading && <p className="text-center">جاري التحميل...</p>}
-      {error && <p className="text-red-500 text-center">{error}</p>}
-
-      {incomeSources.length === 0 ? (
-        <p className="text-center text-gray-500">لا توجد مصادر دخل مسجلة.</p>
+      {loading ? (
+        <div className="flex justify-center py-6">
+          <svg className="animate-spin h-8 w-8 text-green-600" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+        </div>
       ) : (
-        <div>
-          {/* Table view (lg screens and above) */}
-          <div className="hidden lg:block overflow-x-auto">
-            <table className="w-full table-auto border border-gray-300">
-              <thead>
-                <tr className="text-right bg-gray-100">
-                  <th className="px-4 py-2 border">الاسم</th>
-                  <th className="px-4 py-2 border">الوصف</th>
-                  <th className="px-4 py-2 border">النادي</th>
-                  <th className="px-4 py-2 border">السعر</th>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead>
+            <tr className="bg-gray-100 text-gray-700">
+              <th className="px-4 py-3 text-right text-sm font-semibold">الاسم</th>
+              <th className="px-4 py-3 text-right text-sm font-semibold">الوصف</th>
+              <th className="px-4 py-3 text-right text-sm font-semibold">النادي</th>
+              <th className="px-4 py-3 text-right text-sm font-semibold">السعر</th>
+              <th className="px-4 py-3 text-right text-sm font-semibold">نوع المخزون</th>
+              <th className="px-4 py-3 text-right text-sm font-semibold">الكمية الباقية</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200 bg-white">
+            {incomeSources?.length ? (
+              incomeSources.map((source) => (
+                <tr key={source.id} className="hover:bg-gray-50 transition-all duration-200">
+                  <td className="px-4 py-3 text-sm text-gray-800">{source.name || 'غير متاح'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-800">{source.description || 'لا يوجد وصف'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-800">{source.club_details?.name || 'غير متاح'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-800">{source.price ? `${source.price} جنيه` : 'غير متاح'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-800">{source.stock_item?.name || 'بدون مخزون'}</td>
+                  <td className="px-4 py-3 text-sm text-gray-800">{source.stock_item?.current_quantity ?? 'غير متاح'}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {incomeSources.map((source) => (
-                  <tr key={source.id} className="text-right hover:bg-gray-50">
-                    <td className="px-4 py-2 border">{source.name}</td>
-                    <td className="px-4 py-2 border">
-                      {source.description || "لا يوجد وصف"}
-                    </td>
-                    <td className="px-4 py-2 border">
-                      {source.club_details?.name || "غير معروف"}
-                    </td>
-                    <td className="px-4 py-2 border">
-                      {source.price != null ? `${source.price} جنيه` : "غير متاح"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Card view (md and sm screens) */}
-          <div className="lg:hidden space-y-3">
-            {incomeSources.map((source) => (
-              <div key={source.id} className="border border-gray-300 rounded-lg p-4 hover:bg-gray-50">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="text-left text-gray-500">الاسم</div>
-                  <div className="text-right font-medium">{source.name}</div>
-
-                  <div className="text-left text-gray-500">الوصف</div>
-                  <div className="text-right">{source.description || "لا يوجد وصف"}</div>
-
-                  <div className="text-left text-gray-500">النادي</div>
-                  <div className="text-right">{source.club_details?.name || "غير معروف"}</div>
-
-                  <div className="text-left text-gray-500">السعر</div>
-                  <div className="text-right">
-                    {source.price != null ? `${source.price} جنيه` : "غير متاح"}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {incomeSourcesPagination?.count > 20 && (
-        <div className="flex justify-center gap-2 mt-4">
-          {Array.from(
-            { length: Math.ceil(incomeSourcesPagination.count / 20) },
-            (_, i) => (
-              <Button
-                key={i + 1}
-                variant="outline"
-                onClick={() => dispatch(fetchIncomeSources({ page: i + 1 }))}
-              >
-                {i + 1}
-              </Button>
-            )
-          )}
-        </div>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="6" className="px-4 py-3 text-center text-gray-500">
+                  لا توجد مصادر مبيعات متاحة
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       )}
     </div>
   );

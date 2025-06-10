@@ -20,16 +20,17 @@ from rest_framework.response import Response
 
 from jinja2 import Template
 from decimal import Decimal
+from django.db import transaction
 
 
 from accounts.models import User
 from staff.models import StaffAttendance
-from .models import Expense, Income, ExpenseCategory, IncomeSource
+from .models import Expense, Income, ExpenseCategory, IncomeSource,StockTransaction,StockItem
 from .serializers import (
     ExpenseSerializer, IncomeSerializer,
     ExpenseCategorySerializer, IncomeSourceSerializer,
     ExpenseDetailSerializer, IncomeDetailSerializer,
-    IncomeSummarySerializer
+    IncomeSummarySerializer,StockItemSerializer,StockTransaction,StockItem
 )
 
 from utils.permissions import IsOwnerOrRelatedToClub
@@ -203,34 +204,58 @@ def income_api(request):
         page = paginator.paginate_queryset(incomes, request)
         serializer = IncomeSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
-    
+        
     elif request.method == 'POST':
         data = request.data.copy()
         data['received_by'] = request.user.id
         data['club'] = request.user.club.id
-        data['date'] = timezone.now().date().isoformat()  # إضافة التاريخ تلقائيًا
+        data['date'] = timezone.now().date().isoformat()
 
         source_id = data.get('source')
+        quantity = data.get('quantity', 1)
         if not source_id:
             return Response({'error': 'Source is required'}, status=status.HTTP_400_BAD_REQUEST)
         
         try:
             source = IncomeSource.objects.get(id=source_id, club=request.user.club)
-            data['amount'] = float(source.price)
+            if source.stock_item:
+                if not source.stock_item.is_sellable:
+                    return Response({'error': 'عنصر المخزون غير قابل للبيع'}, status=status.HTTP_400_BAD_REQUEST)
+                if not data.get('quantity'):
+                    data['quantity'] = 1
+                quantity = int(data['quantity'])
+                if quantity <= 0:
+                    return Response({'error': 'الكمية يجب أن تكون أكبر من صفر'}, status=status.HTTP_400_BAD_REQUEST)
+                if quantity > source.stock_item.current_quantity:
+                    return Response({'error': 'الكمية المطلوبة غير متوفرة في المخزون'}, status=status.HTTP_400_BAD_REQUEST)
+                data['amount'] = float(source.price * quantity)
+            else:
+                data['amount'] = float(source.price)
         except IncomeSource.DoesNotExist:
             return Response({'error': 'Invalid source ID'}, status=status.HTTP_400_BAD_REQUEST)
         except ValueError:
-            return Response({'error': 'Invalid price in source'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Invalid price or quantity'}, status=status.HTTP_400_BAD_REQUEST)
 
         if 'description' not in data or not data['description']:
             data['description'] = ''
 
         serializer = IncomeSerializer(data=data)
         if serializer.is_valid():
-            income = serializer.save()
+            with transaction.atomic():
+                income = serializer.save()
+                if source.stock_item:
+                    stock_transaction = StockTransaction.objects.create(
+                        stock_item=source.stock_item,
+                        transaction_type='CONSUME',
+                        quantity=quantity,
+                        description=f'بيع عبر الإيراد #{income.id} - {data["description"]}',
+                        related_income=income
+                    )
+                    income.stock_transaction = stock_transaction
+                    income.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)    
-    
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_detail_api(request, pk):
@@ -1153,3 +1178,304 @@ def financial_analysis_api(request):
     except Exception as e:
         logger.error(f"Error in financial_analysis_api: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def stock_item_api(request):
+    if request.method == 'GET':
+        stock_items = StockItem.objects.filter(club=request.user.club)
+        name = request.query_params.get('name', '')
+        if name:
+            stock_items = stock_items.filter(name__icontains=name)
+        stock_items = stock_items.order_by('-id')
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(stock_items, request)
+        serializer = StockItemSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+    
+    elif request.method == 'POST':
+        if request.user.role not in ['owner', 'admin']:
+            return Response({'error': 'Only owners and admins can create stock items'}, status=status.HTTP_403_FORBIDDEN)
+        data = request.data.copy()
+        data['club'] = request.user.club.id
+        serializer = StockItemSerializer(data=data)
+        if serializer.is_valid():
+            stock_item = serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def stock_inventory_api(request):
+    if request.method == 'GET':
+        try:
+            stock_items = StockItem.objects.filter(club=request.user.club).annotate(
+                total_added=Sum('transactions__quantity', filter=models.Q(transactions__transaction_type='ADD')),
+                total_consumed=Sum('transactions__quantity', filter=models.Q(transactions__transaction_type='CONSUME'))
+            )
+            report_data = [
+                {
+                    'id': item.id,
+                    'name': item.name,
+                    'unit': item.unit,
+                    'current_quantity': item.current_quantity,
+                    'total_added': item.total_added or 0,
+                    'total_consumed': item.total_consumed or 0
+                } for item in stock_items
+            ]
+            return Response(report_data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error("Error fetching stock inventory: %s", str(e))
+            return Response({'error': 'حدث خطأ أثناء جلب تقرير المخزون'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    elif request.method == 'POST':
+        if request.user.role not in ['owner', 'admin']:
+            return Response({'error': 'Only owners and admins can perform inventory checks'}, status=status.HTTP_403_FORBIDDEN)
+        inventory_data = request.data.get('inventory', [])
+        try:
+            discrepancies = []
+            with transaction.atomic():
+                for item in inventory_data:
+                    stock_item_id = item.get('stock_item_id')
+                    actual_quantity = item.get('actual_quantity')
+                    if not stock_item_id or actual_quantity is None:
+                        return Response({'error': 'يجب تحديد معرف عنصر المخزون والكمية الفعلية'}, status=status.HTTP_400_BAD_REQUEST)
+                    stock_item = StockItem.objects.get(id=stock_item_id, club=request.user.club)
+                    expected_quantity = stock_item.current_quantity
+                    if actual_quantity != expected_quantity:
+                        difference = actual_quantity - expected_quantity
+                        transaction_type = 'ADD' if difference > 0 else 'CONSUME'
+                        quantity = abs(difference)
+                        StockTransaction.objects.create(
+                            stock_item=stock_item,
+                            transaction_type=transaction_type,
+                            quantity=quantity,
+                            description=f'تعديل الجرد اليومي: {"زيادة" if difference > 0 else "نقص"} بمقدار {quantity}',
+                        )
+                        discrepancies.append({
+                            'stock_item': stock_item.name,
+                            'expected_quantity': expected_quantity,
+                            'actual_quantity': actual_quantity,
+                            'difference': difference
+                        })
+            return Response({
+                'message': 'تم تسجيل الجرد بنجاح',
+                'discrepancies': discrepancies
+            }, status=status.HTTP_200_OK)
+        except StockItem.DoesNotExist:
+            return Response({'error': 'عنصر المخزون غير موجود'}, status=status.HTTP_404_NOT_FOUND)
+        except ValueError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error("Error processing inventory: %s", str(e))
+            return Response({'error': 'حدث خطأ أثناء تسجيل الجرد'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def stock_profit_api(request):
+    try:
+        if request.user.role not in ['owner', 'admin']:
+            return Response({'error': 'Only owners and admins can view stock profit'}, status=status.HTTP_403_FORBIDDEN)
+
+        stock_item_id = request.query_params.get('stock_item_id')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+
+        stock_items = StockItem.objects.filter(club=request.user.club)
+        if stock_item_id:
+            stock_items = stock_items.filter(id=stock_item_id)
+
+        if start_date and end_date:
+            try:
+                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+            except ValueError:
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            start_date_obj = None
+            end_date_obj = None
+
+        report_data = []
+        for item in stock_items:
+            purchase_transactions = StockTransaction.objects.filter(
+                stock_item=item,
+                transaction_type='ADD'
+            )
+            if start_date_obj and end_date_obj:
+                purchase_transactions = purchase_transactions.filter(date__date__range=[start_date_obj, end_date_obj])
+
+            total_purchase_cost = sum(
+                tx.related_expense.amount if tx.related_expense else 0
+                for tx in purchase_transactions
+            )
+            total_purchase_quantity = sum(tx.quantity for tx in purchase_transactions)
+
+            sale_transactions = StockTransaction.objects.filter(
+                stock_item=item,
+                transaction_type='CONSUME',
+                related_income__isnull=False
+            )
+            if start_date_obj and end_date_obj:
+                sale_transactions = sale_transactions.filter(date__date__range=[start_date_obj, end_date_obj])
+
+            total_sale_revenue = sum(
+                tx.related_income.amount if tx.related_income else 0
+                for tx in sale_transactions
+            )
+            total_sale_quantity = sum(tx.quantity for tx in sale_transactions)
+
+            # حساب الربح
+            profit = total_sale_revenue - total_purchase_cost
+            profit_per_unit = profit / total_sale_quantity if total_sale_quantity > 0 else 0
+
+            report_data.append({
+                'stock_item_id': item.id,
+                'stock_item_name': item.name,
+                'total_purchase_quantity': total_purchase_quantity,
+                'total_purchase_cost': float(total_purchase_cost),
+                'total_sale_quantity': total_sale_quantity,
+                'total_sale_revenue': float(total_sale_revenue),
+                'profit': float(profit),
+                'profit_per_unit': float(profit_per_unit)
+            })
+
+        return Response(report_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error("Error calculating stock profit: %s", str(e))
+        return Response({'error': 'حدث خطأ أثناء حساب الربح'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+from django.db.models.functions import TruncHour
+from django.db.models import Count
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def stock_sales_analysis_api(request):
+    try:
+        if request.user.role not in ['owner', 'admin']:
+            return Response({'error': 'Only owners and admins can view sales analysis'}, status=status.HTTP_403_FORBIDDEN)
+
+        stock_item_id = request.query_params.get('stock_item_id')
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        period_type = request.query_params.get('period_type', 'monthly')  # daily, weekly, monthly, yearly
+
+        valid_periods = ['daily', 'weekly', 'monthly', 'yearly']
+        if period_type not in valid_periods:
+            return Response({'error': f'Invalid period_type. Use one of: {", ".join(valid_periods)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        stock_items = StockItem.objects.filter(club=request.user.club)
+        if stock_item_id:
+            stock_items = stock_items.filter(id=stock_item_id)
+
+        if start_date and end_date:
+            try:
+                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+                if start_date_obj > end_date_obj:
+                    return Response({'error': 'Start date must be before end date.'}, status=status.HTTP_400_BAD_REQUEST)
+            except ValueError:
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            end_date_obj = timezone.now().date()
+            if period_type == 'daily':
+                start_date_obj = end_date_obj - timedelta(days=30)
+            elif period_type == 'weekly':
+                start_date_obj = end_date_obj - timedelta(weeks=12)
+            elif period_type == 'monthly':
+                start_date_obj = end_date_obj - relativedelta(months=12)
+            else:
+                start_date_obj = end_date_obj - relativedelta(years=5)
+
+        analysis_data = []
+        for item in stock_items:
+            transactions = StockTransaction.objects.filter(
+                stock_item=item,
+                transaction_type='CONSUME',
+                related_income__isnull=False,
+                date__date__range=[start_date_obj, end_date_obj]
+            )
+
+            # تحليل المبيعات حسب الفترة
+            trunc_func = {
+                'daily': TruncDay,
+                'weekly': TruncWeek,
+                'monthly': TruncMonth,
+                'yearly': TruncYear
+            }[period_type]
+
+            sales_by_period = transactions.annotate(period=trunc_func('date')).values('period').annotate(
+                total_quantity=Sum('quantity'),
+                total_revenue=Sum('related_income__amount')
+            ).order_by('period')
+
+            # تحليل ساعات البيع
+            sales_by_hour = transactions.annotate(hour=TruncHour('date')).values('hour').annotate(
+                total_quantity=Sum('quantity'),
+                total_revenue=Sum('related_income__amount')
+            ).order_by('hour')
+
+            # تحليل أداء المبيعات
+            total_quantity_sold = transactions.aggregate(total=Sum('quantity'))['total'] or 0
+            total_revenue = transactions.aggregate(total=Sum('related_income__amount'))['total'] or 0
+            days_in_period = (end_date_obj - start_date_obj).days + 1
+            avg_daily_sales = total_quantity_sold / days_in_period if days_in_period > 0 else 0
+
+            # تقييم حالة البيع
+            sales_status = 'غير معروف'
+            if avg_daily_sales == 0:
+                sales_status = 'لا مبيعات'
+            elif avg_daily_sales < 1:  # أقل من وحدة واحدة يوميًا
+                sales_status = 'ضعيف (مبيعات نادرة)'
+            elif avg_daily_sales < 5:  # بين 1 و5 وحدات يوميًا
+                sales_status = 'متوسط (مبيعات متقطعة)'
+            else:  # أكثر من 5 وحدات يوميًا
+                sales_status = 'قوي (مبيعات مستمرة)'
+
+            # تحليل فترات البيع
+            sale_gaps = []
+            transaction_dates = transactions.values('date__date').distinct().order_by('date__date')
+            prev_date = None
+            for tx_date in transaction_dates:
+                current_date = tx_date['date__date']
+                if prev_date:
+                    gap_days = (current_date - prev_date).days
+                    if gap_days > 7:  # فجوة أكثر من أسبوع
+                        sale_gaps.append({
+                            'start_date': prev_date.isoformat(),
+                            'end_date': current_date.isoformat(),
+                            'gap_days': gap_days
+                        })
+                prev_date = current_date
+
+            analysis_data.append({
+                'stock_item_id': item.id,
+                'stock_item_name': item.name,
+                'total_quantity_sold': total_quantity_sold,
+                'total_revenue': float(total_revenue),
+                'sales_status': sales_status,
+                'avg_daily_sales': float(avg_daily_sales),
+                'sales_by_period': [
+                    {
+                        'period': period['period'].isoformat(),
+                        'total_quantity': period['total_quantity'],
+                        'total_revenue': float(period['total_revenue'] or 0)
+                    } for period in sales_by_period
+                ],
+                'sales_by_hour': [
+                    {
+                        'hour': hour['hour'].strftime('%Y-%m-%d %H:00:00'),
+                        'total_quantity': hour['total_quantity'],
+                        'total_revenue': float(hour['total_revenue'] or 0)
+                    } for hour in sales_by_hour
+                ],
+                'sale_gaps': sale_gaps
+            })
+
+        return Response(analysis_data, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error("Error in stock sales analysis: %s", str(e))
+        return Response({'error': 'حدث خطأ أثناء تحليل المبيعات'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
