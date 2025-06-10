@@ -10,8 +10,8 @@ export const loginUser = createAsyncThunk(
   ) => {
     try {
       const endpoint = useRfid
-        ? `${BASE_URL}/accounts/api/login/rfid/`
-        : `${BASE_URL}/accounts/api/login/`;
+        ? `${BASE_URL}accounts/api/login/rfid/`
+        : `${BASE_URL}accounts/api/login/`;
 
       const payload = useRfid
         ? { rfid_code: rfidCode }
