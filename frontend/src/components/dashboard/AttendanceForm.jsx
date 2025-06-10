@@ -32,7 +32,7 @@ const AttendanceForm = () => {
       const token = localStorage.getItem("token");
       const headers = { Authorization: `Bearer ${token}` };
       const response = await axios.get(
-        `${BASE_URL}/accounts/api/users/?q=${rfid}`,
+        `${BASE_URL}accounts/api/users/?q=${rfid}`,
         { headers }
       );
       return response.data.results || null;

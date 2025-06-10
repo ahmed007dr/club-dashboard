@@ -152,7 +152,7 @@ const EntryForm = ({ onSuccess }) => {
         club_id: foundMember.club_id,
       };
 
-      const response = await fetch(`${BASE_URL}/attendance/api/entry-logs/add/`, {
+      const response = await fetch(`${BASE_URL}attendance/api/entry-logs/add/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

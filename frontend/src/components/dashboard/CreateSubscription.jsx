@@ -40,7 +40,7 @@ const CreateSubscription = ({ onClose }) => {
 
   // Fetch user club
   useEffect(() => {
-    fetch(`${BASE_URL}/accounts/api/profile/`, {
+    fetch(`${BASE_URL}accounts/api/profile/`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -70,7 +70,7 @@ const CreateSubscription = ({ onClose }) => {
       const headers = { Authorization: `Bearer ${token}` };
       
       let allCoaches = [];
-      let nextUrl = `${BASE_URL}/accounts/api/users/`;
+      let nextUrl = `${BASE_URL}accounts/api/users/`;
       
       while (nextUrl) {
         const response = await axios.get(nextUrl, { headers });

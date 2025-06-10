@@ -37,7 +37,7 @@ const Incomes = () => {
   const [userClub, setUserClub] = useState(null);
 
   useEffect(() => {
-    fetch(`${BASE_URL}/accounts/api/profile/`, {
+    fetch(`${BASE_URL}accounts/api/profile/`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`,

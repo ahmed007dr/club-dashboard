@@ -12,7 +12,7 @@ export const fetchStaff = createAsyncThunk(
     if (!token) return rejectWithValue("Authentication token missing");
 
     try {
-      const url = new URL(`${BASE_URL}/staff/api/shifts/`);
+      const url = new URL(`${BASE_URL}staff/api/shifts/`);
       url.searchParams.append("page", page);
       if (club) url.searchParams.append("club_name", club); 
       if (staff) url.searchParams.append("staff_search", staff); 
@@ -40,7 +40,7 @@ export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff, { re
         const token = localStorage.getItem('token');
         console.log('Attempting to add staff shift with data:', newStaff);
         
-        const res = await fetch(`${BASE_URL}/staff/api/shifts/add/`, {
+        const res = await fetch(`${BASE_URL}staff/api/shifts/add/`, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${token}`,
@@ -67,7 +67,7 @@ export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff, { re
 // Edit staff
 export const editStaff = createAsyncThunk('staff/editStaff', async ({ id, updatedStaff }) => {
     const token = localStorage.getItem('token');
-    const res = await fetch(`${BASE_URL}/staff/api/shifts/${id}/edit/`, {
+    const res = await fetch(`${BASE_URL}staff/api/shifts/${id}/edit/`, {
         method: 'PUT',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -82,7 +82,7 @@ export const editStaff = createAsyncThunk('staff/editStaff', async ({ id, update
 // Delete staff
 export const deleteStaff = createAsyncThunk('staff/deleteStaff', async (id) => {
     const token = localStorage.getItem('token');
-    await fetch(`${BASE_URL}/staff/api/shifts/${id}/delete/`, {
+    await fetch(`${BASE_URL}staff/api/shifts/${id}/delete/`, {
         method: 'DELETE',
         headers: {
             'Authorization': `Bearer ${token}`,
@@ -99,7 +99,7 @@ export const getStaffById = createAsyncThunk('staff/getStaffById', async (id) =>
     console.log("Fetching staff data for ID:", id); // Debugging line
 
     try {
-        const res = await fetch(`${BASE_URL}/staff/api/staff/${id}/shifts`, {
+        const res = await fetch(`${BASE_URL}staff/api/staff/${id}/shifts`, {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`,

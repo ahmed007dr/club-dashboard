@@ -56,7 +56,7 @@ export const refreshAccessToken = createAsyncThunk(
       }
 
       const response = await axios.post(
-        `${BASE_URL}/accounts/api/token/refresh/`,
+        `${BASE_URL}accounts/api/token/refresh/`,
         { refresh }
       );
       const { access, refresh: newRefresh } = response.data;

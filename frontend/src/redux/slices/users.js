@@ -10,7 +10,7 @@ export const fetchUsers = createAsyncThunk(
     if (!token) return rejectWithValue("Authentication token missing");
 
     try {
-      const url = new URL(`${BASE_URL}/accounts/api/users/`);
+      const url = new URL(`${BASE_URL}accounts/api/users/`);
       url.searchParams.append("page", page);
       if (search) url.searchParams.append("search", search);
 
@@ -35,7 +35,7 @@ export const addUser = createAsyncThunk(
   async (newUser, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.post(`${BASE_URL}/accounts/api/users/create/`, newUser, {
+      const res = await axios.post(`${BASE_URL}accounts/api/users/create/`, newUser, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -55,7 +55,7 @@ export const updateUser = createAsyncThunk(
     try {
       const token = localStorage.getItem("token");
       const res = await axios.put(
-        `${BASE_URL}/accounts/api/users/${id}/update/`,
+        `${BASE_URL}accounts/api/users/${id}/update/`,
         updatedUser,
         {
           headers: {

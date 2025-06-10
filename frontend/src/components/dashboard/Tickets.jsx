@@ -50,7 +50,7 @@ const Tickets = () => {
       return;
     }
     setLoadingProfile(true);
-    fetch(`${BASE_URL}/accounts/api/profile/`, {
+    fetch(`${BASE_URL}accounts/api/profile/`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`,
         'Content-Type': 'application/json',

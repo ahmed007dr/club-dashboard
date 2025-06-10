@@ -53,7 +53,7 @@ const Navbar = ({ hideMenuButton = false }) => {
         const token = localStorage.getItem('token');
         if (!token) return;
 
-        const res = await axios.get(`${BASE_URL}/accounts/api/profile/`, {
+        const res = await axios.get(`${BASE_URL}accounts/api/profile/`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -113,7 +113,7 @@ const Navbar = ({ hideMenuButton = false }) => {
       }
 
       await axios.post(
-        `${BASE_URL}/accounts/api/logout/`,
+        `${BASE_URL}accounts/api/logout/`,
         { refresh: refreshToken },
         {
           headers: {

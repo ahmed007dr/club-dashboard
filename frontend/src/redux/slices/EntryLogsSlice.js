@@ -10,7 +10,7 @@ export const fetchEntryLogs = createAsyncThunk(
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `${BASE_URL}/attendance/api/entry-logs/`,
+        `${BASE_URL}attendance/api/entry-logs/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -49,7 +49,7 @@ export const addEntryLog = createAsyncThunk(
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post(
-        `${BASE_URL}/attendance/api/entry-logs/add/`,
+        `${BASE_URL}attendance/api/entry-logs/add/`,
         newEntryLog,
         {
           headers: {

@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 
-const API_BASE_URL = `${BASE_URL}/receipts/api`;
+const API_BASE_URL = `${BASE_URL}receipts/api`;
 
 // Helper function to get auth headers
 const getAuthHeaders = () => {

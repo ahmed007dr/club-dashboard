@@ -37,7 +37,7 @@ const DailyReportButton = () => {
     if (userRole === 'admin' || userRole === 'owner') {
       setEmployeeLoading(true);
       axios
-        .get(`${BASE_URL}/accounts/api/active-users/`, {
+        .get(`${BASE_URL}accounts/api/active-users/`, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
@@ -63,7 +63,7 @@ const DailyReportButton = () => {
     setReportData(null);
     setIsErrorModalOpen(false);
     try {
-      const url = `${BASE_URL}/finance/api/employee/daily-report/`;
+      const url = `${BASE_URL}finance/api/employee/daily-report/`;
       let params = {};
 
       if (userRole === 'admin' || userRole === 'owner') {
@@ -99,7 +99,7 @@ const DailyReportButton = () => {
     setError('');
     setIsErrorModalOpen(false);
     try {
-      const url = `${BASE_URL}/finance/api/employee/daily-report/pdf/`;
+      const url = `${BASE_URL}finance/api/employee/daily-report/pdf/`;
       let params = {};
 
       if (userRole === 'admin' || userRole === 'owner') {

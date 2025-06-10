@@ -72,7 +72,7 @@ const Staff = () => {
         const token = localStorage.getItem("token");
         // Fetch clubs
         const usersResponse = await axios.get(
-          `${BASE_URL}/accounts/api/users/`,
+          `${BASE_URL}accounts/api/users/`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -99,7 +99,7 @@ const Staff = () => {
 
         // Fetch profile
         const profileResponse = await axios.get(
-          `${BASE_URL}/accounts/api/profile/`,
+          `${BASE_URL}accounts/api/profile/`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }

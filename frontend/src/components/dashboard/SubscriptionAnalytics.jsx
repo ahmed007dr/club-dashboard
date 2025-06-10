@@ -23,12 +23,12 @@ const SubscriptionAnalytics = () => {
   // Fetch subscription types and coaches
   const fetchFilters = async () => {
     try {
-      console.log('Fetching filters from:', `${BASE_URL}/subscriptions/api/subscription-types/active/`, `${BASE_URL}/accounts/api/coaches/`);
+      console.log('Fetching filters from:', `${BASE_URL}subscriptions/api/subscription-types/active/`, `${BASE_URL}accounts/api/coaches/`);
       const [typesResponse, coachesResponse] = await Promise.all([
-        axios.get(`${BASE_URL}/subscriptions/api/subscription-types/active/`, {
+        axios.get(`${BASE_URL}subscriptions/api/subscription-types/active/`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         }),
-        axios.get(`${BASE_URL}/accounts/api/coaches/`, {
+        axios.get(`${BASE_URL}accounts/api/coaches/`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         }),
       ]);
@@ -45,7 +45,7 @@ const SubscriptionAnalytics = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${BASE_URL}/subscriptions/api/subscriptions/analytics/`, {
+      const response = await axios.get(`${BASE_URL}subscriptions/api/subscriptions/analytics/`, {
         params: {
           start_date: startDate,
           end_date: endDate,

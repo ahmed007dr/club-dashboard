@@ -41,7 +41,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
       const headers = { Authorization: `Bearer ${token}` };
       
       let allCoaches = [];
-      let nextUrl = `${BASE_URL}/accounts/api/users/`;
+      let nextUrl = `${BASE_URL}accounts/api/users/`;
       
       while (nextUrl) {
         const response = await axios.get(nextUrl, { headers });

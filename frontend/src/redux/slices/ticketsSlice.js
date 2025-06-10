@@ -12,7 +12,7 @@ export const fetchTickets = createAsyncThunk(
         ...(ticket_type && { ticket_type }),
         ...(issue_date && { issue_date }),
       }).toString();
-      const response = await fetch(`${BASE_URL}/tickets/api/tickets/?${queryParams}`, {
+      const response = await fetch(`${BASE_URL}tickets/api/tickets/?${queryParams}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
@@ -34,7 +34,7 @@ export const fetchTicketTypes = createAsyncThunk(
   'tickets/fetchTicketTypes',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${BASE_URL}/tickets/api/ticket-types/`, {
+      const response = await fetch(`${BASE_URL}tickets/api/ticket-types/`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
           'Content-Type': 'application/json',
@@ -61,7 +61,7 @@ export const addTicket = createAsyncThunk(
       if (!token) {
         throw new Error('No authentication token found');
       }
-      const response = await fetch(`${BASE_URL}/tickets/api/tickets/add/`, {
+      const response = await fetch(`${BASE_URL}tickets/api/tickets/add/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -89,7 +89,7 @@ export const addTicketType = createAsyncThunk(
   'tickets/addTicketType',
   async (ticketTypeData, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${BASE_URL}/tickets/api/ticket-types/add/`, {
+      const response = await fetch(`${BASE_URL}tickets/api/ticket-types/add/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -113,7 +113,7 @@ export const editTicketById = createAsyncThunk(
   'tickets/editTicketById',
   async ({ ticketId, ticketData }, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${BASE_URL}/tickets/api/tickets/${ticketId}/`, {
+      const response = await fetch(`${BASE_URL}tickets/api/tickets/${ticketId}/`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,
@@ -137,7 +137,7 @@ export const deleteTicketById = createAsyncThunk(
   'tickets/deleteTicketById',
   async (ticketId, { rejectWithValue }) => {
     try {
-      const response = await fetch(`${BASE_URL}/tickets/api/tickets/${ticketId}/delete/`, {
+      const response = await fetch(`${BASE_URL}tickets/api/tickets/${ticketId}/delete/`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${localStorage.getItem('token')}`,

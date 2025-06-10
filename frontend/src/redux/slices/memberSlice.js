@@ -13,7 +13,7 @@ export const fetchUsers = createAsyncThunk(
     }
 
     try {
-      const res = await fetch(`${BASE_URL}/members/api/members/?page=${page}`, {
+      const res = await fetch(`${BASE_URL}members/api/members/?page=${page}`, {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -56,7 +56,7 @@ export const addMember = createAsyncThunk(
     }
 
     try {
-      const res = await fetch(`${BASE_URL}/members/api/members/create/`, {
+      const res = await fetch(`${BASE_URL}members/api/members/create/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -91,7 +91,7 @@ export const editMember = createAsyncThunk(
 
     try {
       console.log("Updated user data:", id, updatedUser);
-      const res = await fetch(`${BASE_URL}/members/api/members/${id}/update/`, {
+      const res = await fetch(`${BASE_URL}members/api/members/${id}/update/`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -124,7 +124,7 @@ export const deleteMember = createAsyncThunk(
     }
 
     try {
-      const res = await fetch(`${BASE_URL}/members/api/members/${id}/delete/`, {
+      const res = await fetch(`${BASE_URL}members/api/members/${id}/delete/`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -155,7 +155,7 @@ export const fetchUserById = createAsyncThunk(
     }
 
     try {
-      const res = await fetch(`${BASE_URL}/members/api/members/${userId}/`, {
+      const res = await fetch(`${BASE_URL}members/api/members/${userId}/`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -193,7 +193,7 @@ export const searchMember = createAsyncThunk(
 
     try {
       const res = await fetch(
-        `${BASE_URL}/members/api/members/search/?q=${encodeURIComponent(query)}&page=${page}`,
+        `${BASE_URL}members/api/members/search/?q=${encodeURIComponent(query)}&page=${page}`,
         {
           method: 'GET',
           headers: {

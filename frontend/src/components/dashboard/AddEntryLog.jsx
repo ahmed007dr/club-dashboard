@@ -17,7 +17,7 @@ const EntryForm = ({ onSuccess }) => {
 
   // Fetch user profile to get club details
   useEffect(() => {
-    fetch(`${BASE_URL}/accounts/api/profile/`, {
+    fetch(`${BASE_URL}accounts/api/profile/`, {
       method: "GET",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,

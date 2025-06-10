@@ -5,7 +5,7 @@ const token = localStorage.getItem('token');
 
 export const fetchClubs = createAsyncThunk('clubs/fetchClubs', async (_, { rejectWithValue }) => {
   try {
-    const response = await fetch(`${BASE_URL}/core/api/club/`, {
+    const response = await fetch(`${BASE_URL}core/api/club/`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`, // Make sure token is included
@@ -32,7 +32,7 @@ export const fetchClubs = createAsyncThunk('clubs/fetchClubs', async (_, { rejec
 // Edit club
 export const editClub = createAsyncThunk('clubs/editClub', async ({ id, updatedClub }, { rejectWithValue }) => {
   try {
-    const response = await fetch(`${BASE_URL}/core/api/club/edit/`, {
+    const response = await fetch(`${BASE_URL}core/api/club/edit/`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -60,7 +60,7 @@ export const switchClub = createAsyncThunk(
   async (clubId, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token'); // Ensure token is retrieved
-      const response = await fetch(`${BASE_URL}/core/api/switch-club/`, {
+      const response = await fetch(`${BASE_URL}core/api/switch-club/`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -30,7 +30,7 @@ function UserList() {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
 
-        let url = currentPage === 1 || filter ? `${BASE_URL}/accounts/api/users/` : nextPageUrl || prevPageUrl;
+        let url = currentPage === 1 || filter ? `${BASE_URL}accounts/api/users/` : nextPageUrl || prevPageUrl;
         const params = filter ? { search: filter } : {};
 
         const response = await axios.get(url, {

@@ -15,7 +15,7 @@ export const fetchAttendances = createAsyncThunk(
     try {
       const token = localStorage.getItem("token");
       const response = await axios.get(
-        `${BASE_URL}/attendance/api/attendances/`,
+        `${BASE_URL}attendance/api/attendances/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -76,7 +76,7 @@ export const deleteAttendance = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.delete(`${BASE_URL}/attendance/api/attendances/${id}/delete/`, {
+      const response = await axios.delete(`${BASE_URL}attendance/api/attendances/${id}/delete/`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -97,7 +97,7 @@ export const checkInStaff = createAsyncThunk(
   'attendance/checkIn',
   async (rfid_code, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${BASE_URL}/staff/api/check-in/`, { rfid_code }, {
+      const response = await axios.post(`${BASE_URL}staff/api/check-in/`, { rfid_code }, {
         headers: {
           Authorization: getToken()
         }
@@ -115,7 +115,7 @@ export const checkInStaff = createAsyncThunk(
 // Thunk: Staff Check-Out
 export const checkOutStaff = createAsyncThunk('attendance/checkOut', async (rfid_code, { rejectWithValue }) => {
   try {
-    const response = await axios.post(`${BASE_URL}/staff/api/check-out/`, { rfid_code }, {
+    const response = await axios.post(`${BASE_URL}staff/api/check-out/`, { rfid_code }, {
       headers: {
         Authorization: getToken()
       }
@@ -132,7 +132,7 @@ export const analyzeAttendance = createAsyncThunk(
   'attendance/analyze',
   async (staffId, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${BASE_URL}/staff/api/attendance/${staffId}/analysis/`, {
+      const response = await axios.get(`${BASE_URL}staff/api/attendance/${staffId}/analysis/`, {
         headers: {
            Authorization: getToken(),  // Added Bearer prefix
           'Content-Type': 'application/json',
@@ -167,7 +167,7 @@ export const analyzeAttendance = createAsyncThunk(
 // Thunk: Get Staff Attendance Report
 export const getStaffAttendanceReport = createAsyncThunk('attendance/report', async (staffId, { rejectWithValue }) => {
   try {
-    const response = await axios.get(`${BASE_URL}/staff/api/staff/${staffId}/attendance/report/`, {
+    const response = await axios.get(`${BASE_URL}staff/api/staff/${staffId}/attendance/report/`, {
       headers: {
         Authorization: getToken()
       }
@@ -183,7 +183,7 @@ export const fetchShiftAttendances = createAsyncThunk(
   'shiftAttendance/fetchShiftAttendances',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${BASE_URL}/staff/api/attendance/`, {
+      const response = await axios.get(`${BASE_URL}staff/api/attendance/`, {
         headers: {
           Authorization: getToken(),
           'Content-Type': 'application/json',

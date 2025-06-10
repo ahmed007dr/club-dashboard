@@ -10,7 +10,7 @@ export const fetchFreeInvites = createAsyncThunk(
     const token = localStorage.getItem('token');
     try {
       const response = await axios.get(
-        `${BASE_URL}/invites/api/free-invites/`,
+        `${BASE_URL}invites/api/free-invites/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -40,7 +40,7 @@ export const addInvite = createAsyncThunk(
     const token = localStorage.getItem('token');
     try {
       const response = await axios.post(
-        `${BASE_URL}/invites/api/free-invites/add/`,
+        `${BASE_URL}invites/api/free-invites/add/`,
         inviteData,
         {
           headers: {
@@ -64,7 +64,7 @@ export const fetchInviteById = createAsyncThunk(
     const token = localStorage.getItem('token');
     try {
       const response = await axios.get(
-        `${BASE_URL}/invites/api/free-invites/${inviteId}/`,
+        `${BASE_URL}invites/api/free-invites/${inviteId}/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -86,7 +86,7 @@ export const deleteInviteById = createAsyncThunk(
     const token = localStorage.getItem('token');
     try {
       await axios.delete(
-        `${BASE_URL}/invites/api/free-invites/${inviteId}/delete/`,
+        `${BASE_URL}invites/api/free-invites/${inviteId}/delete/`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -108,7 +108,7 @@ export const editInviteById = createAsyncThunk(
     const token = localStorage.getItem('token');
     try {
       const response = await axios.put(
-        `${BASE_URL}/invites/api/free-invites/${inviteId}/edit/`,
+        `${BASE_URL}invites/api/free-invites/${inviteId}/edit/`,
         inviteData,
         {
           headers: {
@@ -131,7 +131,7 @@ export const markInviteAsUsed = createAsyncThunk(
     const token = localStorage.getItem('token');
     try {
       const response = await axios.post(
-        `${BASE_URL}/invites/api/free-invites/${inviteId}/mark-used/`,
+        `${BASE_URL}invites/api/free-invites/${inviteId}/mark-used/`,
         { used_by },
         {
           headers: {
