@@ -41,9 +41,8 @@ def subscription_type_list(request):
 
         types = SubscriptionType.objects.filter(club=request.user.club).annotate(
             active_subscriptions_count=Count(
-                'subscription',
-                filter=Q(subscription__end_date__gte=timezone.now().date())
-            )
+                'subscriptions', 
+                filter=Q(subscriptions__end_date__gte=timezone.now().date())            )
         )
 
         if search_term:
