@@ -158,6 +158,34 @@ const Incomes = () => {
     </div>
   );
 
+  const getPageButtons = useCallback((currentPage, totalPages) => {
+    const maxButtons = 5;
+    const buttons = [];
+    const half = Math.floor(maxButtons / 2);
+    let startPage = Math.max(1, currentPage - half);
+    let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+  
+    if (endPage - startPage + 1 < maxButtons) {
+      startPage = Math.max(1, endPage - maxButtons + 1);
+    }
+  
+    if (startPage > 1) {
+      buttons.push(1);
+      if (startPage > 2) buttons.push('...');
+    }
+  
+    for (let i = startPage; i <= endPage; i++) {
+      buttons.push(i);
+    }
+  
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) buttons.push('...');
+      buttons.push(totalPages);
+    }
+  
+    return buttons;
+  }, []);
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto font-sans" dir="rtl">
       <h1 className="text-3xl font-bold text-right flex items-center gap-3">
@@ -281,19 +309,41 @@ const Incomes = () => {
                 handleEditClick={(item) => { setCurrentItem(item); setShowModal(true); }}
                 handleDeleteClick={() => {}}
               />
-
-              <div className="flex justify-center gap-2 mt-6">
-                {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => (
-                  <Button
-                    key={p}
-                    onClick={() => setPage(p)}
-                    variant={page === p ? 'default' : 'outline'}
-                    className="px-3 py-1"
-                  >
-                    {p}
-                  </Button>
-                ))}
+              <div className="flex justify-center items-center gap-4 mt-6">
+                <Button
+                  onClick={() => setPage(page - 1)}
+                  disabled={page === 1}
+                  variant="outline"
+                  className="px-3 py-1 text-sm"
+                >
+                  السابق
+                </Button>
+                <div className="flex gap-1">
+                  {getPageButtons(page, pageCount).map((p, index) => (
+                    <Button
+                      key={index}
+                      onClick={() => typeof p === 'number' && setPage(p)}
+                      variant={page === p ? 'default' : 'outline'}
+                      disabled={typeof p !== 'number'}
+                      className={`px-3 py-1 text-sm ${typeof p !== 'number' ? 'cursor-default' : ''}`}
+                    >
+                      {p}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  onClick={() => setPage(page + 1)}
+                  disabled={page === pageCount || pageCount === 0}
+                  variant="outline"
+                  className="px-3 py-1 text-sm"
+                >
+                  التالي
+                </Button>
+                <span className="text-sm text-gray-600">
+                  صفحة {page} من {pageCount || 1}
+                </span>
               </div>
+
             </CardContent>
           </Card>
         </TabsContent>
