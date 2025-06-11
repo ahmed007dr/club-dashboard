@@ -72,6 +72,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     coach_simple = serializers.SerializerMethodField()
     coach_identifier = serializers.CharField(write_only=True, required=False, allow_blank=True)
     identifier = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    status = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscription
@@ -80,7 +81,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'type', 'type_details', 'coach', 'coach_details', 'start_date', 'end_date',
             'private_training_price', 'paid_amount', 'remaining_amount', 'entry_count',
             'created_by', 'created_by_details', 'freeze_requests', 'subscriptions_count',
-            'coach_simple', 'coach_identifier', 'identifier'
+            'coach_simple', 'coach_identifier', 'identifier', 'status'  
         ]
         extra_kwargs = {
             'remaining_amount': {'read_only': True},
@@ -101,7 +102,15 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 'username': obj.coach.username
             }
         return None
-
+    def get_status(self, obj):
+            today = timezone.now().date()
+            if obj.start_date <= today <= obj.end_date and obj.type.is_active:
+                return "Active"
+            elif obj.start_date > today:
+                return "Upcoming"
+            else:
+                return "Expired"
+            
     def get_coach_details(self, obj):
         if obj.coach and hasattr(obj.coach, 'coach_profile'):
             profile = obj.coach.coach_profile

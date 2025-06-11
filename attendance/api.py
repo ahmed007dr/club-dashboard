@@ -187,130 +187,29 @@ def delete_attendance_api(request, attendance_id):
     attendance.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def entry_log_list_api(request):    
-    """Get paginated list of entry logs with optional filters."""
-    club = request.GET.get('club', '')
-    rfid = request.GET.get('rfid', '')
-    member = request.GET.get('member', '')
-    timestamp = request.GET.get('timestamp', '')
-    page = request.GET.get('page', 1)
-    page_size = request.GET.get('page_size', 20)
-
-    is_search_mode = club or rfid or member or timestamp
-
-    if request.user.role in ['owner', 'admin']:
-        logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
-            club=request.user.club
-        )
-    else:
-        if is_search_mode:
-            logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
-                club=request.user.club
-            )
-        else:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user,
-                club=request.user.club,
-                check_out__isnull=True
-            ).order_by('-check_in').first()
-
-            if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-
-            logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
-                club=request.user.club,
-                approved_by=request.user,
-                timestamp__gte=attendance.check_in,
-                timestamp__lte=timezone.now()
-            )
-
-    if club:
-        logs = logs.filter(club__name__icontains=club)
-    if rfid:
-        logs = logs.filter(member__rfid_code__iexact=rfid)
-    if member:
-        logs = logs.filter(member__name__icontains=member)
-    if timestamp:
-        try:
-            date_obj = datetime.strptime(timestamp, '%Y-%m-%d').date()
-            logs = logs.filter(timestamp__date=date_obj)
-        except ValueError:
-            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    logs = logs.order_by('-timestamp')
-    paginator = PageNumberPagination()
-    paginator.page_size = page_size
-    result_page = paginator.paginate_queryset(logs, request)
-    serializer = EntryLogSerializer(result_page, many=True)
-
-    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_attendance_api(request):
-    """Add a new attendance record and update subscription entry count."""
     serializer = AttendanceSerializer(data=request.data)
-
     if serializer.is_valid():
         attendance = serializer.save()
-
         if not IsOwnerOrRelatedToClub().has_object_permission(request, None, attendance):
             attendance.delete()
-            return Response(
-                {'error': 'ليس لديك الصلاحية لتسجيل حضور لهذا النادي'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
+            return Response({'error': 'ليس لديك الصلاحية لتسجيل حضور لهذا النادي'}, status=status.HTTP_403_FORBIDDEN)
         subscription = attendance.subscription
         if not subscription.can_enter():
             attendance.delete()
-            return Response(
-                {'error': 'لا يمكن تسجيل الحضور: تم الوصول للحد الأقصى لعدد الدخول'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
+            if subscription.start_date > timezone.now().date() or subscription.end_date < timezone.now().date():
+                return Response({'error': 'لا يمكن تسجيل الحضور: الاشتراك غير نشط'}, status=status.HTTP_400_BAD_REQUEST)
+            if not subscription.type.is_active:
+                return Response({'error': 'لا يمكن تسجيل الحضور: نوع الاشتراك غير نشط'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'لا يمكن تسجيل الحضور: تم الوصول للحد الأقصى لعدد الدخول'}, status=status.HTTP_400_BAD_REQUEST)
         subscription.entry_count += 1
         subscription.save()
-
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def create_entry_log_api(request):
-    """Create a new entry log record."""
-    data = request.data.copy()
-    data['approved_by'] = request.user.id
-
-    serializer = EntryLogSerializer(data=data)
-
-    if serializer.is_valid():
-        entry_log = serializer.save()
-
-        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, entry_log):
-            entry_log.delete()
-            return Response(
-                {'error': 'ليس لديك الصلاحية لتسجيل دخول لهذا النادي'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        subscription = entry_log.related_subscription
-        if subscription:
-            if not subscription.can_enter():
-                entry_log.delete()
-                return Response(
-                    {'error': 'لا يمكن تسجيل الدخول: تم الوصول للحد الأقصى لعدد الدخول'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        else:
-            logger.info('No subscription linked to entry log')
-
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -468,3 +367,100 @@ def attendance_monthly_api(request):
                 break
 
     return Response(daily_data)
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def entry_log_list_api(request):    
+    """Get paginated list of entry logs with optional filters."""
+    club = request.GET.get('club', '')
+    rfid = request.GET.get('rfid', '')
+    member = request.GET.get('member', '')
+    timestamp = request.GET.get('timestamp', '')
+    page = request.GET.get('page', 1)
+    page_size = request.GET.get('page_size', 20)
+
+    is_search_mode = club or rfid or member or timestamp
+
+    if request.user.role in ['owner', 'admin']:
+        logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
+            club=request.user.club
+        )
+    else:
+        if is_search_mode:
+            logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
+                club=request.user.club
+            )
+        else:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user,
+                club=request.user.club,
+                check_out__isnull=True
+            ).order_by('-check_in').first()
+
+            if not attendance:
+                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+
+            logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
+                club=request.user.club,
+                approved_by=request.user,
+                timestamp__gte=attendance.check_in,
+                timestamp__lte=timezone.now()
+            )
+
+    if club:
+        logs = logs.filter(club__name__icontains=club)
+    if rfid:
+        logs = logs.filter(member__rfid_code__iexact=rfid)
+    if member:
+        logs = logs.filter(member__name__icontains=member)
+    if timestamp:
+        try:
+            date_obj = datetime.strptime(timestamp, '%Y-%m-%d').date()
+            logs = logs.filter(timestamp__date=date_obj)
+        except ValueError:
+            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    logs = logs.order_by('-timestamp')
+    paginator = PageNumberPagination()
+    paginator.page_size = page_size
+    result_page = paginator.paginate_queryset(logs, request)
+    serializer = EntryLogSerializer(result_page, many=True)
+
+    return paginator.get_paginated_response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def create_entry_log_api(request):
+    """Create a new entry log record."""
+    data = request.data.copy()
+    data['approved_by'] = request.user.id
+
+    serializer = EntryLogSerializer(data=data)
+
+    if serializer.is_valid():
+        entry_log = serializer.save()
+
+        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, entry_log):
+            entry_log.delete()
+            return Response(
+                {'error': 'ليس لديك الصلاحية لتسجيل دخول لهذا النادي'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        subscription = entry_log.related_subscription
+        if subscription:
+            if not subscription.can_enter():
+                entry_log.delete()
+                return Response(
+                    {'error': 'لا يمكن تسجيل الدخول: تم الوصول للحد الأقصى لعدد الدخول'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            logger.info('No subscription linked to entry log')
+
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

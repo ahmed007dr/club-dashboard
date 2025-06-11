@@ -42,28 +42,24 @@ class AttendanceSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         identifier = validated_data.pop('identifier')
-
         try:
-            member = Member.objects.get(
-                Q(rfid_code=identifier) |
-                Q(phone=identifier)
-            )
+            member = Member.objects.get(Q(rfid_code=identifier) | Q(phone=identifier))
         except Member.DoesNotExist:
-            raise serializers.ValidationError({'identifier': 'لم يتم العثور على عضو بالـ RFID أو رقم الهاتف أو رقم العضوية المقدم'})
-
+            raise serializers.ValidationError({'identifier': 'لم يتم العثور على عضو'})
         today = timezone.now().date()
         active_subscription = Subscription.objects.filter(
             member=member,
             start_date__lte=today,
-            end_date__gte=today
+            end_date__gte=today,
+            type__is_active=True
         ).first()
-
         if not active_subscription:
             raise serializers.ValidationError({'subscription': 'لا يوجد اشتراك فعال لهذا العضو'})
-
         validated_data['subscription'] = active_subscription
+        validated_data['attendance_date'] = today
+        validated_data['entry_time'] = timezone.now().time()
         return super().create(validated_data)
-    
+
 
 class EntryLogSerializer(serializers.ModelSerializer):
     identifier = serializers.CharField(write_only=True)
