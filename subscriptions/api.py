@@ -81,12 +81,12 @@ def subscription_type_list(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
+    
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
     if request.method == 'GET':
-        search_term = request.GET.get('identifier', '')
-        # Check if any filter is applied (indicating a search query)
+        search_term = request.GET.get('searchTerm', '') 
         is_search_mode = (
             search_term or
             any(param in request.query_params for param in [

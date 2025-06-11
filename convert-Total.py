@@ -20,7 +20,7 @@ def get_table_data(db_path, table_name):
         conn.close()
         return columns, rows
     except sqlite3.OperationalError as e:
-        print(f"خطأ في جلب بيانات الجدول {table_name}: {e}")
+        print(f"ERROR IN TABLE  {table_name}: {e}")
         return [], []
 
 def check_foreign_key(table, column, value, new_db_path):
@@ -35,7 +35,7 @@ def check_foreign_key(table, column, value, new_db_path):
         conn.close()
         return count > 0
     except sqlite3.OperationalError as e:
-        print(f"خطأ في التحقق من المفتاح الخارجي {table}.{column}: {e}")
+        print(f"ERROR IN FK {table}.{column}: {e}")
         return False
 
 
@@ -47,11 +47,11 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
     model_name = f"{model._meta.app_label}.{model._meta.model_name}"
     old_columns, rows = get_table_data(old_db_path, table_name)
     if not rows:
-        print(f"الجدول {table_name} فارغ")
+        print(f"TABLE  {table_name} SOL ")
         migration_summary[table_name] = {'total': 0, 'success': 0, 'failed': 0}
         return
 
-    print(f"تهجير الجدول {table_name} ({len(rows)} سجلات)...")
+    print(f"Migrations table {table_name} ({len(rows)} سجلات)...")
     migration_summary[table_name] = {'total': len(rows), 'success': 0, 'failed': 0}
 
     new_fields = {field.name: field for field in model._meta.fields}
@@ -90,118 +90,118 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
         ]:
             club_id = row_data.get('club_id')
             if club_id and not check_foreign_key('core_club', 'id', club_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: club_id غير صالح: {club_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: club_id غير صالح: {club_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
         if table_name == 'subscriptions_subscription':
             member_id = row_data.get('member_id')
             if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: member_id غير صالح: {member_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: member_id غير صالح: {member_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
             type_id = row_data.get('type_id')
             if type_id and not check_foreign_key('subscriptions_subscriptiontype', 'id', type_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: type_id غير صالح: {type_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: type_id غير صالح: {type_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
             coach_id = row_data.get('coach_id')
             if coach_id and not check_foreign_key('accounts_user', 'id', coach_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: coach_id غير صالح: {coach_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: coach_id غير صالح: {coach_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
             created_by_id = row_data.get('created_by_id')
             if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: created_by_id غير صالح: {created_by_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: created_by_id غير صالح: {created_by_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
         if table_name == 'subscriptions_freezerequest':
             subscription_id = row_data.get('subscription_id')
             if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: subscription_id غير صالح: {subscription_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: subscription_id غير صالح: {subscription_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
             approved_by_id = row_data.get('approved_by_id')
             if approved_by_id and not check_foreign_key('accounts_user', 'id', approved_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: approved_by_id غير صالح: {approved_by_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: approved_by_id غير صالح: {approved_by_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
         if table_name == 'subscriptions_coachprofile':
             user_id = row_data.get('user_id')
             if user_id and not check_foreign_key('accounts_user', 'id', user_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
         if table_name == 'attendance_attendance':
             subscription_id = row_data.get('subscription_id')
             if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: subscription_id غير صالح: {subscription_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: subscription_id غير صالح: {subscription_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
             approved_by_id = row_data.get('approved_by_id')
             if approved_by_id and not check_foreign_key('accounts_user', 'id', approved_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: approved_by_id غير صالح: {approved_by_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: approved_by_id غير صالح: {approved_by_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
         if table_name == 'attendance_entrylog':
             user_id = row_data.get('user_id')
             if user_id and not check_foreign_key('accounts_user', 'id', user_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
             staff_id = row_data.get('staff_id')
             if staff_id and not check_foreign_key('accounts_user', 'id', staff_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: staff_id غير صالح: {staff_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: staff_id غير صالح: {staff_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
         if table_name == 'staff_shift':
             staff_id = row_data.get('staff_id')
             if staff_id and not check_foreign_key('accounts_user', 'id', staff_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: staff_id غير صالح: {staff_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: staff_id غير صالح: {staff_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
         if table_name == 'staff_staffattendance':
             staff_id = row_data.get('staff_id')
             if staff_id and not check_foreign_key('accounts_user', 'id', staff_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: staff_id غير صالح: {staff_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: staff_id غير صالح: {staff_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
         if table_name == 'finance_expense':
             category_id = row_data.get('category_id')
             if category_id and not check_foreign_key('finance_expensecategory', 'id', category_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: category_id غير صالح: {category_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: category_id غير صالح: {category_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
             user_id = row_data.get('user_id')
             if user_id and not check_foreign_key('accounts_user', 'id', user_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
         if table_name == 'finance_income':
             source_id = row_data.get('source_id')
             if source_id and not check_foreign_key('finance_incomesource', 'id', source_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: source_id غير صالح: {source_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: source_id غير صالح: {source_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
             user_id = row_data.get('user_id')
             if user_id and not check_foreign_key('accounts_user', 'id', user_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
@@ -212,7 +212,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
         if table_name == 'receipts_receipt':
             user_id = row_data.get('user_id')
             if user_id and not check_foreign_key('accounts_user', 'id', user_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
@@ -226,17 +226,17 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                         ticket_type = models['tickets_tickettype'].objects.get(name=ticket_type_name)
                         row_data['ticket_type'] = ticket_type
                     except models['tickets_tickettype'].DoesNotExist:
-                        errors.append(f"تخطي سجل في {table_name}: ticket_type غير صالح: {ticket_type_name}, البيانات: {row_data}")
+                        errors.append(f"تخطي سجل في {table_name}: ticket_type غير صالح: {ticket_type_name}, data: {row_data}")
                         migration_summary[table_name]['failed'] += 1
                         continue
                 else:
-                    errors.append(f"تخطي سجل في {table_name}: ticket_type_id غير صالح: {ticket_type_id}, البيانات: {row_data}")
+                    errors.append(f"تخطي سجل في {table_name}: ticket_type_id غير صالح: {ticket_type_id}, data: {row_data}")
                     migration_summary[table_name]['failed'] += 1
                     continue
 
             issued_by_id = row_data.get('issued_by_id')
             if issued_by_id and not check_foreign_key('accounts_user', 'id', issued_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: issued_by_id غير صالح: {issued_by_id}, البيانات: {row_data}")
+                errors.append(f"تخطي سجل في {table_name}: issued_by_id غير صالح: {issued_by_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
@@ -273,7 +273,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                         try:
                             value = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
                         except ValueError:
-                            errors.append(f"تنسيق تاريخ غير صحيح للحقل {field} في {table_name}: {value}, البيانات: {row_data}")
+                            errors.append(f"error in date {field} في {table_name}: {value}, data: {row_data}")
                             migration_summary[table_name]['failed'] += 1
                             continue
                     row_data[field] = timezone.make_aware(value)
@@ -287,7 +287,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             obj = model(**row_data)
             batch.append(obj)
         except Exception as e:
-            errors.append(f"خطأ في إنشاء كائن لـ {table_name}: {e}, البيانات: {row_data}")
+            errors.append(f"خطأ في إنشاء كائن لـ {table_name}: {e}, data: {row_data}")
             migration_summary[table_name]['failed'] += 1
             continue
 
@@ -298,7 +298,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                 migration_summary[table_name]['success'] += len(batch)
                 batch = []
             except Exception as e:
-                errors.append(f"خطأ في تهجير دفعة لـ {table_name}: {e}, البيانات: {[str(dict(obj.__dict__)) for obj in batch[:5]]}")
+                errors.append(f"error in save {table_name}: {e}, data: {[str(dict(obj.__dict__)) for obj in batch[:5]]}")
                 migration_summary[table_name]['failed'] += len(batch)
                 print(f"محاولة حفظ السجلات واحدًا واحدًا لـ {table_name}...")
                 batch_errors = []
@@ -307,7 +307,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                         obj.save()
                         migration_summary[table_name]['success'] += 1
                     except Exception as e:
-                        batch_errors.append(f"خطأ في حفظ سجل لـ {table_name}: {e}, البيانات: {dict(obj.__dict__)}")
+                        batch_errors.append(f"error in save {table_name}: {e}, data: {dict(obj.__dict__)}")
                         migration_summary[table_name]['failed'] += 1
                 if batch_errors:
                     errors.extend(batch_errors[:10])
@@ -319,7 +319,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             model.objects.bulk_create(batch)
             migration_summary[table_name]['success'] += len(batch)
         except Exception as e:
-            errors.append(f"خطأ في تهجير دفعة لـ {table_name}: {e}, البيانات: {[str(dict(obj.__dict__)) for obj in batch[:5]]}")
+            errors.append(f"error in save {table_name}: {e}, data: {[str(dict(obj.__dict__)) for obj in batch[:5]]}")
             migration_summary[table_name]['failed'] = len(batch)
             print(f"محاولة حفظ السجلات واحدًا واحدًا لـ {table_name}...")
             batch_errors = []
@@ -330,36 +330,36 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                     obj.save()
                     migration_summary[table_name]['success'] += 1
                 except Exception as e:
-                    batch_errors.append(f"خطأ في حفظ سجل لـ {table_name}: {e}, البيانات: {dict(obj.__dict__)}")
+                    batch_errors.append(f"error in save {table_name}: {e}, data: {dict(obj.__dict__)}")
                     migration_summary[table_name]['failed'] += 1
             if batch_errors:
                 errors.extend(batch_errors[:10])
 
     if errors:
-        print(f"تم تهجير الجدول {table_name} مع {len(errors)} أخطاء:")
+        print(f"Done Migrations table {table_name} with {len(errors)} error :")
         for error in errors[:10]:
             print(error)
     else:
-        print(f"تم تهجير الجدول {table_name} بنجاح")
+        print(f"Done Migrations table {table_name} بنجاح")
 
 def migrate_all_required_tables(old_db_path, new_db_path):
     """Migrate data for all required tables, excluding django_content_type, auth_permission, auth_group, and devices-related tables."""
     # Set the new database path
     settings.DATABASES['default']['NAME'] = new_db_path
-    print("تفريغ بيانات قاعدة البيانات الجديدة...")
+    print("flush database...")
     call_command('flush', interactive=False)
-    print("تطبيق التهجيرات...")
+    print("apply mig...")
     try:
         call_command('migrate')
     except Exception as e:
-        print(f"خطأ في تطبيق التهجيرات: {e}")
+        print(f"error in migration: {e}")
         return
 
     # Verify database schema
     with connection.cursor() as cursor:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [row[0] for row in cursor.fetchall()]
-        print(f"الجداول في قاعدة البيانات الجديدة: {tables}")
+        print(f"table in new : {tables}")
 
     migration_summary = {}
     global models
@@ -404,7 +404,7 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'receipts_receipt',
     ]:
         if not models.get(table):
-            print(f"لم يتم العثور على نموذج {table} في النماذج")
+            print(f"dont found {table} here ")
             migration_summary[table] = {'total': 0, 'success': 0, 'failed': 0}
             continue
 
@@ -498,16 +498,16 @@ def migrate_all_required_tables(old_db_path, new_db_path):
 
 def print_summary(migration_summary):
     """Print migration summary."""
-    print("\n=== ملخص التهجير ===")
-    print(f"{'الجدول':<30} {'الإجمالي':>10} {'الناجح':>10} {'الفاشل':>10}")
+    print("\n=== summy ===")
+    print(f"{'الجدول':<30} {'total':>10} {'win':>10} {'lose':>10}")
     print("-" * 62)
     for table, stats in migration_summary.items():
         print(f"{table:<30} {stats['total']:>10} {stats['success']:>10} {stats['failed']:>10}")
     print("========================")
 
 if __name__ == "__main__":
-    OLD_DB_PATH = r"F:\club\club2\src\db_old.sqlite3"
-    NEW_DB_PATH = r"F:\club\club2\src\db.sqlite3"
+    OLD_DB_PATH = r"F:\club\gym\src\db_old.sqlite3"
+    NEW_DB_PATH = r"F:\club\gym\src\db.sqlite3"
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings")
     import django
     django.setup()

@@ -266,7 +266,7 @@ const SubscriptionList = () => {
         fetchSubscriptions({
           page,
           pageSize,
-          searchTerm: filters.memberName,
+          identifier: filters.memberName,
           startDate: filters.startDate,
           endDate: filters.endDate,
           entryCount: filters.entryCount,

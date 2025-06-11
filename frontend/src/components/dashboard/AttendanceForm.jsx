@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   checkInStaff,
@@ -12,6 +12,7 @@ import BASE_URL from "../../config/api";
 import usePermission from "@/hooks/usePermission";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { debounce } from "lodash"; // تأكد من تثبيت lodash: npm install lodash
 
 const AttendanceForm = () => {
   const [rfidCodeCheckIn, setRfidCodeCheckIn] = useState("");
@@ -22,6 +23,8 @@ const AttendanceForm = () => {
   const [errorCheckOut, setErrorCheckOut] = useState("");
   const [loadingCheckIn, setLoadingCheckIn] = useState(false);
   const [loadingCheckOut, setLoadingCheckOut] = useState(false);
+  const rfidCheckInRef = useRef(""); // لتتبع قيمة إدخال تسجيل الدخول
+  const rfidCheckOutRef = useRef(""); // لتتبع قيمة إدخال تسجيل الخروج
 
   const dispatch = useDispatch();
   const { loading } = useSelector((state) => state.attendance);
@@ -42,45 +45,55 @@ const AttendanceForm = () => {
     }
   };
 
-  const handleCheckInChange = async (e) => {
+  // تأخير البحث لتسجيل الدخول    
+  const debouncedFetchStaffCheckIn = debounce(async (value) => {
+    setLoadingCheckIn(true);
+    const results = await fetchStaffByRfid(value);
+    setLoadingCheckIn(false);
+
+    const staff = results.find((staff) => staff.rfid_code === value);
+    if (!staff) {
+      setErrorCheckIn("لم يتم العثور على موظف بهذا الرمز");
+    } else {
+      setFoundStaffCheckIn(staff);
+    }
+  }, 700);
+
+  // تأخير البحث لتسجيل الخروج
+  const debouncedFetchStaffCheckOut = debounce(async (value) => {
+    setLoadingCheckOut(true);
+    const results = await fetchStaffByRfid(value);
+    setLoadingCheckOut(false);
+
+    const staff = results.find((staff) => staff.rfid_code === value);
+    if (!staff) {
+      setErrorCheckOut("لم يتم العثور على موظف بهذا الرمز");
+    } else {
+      setFoundStaffCheckOut(staff);
+    }
+  }, 700);
+
+  const handleCheckInChange = (e) => {
     const value = e.target.value;
-    setRfidCodeCheckIn(value);
+    rfidCheckInRef.current = value; // تحديث القيمة في useRef
+    setRfidCodeCheckIn(value); // تحديث الحالة لعرض القيمة
     setErrorCheckIn("");
     setFoundStaffCheckIn(null);
 
     if (value) {
-      setLoadingCheckIn(true);
-      const results = await fetchStaffByRfid(value);
-      setLoadingCheckIn(false);
-
-      const staff = results.find((staff) => staff.rfid_code === value);
-
-      if (!staff) {
-        setErrorCheckIn("لم يتم العثور على موظف بهذا الرمز");
-      } else {
-        setFoundStaffCheckIn(staff);
-      }
+      debouncedFetchStaffCheckIn(value); // استدعاء البحث مع تأخير
     }
   };
 
-  const handleCheckOutChange = async (e) => {
+  const handleCheckOutChange = (e) => {
     const value = e.target.value;
-    setRfidCodeCheckOut(value);
+    rfidCheckOutRef.current = value; // تحديث القيمة في useRef
+    setRfidCodeCheckOut(value); // تحديث الحالة لعرض القيمة
     setErrorCheckOut("");
     setFoundStaffCheckOut(null);
 
     if (value) {
-      setLoadingCheckOut(true);
-      const results = await fetchStaffByRfid(value);
-      setLoadingCheckOut(false);
-
-      const staff = results.find((staff) => staff.rfid_code === value);
-
-      if (!staff) {
-        setErrorCheckOut("لم يتم العثور على موظف بهذا الرمز");
-      } else {
-        setFoundStaffCheckOut(staff);
-      }
+      debouncedFetchStaffCheckOut(value); // استدعاء البحث مع تأخير
     }
   };
 
@@ -92,12 +105,13 @@ const AttendanceForm = () => {
     }
 
     setLoadingCheckIn(true);
-    const result = await dispatch(checkInStaff(rfidCodeCheckIn));
+    const result = await dispatch(checkInStaff(rfidCheckInRef.current));
     setLoadingCheckIn(false);
 
     if (checkInStaff.fulfilled.match(result)) {
       toast.success("تم تسجيل الدخول بنجاح", { icon: "✅" });
       setRfidCodeCheckIn("");
+      rfidCheckInRef.current = "";
       setFoundStaffCheckIn(null);
     } else {
       toast.error(result.payload?.error || "فشل في تسجيل الدخول", { icon: "❌" });
@@ -112,12 +126,13 @@ const AttendanceForm = () => {
     }
 
     setLoadingCheckOut(true);
-    const result = await dispatch(checkOutStaff(rfidCodeCheckOut));
+    const result = await dispatch(checkOutStaff(rfidCheckOutRef.current));
     setLoadingCheckOut(false);
 
     if (checkOutStaff.fulfilled.match(result)) {
       toast.success("تم تسجيل الخروج بنجاح", { icon: "✅" });
       setRfidCodeCheckOut("");
+      rfidCheckOutRef.current = "";
       setFoundStaffCheckOut(null);
     } else {
       toast.error(result.payload?.error || "فشل في تسجيل الخروج", { icon: "❌" });
@@ -126,12 +141,14 @@ const AttendanceForm = () => {
 
   const handleResetCheckIn = () => {
     setRfidCodeCheckIn("");
+    rfidCheckInRef.current = "";
     setFoundStaffCheckIn(null);
     setErrorCheckIn("");
   };
 
   const handleResetCheckOut = () => {
     setRfidCodeCheckOut("");
+    rfidCheckOutRef.current = "";
     setFoundStaffCheckOut(null);
     setErrorCheckOut("");
   };
