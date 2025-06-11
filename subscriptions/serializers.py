@@ -60,7 +60,6 @@ class FreezeRequestSerializer(serializers.ModelSerializer):
             'cancelled_at': {'read_only': True},
         }
 
-
 class SubscriptionSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     member_details = MemberSerializer(source='member', read_only=True)
@@ -81,7 +80,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'type', 'type_details', 'coach', 'coach_details', 'start_date', 'end_date',
             'private_training_price', 'paid_amount', 'remaining_amount', 'entry_count',
             'created_by', 'created_by_details', 'freeze_requests', 'subscriptions_count',
-            'coach_simple', 'coach_identifier', 'identifier', 'status'  
+            'coach_simple', 'coach_identifier', 'identifier', 'status'
         ]
         extra_kwargs = {
             'remaining_amount': {'read_only': True},
@@ -91,6 +90,23 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'private_training_price': {'required': False},
             'member': {'required': False}
         }
+
+    def get_status(self, obj):
+        today = timezone.now().date()
+        max_entries = obj.type.max_entries
+        entry_count = obj.entry_count
+
+        is_expired_by_date = obj.end_date < today
+
+        is_expired_by_entries = max_entries > 0 and entry_count >= max_entries
+
+        if is_expired_by_date or is_expired_by_entries:
+            return "Expired"
+        elif obj.start_date > today:
+            return "Upcoming"
+        elif obj.start_date <= today <= obj.end_date and obj.type.is_active:
+            return "Active"
+        return "Unknown"
 
     def get_subscriptions_count(self, obj):
         return Subscription.objects.filter(member=obj.member).count()
@@ -102,15 +118,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 'username': obj.coach.username
             }
         return None
-    def get_status(self, obj):
-            today = timezone.now().date()
-            if obj.start_date <= today <= obj.end_date and obj.type.is_active:
-                return "Active"
-            elif obj.start_date > today:
-                return "Upcoming"
-            else:
-                return "Expired"
-            
+
     def get_coach_details(self, obj):
         if obj.coach and hasattr(obj.coach, 'coach_profile'):
             profile = obj.coach.coach_profile

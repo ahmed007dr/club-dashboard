@@ -185,7 +185,7 @@ def subscription_list(request):
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
-
+      
     elif request.method == 'POST':
         identifier = request.data.get('identifier', '')
         mutable_data = request.data.copy()
