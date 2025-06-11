@@ -97,6 +97,7 @@ const Expenses = () => {
       });
   }, []);
 
+
   const debouncedFetchExpenses = useCallback(
     debounce((filters, page) => {
       dispatch(
@@ -134,51 +135,51 @@ const Expenses = () => {
     if (!data.date) newErrors.date = "التاريخ مطلوب.";
     return newErrors;
   };
+  
+const handleSave = async () => {
+  const data = currentExpense || newExpense;
+  const validationErrors = validateForm(data);
+  if (Object.keys(validationErrors).length > 0) {
+    setErrors(validationErrors);
+    return;
+  }
 
-  const handleSave = () => {
-    const data = currentExpense || newExpense;
-    const validationErrors = validateForm(data);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("club", parseInt(data.club));
-    formData.append("category", parseInt(data.category));
-    formData.append("amount", parseFloat(data.amount));
-    formData.append("description", data.description || "");
-    formData.append("date", data.date);
-    formData.append("invoice_number", data.invoice_number || "");
-    if (data.attachment) formData.append("attachment", data.attachment);
-
-    const action = currentExpense
-      ? updateExpense({ id: currentExpense.id, updatedData: formData })
-      : addExpense(formData);
-
-    dispatch(action)
-      .unwrap()
-      .then(() => {
-        setShowModal(false);
-        setCurrentExpense(null);
-        setNewExpense({
-          club: userClub?.id.toString() || "",
-          category: "",
-          amount: "",
-          description: "",
-          date: "",
-          invoice_number: "",
-          attachment: null,
-        });
-        setErrors({});
-        setCurrentPage(1);
-        dispatch(fetchExpenses({ page: 1, filters }));
-      })
-      .catch((err) => {
-        console.error("فشل في حفظ المصروف:", err);
-        setErrors({ general: err.message || "فشل في حفظ المصروف" });
-      });
+  const expenseData = {
+    club: parseInt(data.club),
+    category: parseInt(data.category) || 1, // قيمة افتراضية إذا لزم
+    amount: parseFloat(data.amount),
+    date: data.date,
+    description: data.description || "",
+    invoice_number: data.invoice_number || "",
   };
+
+  console.log("Sending expenseData:", expenseData); // للتصحيح
+
+  const action = currentExpense
+    ? updateExpense({ id: currentExpense.id, updatedData: expenseData })
+    : addExpense(expenseData);
+
+  try {
+    await dispatch(action).unwrap();
+    setShowModal(false);
+    setCurrentExpense(null);
+    setNewExpense({
+      club: userClub?.id.toString() || "",
+      category: "",
+      amount: "",
+      description: "",
+      date: "",
+      invoice_number: "",
+      attachment: null,
+    });
+    setErrors({});
+    setCurrentPage(1);
+    dispatch(fetchExpenses({ page: 1, filters }));
+  } catch (err) {
+    console.error("فشل في حفظ المصروف:", err);
+    setErrors({ general: err.message || "فشل في حفظ المصروف. تحقق من البيانات." });
+  }
+};
 
   const exportToExcel = async () => {
     try {
