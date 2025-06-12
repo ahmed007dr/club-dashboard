@@ -85,6 +85,7 @@ def subscription_type_list(request):
 import logging
 logger = logging.getLogger(__name__)
 
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
@@ -103,6 +104,7 @@ def subscription_list(request):
             club=request.user.club
         )
 
+        # تطبيق شروط الموظفين (reception, accountant)
         if request.user.role in ['reception', 'accountant'] and not is_search_mode:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
@@ -117,6 +119,7 @@ def subscription_list(request):
                 created_at__lte=timezone.now()
             )
 
+        # التعامل مع البحث باستخدام search_term
         if search_term:
             try:
                 subscription = subscriptions.get(
@@ -130,6 +133,37 @@ def subscription_list(request):
                 return Response({'error': 'لا يوجد اشتراك مطابق'}, status=status.HTTP_404_NOT_FOUND)
             except Subscription.MultipleObjectsReturned:
                 return Response({'error': 'تم العثور على أكثر من اشتراك مطابق. يرجى تحديد المعرف بشكل أكثر دقة.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # التعامل مع طلبات القائمة العامة (بدون search_term)
+        # تطبيق الفلاتر الإضافية بناءً على query_params
+        if request.query_params.get('member_id'):
+            subscriptions = subscriptions.filter(member_id=request.query_params.get('member_id'))
+        if request.query_params.get('type_id'):
+            subscriptions = subscriptions.filter(type_id=request.query_params.get('type_id'))
+        if request.query_params.get('club_id'):
+            subscriptions = subscriptions.filter(club_id=request.query_params.get('club_id'))
+        if request.query_params.get('start_date'):
+            subscriptions = subscriptions.filter(start_date__gte=request.query_params.get('start_date'))
+        if request.query_params.get('end_date'):
+            subscriptions = subscriptions.filter(end_date__lte=request.query_params.get('end_date'))
+        if request.query_params.get('status'):
+            today = timezone.now().date()
+            if request.query_params.get('status') == 'active':
+                subscriptions = subscriptions.filter(start_date__lte=today, end_date__gte=today)
+            elif request.query_params.get('status') == 'expired':
+                subscriptions = subscriptions.filter(end_date__lt=today)
+            elif request.query_params.get('status') == 'upcoming':
+                subscriptions = subscriptions.filter(start_date__gt=today)
+
+        # ترتيب الاشتراكات
+        subscriptions = subscriptions.order_by('-start_date')
+
+        # تطبيق الترقيم
+        paginator = PageNumberPagination()
+        page = paginator.paginate_queryset(subscriptions, request)
+        serializer = SubscriptionSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+
     elif request.method == 'POST':
         identifier = request.data.get('identifier', '')
         mutable_data = request.data.copy()
