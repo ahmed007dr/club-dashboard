@@ -13,9 +13,13 @@ function CoachProfile() {
     dispatch(fetchCoachProfile(coachId));
   }, [dispatch, coachId]);
 
-  // Memoized subscriptions to optimize rendering
-  const activeSubscriptions = useMemo(() => data?.subscriptions || [], [data]);
-  const completedSubscriptions = useMemo(() => data?.completed_subscriptions || [], [data]);
+  // Memoized data to optimize rendering
+  const upcomingSubscriptions = useMemo(() => data?.upcoming_subscriptions || [], [data]);
+  const expiredSubscriptions = useMemo(() => data?.expired_subscriptions || [], [data]);
+  const membersDetails = useMemo(() => data?.members_details || [], [data]);
+  const revenueByType = useMemo(() => data?.revenue_by_type || [], [data]);
+  const monthlyRevenue = useMemo(() => data?.monthly_revenue || [], [data]);
+  const subscriptionTypes = useMemo(() => data?.subscription_types || [], [data]);
 
   // Retry handler for errors
   const handleRetry = () => {
@@ -60,7 +64,7 @@ function CoachProfile() {
       </h1>
 
       {/* Financial and Clients Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         {/* Financial Summary */}
         <div className="bg-white rounded-xl shadow-sm p-6 transform hover:shadow-md transition-shadow duration-300">
           <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">ملخص مالي</h2>
@@ -77,12 +81,18 @@ function CoachProfile() {
                 {data?.total_paid_amount ? `${data.total_paid_amount} جنيه` : '—'}
               </span>
             </p>
+            <p className="flex justify-between items-center text-gray-600">
+              <span className="font-medium">المبالغ المتبقية:</span>
+              <span className="text-indigo-600 font-semibold">
+                {data?.total_remaining_amount ? `${data.total_remaining_amount} جنيه` : '—'}
+              </span>
+            </p>
           </div>
         </div>
 
         {/* Clients Summary */}
         <div className="bg-white rounded-xl shadow-sm p-6 transform hover:shadow-md transition-shadow duration-300">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">العمليات</h2>
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">إحصائيات العملاء</h2>
           <div className="space-y-4">
             <p className="flex justify-between items-center text-gray-600">
               <span className="font-medium">العملاء النشطين:</span>
@@ -92,55 +102,167 @@ function CoachProfile() {
               <span className="font-medium">عملاء الشهر السابق:</span>
               <span className="text-indigo-600 font-semibold">{data?.previous_month_clients ?? '—'}</span>
             </p>
+            <p className="flex justify-between items-center text-gray-600">
+              <span className="font-medium">إجمالي العملاء:</span>
+              <span className="text-indigo-600 font-semibold">{data?.total_career_clients ?? '—'}</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Subscription Types Summary */}
+        <div className="bg-white rounded-xl shadow-sm p-6 transform hover:shadow-md transition-shadow duration-300">
+          <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">أنواع الاشتراكات</h2>
+          <div className="space-y-4">
+            {subscriptionTypes.length > 0 ? (
+              subscriptionTypes.map((type, index) => (
+                <p key={index} className="flex justify-between items-center text-gray-600">
+                  <span className="font-medium">{type.type_name}:</span>
+                  <span className="text-indigo-600 font-semibold">{type.subscription_count} اشتراك</span>
+                </p>
+              ))
+            ) : (
+              <p className="text-gray-500">لا توجد أنواع اشتراكات</p>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Active Subscriptions */}
-      {activeSubscriptions.length > 0 ? (
+      {/* Financial Details */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        {/* Revenue by Type */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-6 border-b border-gray-200 pb-2">الإيرادات حسب نوع الاشتراك</h2>
+          {revenueByType.length > 0 ? (
+            <div className="space-y-4">
+              {revenueByType.map((type, index) => (
+                <div key={index} className="bg-gray-50 rounded-lg p-4">
+                  <p className="font-medium text-gray-700 mb-2">{type.type_name}</p>
+                  <p className="flex justify-between text-gray-600">
+                    <span>المدفوع:</span>
+                    <span className="text-indigo-600 font-semibold">{type.total_paid} جنيه</span>
+                  </p>
+                  <p className="flex justify-between text-gray-600">
+                    <span>التدريب الخاص:</span>
+                    <span className="text-indigo-600 font-semibold">{type.total_private_training} جنيه</span>
+                  </p>
+                  <p className="flex justify-between text-gray-600">
+                    <span>المتبقي:</span>
+                    <span className="text-indigo-600 font-semibold">{type.total_remaining} جنيه</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center">لا توجد إيرادات حسب نوع الاشتراك</p>
+          )}
+        </div>
+
+        {/* Monthly Revenue */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-6 border-b border-gray-200 pb-2">الإيرادات الشهرية</h2>
+          {monthlyRevenue.length > 0 ? (
+            <div className="space-y-4">
+              {monthlyRevenue.map((month, index) => (
+                <div key={index} className="bg-gray-50 rounded-lg p-4">
+                  <p className="font-medium text-gray-700 mb-2">{month.month}</p>
+                  <p className="flex justify-between text-gray-600">
+                    <span>المدفوع:</span>
+                    <span className="text-indigo-600 font-semibold">{month.total_paid} جنيه</span>
+                  </p>
+                  <p className="flex justify-between text-gray-600">
+                    <span>التدريب الخاص:</span>
+                    <span className="text-indigo-600 font-semibold">{month.total_private_training} جنيه</span>
+                  </p>
+                  <p className="flex justify-between text-gray-600">
+                    <span>المتبقي:</span>
+                    <span className="text-indigo-600 font-semibold">{month.total_remaining} جنيه</span>
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center">لا توجد إيرادات شهرية</p>
+          )}
+        </div>
+      </div>
+
+      {/* Members Details */}
+      {membersDetails.length > 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-800 mb-6 border-b border-gray-200 pb-2">
-            الاشتراكات النشطة ({activeSubscriptions.length})
+            تفاصيل الأعضاء ({membersDetails.length})
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {activeSubscriptions.map((sub) => (
+            {membersDetails.map((member) => (
               <div
-                key={sub.subscription_id}
+                key={member.subscription_id}
                 className="bg-gray-50 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow duration-300"
               >
                 <div className="space-y-3">
                   <p className="flex justify-between">
                     <span className="font-medium text-gray-600">العضو:</span>
-                    <span className="text-gray-800">{sub.member_name || '—'}</span>
+                    <span className="text-gray-800">{member.member_name || '—'}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">نوع الاشتراك:</span>
+                    <span className="text-gray-800">{member.type_name || '—'}</span>
                   </p>
                   <p className="flex justify-between">
                     <span className="font-medium text-gray-600">تاريخ البدء:</span>
                     <span className="text-gray-800">
-                      {sub.start_date ? new Date(sub.start_date).toLocaleDateString('ar-EG') : '—'}
+                      {member.start_date ? new Date(member.start_date).toLocaleDateString('ar-EG') : '—'}
                     </span>
                   </p>
                   <p className="flex justify-between">
                     <span className="font-medium text-gray-600">تاريخ الانتهاء:</span>
                     <span className="text-gray-800">
-                      {sub.end_date ? new Date(sub.end_date).toLocaleDateString('ar-EG') : '—'}
+                      {member.end_date ? new Date(member.end_date).toLocaleDateString('ar-EG') : '—'}
                     </span>
                   </p>
                   <p className="flex justify-between">
                     <span className="font-medium text-gray-600">الحالة:</span>
-                    <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded">
-                      {sub.status || 'نشط'}
+                    <span
+                      className={`text-xs px-2 py-1 rounded ${
+                        member.status === 'Active'
+                          ? 'bg-green-100 text-green-800'
+                          : member.status === 'Expired'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-blue-100 text-blue-800'
+                      }`}
+                    >
+                      {member.status || '—'}
                     </span>
                   </p>
                   <p className="flex justify-between">
-                    <span className="font-medium text-gray-600">السعر:</span>
+                    <span className="font-medium text-gray-600">عدد الحضور:</span>
+                    <span className="text-gray-800">{member.attendance_count || 0}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">الحصص المستخدمة:</span>
+                    <span className="text-gray-800">
+                      {member.entries_used}/{member.max_entries || 'غير محدود'}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">مكتمل:</span>
+                    <span className="text-gray-800">{member.fully_used ? 'نعم' : 'لا'}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">سعر التدريب:</span>
                     <span className="text-indigo-600 font-semibold">
-                      {sub.private_training_price ? `${sub.private_training_price} جنيه` : '—'}
+                      {member.private_training_price ? `${member.private_training_price} جنيه` : '—'}
                     </span>
                   </p>
                   <p className="flex justify-between">
                     <span className="font-medium text-gray-600">المدفوع:</span>
                     <span className="text-indigo-600 font-semibold">
-                      {sub.paid_amount ? `${sub.paid_amount} جنيه` : '—'}
+                      {member.paid_amount ? `${member.paid_amount} جنيه` : '—'}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">المتبقي:</span>
+                    <span className="text-indigo-600 font-semibold">
+                      {member.remaining_amount ? `${member.remaining_amount} جنيه` : '—'}
                     </span>
                   </p>
                 </div>
@@ -150,18 +272,18 @@ function CoachProfile() {
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm p-6 mb-8 text-center text-gray-500">
-          لا توجد اشتراكات نشطة حاليًا
+          لا توجد بيانات أعضاء
         </div>
       )}
 
-      {/* Completed Subscriptions */}
-      {completedSubscriptions.length > 0 ? (
-        <div className="bg-white rounded-xl shadow-sm p-6">
+      {/* Upcoming Subscriptions */}
+      {upcomingSubscriptions.length > 0 ? (
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-800 mb-6 border-b border-gray-200 pb-2">
-            الاشتراكات المنتهية ({completedSubscriptions.length})
+            الاشتراكات القادمة ({upcomingSubscriptions.length})
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {completedSubscriptions.map((sub) => (
+            {upcomingSubscriptions.map((sub) => (
               <div
                 key={sub.subscription_id}
                 className="bg-gray-50 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow duration-300"
@@ -170,6 +292,10 @@ function CoachProfile() {
                   <p className="flex justify-between">
                     <span className="font-medium text-gray-600">العضو:</span>
                     <span className="text-gray-800">{sub.member_name || '—'}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">نوع الاشتراك:</span>
+                    <span className="text-gray-800">{sub.type_name || '—'}</span>
                   </p>
                   <p className="flex justify-between">
                     <span className="font-medium text-gray-600">تاريخ البدء:</span>
@@ -184,13 +310,7 @@ function CoachProfile() {
                     </span>
                   </p>
                   <p className="flex justify-between">
-                    <span className="font-medium text-gray-600">الحالة:</span>
-                    <span className="bg-gray-100 text-gray-800 text-xs px-2 py-1 rounded">
-                      {sub.status || 'منتهي'}
-                    </span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="font-medium text-gray-600">السعر:</span>
+                    <span className="font-medium text-gray-600">سعر التدريب:</span>
                     <span className="text-indigo-600 font-semibold">
                       {sub.private_training_price ? `${sub.private_training_price} جنيه` : '—'}
                     </span>
@@ -199,6 +319,74 @@ function CoachProfile() {
                     <span className="font-medium text-gray-600">المدفوع:</span>
                     <span className="text-indigo-600 font-semibold">
                       {sub.paid_amount ? `${sub.paid_amount} جنيه` : '—'}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">المتبقي:</span>
+                    <span className="text-indigo-600 font-semibold">
+                      {sub.remaining_amount ? `${sub.remaining_amount} جنيه` : '—'}
+                    </span>
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-8 text-center text-gray-500">
+          لا توجد اشتراكات قادمة
+        </div>
+      )}
+
+      {/* Expired Subscriptions */}
+      {expiredSubscriptions.length > 0 ? (
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-xl font-semibold text-gray-800 mb-6 border-b border-gray-200 pb-2">
+            الاشتراكات المنتهية ({expiredSubscriptions.length})
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {expiredSubscriptions.map((sub) => (
+              <div
+                key={sub.subscription_id}
+                className="bg-gray-50 rounded-lg p-5 shadow-sm hover:shadow-md transition-shadow duration-300"
+              >
+                <div className="space-y-3">
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">العضو:</span>
+                    <span className="text-gray-800">{sub.member_name || '—'}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">نوع الاشتراك:</span>
+                    <span className="text-gray-800">{sub.type_name || '—'}</span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">تاريخ البدء:</span>
+                    <span className="text-gray-800">
+                      {sub.start_date ? new Date(sub.start_date).toLocaleDateString('ar-EG') : '—'}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">تاريخ الانتهاء:</span>
+                    <span className="text-gray-800">
+                      {sub.end_date ? new Date(sub.end_date).toLocaleDateString('ar-EG') : '—'}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">سعر التدريب:</span>
+                    <span className="text-indigo-600 font-semibold">
+                      {sub.private_training_price ? `${sub.private_training_price} جنيه` : '—'}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">المدفوع:</span>
+                    <span className="text-indigo-600 font-semibold">
+                      {sub.paid_amount ? `${sub.paid_amount} جنيه` : '—'}
+                    </span>
+                  </p>
+                  <p className="flex justify-between">
+                    <span className="font-medium text-gray-600">المتبقي:</span>
+                    <span className="text-indigo-600 font-semibold">
+                      {sub.remaining_amount ? `${sub.remaining_amount} جنيه` : '—'}
                     </span>
                   </p>
                 </div>

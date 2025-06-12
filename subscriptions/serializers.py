@@ -7,8 +7,9 @@ from accounts.models import User
 from members.models import Member
 from django.utils import timezone
 from django.db import models
-from django.db.models import Q
-
+from django.db.models import Q, Count, Sum
+from django.db.models.functions import TruncMonth
+from attendance.models import Attendance
 
 class SubscriptionTypeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
@@ -25,14 +26,11 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, data):
-        # Ensure max_freeze_days is non-negative
         max_freeze_days = data.get('max_freeze_days', getattr(self.instance, 'max_freeze_days', 0))
         if max_freeze_days < 0:
             raise serializers.ValidationError({
                 'max_freeze_days': 'يجب أن تكون أيام التجميد غير سالبة'
             })
-
-        # Prevent disabling is_private_training if active subscriptions exist
         if self.instance and 'is_private_training' in data:
             if not data['is_private_training'] and self.instance.is_private_training:
                 if Subscription.objects.filter(
@@ -42,9 +40,7 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({
                         'is_private_training': 'لا يمكن إلغاء التدريب الخاص لوجود اشتراكات نشطة'
                     })
-
         return data
-
 
 class FreezeRequestSerializer(serializers.ModelSerializer):
     created_by_details = UserSerializer(source='created_by', read_only=True)
@@ -105,7 +101,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             return "Frozen"
 
         is_expired_by_date = obj.end_date < today
-
         is_expired_by_entries = max_entries > 0 and entry_count >= max_entries
 
         if is_expired_by_date or is_expired_by_entries:
@@ -147,7 +142,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         identifier = data.get('identifier', '')
         private_training_price = data.get('private_training_price', getattr(self.instance, 'private_training_price', 0))
 
-        # Handle identifier if provided
         if identifier and not member:
             try:
                 member = Member.objects.get(
@@ -158,7 +152,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             except Member.DoesNotExist:
                 raise serializers.ValidationError("لا يوجد عضو بهذا المعرف (هاتف، RFID، أو اسم).")
 
-        # Handle coach_identifier if provided
         if coach_identifier and not coach:
             try:
                 coach = User.objects.get(
@@ -171,16 +164,10 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             except User.DoesNotExist:
                 raise serializers.ValidationError("لا يوجد مدرب بهذا المعرف (اسم المستخدم أو RFID).")
 
-        # Handle private training logic
-        if subscription_type and subscription_type.is_private_training:
-            if not coach:
-                raise serializers.ValidationError("مطلوب كابتن لاشتراك التدريب الخاص.")
-            if coach and (coach.club != club or coach.role != 'coach' or not coach.is_active):
+        if coach:
+            if coach.club != club or coach.role != 'coach' or not coach.is_active:
                 raise serializers.ValidationError("الكابتن يجب أن يكون نشط ومن نفس النادي.")
-            if private_training_price <= 0:
-                raise serializers.ValidationError("سعر التدريب الخاص يجب أن يكون أكبر من 0.")
-
-            if coach and hasattr(coach, 'coach_profile'):
+            if hasattr(coach, 'coach_profile'):
                 profile = coach.coach_profile
                 if profile.max_trainees > 0:
                     active_subscriptions = Subscription.objects.filter(
@@ -195,14 +182,12 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                         )
             else:
                 raise serializers.ValidationError("الكابتن ليس لديه ملف تدريب.")
+            if private_training_price <= 0:
+                raise serializers.ValidationError("سعر التدريب الخاص يجب أن يكون أكبر من 0 عند اختيار كابتن.")
         else:
-            # If not private training, ensure private_training_price and coach are null
             if private_training_price is not None and private_training_price > 0:
-                raise serializers.ValidationError("لا يمكن تحديد سعر تدريب خاص لاشتراك غير خاص.")
-            if coach is not None:
-                data['coach'] = None
-            if private_training_price is not None:
-                data['private_training_price'] = None
+                raise serializers.ValidationError("لا يمكن تحديد سعر تدريب خاص بدون اختيار كابتن.")
+            data['private_training_price'] = 0
 
         if club and subscription_type and subscription_type.club != club:
             raise serializers.ValidationError("نوع الاشتراك يجب أن يكون لنفس النادي.")
@@ -233,12 +218,9 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        # Remove coach_identifier and identifier from validated_data
         validated_data.pop('coach_identifier', None)
         validated_data.pop('identifier', None)
-        # Create the subscription
         return Subscription.objects.create(**validated_data)
-
 
 class MemberBehaviorSerializer(serializers.Serializer):
     member_name = serializers.CharField(source='member__name')
@@ -253,11 +235,20 @@ class CoachReportSerializer(serializers.Serializer):
     active_clients = serializers.IntegerField()
     total_private_training_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_remaining_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     previous_month_clients = serializers.IntegerField()
-    subscriptions = serializers.SerializerMethodField()
-    completed_subscriptions = serializers.SerializerMethodField()
+    upcoming_subscriptions = serializers.SerializerMethodField()
+    expired_subscriptions = serializers.SerializerMethodField()
+    monthly_clients = serializers.SerializerMethodField()
+    total_career_clients = serializers.SerializerMethodField()
+    subscription_types = serializers.SerializerMethodField()
+    members_details = serializers.SerializerMethodField()
+    revenue_by_type = serializers.SerializerMethodField()
+    monthly_revenue = serializers.SerializerMethodField()
+    start_date = serializers.DateField()
+    end_date = serializers.DateField()
 
-    def get_subscriptions(self, obj):
+    def get_upcoming_subscriptions(self, obj):
         today = timezone.now().date()
         subscriptions = obj.get('subscriptions', [])
         return [
@@ -266,16 +257,16 @@ class CoachReportSerializer(serializers.Serializer):
                 'member_name': sub.member.name,
                 'start_date': sub.start_date,
                 'end_date': sub.end_date,
-                'status': 'سارية' if sub.start_date <= today <= sub.end_date else 'منتهية',
+                'type_name': sub.type.name,
                 'private_training_price': sub.private_training_price,
                 'paid_amount': sub.paid_amount,
+                'remaining_amount': sub.remaining_amount
             }
-            for sub in subscriptions
+            for sub in subscriptions if sub.start_date > today
         ]
 
-    def get_completed_subscriptions(self, obj):
-        start_date = obj.get('start_date')
-        end_date = obj.get('end_date')
+    def get_expired_subscriptions(self, obj):
+        today = timezone.now().date()
         subscriptions = obj.get('subscriptions', [])
         return [
             {
@@ -283,9 +274,131 @@ class CoachReportSerializer(serializers.Serializer):
                 'member_name': sub.member.name,
                 'start_date': sub.start_date,
                 'end_date': sub.end_date,
+                'type_name': sub.type.name,
                 'private_training_price': sub.private_training_price,
                 'paid_amount': sub.paid_amount,
+                'remaining_amount': sub.remaining_amount
             }
-            for sub in subscriptions
-            if start_date <= sub.end_date <= end_date
+            for sub in subscriptions if sub.end_date < today or (sub.type.max_entries > 0 and sub.entry_count >= sub.type.max_entries)
         ]
+
+    def get_monthly_clients(self, obj):
+        start_date = obj.get('start_date')
+        end_date = obj.get('end_date')
+        monthly_counts = Subscription.objects.filter(
+            coach_id=obj['coach_id'],
+            club=obj['club'],
+            start_date__lte=end_date,
+            end_date__gte=start_date
+        ).annotate(
+            month=TruncMonth('start_date')
+        ).values('month').annotate(
+            client_count=Count('id')
+        ).order_by('month')
+        return [
+            {
+                'month': item['month'].strftime('%Y-%m'),
+                'client_count': item['client_count']
+            }
+            for item in monthly_counts
+        ]
+
+    def get_total_career_clients(self, obj):
+        return Subscription.objects.filter(
+            coach_id=obj['coach_id'],
+            club=obj['club']
+        ).count()
+
+    def get_subscription_types(self, obj):
+        type_counts = Subscription.objects.filter(
+            coach_id=obj['coach_id'],
+            club=obj['club'],
+            start_date__lte=obj['end_date'],
+            end_date__gte=obj['start_date']
+        ).values('type__name').annotate(
+            count=Count('id')
+        ).order_by('-count')
+        return [
+            {
+                'type_name': item['type__name'],
+                'subscription_count': item['count']
+            }
+            for item in type_counts
+        ]
+
+    def get_revenue_by_type(self, obj):
+        revenue_by_type = Subscription.objects.filter(
+            coach_id=obj['coach_id'],
+            club=obj['club'],
+            start_date__lte=obj['end_date'],
+            end_date__gte=obj['start_date']
+        ).values('type__name').annotate(
+            total_paid=Sum('paid_amount'),
+            total_private_training=Sum('private_training_price'),
+            total_remaining=Sum('remaining_amount')
+        ).order_by('-total_paid')
+        return [
+            {
+                'type_name': item['type__name'],
+                'total_paid': item['total_paid'] or 0.0,
+                'total_private_training': item['total_private'] or item.get('total_private_training', 0.0),
+                'total_remaining': item['total_remaining'] or 0.0
+            }
+            for item in revenue_by_type
+        ]
+
+    def get_monthly_revenue(self, data):
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        monthly_revenue = Subscription.objects.filter(
+            coach_id=data['coach_id'],
+            club=data['club'],
+            start_date__lte=end_date,
+            end_date__gte=start_date
+        ).annotate(
+            month=TruncMonth('start_date')
+        ).values('month').annotate(
+            total_paid=Sum('paid_amount'),
+            total_private_training=Sum('private_training_price'),
+            total_remaining=Sum('remaining_amount')
+        ).order_by('month')
+        return [
+            {
+                'month': item['month'].strftime('%Y-%m'),
+                'total_paid': item['total_paid'] or 0.0,
+                'total_private_training': item['total_private_training'] or 0.0,
+                'total_remaining': item['total_remaining'] or 0.0
+            }
+            for item in monthly_revenue
+        ]
+
+    def get_members_details(self, obj):
+        start_date = obj.get('start_date')
+        end_date = obj.get('end_date')
+        subscriptions = obj.get('subscriptions', [])
+        today = timezone.now().date()
+        members_data = []
+        for sub in subscriptions:
+            attendance_count = Attendance.objects.filter(
+                subscription=sub,
+                attendance_date__range=(start_date, end_date)
+            ).count()
+            max_entries = sub.type.max_entries
+            fully_used = max_entries > 0 and sub.entry_count >= max_entries
+            members_data.append({
+                'member_id': sub.member.id,
+                'member_name': sub.member.name,
+                'subscription_id': sub.id,
+                'type_name': sub.type.name,
+                'start_date': sub.start_date,
+                'end_date': sub.end_date,
+                'status': 'Active' if sub.start_date <= today <= sub.end_date and not fully_used else 'Expired' if sub.end_date < today or fully_used else 'Upcoming',
+                'attendance_count': attendance_count,
+                'max_entries': max_entries,
+                'entries_used': sub.entry_count,
+                'fully_used': fully_used,
+                'private_training_price': sub.private_training_price,
+                'paid_amount': sub.paid_amount,
+                'remaining_amount': sub.remaining_amount
+            })
+        return members_data

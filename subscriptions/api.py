@@ -3,7 +3,8 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.db.models import (
-    Count, Sum, Avg, Q, Case, When, F, Max, IntegerField, FloatField, Value, ExpressionWrapper
+    Count, Sum, Avg, Q, Case, When, F, Max,
+    IntegerField, FloatField, Value, ExpressionWrapper
 )
 from django.db.models.functions import TruncMonth, TruncWeek
 from django.shortcuts import get_object_or_404
@@ -17,7 +18,8 @@ from rest_framework.response import Response
 
 from subscriptions.models import Subscription, SubscriptionType, FreezeRequest
 from subscriptions.serializers import (
-    SubscriptionSerializer, SubscriptionTypeSerializer, CoachReportSerializer, MemberBehaviorSerializer
+    SubscriptionSerializer, SubscriptionTypeSerializer,
+    CoachReportSerializer, MemberBehaviorSerializer
 )
 
 from finance.models import Income, IncomeSource
@@ -86,6 +88,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
@@ -104,7 +107,6 @@ def subscription_list(request):
             club=request.user.club
         )
 
-        # تطبيق شروط الموظفين (reception, accountant)
         if request.user.role in ['reception', 'accountant'] and not is_search_mode:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
@@ -119,7 +121,6 @@ def subscription_list(request):
                 created_at__lte=timezone.now()
             )
 
-        # التعامل مع البحث باستخدام search_term
         if search_term:
             try:
                 subscription = subscriptions.get(
@@ -134,8 +135,6 @@ def subscription_list(request):
             except Subscription.MultipleObjectsReturned:
                 return Response({'error': 'تم العثور على أكثر من اشتراك مطابق. يرجى تحديد المعرف بشكل أكثر دقة.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # التعامل مع طلبات القائمة العامة (بدون search_term)
-        # تطبيق الفلاتر الإضافية بناءً على query_params
         if request.query_params.get('member_id'):
             subscriptions = subscriptions.filter(member_id=request.query_params.get('member_id'))
         if request.query_params.get('type_id'):
@@ -155,49 +154,16 @@ def subscription_list(request):
             elif request.query_params.get('status') == 'upcoming':
                 subscriptions = subscriptions.filter(start_date__gt=today)
 
-        # ترتيب الاشتراكات
         subscriptions = subscriptions.order_by('-start_date')
-
-        # تطبيق الترقيم
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
     elif request.method == 'POST':
-        identifier = request.data.get('identifier', '')
         mutable_data = request.data.copy()
         mutable_data['created_by'] = request.user.id
-
-        if identifier:
-            try:
-                member = Member.objects.filter(
-                    Q(phone=identifier) | Q(rfid_code=identifier) | Q(name__iexact=identifier)
-                ).first()
-                if not member:
-                    return Response({'error': 'لا يوجد عضو بهذا المعرف'}, status=status.HTTP_400_BAD_REQUEST)
-                mutable_data['member'] = member.id
-            except Member.DoesNotExist:
-                return Response({'error': 'معرف غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
-
-        if 'start_date' not in mutable_data or not mutable_data['start_date']:
-            today = timezone.now().date()
-            active_subscriptions = Subscription.objects.filter(
-                member=mutable_data['member'],
-                club=mutable_data['club'],
-                start_date__lte=today,
-                end_date__gte=today
-            ).exclude(entry_count__gte=F('type__max_entries')).exclude(type__max_entries=0)
-            
-            if active_subscriptions.exists():
-                latest_subscription = active_subscriptions.order_by('-end_date').first()
-                if (latest_subscription.entry_count >= latest_subscription.type.max_entries and
-                    latest_subscription.type.max_entries > 0):
-                    mutable_data['start_date'] = today
-                else:
-                    mutable_data['start_date'] = latest_subscription.end_date + timedelta(days=1)
-            else:
-                mutable_data['start_date'] = today
+        mutable_data['club'] = request.user.club.id
 
         serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
         if serializer.is_valid():
@@ -206,22 +172,26 @@ def subscription_list(request):
                 subscription.delete()
                 return Response({'error': 'غير مخول لإنشاء اشتراك لهذا النادي'}, status=status.HTTP_403_FORBIDDEN)
 
-            if subscription.paid_amount > 0:
+            if subscription.paid_amount > 0 or subscription.private_training_price > 0:
                 source, _ = IncomeSource.objects.get_or_create(
                     club=subscription.club, name='Subscription', defaults={'description': 'ايراد عن اشتراك'}
                 )
+                amount = subscription.paid_amount + (subscription.private_training_price or 0)
                 income = Income(
-                    club=subscription.club, source=source, amount=subscription.paid_amount,
+                    club=subscription.club,
+                    source=source,
+                    amount=amount,
                     description=f"اشتراك {subscription.member.name}" + 
                                 (f" مع الكابتن {subscription.coach.username} بسعر {subscription.private_training_price}" 
-                                 if subscription.coach and subscription.type.is_private_training else ""),
-                    date=timezone.now().date(), received_by=request.user
+                                 if subscription.coach else ""),
+                    date=timezone.now().date(),
+                    received_by=request.user
                 )
                 income.save()
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -286,69 +256,44 @@ def subscription_detail(request, pk):
         serializer = SubscriptionSerializer(subscription)
         return Response(serializer.data)
     
-    elif request.method == 'PUT':
-        identifier = request.GET.get('identifier', '')
-        mutable_data = request.data.copy()
 
-        if identifier:
-            try:
-                member = Member.objects.filter(
-                    Q(phone=identifier) | Q(rfid_code=identifier) | Q(name__iexact=identifier)
-                ).first()
-                if not member:
-                    return Response({'error': 'لا يوجد عضو بهذا المعرف'}, status=status.HTTP_400_BAD_REQUEST)
-                mutable_data['member'] = member.id
-            except Member.DoesNotExist:
-                return Response({'error': 'معرف غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'PUT':
+        mutable_data = request.data.copy()
+        mutable_data['club'] = request.user.club.id
 
         with transaction.atomic():
-            type_id = mutable_data.get('type')
-            if type_id:
-                subscription_type = get_object_or_404(SubscriptionType, pk=type_id, club=request.user.club)
-                type_data = {
-                    'max_freeze_days': mutable_data.get('max_freeze_days', subscription_type.max_freeze_days),
-                    'is_private_training': mutable_data.get('is_private_training', subscription_type.is_private_training)
-                }
-                type_serializer = SubscriptionTypeSerializer(
-                    subscription_type, 
-                    data=type_data, 
-                    partial=True, 
-                    context={'request': request}
-                )
-                if type_serializer.is_valid():
-                    type_serializer.save()
-                else:
-                    return Response(type_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
             serializer = SubscriptionSerializer(subscription, data=mutable_data, partial=True, context={'request': request})
             if serializer.is_valid():
                 updated_subscription = serializer.save()
-                if 'paid_amount' in mutable_data or 'private_training_price' in mutable_data:
-                    old_paid_amount = subscription.paid_amount
-                    old_private_training_price = subscription.private_training_price or Decimal('0')
-                    new_paid_amount = updated_subscription.paid_amount
-                    new_private_training_price = updated_subscription.private_training_price or Decimal('0')
-                    additional_amount = (new_paid_amount - old_paid_amount) + (new_private_training_price - old_private_training_price)
-                    if additional_amount > 0:
-                        source, _ = IncomeSource.objects.get_or_create(
-                            club=updated_subscription.club, 
-                            name='Subscription', 
-                            defaults={'description': 'ايراد عن اشتراك'}
-                        )
-                        income = Income(
-                            club=updated_subscription.club,
-                            source=source,
-                            amount=additional_amount,
-                            description=f"ايراد اضافي لاشتراك {updated_subscription.member.name}" +
-                                        (f" مع الكابتن {updated_subscription.coach.username} بسعر {updated_subscription.private_training_price}" 
-                                         if updated_subscription.coach and updated_subscription.type.is_private_training else ""),
-                            date=timezone.now().date(),
-                            received_by=request.user
-                        )
-                        income.save()
+                
+                # Calculate additional amount for Income
+                old_paid_amount = subscription.paid_amount or Decimal('0')
+                old_private_training_price = subscription.private_training_price or Decimal('0')
+                new_paid_amount = updated_subscription.paid_amount or Decimal('0')
+                new_private_training_price = updated_subscription.private_training_price or Decimal('0')
+                additional_amount = (new_paid_amount - old_paid_amount) + (new_private_training_price - old_private_training_price)
+
+                if additional_amount > 0:
+                    source, _ = IncomeSource.objects.get_or_create(
+                        club=updated_subscription.club, 
+                        name='Subscription', 
+                        defaults={'description': 'ايراد عن اشتراك'}
+                    )
+                    income = Income(
+                        club=updated_subscription.club,
+                        source=source,
+                        amount=additional_amount,
+                        description=f"ايراد اضافي لاشتراك {updated_subscription.member.name}" +
+                                    (f" مع الكابتن {updated_subscription.coach.username} بسعر {updated_subscription.private_training_price}" 
+                                     if updated_subscription.coach else ""),
+                        date=timezone.now().date(),
+                        received_by=request.user
+                    )
+                    income.save()
+                
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        
     elif request.method == 'DELETE':
         subscription.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -656,7 +601,6 @@ def cancel_freeze(request, freeze_id):
     serializer = SubscriptionSerializer(subscription)
     return Response(serializer.data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def coach_report(request, coach_id):
@@ -667,7 +611,8 @@ def coach_report(request, coach_id):
     # Handle date range
     start_date = request.query_params.get('start_date', None)
     end_date = request.query_params.get('end_date', None)
-    
+    type_id = request.query_params.get('type_id', None)
+
     if start_date:
         try:
             start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
@@ -684,33 +629,41 @@ def coach_report(request, coach_id):
     else:
         end_date = timezone.now().date()
 
-    # Get all subscriptions for the specified period
+    # Get all subscriptions for the coach
     subscriptions = Subscription.objects.filter(
         coach=coach,
         club=request.user.club,
-        type__is_private_training=True,
         start_date__lte=end_date,
         end_date__gte=start_date
-    ).select_related('member', 'type')
+    ).select_related('member', 'type').prefetch_related('attendance_attendances')
 
-    # Calculate previous month's clients
+    if type_id:
+        try:
+            subscriptions = subscriptions.filter(type_id=int(type_id))
+        except ValueError:
+            return Response({'error': 'معرف نوع الاشتراك غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Previous month's clients
     prev_month_end = start_date - timedelta(days=1)
     prev_month_start = prev_month_end.replace(day=1)
     prev_month_clients = Subscription.objects.filter(
         coach=coach,
         club=request.user.club,
-        type__is_private_training=True,
         start_date__lte=prev_month_end,
         end_date__gte=prev_month_start
-    ).aggregate(
+    )
+    if type_id:
+        prev_month_clients = prev_month_clients.filter(type_id=type_id)
+    prev_month_clients = prev_month_clients.aggregate(
         prev_clients=Count('id')
     )['prev_clients'] or 0
 
     # Aggregate data
     aggregated_data = subscriptions.aggregate(
-        active_clients=Count('id'),
+        active_clients=Count('id', filter=Q(start_date__lte=timezone.now().date(), end_date__gte=timezone.now().date())),
         total_private_training_amount=Sum('private_training_price'),
-        total_paid_amount=Sum('paid_amount')
+        total_paid_amount=Sum('paid_amount'),
+        total_remaining_amount=Sum('remaining_amount')
     )
 
     # Prepare report
@@ -720,8 +673,10 @@ def coach_report(request, coach_id):
         'active_clients': aggregated_data['active_clients'] or 0,
         'total_private_training_amount': aggregated_data['total_private_training_amount'] or 0,
         'total_paid_amount': aggregated_data['total_paid_amount'] or 0,
+        'total_remaining_amount': aggregated_data['total_remaining_amount'] or 0,
         'previous_month_clients': prev_month_clients,
         'subscriptions': subscriptions,
+        'club': request.user.club,
         'start_date': start_date,
         'end_date': end_date
     }
