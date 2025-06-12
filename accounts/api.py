@@ -74,8 +74,6 @@ def api_user_list(request):
     search_query = request.query_params.get('search', '').strip()
 
     if request.user.role == 'owner':
-        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').all()
-    else:
         users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(club=request.user.club)
 
     if search_query:

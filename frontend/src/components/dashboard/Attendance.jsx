@@ -151,13 +151,13 @@ const Attendance = () => {
     const fetchStats = async () => {
       try {
         const [dailyResponse, weeklyResponse] = await Promise.all([
-          fetch(`${BASE_URL}attendances/api/attendances/hourly/`, {
+          fetch(`${BASE_URL}attendance/api/attendances/hourly/`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
               "Content-Type": "application/json",
             },
           }),
-          fetch(`${BASE_URL}attendances/api/attendances/weekly/`, {
+          fetch(`${BASE_URL}attendance/api/attendances/weekly/`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
               "Content-Type": "application/json",
