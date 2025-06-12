@@ -17,7 +17,7 @@ from rest_framework.response import Response
 
 from subscriptions.models import Subscription, SubscriptionType, FreezeRequest
 from subscriptions.serializers import (
-    SubscriptionSerializer, SubscriptionTypeSerializer, CoachReportSerializer,MemberBehaviorSerializer
+    SubscriptionSerializer, SubscriptionTypeSerializer, CoachReportSerializer, MemberBehaviorSerializer
 )
 
 from finance.models import Income, IncomeSource
@@ -82,11 +82,14 @@ def subscription_type_list(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     
+import logging
+logger = logging.getLogger(__name__)
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
     if request.method == 'GET':
-        search_term = request.GET.get('searchTerm', '') 
+        search_term = request.GET.get('searchTerm', request.GET.get('search_term', '')) 
         is_search_mode = (
             search_term or
             any(param in request.query_params for param in [
@@ -96,17 +99,15 @@ def subscription_list(request):
             any(param.endswith('_gte') or param.endswith('_lte') for param in request.query_params)
         )
 
-        # Base queryset for subscriptions
         subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(
             club=request.user.club
         )
 
-        # Restrict non-admin users to their shift unless it's a search query
         if request.user.role in ['reception', 'accountant'] and not is_search_mode:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club,
-                check_out__isnull=True  # Current open shift
+                check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
                 return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
@@ -116,76 +117,19 @@ def subscription_list(request):
                 created_at__lte=timezone.now()
             )
 
-        # Apply filters
-        filterable_fields = {
-            'member_id': 'member_id',
-            'type_id': 'type_id',
-            'club_id': 'club_id',
-            'club_name': 'club__name__iexact',
-            'start_date': 'start_date',
-            'end_date': 'end_date',
-            'paid_amount': 'paid_amount',
-            'remaining_amount': 'remaining_amount',
-            'entry_count': 'entry_count',
-        }
-
-        filters = {}
-        for param, field in filterable_fields.items():
-            if param in request.query_params:
-                filters[field] = request.query_params[param]
-
-        range_filters = {}
-        for param in request.query_params:
-            if param.endswith('_gte') or param.endswith('_lte'):
-                field_name = param.rsplit('__', 1)[0]
-                if field_name in filterable_fields.values():
-                    range_filters[param] = request.query_params[param]
-
         if search_term:
-            subscriptions = subscriptions.filter(
-                Q(member__name__icontains=search_term) |
-                Q(member__phone__icontains=search_term) |
-                Q(member__rfid_code__icontains=search_term)
-            )
-
-        try:
-            subscriptions = subscriptions.filter(**filters)
-        except ValueError as e:
-            return Response({'error': f'Invalid filter value: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            subscriptions = subscriptions.filter(**range_filters)
-        except ValueError as e:
-            return Response({'error': f'Invalid range filter value: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
-
-        subscriptions = subscriptions.order_by('-id')
-
-        # Apply status filter
-        status_filter = request.query_params.get('status', '').lower()
-        today = timezone.now().date()
-
-        status_filters = {
-            'active': {
-                'start_date__lte': today,
-                'end_date__gte': today
-            },
-            'expired': {
-                'end_date__lt': today
-            },
-            'upcoming': {
-                'start_date__gt': today
-            }
-        }
-
-        if status_filter in status_filters:
-            subscriptions = subscriptions.filter(**status_filters[status_filter])
-
-        # Pagination
-        paginator = PageNumberPagination()
-        page = paginator.paginate_queryset(subscriptions, request)
-        serializer = SubscriptionSerializer(page, many=True)
-        return paginator.get_paginated_response(serializer.data)
-      
+            try:
+                subscription = subscriptions.get(
+                    Q(member__rfid_code__exact=search_term) |
+                    Q(member__phone__exact=search_term) |
+                    Q(member__name__exact=search_term)
+                )
+                serializer = SubscriptionSerializer(subscription)
+                return Response(serializer.data)
+            except Subscription.DoesNotExist:
+                return Response({'error': 'لا يوجد اشتراك مطابق'}, status=status.HTTP_404_NOT_FOUND)
+            except Subscription.MultipleObjectsReturned:
+                return Response({'error': 'تم العثور على أكثر من اشتراك مطابق. يرجى تحديد المعرف بشكل أكثر دقة.'}, status=status.HTTP_400_BAD_REQUEST)
     elif request.method == 'POST':
         identifier = request.data.get('identifier', '')
         mutable_data = request.data.copy()
@@ -209,7 +153,7 @@ def subscription_list(request):
                 club=mutable_data['club'],
                 start_date__lte=today,
                 end_date__gte=today
-            ).exclude(entry_count__gte=models.F('type__max_entries')).exclude(type__max_entries=0)
+            ).exclude(entry_count__gte=F('type__max_entries')).exclude(type__max_entries=0)
             
             if active_subscriptions.exists():
                 latest_subscription = active_subscriptions.order_by('-end_date').first()
@@ -243,7 +187,7 @@ def subscription_list(request):
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

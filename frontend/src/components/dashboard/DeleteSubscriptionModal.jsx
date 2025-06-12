@@ -1,44 +1,73 @@
-import React from 'react';
-import { useDispatch } from 'react-redux';
-import { deleteSubscriptionById } from '../../redux/slices/subscriptionsSlice';
+import React, { useCallback } from "react";
+import { useDispatch } from "react-redux";
+import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { deleteSubscriptionById, fetchSubscriptions } from "@/redux/slices/subscriptionsSlice";
+import { toast } from "react-hot-toast";
 
-const DeleteSubscriptionModal = ({ isOpen, onClose, subscription }) => {
+const DeleteSubscriptionModal = ({
+  isOpen,
+  onClose,
+  subscription,
+  setCurrentPage,
+  filters,
+  itemsPerPage,
+  subscriptionsLength,
+}) => {
   const dispatch = useDispatch();
 
-  const handleDelete = async () => {
-    await dispatch(deleteSubscriptionById(subscription.id));
-    onClose();
-  };
+  const handleDelete = useCallback(() => {
+    if (!subscription) return;
+    dispatch(deleteSubscriptionById(subscription.id))
+      .unwrap()
+      .then(() => {
+        toast.success("تم حذف الاشتراك بنجاح!");
+        onClose();
+        dispatch(fetchSubscriptions({ page: 1, pageSize: itemsPerPage, ...filters }));
+        if (subscriptionsLength === 1 && setCurrentPage > 1) {
+          setCurrentPage((prev) => prev - 1);
+        }
+      })
+      .catch((err) => {
+        toast.error(`فشل في حذف الاشتراك: ${err.message || "حدث خطأ"}`);
+      });
+  }, [dispatch, subscription, onClose, filters, itemsPerPage, subscriptionsLength, setCurrentPage]);
 
-  if (!isOpen || !subscription) return null;
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="modal relative">
-        <button
-          className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-          onClick={onClose}
-        >
-          ✕
-        </button>
-        <h2 className="text-lg font-semibold mb-4">حذف الاشتراك</h2>
-        هل أنت متأكد أنك تريد حذف <strong>{subscription.name}</strong>؟
-        <div className="flex justify-end space-x-2">
-          <button
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-40"
+    >
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        className="bg-white p-6 rounded-lg relative max-w-md w-full"
+      >
+        <h3 className="text-lg font-semibold mb-4 text-right">تأكيد الحذف</h3>
+        <p className="text-right">
+          هل أنت متأكد من حذف اشتراك <strong>{subscription?.member_details.name}</strong>؟
+        </p>
+        <div className="mt-6 flex justify-end gap-3">
+          <Button
             onClick={onClose}
-            className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400"
+            className="bg-gray-200 text-gray-700 hover:bg-gray-300"
           >
-             إلغاء
-          </button>
-          <button
+            إلغاء
+          </Button>
+          <Button
             onClick={handleDelete}
-      className="btn"
+            className="bg-red-600 text-white hover:bg-red-700"
           >
             حذف
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
 
