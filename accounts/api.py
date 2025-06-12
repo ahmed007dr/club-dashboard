@@ -5,7 +5,6 @@ from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from .serializers import UserProfileSerializer, LoginSerializer, RFIDLoginSerializer, UserSerializer
-from utils.permissions import IsOwnerOrRelatedToClub
 from .models import User
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
@@ -38,6 +37,7 @@ def api_login(request):
         }, status=status.HTTP_401_UNAUTHORIZED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def api_logout(request):
@@ -54,27 +54,35 @@ def api_logout(request):
     except Exception:
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def api_user_profile(request):
+    """
+    Get the profile of the authenticated user (Owner or Admin only).
+    """
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+
     user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=request.user.id)
     serializer = UserProfileSerializer(user)
     return Response(serializer.data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def api_user_list(request):
     """
-    List users with search functionality, including new fields (phone_number, card_number).
-    Only accessible to users with 'owner' or 'admin' role.
+    List users in the authenticated user's club (Owner or Admin only).
     """
     if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالوصول إلى هذه الصفحة.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
 
     search_query = request.query_params.get('search', '').strip()
 
-    if request.user.role == 'owner':
-        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(club=request.user.club)
+    users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(
+        club=request.user.club
+    )
 
     if search_query:
         is_active_filter = None
@@ -91,8 +99,7 @@ def api_user_list(request):
             Q(role__icontains=search_query) |
             Q(rfid_code__icontains=search_query) |
             Q(phone_number__icontains=search_query) |
-            Q(card_number__icontains=search_query) |
-            Q(club__name__icontains=search_query)
+            Q(card_number__icontains=search_query)
         )
 
         if is_active_filter is not None:
@@ -106,51 +113,58 @@ def api_user_list(request):
     serializer = UserProfileSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def api_user_create(request):
     """
-    Create a new user with roles 'reception', 'coach', or 'accountant' only.
-    Only accessible to users with 'owner' or 'admin' role and 'add_user' permission.
+    Create a new user (Owner or Admin only).
     """
     if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالوصول إلى هذه الصفحة.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
 
     if not request.user.has_perm('auth.add_user'):
         return Response({'error': 'لا تملك الصلاحية لإنشاء مستخدمين.'}, status=status.HTTP_403_FORBIDDEN)
 
-    serializer = UserSerializer(data=request.data)
+
+    data = request.data.copy()
+    data['club'] = request.user.club.id
+
+    serializer = UserSerializer(data=data)
     if serializer.is_valid():
         user = serializer.save()
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated])
 def api_user_update(request, pk):
     """
-    Update an existing user with roles 'reception', 'coach', or 'accountant' only.
-    Only accessible to users with 'owner' or 'admin' role and 'change_user' permission.
+    Update an existing user in the authenticated user's club (Owner or Admin only).
     """
     if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالوصول إلى هذه الصفحة.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
 
     if not request.user.has_perm('auth.change_user'):
         return Response({'error': 'لا تملك الصلاحية لتعديل مستخدمين.'}, status=status.HTTP_403_FORBIDDEN)
 
     try:
-        if request.user.role == 'owner':
-            user = User.objects.get(pk=pk)
-        else:
-            user = User.objects.get(pk=pk, club=request.user.club)
+        # التأكد من أن المستخدم في نفس النادي
+        user = User.objects.get(pk=pk, club=request.user.club)
     except User.DoesNotExist:
-        return Response({'error': 'المستخدم غير موجود.'}, status=status.HTTP_404_NOT_FOUND)
+        return Response({'error': 'المستخدم غير موجود في ناديك.'}, status=status.HTTP_404_NOT_FOUND)
 
-    serializer = UserSerializer(user, data=request.data, partial=True)
+    # التأكد من أن النادي لا يتغير
+    data = request.data.copy()
+    data['club'] = request.user.club.id
+
+    serializer = UserSerializer(user, data=data, partial=True)
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -172,27 +186,36 @@ def api_rfid_login(request):
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def active_users_api(request):
+    """
+    List active users in the authenticated user's club (Owner or Admin only).
+    """
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+
     try:
-        users = User.objects.filter(is_active=True)
-        
-        if request.user.role != 'owner':
-            users = users.filter(club=request.user.club)
-        
+        users = User.objects.filter(is_active=True, club=request.user.club)
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def coach_list(request):
+    """
+    List active coaches in the authenticated user's club (Owner or Admin only).
+    """
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+
     coaches = User.objects.filter(
         role='coach',
         is_active=True,
         club=request.user.club
     ).values('id', 'username')
-    return Response(coaches)
+    return Response(coaches, status=status.HTTP_200_OK)
