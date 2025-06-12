@@ -246,6 +246,7 @@ const SubscriptionList = () => {
       Active: "نشط",
       Expired: "منتهي",
       Upcoming: "قادمة",
+      Frozen: "مجمد",
     };
     return statusMap[status] || "غير معروف";
   }, []);
@@ -265,10 +266,40 @@ const SubscriptionList = () => {
   const handleFilterChange = useCallback((e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
-    setCurrentPage(1);
     setError(null);
   }, []);
-
+  
+  const handleSearch = useCallback(() => {
+    setIsLoading(true);
+    setCurrentPage(1);
+    setError(null);
+    const query = {
+      page: 1,
+      pageSize: itemsPerPage,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      entryCount: filters.entryCount,
+      status: filters.status,
+    };
+    if (filters.memberName.trim()) {
+      query.identifier = filters.memberName;
+    }
+    console.log("Search query:", query);
+    dispatch(fetchSubscriptions(query))
+      .unwrap()
+      .then(() => {
+        console.log("Search completed successfully");
+      })
+      .catch((err) => {
+        setError("فشل في البحث: " + (err.message || "حدث خطأ"));
+        console.error("Search error:", err);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [dispatch, filters, itemsPerPage]);
+  
+  
   // إعادة تعيين الفلاتر
   const resetFilters = useCallback(() => {
     setFilters({
@@ -499,20 +530,17 @@ const SubscriptionList = () => {
   );
 
   // البحث المؤخر
-  const debouncedFetchSubscriptions = useCallback(
-    debounce((filters, page, pageSize) => {
+  useEffect(() => {
+    if (!filters.memberName) { 
       setIsLoading(true);
       const query = {
-        page,
-        pageSize,
+        page: currentPage,
+        pageSize: itemsPerPage,
         startDate: filters.startDate,
         endDate: filters.endDate,
         entryCount: filters.entryCount,
         status: filters.status,
       };
-      if (filters.memberName.trim()) {
-        query.identifier = filters.memberName;
-      }
       dispatch(fetchSubscriptions(query))
         .unwrap()
         .catch((err) => {
@@ -521,24 +549,28 @@ const SubscriptionList = () => {
         .finally(() => {
           setIsLoading(false);
         });
-    }, 500),
-    [dispatch]
-  );
-
+    }
+  }, [filters.startDate, filters.endDate, filters.entryCount, filters.status, currentPage, itemsPerPage]);
   // جلب الاشتراكات
   useEffect(() => {
-    debouncedFetchSubscriptions(filters, currentPage, itemsPerPage);
-  }, [filters, currentPage, itemsPerPage, debouncedFetchSubscriptions]);
-
-  // عرض حالة التحميل
-  if (status === "loading" && !isLoading) {
-    return (
-      <div className="flex justify-center items-center h-screen bg-gray-100">
-        <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
-        <span className="mr-2 text-gray-600">جاري التحميل...</span>
-      </div>
-    );
-  }
+    setIsLoading(true);
+    const query = {
+      page: currentPage,
+      pageSize: itemsPerPage,
+      startDate: filters.startDate,
+      endDate: filters.endDate,
+      entryCount: filters.entryCount,
+      status: filters.status,
+    };
+    dispatch(fetchSubscriptions(query))
+      .unwrap()
+      .catch((err) => {
+        setError("فشل في جلب الاشتراكات: " + (err.message || "حدث خطأ"));
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
+  }, [filters.startDate, filters.endDate, filters.entryCount, filters.status, currentPage, itemsPerPage]);
 
   return (
     <div className="mx-auto p-4 sm:p-6 bg-gray-100 min-h-screen" dir="rtl">
@@ -572,14 +604,14 @@ const SubscriptionList = () => {
       <div className="bg-white p-4 rounded-lg shadow-sm mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="lg:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">اسم العضو</label>
-            <div className="relative">
+            <label className="block text-sm font-medium text-gray-700 mb-1">اسم العضو / RFID / رقم الهاتف</label>
+            <div className="relative flex items-center gap-2">
               <Input
                 type="text"
                 name="memberName"
                 value={filters.memberName}
                 onChange={handleFilterChange}
-                placeholder="ابحث باسم العضو..."
+                placeholder="ابحث باسم العضو، RFID، أو رقم الهاتف..."
                 className="w-full text-right pr-10"
               />
               <svg
@@ -590,6 +622,13 @@ const SubscriptionList = () => {
               >
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
+              <Button
+                onClick={handleSearch}
+                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={isLoading}
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "ابحث الآن"}
+              </Button>
             </div>
           </div>
           <div>
@@ -642,6 +681,7 @@ const SubscriptionList = () => {
               <option value="Active">نشط</option>
               <option value="Expired">منتهي</option>
               <option value="Upcoming">قادمة</option>
+              <option value="Frozen">مجمد</option>
             </select>
           </div>
           <div className="flex items-end gap-2 col-span-1 sm:col-span-2 lg:col-span-4">
@@ -655,7 +695,7 @@ const SubscriptionList = () => {
           </div>
         </div>
       </div>
-
+      
       {/* جدول الاشتراكات */}
       <div className="bg-white rounded-lg shadow-sm">
         {isLoading ? (
@@ -712,19 +752,20 @@ const SubscriptionList = () => {
                         <td className="py-3 px-4">{subscription.remaining_amount}</td>
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2 py-1 rounded text-xs font-medium ${
-                              displayStatus === "نشط"
-                                ? "bg-green-100 text-green-600"
-                                : displayStatus === "منتهي"
-                                ? "bg-red-100 text-red-600"
-                                : displayStatus === "قادمة"
-                                ? "bg-blue-100 text-blue-600"
-                                : "bg-gray-100 text-gray-600"
-                            }`}
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            displayStatus === "نشط"
+                              ? "bg-green-100 text-green-600"
+                              : displayStatus === "منتهي"
+                              ? "bg-red-100 text-red-600"
+                              : displayStatus === "قادمة"
+                              ? "bg-blue-100 text-blue-600"
+                              : displayStatus === "مجمد"
+                              ? "bg-gray-100 text-gray-600"
+                              : "bg-gray-100 text-gray-600"
+                          }`}
                           >
-                            {displayStatus}
-                          </span>
-                        </td>
+                          {displayStatus}
+                          </span>                        </td>
                         <td className="py-3 px-4 flex items-center justify-center gap-2">
                           <Input
                             type="text"

@@ -96,6 +96,14 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         max_entries = obj.type.max_entries
         entry_count = obj.entry_count
 
+        active_freeze = obj.freeze_requests.filter(
+            is_active=True,
+            start_date__lte=today,
+            end_date__gte=today  
+        ).exists()
+        if active_freeze:
+            return "Frozen"
+
         is_expired_by_date = obj.end_date < today
 
         is_expired_by_entries = max_entries > 0 and entry_count >= max_entries
