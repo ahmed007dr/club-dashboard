@@ -112,7 +112,7 @@ def member_search_api(request):
 
     members = Member.objects.filter(
         Q(club=request.user.club) & search_filter
-    ).order_by('-id')
+    ).order_by('-name')
 
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(members, request)
@@ -129,6 +129,10 @@ def api_user_profile(request):
     }
     return Response(profile_data)
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def create_member_api(request):
@@ -138,42 +142,79 @@ def create_member_api(request):
             club=request.user.club,
             check_out__isnull=True
         ).order_by('-check_in').first()
-
         if not attendance:
-            return Response({'error': 'You can only create members during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {'error': 'You can only create members during an active shift.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
-    membership_number = generate_membership_number()
-    data = request.data.copy()
-    data['membership_number'] = membership_number
+    if not request.user.club:
+        return Response(
+            {'error': 'User is not associated with any club.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
 
-    serializer = MemberSerializer(data=data, context={'request': request})
+    data = request.data
+    mutable_data = {}
+    for key in data:
+        if key != 'photo':
+            mutable_data[key] = data[key]
+    mutable_data['membership_number'] = generate_membership_number()
+    mutable_data['club'] = request.user.club.id
 
+    serializer = MemberSerializer(data=mutable_data, context={'request': request})
     if serializer.is_valid():
         try:
             member = serializer.save()
-            if not IsOwnerOrRelatedToClub().has_object_permission(request, None, member):
-                member.delete()
-                return Response({'error': 'You do not have permission to create a member for this club'}, status=status.HTTP_403_FORBIDDEN)
+            if 'photo' in request.FILES:
+                member.photo = request.FILES['photo']
+                member.save()
+            logger.info(f"Member created: {member.id}, {member.name}")
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        except IntegrityError:
-            return Response({'error': 'Membership number or RFID code already exists'}, status=status.HTTP_400_BAD_REQUEST)
+        except IntegrityError as e:
+            logger.error(f"IntegrityError creating member: {str(e)}")
+            return Response(
+                {'error': 'Membership number or RFID code already exists'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
-            return Response({'error': f'Error uploading file: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+            logger.error(f"Unexpected error creating member: {str(e)}")
+            return Response(
+                {'error': f'Error creating member: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    logger.error(f"Serializer errors: {serializer.errors}")
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def update_member_api(request, member_id):
+    member = get_object_or_404(Member, pk=member_id, club=request.user.club)
     if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'Only owners or admins can update members.'}, status=status.HTTP_403_FORBIDDEN)
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club,
+            check_out__isnull=True
+        ).order_by('-check_in').first()
+        if not attendance:
+            return Response(
+                {'error': 'You can only update members during an active shift.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
-    member = get_object_or_404(Member, id=member_id)
-    serializer = MemberSerializer(member, data=request.data)
+    data = request.data.copy()
+    serializer = MemberSerializer(member, data=data, partial=True, context={'request': request})
     if serializer.is_valid():
-        updated_member = serializer.save()
-        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, updated_member):
-            return Response({'error': 'You do not have permission to update this member to this club'}, status=status.HTTP_403_FORBIDDEN)
-        return Response(serializer.data)
+        try:
+            updated_member = serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error updating member {member_id}: {str(e)}")
+            return Response(
+                {'error': f'Error updating member: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    logger.error(f"Serializer errors for member {member_id}: {serializer.errors}")
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])

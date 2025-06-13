@@ -46,10 +46,10 @@ export const fetchUsers = createAsyncThunk(
   }
 );
 
-// Add member
+
 export const addMember = createAsyncThunk(
   'users/addUser',
-  async (newUser, { rejectWithValue }) => {
+  async (formData, { rejectWithValue }) => {
     const token = localStorage.getItem('token');
     if (!token) {
       return rejectWithValue("Authentication token is missing. Please log in again.");
@@ -60,14 +60,14 @@ export const addMember = createAsyncThunk(
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newUser),
+        body: formData,
       });
 
       if (!res.ok) {
         const errorData = await res.json();
-        return rejectWithValue(errorData.message || 'Failed to add member');
+        console.error('Add member error details:', errorData);
+        return rejectWithValue(errorData);
       }
 
       const data = await res.json();
@@ -79,7 +79,6 @@ export const addMember = createAsyncThunk(
     }
   }
 );
-
 // Edit member
 export const editMember = createAsyncThunk(
   'users/editUser',
@@ -90,19 +89,25 @@ export const editMember = createAsyncThunk(
     }
 
     try {
-      console.log("Updated user data:", id, updatedUser);
+      const form = new FormData();
+      Object.keys(updatedUser).forEach(key => {
+        if (updatedUser[key] !== null && updatedUser[key] !== undefined) {
+          form.append(key, updatedUser[key]);
+        }
+      });
+
       const res = await fetch(`${BASE_URL}members/api/members/${id}/update/`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(updatedUser),
+        body: form,
       });
 
       if (!res.ok) {
         const errorData = await res.json();
-        return rejectWithValue(errorData.message || 'Failed to update member');
+        console.error('Edit member error details:', JSON.stringify(errorData, null, 2));
+        return rejectWithValue(errorData);
       }
 
       const data = await res.json();
@@ -113,6 +118,7 @@ export const editMember = createAsyncThunk(
     }
   }
 );
+
 
 // Delete member
 export const deleteMember = createAsyncThunk(

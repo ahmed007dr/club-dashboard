@@ -2,12 +2,9 @@ from rest_framework import permissions
 from staff.models import StaffAttendance
 from django.utils import timezone
 from datetime import timedelta
-from utils.finance_permissions import apply_finance_permissions
+from utils.finance_permissions import apply_finance_permissions, FINANCE_PERMISSION_RULES
 
 class IsOwnerOrRelatedToClub(permissions.BasePermission):
-    """
-    Custom permission for club-related access with finance-specific exceptions.
-    """
     FULL_ACCESS_ROLES = ['owner', 'admin']
     LIMITED_ACCESS_ROLES = ['reception', 'accounting', 'coach']
     DATA_VISIBLE_DAYS = 7
@@ -19,22 +16,19 @@ class IsOwnerOrRelatedToClub(permissions.BasePermission):
     ]
 
     def _get_club(self, obj):
-        """Resolve club from object or its subscription."""
         club = getattr(obj, 'club', None)
         if not club and hasattr(obj, 'subscription') and obj.subscription:
             club = getattr(obj.subscription, 'club', None)
         return club
 
     def has_permission(self, request, view):
-        """Ensure user is authenticated and has a club."""
         if not request.user.is_authenticated or not request.user.club:
             return False
 
-        # Apply finance-specific permissions if view is in finance app
-        if view.__module__.startswith('finance.views'):
+        # Apply finance-specific permissions if applicable
+        if view and getattr(view, '__module__', '').startswith('finance.views'):
             finance_perm = apply_finance_permissions(view, request)
             if finance_perm and isinstance(finance_perm, dict):
-                # Store shift info for later use in has_object_permission
                 request.finance_shift_info = finance_perm
                 return True
             elif finance_perm is None:
@@ -44,13 +38,12 @@ class IsOwnerOrRelatedToClub(permissions.BasePermission):
         return True
 
     def has_object_permission(self, request, view, obj):
-        """Check object-level access based on role, shift, and finance rules."""
         club = self._get_club(obj)
         if not club or not request.user.club:
             return False
 
         # Finance-specific handling
-        if view.__module__.startswith('finance.views'):
+        if view and getattr(view, '__module__', '').startswith('finance.views'):
             if view.__name__ in FINANCE_PERMISSION_RULES['exempt_views']:
                 return club == request.user.club
 
@@ -74,7 +67,7 @@ class IsOwnerOrRelatedToClub(permissions.BasePermission):
 
             return False
 
-        # Non-finance handling (fallback to original logic)
+        # Non-finance handling
         if request.user.role in self.FULL_ACCESS_ROLES:
             return club == request.user.club
 
