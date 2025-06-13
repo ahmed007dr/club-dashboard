@@ -1,11 +1,12 @@
 from django.db import models
 from utils.generate_invoice import generate_invoice_number
+from core.models import Club
 
 class ExpenseCategory(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    is_stock_related = models.BooleanField(default=False)  
+    is_stock_related = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name
@@ -27,12 +28,11 @@ class Expense(models.Model):
     invoice_number = models.CharField(max_length=100, blank=True, null=True)
     attachment = models.FileField(upload_to='expenses/', null=True, blank=True)
     stock_item = models.ForeignKey('StockItem', on_delete=models.SET_NULL, null=True, blank=True)
-    stock_quantity = models.PositiveIntegerField(null=True, blank=True)  
+    stock_quantity = models.PositiveIntegerField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         if not self.invoice_number:
             self.invoice_number = generate_invoice_number(invoice_date=self.date)
-
         if self.category and self.category.is_stock_related:
             if self.stock_item and self.stock_quantity:
                 StockTransaction.objects.create(
@@ -40,14 +40,14 @@ class Expense(models.Model):
                     transaction_type='ADD',
                     quantity=self.stock_quantity,
                     description=f'شراء عبر المصروف #{self.invoice_number}',
-                    related_expense=self
+                    related_expense=self,
+                    created_by=self.paid_by
                 )
             else:
                 raise ValueError('يجب تحديد عنصر المخزون والكمية لفئة المصروفات المرتبطة بالمخزون')
         else:
             self.stock_item = None
             self.stock_quantity = None
-
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -67,7 +67,8 @@ class IncomeSource(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
-    stock_item = models.ForeignKey('StockItem', on_delete=models.SET_NULL, null=True, blank=True)  
+    stock_item = models.ForeignKey('StockItem', on_delete=models.SET_NULL, null=True, blank=True)
+
     def __str__(self):
         return f"{self.name} ({self.price} جنيه)"
 
@@ -86,7 +87,7 @@ class Income(models.Model):
     date = models.DateField()
     received_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     related_receipt = models.ForeignKey('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True)
-    stock_transaction = models.ForeignKey('StockTransaction', on_delete=models.SET_NULL, null=True, blank=True)  # ربط بحركة المخزون
+    stock_transaction = models.ForeignKey('StockTransaction', on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
         return f"{self.source.name} - {self.amount}"
@@ -104,11 +105,11 @@ class StockItem(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
-    unit = models.CharField(max_length=50, default='water')  
-    initial_quantity = models.PositiveIntegerField(default=0)  
-    current_quantity = models.PositiveIntegerField(default=0)  
-    is_sellable = models.BooleanField(default=True)  
-    
+    unit = models.CharField(max_length=50, default='water')
+    initial_quantity = models.PositiveIntegerField(default=0)
+    current_quantity = models.PositiveIntegerField(default=0)
+    is_sellable = models.BooleanField(default=True)
+
     def __str__(self):
         return f"{self.name} ({self.current_quantity} {self.unit})"
 
@@ -124,7 +125,6 @@ class StockTransaction(models.Model):
         ('ADD', 'إضافة'),
         ('CONSUME', 'استهلاك'),
     )
-
     stock_item = models.ForeignKey('StockItem', on_delete=models.CASCADE, related_name='transactions')
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPES)
     quantity = models.PositiveIntegerField()
@@ -132,9 +132,9 @@ class StockTransaction(models.Model):
     description = models.TextField(blank=True)
     related_expense = models.ForeignKey('Expense', on_delete=models.SET_NULL, null=True, blank=True)
     related_income = models.ForeignKey('Income', on_delete=models.SET_NULL, null=True, blank=True)
+    created_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='stock_transactions')
 
     def save(self, *args, **kwargs):
-        # تحديث الكمية الحالية في StockItem
         if self.transaction_type == 'ADD':
             self.stock_item.current_quantity += self.quantity
         elif self.transaction_type == 'CONSUME':
@@ -151,5 +151,6 @@ class StockTransaction(models.Model):
         indexes = [
             models.Index(fields=['stock_item']),
             models.Index(fields=['date']),
+            models.Index(fields=['created_by']),
         ]
         ordering = ['-date']

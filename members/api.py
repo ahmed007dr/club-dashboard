@@ -23,7 +23,7 @@ from utils.permissions import IsOwnerOrRelatedToClub
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_list_api(request):
     search_term = request.GET.get('q', '')
-    is_search_mode = bool(search_term)  # Consider it a search if q is provided
+    is_search_mode = bool(search_term)  
 
     if request.user.role in ['owner', 'admin']:
         members = Member.objects.filter(club=request.user.club).order_by('-id')
@@ -36,7 +36,7 @@ def member_list_api(request):
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
                 club=request.user.club,
-                check_out__isnull=True  # Current open shift
+                check_out__isnull=True  
             ).order_by('-check_in').first()
 
             if not attendance:

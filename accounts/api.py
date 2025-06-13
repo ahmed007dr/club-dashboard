@@ -8,21 +8,19 @@ from .serializers import UserProfileSerializer, LoginSerializer, RFIDLoginSerial
 from .models import User
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
-
+from utils.permissions import IsOwnerOrRelatedToClub  
+from staff.models import StaffAttendance
+from django.utils import timezone
+from datetime import timedelta
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_login(request):
-    """
-    Authenticate a user with username and password, returning user data with permissions and groups.
-    """
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
-        
         user = authenticate(username=username, password=password)
-        
         if user:
             user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
             refresh = RefreshToken.for_user(user)
@@ -31,19 +29,12 @@ def api_login(request):
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }, status=status.HTTP_200_OK)
-        
-        return Response({
-            'error': 'Invalid credentials'
-        }, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def api_logout(request):
-    """
-    Blacklist a refresh token to log out the user.
-    """
     try:
         refresh_token = request.data.get('refresh')
         if not refresh_token:
@@ -54,35 +45,33 @@ def api_logout(request):
     except Exception:
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_profile(request):
-    """
-    Get the profile of the authenticated user (Owner or Admin only).
-    """
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-
     user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=request.user.id)
     serializer = UserProfileSerializer(user)
     return Response(serializer.data)
 
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_list(request):
-    """
-    List users in the authenticated user's club (Owner or Admin only).
-    """
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-
     search_query = request.query_params.get('search', '').strip()
-
     users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(
         club=request.user.club
     )
+
+    # For Reception/Accounting/Coach, limit to last week's data unless searching
+    if request.user.role not in ['owner', 'admin']:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user,
+            club=request.user.club,
+            check_out__isnull=True
+        ).order_by('-check_in').first()
+        if not attendance and not search_query:
+            return Response({'error': 'يجب أن تكون في وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        if not search_query:
+            week_ago = timezone.now() - timedelta(days=7)
+            users = users.filter(created_at__gte=week_ago)
 
     if search_query:
         is_active_filter = None
@@ -113,67 +102,43 @@ def api_user_list(request):
     serializer = UserProfileSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
-
 @api_view(['POST'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_create(request):
-    """
-    Create a new user (Owner or Admin only).
-    """
     if request.user.role not in ['owner', 'admin']:
         return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
 
-    if not request.user.has_perm('auth.add_user'):
-        return Response({'error': 'لا تملك الصلاحية لإنشاء مستخدمين.'}, status=status.HTTP_403_FORBIDDEN)
-
-
     data = request.data.copy()
     data['club'] = request.user.club.id
-
     serializer = UserSerializer(data=data)
     if serializer.is_valid():
         user = serializer.save()
         return Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['PUT'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_update(request, pk):
-    """
-    Update an existing user in the authenticated user's club (Owner or Admin only).
-    """
     if request.user.role not in ['owner', 'admin']:
         return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
 
-    if not request.user.has_perm('auth.change_user'):
-        return Response({'error': 'لا تملك الصلاحية لتعديل مستخدمين.'}, status=status.HTTP_403_FORBIDDEN)
-
     try:
-        # التأكد من أن المستخدم في نفس النادي
         user = User.objects.get(pk=pk, club=request.user.club)
     except User.DoesNotExist:
         return Response({'error': 'المستخدم غير موجود في ناديك.'}, status=status.HTTP_404_NOT_FOUND)
 
-    # التأكد من أن النادي لا يتغير
     data = request.data.copy()
     data['club'] = request.user.club.id
-
     serializer = UserSerializer(user, data=data, partial=True)
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_rfid_login(request):
-    """
-    Authenticate a user with RFID code, returning user data with permissions and groups.
-    """
     serializer = RFIDLoginSerializer(data=request.data)
-    
     if serializer.is_valid():
         user = serializer.validated_data['user']
         user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
@@ -183,33 +148,21 @@ def api_rfid_login(request):
             'refresh': str(refresh),
             'access': str(refresh.access_token),
         }, status=status.HTTP_200_OK)
-
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def active_users_api(request):
-    """
-    List active users in the authenticated user's club (Owner or Admin only).
-    """
     if request.user.role not in ['owner', 'admin']:
         return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
 
-    try:
-        users = User.objects.filter(is_active=True, club=request.user.club)
-        serializer = UserSerializer(users, many=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-    except Exception as e:
-        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
+    users = User.objects.filter(is_active=True, club=request.user.club)
+    serializer = UserSerializer(users, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def coach_list(request):
-    """
-    List active coaches in the authenticated user's club (Owner or Admin only).
-    """
     if request.user.role not in ['owner', 'admin']:
         return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -219,3 +172,42 @@ def coach_list(request):
         club=request.user.club
     ).values('id', 'username')
     return Response(coaches, status=status.HTTP_200_OK)
+
+# # وظيفة جديدة لتسجيل حضور/خروج زملاء
+# @api_view(['POST'])
+# @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+# def api_staff_check_in_out(request):
+#     """
+#     Allow Reception/Accounting/Coach to check-in/out colleagues in their club.
+#     """
+#     staff_id = request.data.get('staff_id')
+#     action = request.data.get('action')  # 'check_in' or 'check_out'
+
+#     try:
+#         staff = User.objects.get(id=staff_id, club=request.user.club)
+#     except User.DoesNotExist:
+#         return Response({'error': 'الموظف غير موجود في ناديك.'}, status=status.HTTP_404_NOT_FOUND)
+
+#     if action == 'check_in':
+#         if StaffAttendance.objects.filter(staff=staff, club=request.user.club, check_out__isnull=True).exists():
+#             return Response({'error': 'الموظف لديه وردية نشطة بالفعل.'}, status=status.HTTP_400_BAD_REQUEST)
+#         attendance = StaffAttendance.objects.create(
+#             staff=staff,
+#             club=request.user.club,
+#             check_in=timezone.now()
+#         )
+#         return Response({'message': 'تم تسجيل الحضور بنجاح.'}, status=status.HTTP_201_CREATED)
+
+#     elif action == 'check_out':
+#         attendance = StaffAttendance.objects.filter(
+#             staff=staff,
+#             club=request.user.club,
+#             check_out__isnull=True
+#         ).order_by('-check_in').first()
+#         if not attendance:
+#             return Response({'error': 'لا توجد وردية نشطة لهذا الموظف.'}, status=status.HTTP_400_BAD_REQUEST)
+#         attendance.check_out = timezone.now()
+#         attendance.save()
+#         return Response({'message': 'تم تسجيل الخروج بنجاح.'}, status=status.HTTP_200_OK)
+
+#     return Response({'error': 'الإجراء غير صالح. استخدم check_in أو check_out.'}, status=status.HTTP_400_BAD_REQUEST)
