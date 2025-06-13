@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchSubscriptionTypes, postSubscription, fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
@@ -20,7 +21,9 @@ const CreateSubscription = ({ onClose }) => {
     start_date: "",
     paid_amount: "",
     coach: "",
-    private_training_price: ""
+    remaining_amount: "0",
+    coach_compensation_type: "from_subscription",
+    coach_compensation_value: "0",
   });
 
   // Data state
@@ -80,14 +83,12 @@ const CreateSubscription = ({ onClose }) => {
       
       const coaches = allCoaches.filter(user => user.role === 'coach');
       return coaches;
-      
     } catch (error) {
       console.error('❌ Failed to fetch all coaches:', error);
       throw error;
     }
   };
 
-  // Fetch all members (regular users)
   const fetchAllMembers = async () => {
     try {
       let allResults = [];
@@ -109,7 +110,6 @@ const CreateSubscription = ({ onClose }) => {
     }
   };
 
-  // Fetch all subscription types
   const fetchAllSubscriptionTypes = async () => {
     try {
       let allResults = [];
@@ -118,7 +118,7 @@ const CreateSubscription = ({ onClose }) => {
 
       while (hasMore) {
         const response = await dispatch(fetchSubscriptionTypes({ page: currentPage })).unwrap();
-        const results = Array.isArray(response) ? response : response.results || [];
+        const results = Array.isArray(response.results) ? response.results : [];
         allResults = [...allResults, ...results];
         hasMore = !!response.next;
         currentPage += 1;
@@ -131,7 +131,6 @@ const CreateSubscription = ({ onClose }) => {
     }
   };
 
-  // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
@@ -141,7 +140,6 @@ const CreateSubscription = ({ onClose }) => {
           fetchAllCoaches(),
         ]);
 
-        // Extract unique clubs
         const uniqueClubs = Array.from(
           new Map(
             membersResult.results.map((m) => [
@@ -156,7 +154,8 @@ const CreateSubscription = ({ onClose }) => {
         setAllSubscriptionTypes(subscriptionTypesResult);
         setAllCoaches(coachesResult);
       } catch (error) {
-        handleError(error, "Failed to load initial data");
+        setErrorMessage("فشل في تحميل البيانات الأولية");
+        setIsModalOpen(true);
       } finally {
         setIsInitialLoad(false);
       }
@@ -165,7 +164,6 @@ const CreateSubscription = ({ onClose }) => {
     fetchInitialData();
   }, [dispatch]);
 
-  // Handle member search when identifier changes
   useEffect(() => {
     if (!formData.identifier || !formData.club) {
       setFoundMember(null);
@@ -175,7 +173,6 @@ const CreateSubscription = ({ onClose }) => {
     const searchValue = formData.identifier.trim().toUpperCase();
     setSearchLoading(true);
 
-    // Search through members of the selected club
     const member = allMembers.results.find(m => 
       m.club.toString() === formData.club.toString() && (
         (m.rfid_code && m.rfid_code.toUpperCase() === searchValue) ||
@@ -204,14 +201,11 @@ const CreateSubscription = ({ onClose }) => {
     setSearchLoading(false);
   }, [formData.identifier, formData.club, allMembers.results]);
 
-  // Handle form submission
- // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { club, identifier, type, start_date, paid_amount, coach, private_training_price } = formData;
+    const { club, identifier, type, start_date, paid_amount, coach, remaining_amount, coach_compensation_type, coach_compensation_value } = formData;
 
-    // Client-side validation
-    if (!club || !identifier || !type || !start_date || !paid_amount) {
+    if (!club || !identifier || !type || !start_date || !paid_amount || !remaining_amount) {
       setErrorMessage("يرجى ملء جميع الحقول المطلوبة");
       setIsModalOpen(true);
       return;
@@ -223,8 +217,20 @@ const CreateSubscription = ({ onClose }) => {
       return;
     }
 
-    if (private_training_price && isNaN(parseFloat(private_training_price))) {
-      setErrorMessage("سعر التدريب الخاص يجب أن يكون رقمًا صحيحًا");
+    if (isNaN(parseFloat(remaining_amount)) || parseFloat(remaining_amount) < 0) {
+      setErrorMessage("المبلغ المتبقي يجب أن يكون رقمًا غير سالب");
+      setIsModalOpen(true);
+      return;
+    }
+
+    if (coach && (!coach_compensation_type || isNaN(parseFloat(coach_compensation_value)) || parseFloat(coach_compensation_value) < 0)) {
+      setErrorMessage("يرجى تحديد نوع تعويض الكابتن وقيمة صالحة غير سالبة");
+      setIsModalOpen(true);
+      return;
+    }
+
+    if (coach_compensation_type === 'from_subscription' && parseFloat(coach_compensation_value) > 100) {
+      setErrorMessage("نسبة الكابتن لا يمكن أن تتجاوز 100%");
       setIsModalOpen(true);
       return;
     }
@@ -238,14 +244,15 @@ const CreateSubscription = ({ onClose }) => {
       start_date,
       paid_amount: parseFloat(paid_amount),
       coach: coach ? parseInt(coach) : null,
-      private_training_price: private_training_price ? parseFloat(private_training_price) : null
+      remaining_amount: parseFloat(remaining_amount),
+      coach_compensation_type: coach ? coach_compensation_type : null,
+      coach_compensation_value: coach ? parseFloat(coach_compensation_value) : 0,
     };
 
     try {
       await dispatch(postSubscription(payload)).unwrap();
       toast.success("تم إنشاء الاشتراك بنجاح!");
 
-      // Re-fetch subscriptions with default filters and page 1
       await dispatch(
         fetchSubscriptions({
           page: 1,
@@ -259,7 +266,6 @@ const CreateSubscription = ({ onClose }) => {
         })
       ).unwrap();
 
-      // Reset form
       setFormData({
         club: userClub?.id?.toString() || "",
         identifier: "",
@@ -267,42 +273,33 @@ const CreateSubscription = ({ onClose }) => {
         start_date: "",
         paid_amount: "",
         coach: "",
-        private_training_price: ""
+        remaining_amount: "0",
+        coach_compensation_type: "from_subscription",
+        coach_compensation_value: "0"
       });
       setFoundMember(null);
-
-      // Close modal and notify parent
       onClose();
-      if (onSuccess) onSuccess();
     } catch (error) {
-      console.log("Full error object:", JSON.stringify(error, null, 2));
-      let errorData = error.payload || error.data || error.response || error;
-      if (errorData?.non_field_errors && Array.isArray(errorData.non_field_errors)) {
-        setErrorMessage(errorData.non_field_errors[0]);
-      } else {
-        setErrorMessage(errorData?.message || error.message || "حدث خطأ غير متوقع");
-      }
+      console.error("Error creating subscription:", JSON.stringify(error, null, 2));
+      const errorData = error.payload || error.data || error.response || error;
+      setErrorMessage(
+        errorData?.non_field_errors?.[0] ||
+        errorData?.message ||
+        error.message ||
+        "حدث خطأ غير متوقع"
+      );
       setIsModalOpen(true);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-
-  // Error handling
-  const handleError = (error, defaultMessage) => {
-    const errorMessage =
-      error?.payload?.message || error?.message || defaultMessage;
-    setErrorMessage(errorMessage);
-    setIsModalOpen(true);
-  };
-
   return (
-    <div className="container w-full mx-auto p-4 " dir="rtl">
+    <div className="container w-full mx-auto p-4" dir="rtl">
       <h2 className="text-xl font-bold mb-6">إنشاء اشتراك جديد</h2>
 
       {isModalOpen && (
-        <div className="fixed top-1/4 left-0 right-0  flex items-start justify-center z-50">
+        <div className="fixed top-1/4 left-0 right-0 flex items-start justify-center z-50">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full max-h-[70vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">حدث خطأ</h3>
             <p className="text-red-600">{errorMessage}</p>
@@ -315,14 +312,11 @@ const CreateSubscription = ({ onClose }) => {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5 w-full ">
-        {/* Club & Identifier Inputs */}
-        <div className="flex flex-col md:flex-row gap-8 ">
-          <div className=" w-full flex-1">
-            <div className="">
-
-              <div className="flex  flex-col md:flex-row gap-4">
-                {/* Modified Club Input */}
+      <form onSubmit={handleSubmit} className="space-y-5 w-full">
+        <div className="flex flex-col md:flex-row gap-8">
+          <div className="w-full flex-1">
+            <div>
+              <div className="flex flex-col md:flex-row gap-4">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium mb-2">النادي</label>
                   <select
@@ -358,11 +352,11 @@ const CreateSubscription = ({ onClose }) => {
                     className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
                     placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
                     disabled={!formData.club || isSubmitting}
+                    required
                   />
                 </div>
               </div>
 
-              {/* Loading and Errors */}
               {searchLoading && (
                 <div className="text-center py-2">
                   <p>جاري البحث عن العضو...</p>
@@ -379,7 +373,6 @@ const CreateSubscription = ({ onClose }) => {
                 </div>
               )}
 
-              {/* Subscription Type & Coach */}
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
@@ -388,6 +381,7 @@ const CreateSubscription = ({ onClose }) => {
                     onChange={(e) => setFormData({ ...formData, type: e.target.value })}
                     className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
                     disabled={isSubmitting || !foundMember}
+                    required
                   >
                     <option value="">اختر النوع</option>
                     {allSubscriptionTypes
@@ -411,14 +405,13 @@ const CreateSubscription = ({ onClose }) => {
                     <option value="">اختر مدربًا</option>
                     {allCoaches.map((coach) => (
                       <option key={coach.id} value={coach.id}>
-                        {coach.username} 
+                        {coach.username}
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              {/* Start Date & Paid Amount */}
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium mb-2">تاريخ البدء</label>
@@ -431,6 +424,7 @@ const CreateSubscription = ({ onClose }) => {
                     className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
                     min={new Date().toISOString().split("T")[0]}
                     disabled={isSubmitting || !foundMember}
+                    required
                   />
                 </div>
 
@@ -447,30 +441,69 @@ const CreateSubscription = ({ onClose }) => {
                     className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
                     placeholder="0.00"
                     disabled={isSubmitting || !foundMember}
+                    required
                   />
                 </div>
               </div>
 
-              {/* Private Training Price */}
-              <div className="w-full">
-                <label className="block text-sm font-medium mb-2">سعر التدريب الخاص</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.private_training_price}
-                  onChange={(e) =>
-                    setFormData({ ...formData, private_training_price: e.target.value })
-                  }
-                  className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-                  placeholder="0.00"
-                  disabled={isSubmitting || !foundMember}
-                />
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">المبلغ المتبقي</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.remaining_amount}
+                    onChange={(e) =>
+                      setFormData({ ...formData, remaining_amount: e.target.value })
+                    }
+                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    placeholder="0.00"
+                    disabled={isSubmitting || !foundMember}
+                    required
+                  />
+                </div>
               </div>
+
+              {formData.coach && (
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="w-full md:w-1/2">
+                    <label className="block text-sm font-medium mb-2">نوع تعويض الكابتن</label>
+                    <select
+                      value={formData.coach_compensation_type}
+                      onChange={(e) =>
+                        setFormData({ ...formData, coach_compensation_type: e.target.value })
+                      }
+                      className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                      disabled={isSubmitting || !foundMember}
+                    >
+                      <option value="from_subscription">من داخل قيمة الاشتراك (نسبة %)</option>
+                      <option value="external">مبلغ خارجي (جنيه)</option>
+                    </select>
+                  </div>
+
+                  <div className="w-full md:w-1/2">
+                    <label className="block text-sm font-medium mb-2">
+                      {formData.coach_compensation_type === 'from_subscription' ? 'نسبة الكابتن (%)' : 'مبلغ الكابتن (جنيه)'}
+                    </label>
+                    <input
+                      type="number"
+                      step={formData.coach_compensation_type === 'from_subscription' ? "0.1" : "0.01"}
+                      min="0"
+                      value={formData.coach_compensation_value}
+                      onChange={(e) =>
+                        setFormData({ ...formData, coach_compensation_value: e.target.value })
+                      }
+                      className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                      placeholder="0.00"
+                      disabled={isSubmitting || !foundMember}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-          <div className="">
-            {/* Member Info Display */}
+          <div>
             {foundMember && (
               <div className="border rounded-lg p-4 bg-gray-50">
                 <div className="flex items-start gap-4">
@@ -512,7 +545,6 @@ const CreateSubscription = ({ onClose }) => {
           </div>
         </div>
 
-        {/* Submit */}
         <Button
           type="submit"
           className="w-full mt-6"

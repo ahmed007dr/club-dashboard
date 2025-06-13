@@ -34,33 +34,44 @@ class SubscriptionType(models.Model):
             models.Index(fields=['id']),
         ]
 
+COACH_COMPENSATION_TYPES = (
+        ('from_subscription', 'من داخل قيمة الاشتراك'),
+        ('external', 'مبلغ خارجي'),
+    )
+
+
 class Subscription(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     member = models.ForeignKey('members.Member', on_delete=models.CASCADE)
     type = models.ForeignKey(SubscriptionType, on_delete=models.CASCADE, related_name='subscriptions')
-
     coach = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, 
                             related_name='private_subscriptions', 
                             limit_choices_to={'role': 'coach', 'is_active': True})
     start_date = models.DateField()
     end_date = models.DateField(blank=True, null=True)
-    private_training_price = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True, blank=True,
-                                               help_text="سعر التدريب الخاص المخصص لهذا العضو")
-    paid_amount = models.DecimalField(max_digits=10, decimal_places=2)
-    remaining_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    paid_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=False)
+    remaining_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=False)
     entry_count = models.PositiveIntegerField(default=0)
     created_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, related_name='created_subscriptions')
-
+    coach_compensation_type = models.CharField(
+        max_length=20,
+        choices=COACH_COMPENSATION_TYPES,
+        default='from_subscription',
+        blank=True,
+        null=True,
+        help_text="تحديد ما إذا كان تعويض الكابتن من الاشتراك أو مبلغ خارجي"
+    )
+    coach_compensation_value = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        null=False,
+        help_text="نسبة أو مبلغ تعويض الكابتن (نسبة مئوية إذا كان من الاشتراك، أو مبلغ إذا كان خارجيًا)"
+    )
     def save(self, *args, **kwargs):
         if self.start_date and self.type and not self.end_date:
             self.end_date = self.start_date + timedelta(days=self.type.duration_days)
-        
-        if self.type.is_private_training and self.private_training_price > 0:
-            self.remaining_amount = self.private_training_price - self.paid_amount
-        else:
-            self.remaining_amount = self.type.price - self.paid_amount
-        
-        super().save(*args, **kwargs)
+        super().save(*args, **kwargs) 
 
     def __str__(self):
         coach_str = f" مع الكابتن {self.coach.username}" if self.coach else ""

@@ -7,9 +7,10 @@ from accounts.models import User
 from members.models import Member
 from django.utils import timezone
 from django.db import models
-from django.db.models import Q, Count, Sum
+from django.db.models import Q, Count, Sum,F
 from django.db.models.functions import TruncMonth
 from attendance.models import Attendance
+
 
 class SubscriptionTypeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
@@ -56,6 +57,8 @@ class FreezeRequestSerializer(serializers.ModelSerializer):
             'cancelled_at': {'read_only': True},
         }
 
+
+
 class SubscriptionSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     member_details = MemberSerializer(source='member', read_only=True)
@@ -74,35 +77,34 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'club', 'club_details', 'member', 'member_details',
             'type', 'type_details', 'coach', 'coach_details', 'start_date', 'end_date',
-            'private_training_price', 'paid_amount', 'remaining_amount', 'entry_count',
+            'paid_amount', 'remaining_amount', 'entry_count',
             'created_by', 'created_by_details', 'freeze_requests', 'subscriptions_count',
-            'coach_simple', 'coach_identifier', 'identifier', 'status'
+            'coach_simple', 'coach_identifier', 'identifier', 'status',
+            'coach_compensation_type', 'coach_compensation_value'
         ]
         extra_kwargs = {
-            'remaining_amount': {'read_only': True},
             'end_date': {'read_only': True},
             'created_by': {'read_only': True},
             'coach': {'required': False},
-            'private_training_price': {'required': False},
-            'member': {'required': False}
+            'member': {'required': False},
+            'remaining_amount': {'required': True},
+            'coach_compensation_type': {'required': False},
+            'coach_compensation_value': {'required': False},
         }
 
     def get_status(self, obj):
         today = timezone.now().date()
         max_entries = obj.type.max_entries
         entry_count = obj.entry_count
-
         active_freeze = obj.freeze_requests.filter(
             is_active=True,
             start_date__lte=today,
-            end_date__gte=today  
+            end_date__gte=today
         ).exists()
         if active_freeze:
             return "Frozen"
-
         is_expired_by_date = obj.end_date < today
         is_expired_by_entries = max_entries > 0 and entry_count >= max_entries
-
         if is_expired_by_date or is_expired_by_entries:
             return "Expired"
         elif obj.start_date > today:
@@ -140,7 +142,13 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         coach_identifier = data.get('coach_identifier', '')
         member = data.get('member')
         identifier = data.get('identifier', '')
-        private_training_price = data.get('private_training_price', getattr(self.instance, 'private_training_price', 0))
+        paid_amount = data.get('paid_amount', getattr(self.instance, 'paid_amount', 0)) or 0
+        remaining_amount = data.get('remaining_amount', getattr(self.instance, 'remaining_amount', 0)) or 0
+        coach_compensation_type = data.get('coach_compensation_type')
+        coach_compensation_value = data.get('coach_compensation_value', getattr(self.instance, 'coach_compensation_value', 0)) or 0
+
+        if remaining_amount < 0:
+            raise serializers.ValidationError("المبلغ المتبقي لا يمكن أن يكون سالبًا.")
 
         if identifier and not member:
             try:
@@ -166,7 +174,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
         if coach:
             if coach.club != club or coach.role != 'coach' or not coach.is_active:
-                raise serializers.ValidationError("الكابتن يجب أن يكون نشط ومن نفس النادي.")
+                raise serializers.ValidationError("الكابتن يجب أن يكون نشطًا ومن نفس النادي.")
             if hasattr(coach, 'coach_profile'):
                 profile = coach.coach_profile
                 if profile.max_trainees > 0:
@@ -182,12 +190,22 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                         )
             else:
                 raise serializers.ValidationError("الكابتن ليس لديه ملف تدريب.")
-            if private_training_price <= 0:
-                raise serializers.ValidationError("سعر التدريب الخاص يجب أن يكون أكبر من 0 عند اختيار كابتن.")
+
+            if coach_compensation_type not in ['from_subscription', 'external', None]:
+                raise serializers.ValidationError("نوع تعويض الكابتن غير صالح.")
+            if coach_compensation_value < 0:
+                raise serializers.ValidationError("قيمة تعويض الكابتن لا يمكن أن تكون سالبة.")
+            if coach_compensation_type == 'from_subscription':
+                if coach_compensation_value > 100:
+                    raise serializers.ValidationError("نسبة الكابتن لا يمكن أن تتجاوز 100%.")
+            if not coach_compensation_type:
+                data['coach_compensation_type'] = 'from_subscription'
+                data['coach_compensation_value'] = 0
         else:
-            if private_training_price is not None and private_training_price > 0:
-                raise serializers.ValidationError("لا يمكن تحديد سعر تدريب خاص بدون اختيار كابتن.")
-            data['private_training_price'] = 0
+            if coach_compensation_type or coach_compensation_value > 0:
+                raise serializers.ValidationError("لا يمكن تحديد تعويض كابتن بدون اختيار كابتن.")
+            data['coach_compensation_type'] = None
+            data['coach_compensation_value'] = 0
 
         if club and subscription_type and subscription_type.club != club:
             raise serializers.ValidationError("نوع الاشتراك يجب أن يكون لنفس النادي.")
@@ -195,22 +213,23 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         if member:
             today = timezone.now().date()
             active_subscriptions = Subscription.objects.filter(
-                member=member, club=club, start_date__lte=today, end_date__gte=today
-            ).exclude(entry_count__gte=models.F('type__max_entries')).exclude(type__max_entries=0)
-
+                member=member,
+                club=club,
+                start_date__lte=today,
+                end_date__gte=today
+            ).exclude(entry_count__gte=F('type__max_entries')).exclude(type__max_entries=0)
             if active_subscriptions.exists() and not self.instance:
                 latest_active_subscription = active_subscriptions.order_by('-end_date').first()
                 if latest_active_subscription:
                     max_end_date = latest_active_subscription.end_date
                     if (latest_active_subscription.entry_count >= latest_active_subscription.type.max_entries and
-                        latest_active_subscription.type.max_entries > 0):
+                            latest_active_subscription.type.max_entries > 0):
                         max_end_date = today
                     start_date = data.get('start_date', today)
                     if start_date <= max_end_date:
                         raise serializers.ValidationError(
                             f"لا يمكن إنشاء اشتراك جديد يبدأ قبل {max_end_date} بسبب وجود اشتراك نشط."
                         )
-
             unpaid_subscriptions = Subscription.objects.filter(member=member, club=club, remaining_amount__gt=0)
             if unpaid_subscriptions.exists() and not self.instance:
                 raise serializers.ValidationError("يجب تسوية المدفوعات المستحقة أولاً.")
@@ -229,11 +248,12 @@ class MemberBehaviorSerializer(serializers.Serializer):
     is_regular = serializers.BooleanField()
     is_repeated = serializers.BooleanField()
 
+
 class CoachReportSerializer(serializers.Serializer):
     coach_id = serializers.IntegerField()
     coach_username = serializers.CharField()
     active_clients = serializers.IntegerField()
-    total_private_training_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    total_coach_compensation = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_paid_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     total_remaining_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     previous_month_clients = serializers.IntegerField()
@@ -258,9 +278,10 @@ class CoachReportSerializer(serializers.Serializer):
                 'start_date': sub.start_date,
                 'end_date': sub.end_date,
                 'type_name': sub.type.name,
-                'private_training_price': sub.private_training_price,
                 'paid_amount': sub.paid_amount,
-                'remaining_amount': sub.remaining_amount
+                'remaining_amount': sub.remaining_amount,
+                'coach_compensation_type': sub.coach_compensation_type,
+                'coach_compensation_value': sub.coach_compensation_value,
             }
             for sub in subscriptions if sub.start_date > today
         ]
@@ -275,9 +296,10 @@ class CoachReportSerializer(serializers.Serializer):
                 'start_date': sub.start_date,
                 'end_date': sub.end_date,
                 'type_name': sub.type.name,
-                'private_training_price': sub.private_training_price,
                 'paid_amount': sub.paid_amount,
-                'remaining_amount': sub.remaining_amount
+                'remaining_amount': sub.remaining_amount,
+                'coach_compensation_type': sub.coach_compensation_type,
+                'coach_compensation_value': sub.coach_compensation_value,
             }
             for sub in subscriptions if sub.end_date < today or (sub.type.max_entries > 0 and sub.entry_count >= sub.type.max_entries)
         ]
@@ -334,14 +356,12 @@ class CoachReportSerializer(serializers.Serializer):
             end_date__gte=obj['start_date']
         ).values('type__name').annotate(
             total_paid=Sum('paid_amount'),
-            total_private_training=Sum('private_training_price'),
             total_remaining=Sum('remaining_amount')
         ).order_by('-total_paid')
         return [
             {
                 'type_name': item['type__name'],
                 'total_paid': item['total_paid'] or 0.0,
-                'total_private_training': item['total_private'] or item.get('total_private_training', 0.0),
                 'total_remaining': item['total_remaining'] or 0.0
             }
             for item in revenue_by_type
@@ -359,14 +379,12 @@ class CoachReportSerializer(serializers.Serializer):
             month=TruncMonth('start_date')
         ).values('month').annotate(
             total_paid=Sum('paid_amount'),
-            total_private_training=Sum('private_training_price'),
             total_remaining=Sum('remaining_amount')
         ).order_by('month')
         return [
             {
                 'month': item['month'].strftime('%Y-%m'),
                 'total_paid': item['total_paid'] or 0.0,
-                'total_private_training': item['total_private_training'] or 0.0,
                 'total_remaining': item['total_remaining'] or 0.0
             }
             for item in monthly_revenue
@@ -397,8 +415,10 @@ class CoachReportSerializer(serializers.Serializer):
                 'max_entries': max_entries,
                 'entries_used': sub.entry_count,
                 'fully_used': fully_used,
-                'private_training_price': sub.private_training_price,
                 'paid_amount': sub.paid_amount,
-                'remaining_amount': sub.remaining_amount
+                'remaining_amount': sub.remaining_amount,
+                'coach_compensation_type': sub.coach_compensation_type,
+                'coach_compensation_value': sub.coach_compensation_value,
             })
         return members_data
+    

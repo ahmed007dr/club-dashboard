@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
-import BASE_URL from '@/config/api'; // تأكد إن المسار ده صحيح حسب هيكلية المشروع
+import BASE_URL from '@/config/api';
 
 // جلب أنواع الاشتراكات مع دعم التصفية والترقيم
 export const fetchSubscriptionTypes = createAsyncThunk(
@@ -20,18 +20,18 @@ export const fetchSubscriptionTypes = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        return rejectWithValue('Authentication token is missing.');
+        throw new Error('Authentication token is missing.');
       }
 
-      // بناء query parameters
-      const params = new URLSearchParams();
-      params.append('page', page);
-      if (searchQuery) params.append('q', searchQuery);
-      if (statusFilter !== 'all') params.append('status', statusFilter);
-      if (durationFilter) params.append('duration', durationFilter);
-      if (includesGym) params.append('includes_gym', includesGym);
-      if (includesPool) params.append('includes_pool', includesPool);
-      if (includesClasses) params.append('includes_classes', includesClasses);
+      const params = new URLSearchParams({
+        page,
+        ...(searchQuery && { q: searchQuery }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+        ...(durationFilter && { duration: durationFilter }),
+        ...(includesGym && { includes_gym: includesGym }),
+        ...(includesPool && { includes_pool: includesPool }),
+        ...(includesClasses && { includes_classes: includesClasses }),
+      });
 
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscription-types/?${params.toString()}`,
@@ -43,37 +43,27 @@ export const fetchSubscriptionTypes = createAsyncThunk(
       );
 
       const data = response.data;
-      let subscriptions = data.results || [];
-      if (!Array.isArray(subscriptions)) {
-        console.warn('Response results is not an array:', subscriptions);
-        subscriptions = [];
-      }
-
       return {
-        count: data.count ?? 0,
-        results: subscriptions,
-        next: data.next ?? null,
-        previous: data.previous ?? null,
+        count: data.count || 0,
+        results: Array.isArray(data.results) ? data.results : [],
+        next: data.next || null,
+        previous: data.previous || null,
       };
     } catch (error) {
-      console.error('Error fetching subscription types:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      const errorMessage =
+      console.error('Error fetching subscription types:', error);
+      return rejectWithValue(
         error.response?.data?.detail ||
         error.response?.data?.message ||
         error.message ||
-        'Failed to fetch subscription types';
-      return rejectWithValue(errorMessage);
+        'Failed to fetch subscription types'
+      );
     }
   }
 );
 
 // جلب أنواع الاشتراكات النشطة
 export const fetchActiveSubscriptionTypes = createAsyncThunk(
-  'activeSubscriptionTypes/fetch',
+  'subscriptions/fetchActiveSubscriptionTypes',
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
@@ -85,17 +75,17 @@ export const fetchActiveSubscriptionTypes = createAsyncThunk(
           },
         }
       );
-      return response.data;
+      return Array.isArray(response.data.results) ? response.data.results : [];
     } catch (error) {
       console.error('Error fetching active subscription types:', error);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
 // جلب نوع اشتراك معين حسب ID
 export const fetchSubscriptionTypeById = createAsyncThunk(
-  'subscriptions/fetchById',
+  'subscriptions/fetchSubscriptionTypeById',
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
@@ -110,7 +100,7 @@ export const fetchSubscriptionTypeById = createAsyncThunk(
       return response.data;
     } catch (error) {
       console.error('Error fetching subscription type by ID:', error);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -122,7 +112,7 @@ export const updateSubscription = createAsyncThunk(
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        return rejectWithValue('Authorization token is missing.');
+        throw new Error('Authorization token is missing.');
       }
 
       const response = await axios.put(
@@ -135,50 +125,45 @@ export const updateSubscription = createAsyncThunk(
           },
         }
       );
-      console.log('Update successful:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Update failed:', error.response?.data || error.message);
-      return rejectWithValue(error.response?.data || error.message);
+      console.error('Error updating subscription:', error);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
 // حذف اشتراك حسب ID
 export const deleteSubscriptionById = createAsyncThunk(
-  'subscriptions/deleteById',
+  'subscriptions/deleteSubscriptionById',
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const config = {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      };
-
       await axios.delete(
         `${BASE_URL}subscriptions/api/subscriptions/${id}/`,
-        config
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
       );
-      console.log('Subscription deleted successfully:', id);
       return id;
     } catch (error) {
       console.error('Error deleting subscription:', error);
-      return rejectWithValue(
-        error.response?.data?.detail || 'Failed to delete subscription'
-      );
+      return rejectWithValue(error.response?.data?.detail || error.message);
     }
   }
 );
 
 // إضافة اشتراك جديد
 export const postSubscription = createAsyncThunk(
-  'subscription/postSubscription',
+  'subscriptions/postSubscription',
   async (subscriptionData, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error('Access token not found');
+      if (!token) {
+        throw new Error('Authentication token is missing.');
+      }
 
       const response = await axios.post(
         `${BASE_URL}subscriptions/api/subscriptions/`,
@@ -190,27 +175,20 @@ export const postSubscription = createAsyncThunk(
           },
         }
       );
-
       return response.data;
     } catch (error) {
       console.error('Error posting subscription:', error);
-      return rejectWithValue(
-        error.response?.data || { message: error.message }
-      );
+      return rejectWithValue(error.response?.data || { message: error.message });
     }
   }
 );
 
 // تحديث نوع اشتراك
 export const putSubscriptionType = createAsyncThunk(
-  'subscriptionTypes/putSubscriptionType',
+  'subscriptions/putSubscriptionType',
   async ({ id, subscriptionData }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Access token not found');
-      }
-
       const response = await axios.put(
         `${BASE_URL}subscriptions/api/subscription-types/${id}/`,
         subscriptionData,
@@ -221,13 +199,10 @@ export const putSubscriptionType = createAsyncThunk(
           },
         }
       );
-
-      console.log('Subscription type updated successfully:', response.data);
       return response.data;
     } catch (error) {
-      const errorMsg = error.response?.data || error.message;
-      console.error('Error updating subscription type:', errorMsg);
-      return rejectWithValue(errorMsg);
+      console.error('Error updating subscription type:', error);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -238,7 +213,7 @@ export const deleteSubscriptionType = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.delete(
+      await axios.delete(
         `${BASE_URL}subscriptions/api/subscription-types/${id}/`,
         {
           headers: {
@@ -246,13 +221,10 @@ export const deleteSubscriptionType = createAsyncThunk(
           },
         }
       );
-      console.log('Subscription type deleted successfully:', response.data);
       return id;
     } catch (error) {
       console.error('Error deleting subscription type:', error);
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to delete subscription type'
-      );
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -269,16 +241,14 @@ export const addSubscriptionType = createAsyncThunk(
         {
           headers: {
             Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         }
       );
-      console.log('Subscription type added successfully:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error adding subscription type:', error.response?.data);
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to add subscription type'
-      );
+      console.error('Error adding subscription type:', error);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -289,8 +259,6 @@ export const fetchSubscriptionById = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) throw new Error('Access token not found');
-
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscriptions/${id}/`,
         {
@@ -299,12 +267,10 @@ export const fetchSubscriptionById = createAsyncThunk(
           },
         }
       );
-
-      console.log('Fetched subscription:', response.data);
       return response.data;
     } catch (error) {
-      console.error('Error fetching subscription:', error.response?.data || error.message);
-      return rejectWithValue(error.response?.data || error.message);
+      console.error('Error fetching subscription:', error);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -323,11 +289,10 @@ export const fetchActiveSubscriptions = createAsyncThunk(
           },
         }
       );
-
-      return response.data;
+      return Array.isArray(response.data.results) ? response.data.results : [];
     } catch (error) {
       console.error('Error fetching active subscriptions:', error);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -346,11 +311,10 @@ export const fetchExpiredSubscriptions = createAsyncThunk(
           },
         }
       );
-
-      return response.data;
+      return Array.isArray(response.data.results) ? response.data.results : [];
     } catch (error) {
       console.error('Error fetching expired subscriptions:', error);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -364,20 +328,21 @@ export const fetchMemberSubscriptions = createAsyncThunk(
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscriptions/member/`,
         {
-          params: { 
-            member_id: memberId,
-            page: page
-          },
+          params: { member_id: memberId, page },
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
           },
         }
       );
-      return response.data;
+      return {
+        results: Array.isArray(response.data.results) ? response.data.results : [],
+        count: response.data.count || 0,
+        next: response.data.next || null,
+        previous: response.data.previous || null,
+      };
     } catch (error) {
       console.error('Error fetching member subscriptions:', error);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -396,11 +361,10 @@ export const fetchSubscriptionStats = createAsyncThunk(
           },
         }
       );
-
       return response.data;
     } catch (error) {
       console.error('Error fetching subscription stats:', error);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -419,10 +383,10 @@ export const fetchUpcomingSubscriptions = createAsyncThunk(
           },
         }
       );
-      return response.data;
+      return Array.isArray(response.data.results) ? response.data.results : [];
     } catch (error) {
       console.error('Error fetching upcoming subscriptions:', error);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -443,25 +407,20 @@ export const makePayment = createAsyncThunk(
           },
         }
       );
-
-      return response.data;
+      return { subscriptionId, ...response.data };
     } catch (error) {
       console.error('Error making payment:', error);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
 // تجديد اشتراك
 export const renewSubscription = createAsyncThunk(
-  'subscription/renewSubscription',
+  'subscriptions/renewSubscription',
   async ({ subscriptionId }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        return rejectWithValue('No token found in localStorage');
-      }
-
       const response = await axios.post(
         `${BASE_URL}subscriptions/api/subscriptions/${subscriptionId}/renew/`,
         {},
@@ -472,11 +431,10 @@ export const renewSubscription = createAsyncThunk(
           },
         }
       );
-      console.log('Subscription renewed successfully:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error renewing subscription:', error);
-      return rejectWithValue(error.response?.data || error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -487,17 +445,12 @@ export const fetchSubscriptions = createAsyncThunk(
   async (params = {}, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) return rejectWithValue('Authentication token missing');
+      if (!token) {
+        throw new Error('Authentication token missing');
+      }
 
-      const config = {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      };
-
-      // بناء query parameters
       const queryParams = {
-        page: Number(params.page) || 1,
+        page: params.page || 1,
         page_size: params.pageSize || 20,
         ...(params.searchTerm && { search_term: params.searchTerm }),
         ...(params.memberId && { member_id: params.memberId }),
@@ -511,61 +464,42 @@ export const fetchSubscriptions = createAsyncThunk(
         ...(params.status && { status: params.status }),
         ...(params.entryCount && { entry_count: params.entryCount }),
         ...(params.sort && { ordering: params.sort }),
+        ...(params.startDateGte && { start_date_gte: params.startDateGte }),
+        ...(params.startDateLte && { start_date_lte: params.startDateLte }),
+        ...(params.endDateGte && { end_date_gte: params.endDateGte }),
+        ...(params.endDateLte && { end_date_lte: params.endDateLte }),
+        ...(params.paidAmountGte && { paid_amount_gte: params.paidAmountGte }),
+        ...(params.paidAmountLte && { paid_amount_lte: params.paidAmountLte }),
       };
-
-      // معالجة تصفية التواريخ
-      if (params.startDateGte) queryParams.start_date_gte = params.startDateGte;
-      if (params.startDateLte) queryParams.start_date_lte = params.startDateLte;
-      if (params.endDateGte) queryParams.end_date_gte = params.endDateGte;
-      if (params.endDateLte) queryParams.end_date_lte = params.endDateLte;
-
-      // معالجة تصفية المبالغ
-      if (params.paidAmountGte) queryParams.paid_amount_gte = params.paidAmountGte;
-      if (params.paidAmountLte) queryParams.paid_amount_lte = params.paidAmountLte;
 
       const queryString = new URLSearchParams(queryParams).toString();
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscriptions/?${queryString}`,
-        config
-      );
-
-      // تحديد حالة الاشتراك على الـ client side
-      const currentDate = new Date().toISOString().split('T')[0];
-      const subscriptionsWithStatus = response.data.results.map((sub) => {
-        if (sub.end_date < currentDate) {
-          return { ...sub, status: 'Expired' };
-        } else if (sub.start_date > currentDate) {
-          return { ...sub, status: 'Upcoming' };
-        } else {
-          return { ...sub, status: 'Active' };
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-      });
+      );
 
       return {
-        subscriptions: subscriptionsWithStatus,
-        count: response.data.count,
-        next: response.data.next,
-        previous: response.data.previous,
+        subscriptions: Array.isArray(response.data.results) ? response.data.results : [],
+        count: response.data.count || 0,
+        next: response.data.next || null,
+        previous: response.data.previous || null,
       };
     } catch (error) {
-      console.error('Error fetching subscriptions:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-      });
-      return rejectWithValue(
-        error.response?.data || 'Error fetching subscriptions'
-      );
+      console.error('Error fetching subscriptions:', error);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
 // إضافة حضور
 export const addAttendance = createAsyncThunk(
-  'attendance/addAttendance',
+  'subscriptions/addAttendance',
   async (newAttendance, { rejectWithValue }) => {
     try {
-      console.log('Sending attendance data:', newAttendance);
       const token = localStorage.getItem('token');
       const response = await axios.post(
         `${BASE_URL}attendance/api/attendances/add/`,
@@ -577,21 +511,17 @@ export const addAttendance = createAsyncThunk(
           },
         }
       );
-
-      console.log('Attendance response data:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error adding attendance:', error);
-      return rejectWithValue(
-        error.response?.data?.message || 'Failed to add attendance.'
-      );
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
 
 // طلب تجميد اشتراك
 export const requestSubscriptionFreeze = createAsyncThunk(
-  'subscriptions/requestFreeze',
+  'subscriptions/requestSubscriptionFreeze',
   async ({ subscriptionId, requestedDays, startDate }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
@@ -603,22 +533,22 @@ export const requestSubscriptionFreeze = createAsyncThunk(
         },
         {
           headers: {
-            Authorization: token ? `Bearer ${token}` : undefined,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         }
       );
-      console.log('Subscription freeze request successful:', response.data);
-      return { subscriptionId, data: response.data };
+      return { subscriptionId, ...response.data };
     } catch (error) {
-      console.error('Subscription freeze request failed:', error.response?.data || error.message);
-      return rejectWithValue({ subscriptionId, error: error.response?.data || error.message });
+      console.error('Error requesting subscription freeze:', error);
+      return rejectWithValue({ subscriptionId, error: error.response?.data?.message || error.message });
     }
   }
 );
 
 // إلغاء تجميد اشتراك
 export const cancelSubscriptionFreeze = createAsyncThunk(
-  'subscriptions/cancelFreeze',
+  'subscriptions/cancelSubscriptionFreeze',
   async ({ freezeRequestId }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
@@ -627,15 +557,15 @@ export const cancelSubscriptionFreeze = createAsyncThunk(
         {},
         {
           headers: {
-            Authorization: token ? `Bearer ${token}` : undefined,
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
           },
         }
       );
-      console.log('Subscription freeze cancel successful:', response.data);
-      return { freezeRequestId, data: response.data };
+      return { freezeRequestId, ...response.data };
     } catch (error) {
-      console.error('Subscription freeze cancel failed:', error.response?.data || error.message);
-      return rejectWithValue({ freezeRequestId, error: error.response?.data || error.message });
+      console.error('Error canceling subscription freeze:', error);
+      return rejectWithValue({ freezeRequestId, error: error.response?.data?.message || error.message });
     }
   }
 );
@@ -643,12 +573,17 @@ export const cancelSubscriptionFreeze = createAsyncThunk(
 // جلب ملف المدرب
 export const fetchCoachProfile = createAsyncThunk(
   'subscriptions/fetchCoachProfile',
-  async (coachId, { rejectWithValue }) => {
+  async ({ coachId, startDate, endDate }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
+      const params = {
+        ...(startDate && { start_date: startDate }),
+        ...(endDate && { end_date: endDate }),
+      };
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/coach-report/${coachId}/`,
         {
+          params,
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -657,7 +592,7 @@ export const fetchCoachProfile = createAsyncThunk(
       return response.data;
     } catch (error) {
       console.error('Error fetching coach profile:', error);
-      return rejectWithValue(error.response?.data || 'Network error');
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -671,10 +606,9 @@ const subscriptionsSlice = createSlice({
       next: null,
       previous: null,
     },
-    ActivesubscriptionTypes: [],
-    Activesubscription: [],
+    activeSubscriptionTypes: [],
+    activeSubscriptions: [],
     subscriptions: [],
-    allsubscriptions: [],
     expiredSubscriptions: [],
     memberSubscriptions: { results: [], count: 0, next: null, previous: null },
     upcomingSubscriptions: [],
@@ -694,7 +628,7 @@ const subscriptionsSlice = createSlice({
     stats: null,
     subscriptionType: null,
     subscription: null,
-    payment: null,
+    paymentStatus: null,
     loading: false,
     error: null,
     status: 'idle',
@@ -726,34 +660,27 @@ const subscriptionsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // جلب أنواع الاشتراكات
       .addCase(fetchSubscriptionTypes.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchSubscriptionTypes.fulfilled, (state, action) => {
         state.loading = false;
-        state.subscriptionTypes = {
-          count: action.payload.count || 0,
-          results: Array.isArray(action.payload.results)
-            ? action.payload.results
-            : [],
-          next: action.payload.next || null,
-          previous: action.payload.previous || null,
-        };
+        state.subscriptionTypes = action.payload;
       })
       .addCase(fetchSubscriptionTypes.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+
+      // إضافة نوع اشتراك
       .addCase(addSubscriptionType.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(addSubscriptionType.fulfilled, (state, action) => {
         state.loading = false;
-        if (!Array.isArray(state.subscriptionTypes.results)) {
-          state.subscriptionTypes.results = [];
-        }
         state.subscriptionTypes.results.push(action.payload);
         state.subscriptionTypes.count += 1;
       })
@@ -761,6 +688,8 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+
+      // جلب نوع اشتراك معين
       .addCase(fetchSubscriptionTypeById.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -773,45 +702,54 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+
+      // تحديث اشتراك
       .addCase(updateSubscription.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(updateSubscription.fulfilled, (state, action) => {
         state.loading = false;
         const updatedSubscription = action.payload;
-        const index = state.subscriptions.findIndex(
-          (subscription) => subscription.id === updatedSubscription.id
+        state.subscriptions = state.subscriptions.map((sub) =>
+          sub.id === updatedSubscription.id ? updatedSubscription : sub
         );
-        if (index !== -1) {
-          state.subscriptions[index] = updatedSubscription;
-        }
+        state.memberSubscriptions.results = state.memberSubscriptions.results.map((sub) =>
+          sub.id === updatedSubscription.id ? updatedSubscription : sub
+        );
       })
       .addCase(updateSubscription.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+
+      // حذف اشتراك
       .addCase(deleteSubscriptionById.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(deleteSubscriptionById.fulfilled, (state, action) => {
         state.loading = false;
-        state.subscriptions = state.subscriptions.filter(
-          (subscription) => subscription.id !== action.payload
+        state.subscriptions = state.subscriptions.filter((sub) => sub.id !== action.payload);
+        state.memberSubscriptions.results = state.memberSubscriptions.results.filter(
+          (sub) => sub.id !== action.payload
         );
       })
       .addCase(deleteSubscriptionById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+
+      // جلب الاشتراكات
       .addCase(fetchSubscriptions.pending, (state) => {
         state.status = 'loading';
+        state.error = null;
       })
       .addCase(fetchSubscriptions.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.subscriptions = action.payload.subscriptions || [];
+        state.subscriptions = action.payload.subscriptions;
         state.pagination = {
-          count: action.payload.count || 0,
+          count: action.payload.count,
           next: action.payload.next,
           previous: action.payload.previous,
         };
@@ -820,6 +758,8 @@ const subscriptionsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
+
+      // إضافة اشتراك
       .addCase(postSubscription.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -827,11 +767,14 @@ const subscriptionsSlice = createSlice({
       .addCase(postSubscription.fulfilled, (state, action) => {
         state.loading = false;
         state.subscriptions.push(action.payload);
+        state.memberSubscriptions.results.push(action.payload);
       })
       .addCase(postSubscription.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+
+      // تحديث نوع اشتراك
       .addCase(putSubscriptionType.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -839,17 +782,16 @@ const subscriptionsSlice = createSlice({
       .addCase(putSubscriptionType.fulfilled, (state, action) => {
         state.loading = false;
         const updatedSubscriptionType = action.payload;
-        const index = state.subscriptionTypes.results.findIndex(
-          (sub) => sub.id === updatedSubscriptionType.id
+        state.subscriptionTypes.results = state.subscriptionTypes.results.map((sub) =>
+          sub.id === updatedSubscriptionType.id ? updatedSubscriptionType : sub
         );
-        if (index !== -1) {
-          state.subscriptionTypes.results[index] = updatedSubscriptionType;
-        }
       })
       .addCase(putSubscriptionType.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+
+      // حذف نوع اشتراك
       .addCase(deleteSubscriptionType.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -859,17 +801,17 @@ const subscriptionsSlice = createSlice({
         state.subscriptionTypes.results = state.subscriptionTypes.results.filter(
           (sub) => sub.id !== action.payload
         );
-        state.subscriptionTypes.count = Math.max(
-          (state.subscriptionTypes.count || 0) - 1,
-          0
-        );
+        state.subscriptionTypes.count = Math.max(state.subscriptionTypes.count - 1, 0);
       })
       .addCase(deleteSubscriptionType.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+
+      // جلب اشتراك معين
       .addCase(fetchSubscriptionById.pending, (state) => {
         state.status = 'loading';
+        state.error = null;
       })
       .addCase(fetchSubscriptionById.fulfilled, (state, action) => {
         state.status = 'succeeded';
@@ -879,30 +821,36 @@ const subscriptionsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
+
+      // جلب الاشتراكات النشطة
       .addCase(fetchActiveSubscriptions.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchActiveSubscriptions.fulfilled, (state, action) => {
         state.loading = false;
-        state.Activesubscription = action.payload || [];
+        state.activeSubscriptions = action.payload;
       })
       .addCase(fetchActiveSubscriptions.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+
+      // جلب الاشتراكات المنتهية
       .addCase(fetchExpiredSubscriptions.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchExpiredSubscriptions.fulfilled, (state, action) => {
         state.loading = false;
-        state.expiredSubscriptions = action.payload || [];
+        state.expiredSubscriptions = action.payload;
       })
       .addCase(fetchExpiredSubscriptions.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+
+      // جلب إحصائيات الاشتراكات
       .addCase(fetchSubscriptionStats.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -915,18 +863,22 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+
+      // جلب الاشتراكات القادمة
       .addCase(fetchUpcomingSubscriptions.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchUpcomingSubscriptions.fulfilled, (state, action) => {
         state.loading = false;
-        state.upcomingSubscriptions = action.payload || [];
+        state.upcomingSubscriptions = action.payload;
       })
       .addCase(fetchUpcomingSubscriptions.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
+
+      // إجراء دفعة
       .addCase(makePayment.pending, (state) => {
         state.loading = true;
         state.paymentStatus = null;
@@ -934,13 +886,12 @@ const subscriptionsSlice = createSlice({
       .addCase(makePayment.fulfilled, (state, action) => {
         state.loading = false;
         state.paymentStatus = 'succeeded';
-        state.subscriptions = state.subscriptions.map((subscription) =>
-          subscription.id === action.payload.subscriptionId
-            ? {
-                ...subscription,
-                remaining_amount: action.payload.remaining_amount,
-              }
-            : subscription
+        const { subscriptionId, remaining_amount } = action.payload;
+        state.subscriptions = state.subscriptions.map((sub) =>
+          sub.id === subscriptionId ? { ...sub, remaining_amount } : sub
+        );
+        state.memberSubscriptions.results = state.memberSubscriptions.results.map((sub) =>
+          sub.id === subscriptionId ? { ...sub, remaining_amount } : sub
         );
       })
       .addCase(makePayment.rejected, (state, action) => {
@@ -948,6 +899,8 @@ const subscriptionsSlice = createSlice({
         state.paymentStatus = 'failed';
         state.error = action.payload;
       })
+
+      // تجديد اشتراك
       .addCase(renewSubscription.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -955,33 +908,38 @@ const subscriptionsSlice = createSlice({
       .addCase(renewSubscription.fulfilled, (state, action) => {
         state.loading = false;
         state.status = 'succeeded';
-        const index = state.subscriptions.findIndex(
-          (sub) => sub.id === action.payload.id
+        const updatedSubscription = action.payload;
+        state.subscriptions = state.subscriptions.map((sub) =>
+          sub.id === updatedSubscription.id ? updatedSubscription : sub
         );
-        if (index !== -1) {
-          state.subscriptions[index].end_date = action.payload.end_date;
-        }
+        state.memberSubscriptions.results = state.memberSubscriptions.results.map((sub) =>
+          sub.id === updatedSubscription.id ? updatedSubscription : sub
+        );
       })
       .addCase(renewSubscription.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
         state.status = 'failed';
+        state.error = action.payload;
       })
+
+      // جلب اشتراكات عضو
       .addCase(fetchMemberSubscriptions.pending, (state) => {
         state.status = 'loading';
+        state.error = null;
       })
       .addCase(fetchMemberSubscriptions.fulfilled, (state, action) => {
         state.status = 'succeeded';
-        state.memberSubscriptions = action.payload || { results: [], count: 0, next: null, previous: null };
+        state.memberSubscriptions = action.payload;
       })
       .addCase(fetchMemberSubscriptions.rejected, (state, action) => {
         state.status = 'failed';
-        state.error = typeof action.payload === 'object' 
-          ? action.payload.message || 'An error occurred' 
-          : action.payload;
+        state.error = action.payload;
       })
+
+      // إضافة حضور
       .addCase(addAttendance.pending, (state) => {
         state.loading = true;
+        state.error = null;
       })
       .addCase(addAttendance.fulfilled, (state, action) => {
         state.loading = false;
@@ -991,6 +949,8 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
+
+      // طلب تجميد اشتراك
       .addCase(requestSubscriptionFreeze.pending, (state, action) => {
         const { subscriptionId } = action.meta.arg;
         state.freezeStatus[subscriptionId] = 'loading';
@@ -998,21 +958,25 @@ const subscriptionsSlice = createSlice({
         delete state.freezeSuccess[subscriptionId];
       })
       .addCase(requestSubscriptionFreeze.fulfilled, (state, action) => {
-        const { subscriptionId, data } = action.payload || {};
-        if (subscriptionId) {
-          state.freezeStatus[subscriptionId] = 'succeeded';
-          state.freezeSuccess[subscriptionId] = data.message || 'تم طلب تجميد الاشتراك بنجاح';
-          delete state.freezeError[subscriptionId];
-        }
+        state.loading = false;
+        const { subscriptionId, id, end_date, freeze_requests } = action.payload;
+        state.freezeStatus[subscriptionId] = 'succeeded';
+        state.freezeSuccess[subscriptionId] = 'تم طلب تجميد الاشتراك بنجاح';
+        state.subscriptions = state.subscriptions.map((sub) =>
+          sub.id === id ? { ...sub, end_date, freeze_requests } : sub
+        );
+        state.memberSubscriptions.results = state.memberSubscriptions.results.map((sub) =>
+          sub.id === id ? { ...sub, end_date, freeze_requests } : sub
+        );
       })
       .addCase(requestSubscriptionFreeze.rejected, (state, action) => {
-        const { subscriptionId, error } = action.payload || {};
-        if (subscriptionId) {
-          state.freezeStatus[subscriptionId] = 'failed';
-          state.freezeError[subscriptionId] = error || 'Unknown error';
-          delete state.freezeSuccess[subscriptionId];
-        }
+        state.loading = false;
+        const { subscriptionId, error } = action.payload;
+        state.freezeStatus[subscriptionId] = 'failed';
+        state.freezeError[subscriptionId] = error;
       })
+
+      // إلغاء تجميد اشتراك
       .addCase(cancelSubscriptionFreeze.pending, (state, action) => {
         const { freezeRequestId } = action.meta.arg;
         state.cancelStatus[freezeRequestId] = 'loading';
@@ -1020,32 +984,25 @@ const subscriptionsSlice = createSlice({
         delete state.cancelSuccess[freezeRequestId];
       })
       .addCase(cancelSubscriptionFreeze.fulfilled, (state, action) => {
-        const { freezeRequestId, data } = action.payload || {};
-        if (freezeRequestId) {
-          state.cancelStatus[freezeRequestId] = 'succeeded';
-          state.cancelSuccess[freezeRequestId] = data.message || 'تم إلغاء تجميد الاشتراك بنجاح';
-          delete state.cancelError[freezeRequestId];
-          if (data.id && state.memberSubscriptions.results) {
-            const index = state.memberSubscriptions.results.findIndex(
-              (sub) => sub.id === data.id
-            );
-            if (index !== -1) {
-              state.memberSubscriptions.results[index] = {
-                ...state.memberSubscriptions.results[index],
-                ...data,
-              };
-            }
-          }
-        }
+        state.loading = false;
+        const { freezeRequestId, id, end_date, freeze_requests } = action.payload;
+        state.cancelStatus[freezeRequestId] = 'succeeded';
+        state.cancelSuccess[freezeRequestId] = 'تم إلغاء تجميد الاشتراك بنجاح';
+        state.subscriptions = state.subscriptions.map((sub) =>
+          sub.id === id ? { ...sub, end_date, freeze_requests } : sub
+        );
+        state.memberSubscriptions.results = state.memberSubscriptions.results.map((sub) =>
+          sub.id === id ? { ...sub, end_date, freeze_requests } : sub
+        );
       })
       .addCase(cancelSubscriptionFreeze.rejected, (state, action) => {
-        const { freezeRequestId, error } = action.payload || {};
-        if (freezeRequestId) {
-          state.cancelStatus[freezeRequestId] = 'failed';
-          state.cancelError[freezeRequestId] = error || 'Unknown error';
-          delete state.cancelSuccess[freezeRequestId];
-        }
+        state.loading = false;
+        const { freezeRequestId, error } = action.payload;
+        state.cancelStatus[freezeRequestId] = 'failed';
+        state.cancelError[freezeRequestId] = error;
       })
+
+      // جلب ملف المدرب
       .addCase(fetchCoachProfile.pending, (state) => {
         state.coachProfile.loading = true;
         state.coachProfile.error = null;
@@ -1057,7 +1014,7 @@ const subscriptionsSlice = createSlice({
       })
       .addCase(fetchCoachProfile.rejected, (state, action) => {
         state.coachProfile.loading = false;
-        state.coachProfile.error = action.payload || 'Failed to fetch coach profile';
+        state.coachProfile.error = action.payload;
       });
   },
 });

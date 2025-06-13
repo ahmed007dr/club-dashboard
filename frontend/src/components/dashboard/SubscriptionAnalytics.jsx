@@ -109,7 +109,7 @@ const SubscriptionAnalytics = () => {
       : popularTypes;
     sortedPopularTypes.forEach((type) => {
       if (type) {
-        data.push([type.name ?? 'غير معروف', type.total_subscriptions ?? 0, type.percentage ?? 0]);
+        data.push([type.name ?? 'غير معروف', type.total ?? 0, type.percentage ?? 0]);
       }
     });
 
@@ -162,7 +162,7 @@ const SubscriptionAnalytics = () => {
 
     // Revenue Analysis
     data.push([], ['الإيرادات حسب نوع الاشتراك']);
-    data.push(['النوع', 'إجمالي الإيرادات', 'إيرادات التدريب الخاص', 'المبالغ المتبقية']);
+    data.push(['النوع', 'إجمالي الإيرادات', 'إيرادات تعويض الكابتن', 'المبالغ المتبقية']);
     const revenueAnalysis = Array.isArray(analytics.revenue_analysis) ? analytics.revenue_analysis : [];
     const sortedRevenue = sortConfig.key?.includes('revenue')
       ? sortData(revenueAnalysis, sortConfig.key.split('.')[1], sortConfig.direction)
@@ -172,7 +172,7 @@ const SubscriptionAnalytics = () => {
         data.push([
           type.name ?? 'غير معروف',
           type.total_revenue ?? 0,
-          type.private_revenue ?? 0,
+          type.coach_compensation_revenue ?? 0,
           type.remaining_amount ?? 0,
         ]);
       }
@@ -212,7 +212,7 @@ const SubscriptionAnalytics = () => {
 
     // Coach Analysis
     data.push([], ['تحليل الكباتن']);
-    data.push(['اسم الكابتن', 'عدد العملاء', 'إجمالي الحضور', 'إجمالي الإيرادات']);
+    data.push(['اسم الكابتن', 'عدد العملاء', 'إجمالي الحضور', 'إجمالي إيرادات التعويض']);
     const coachAnalysis = Array.isArray(analytics.coach_analysis) ? analytics.coach_analysis : [];
     const sortedCoaches = sortConfig.key?.includes('coach')
       ? sortData(coachAnalysis, sortConfig.key.split('.')[1], sortConfig.direction)
@@ -295,7 +295,7 @@ const SubscriptionAnalytics = () => {
         : analytics.popular_subscription_types || []
       ).map((type) => [
         type?.name ?? 'غير معروف',
-        type?.total_subscriptions ?? 0,
+        type?.total ?? 0,
         type?.percentage ?? 0,
       ]),
       styles: { font: 'Amiri', halign: 'right' },
@@ -348,14 +348,14 @@ const SubscriptionAnalytics = () => {
     doc.text('الإيرادات حسب نوع الاشتراك', 10, doc.lastAutoTable.finalY + 10, { align: 'right' });
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
-      head: [['النوع', 'إجمالي الإيرادات', 'إيرادات التدريب الخاص', 'المبالغ المتبقية']],
+      head: [['النوع', 'إجمالي الإيرادات', 'إيرادات تعويض الكابتن', 'المبالغ المتبقية']],
       body: (sortConfig.key?.includes('revenue')
         ? sortData(analytics.revenue_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
         : analytics.revenue_analysis || []
       ).map((type) => [
         type?.name ?? 'غير معروف',
         type?.total_revenue ?? 0,
-        type?.private_revenue ?? 0,
+        type?.coach_compensation_revenue ?? 0,
         type?.remaining_amount ?? 0,
       ]),
       styles: { font: 'Amiri', halign: 'right' },
@@ -393,7 +393,7 @@ const SubscriptionAnalytics = () => {
     doc.text('تحليل الكباتن', 10, doc.lastAutoTable.finalY + 10, { align: 'right' });
     autoTable(doc, {
       startY: doc.lastAutoTable.finalY + 15,
-      head: [['اسم الكابتن', 'عدد العملاء', 'إجمالي الحضور', 'إجمالي الإيرادات']],
+      head: [['اسم الكابتن', 'عدد العملاء', 'إجمالي الحضور', 'إجمالي إيرادات التعويض']],
       body: (sortConfig.key?.includes('coach')
         ? sortData(analytics.coach_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
         : analytics.coach_analysis || []
@@ -558,8 +558,8 @@ const SubscriptionAnalytics = () => {
                     <th className="table-header" onClick={() => handleSort('popular.name')}>
                       النوع {sortConfig.key === 'popular.name' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('popular.total_subscriptions')}>
-                      عدد الاشتراكات {sortConfig.key === 'popular.total_subscriptions' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('popular.total')}>
+                      عدد الاشتراكات {sortConfig.key === 'popular.total' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('popular.percentage')}>
                       النسبة (%) {sortConfig.key === 'popular.percentage' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -573,7 +573,7 @@ const SubscriptionAnalytics = () => {
                   ).map((type, index) => (
                     <tr key={`popular-${index}`}>
                       <td className="table-cell">{type?.name ?? 'غير معروف'}</td>
-                      <td className="table-cell">{type?.total_subscriptions ?? 0}</td>
+                      <td className="table-cell">{type?.total ?? 0}</td>
                       <td className="table-cell">{type?.percentage ?? 0}</td>
                     </tr>
                   ))}
@@ -683,8 +683,8 @@ const SubscriptionAnalytics = () => {
                     <th className="table-header" onClick={() => handleSort('revenue.total_revenue')}>
                       إجمالي الإيرادات {sortConfig.key === 'revenue.total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th className="table-header" onClick={() => handleSort('revenue.private_revenue')}>
-                      إيرادات التدريب الخاص {sortConfig.key === 'revenue.private_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                    <th className="table-header" onClick={() => handleSort('revenue.coach_compensation_revenue')}>
+                      إيرادات تعويض الكابتن {sortConfig.key === 'revenue.coach_compensation_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('revenue.remaining_amount')}>
                       المبالغ المتبقية {sortConfig.key === 'revenue.remaining_amount' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -699,7 +699,7 @@ const SubscriptionAnalytics = () => {
                     <tr key={`revenue-${index}`}>
                       <td className="table-cell">{type?.name ?? 'غير معروف'}</td>
                       <td className="table-cell">{type?.total_revenue ?? 0}</td>
-                      <td className="table-cell">{type?.private_revenue ?? 0}</td>
+                      <td className="table-cell">{type?.coach_compensation_revenue ?? 0}</td>
                       <td className="table-cell">{type?.remaining_amount ?? 0}</td>
                     </tr>
                   ))}
@@ -789,7 +789,7 @@ const SubscriptionAnalytics = () => {
                       إجمالي الحضور {sortConfig.key === 'total_attendance' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                     <th className="table-header" onClick={() => handleSort('total_revenue')}>
-                      إجمالي الإيرادات {sortConfig.key === 'total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                      إجمالي إيرادات التعويض {sortConfig.key === 'total_revenue' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>

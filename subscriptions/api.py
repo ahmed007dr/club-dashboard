@@ -30,6 +30,9 @@ from attendance.models import Attendance
 
 from utils.permissions import IsOwnerOrRelatedToClub
 
+import logging
+logger = logging.getLogger(__name__)
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_type_list(request):
@@ -44,7 +47,8 @@ def subscription_type_list(request):
         types = SubscriptionType.objects.filter(club=request.user.club).annotate(
             active_subscriptions_count=Count(
                 'subscriptions', 
-                filter=Q(subscriptions__end_date__gte=timezone.now().date())            )
+                filter=Q(subscriptions__end_date__gte=timezone.now().date())
+            )
         )
 
         if search_term:
@@ -82,12 +86,6 @@ def subscription_type_list(request):
             subscription_type = serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    
-import logging
-logger = logging.getLogger(__name__)
-
-
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -172,18 +170,26 @@ def subscription_list(request):
                 subscription.delete()
                 return Response({'error': 'غير مخول لإنشاء اشتراك لهذا النادي'}, status=status.HTTP_403_FORBIDDEN)
 
-            if subscription.paid_amount > 0 or subscription.private_training_price > 0:
+            if subscription.paid_amount > 0 or (subscription.coach and subscription.coach_compensation_type == 'external' and subscription.coach_compensation_value > 0):
                 source, _ = IncomeSource.objects.get_or_create(
                     club=subscription.club, name='Subscription', defaults={'description': 'ايراد عن اشتراك'}
                 )
-                amount = subscription.paid_amount + (subscription.private_training_price or 0)
+                amount = subscription.paid_amount
+                if subscription.coach and subscription.coach_compensation_type == 'external':
+                    amount += subscription.coach_compensation_value or 0
+                
+                description = f"اشتراك {subscription.member.name}"
+                if subscription.coach:
+                    if subscription.coach_compensation_type == 'external':
+                        description += f" مع الكابتن {subscription.coach.username} بمبلغ خارجي {subscription.coach_compensation_value} جنيه"
+                    elif subscription.coach_compensation_type == 'from_subscription':
+                        description += f" مع الكابتن {subscription.coach.username} بنسبة {subscription.coach_compensation_value}% من الاشتراك"
+
                 income = Income(
                     club=subscription.club,
                     source=source,
                     amount=amount,
-                    description=f"اشتراك {subscription.member.name}" + 
-                                (f" مع الكابتن {subscription.coach.username} بسعر {subscription.private_training_price}" 
-                                 if subscription.coach else ""),
+                    description=description,
                     date=timezone.now().date(),
                     received_by=request.user
                 )
@@ -191,7 +197,6 @@ def subscription_list(request):
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -220,7 +225,6 @@ def subscription_type_detail(request, pk):
             )
         subscription_type.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -242,9 +246,8 @@ def subscription_detail(request, pk):
     if request.method == 'GET':
         if request.user.role in ['reception', 'accountant']:
             identifier = request.GET.get('identifier', '')
-            is_search_mode = bool(identifier)  # Consider it a search if identifier is provided
+            is_search_mode = bool(identifier)
             if not is_search_mode:
-                # Restrict to subscriptions created during current shift
                 attendance = StaffAttendance.objects.filter(
                     staff=request.user,
                     club=request.user.club,
@@ -256,7 +259,6 @@ def subscription_detail(request, pk):
         serializer = SubscriptionSerializer(subscription)
         return Response(serializer.data)
     
-
     elif request.method == 'PUT':
         mutable_data = request.data.copy()
         mutable_data['club'] = request.user.club.id
@@ -266,12 +268,11 @@ def subscription_detail(request, pk):
             if serializer.is_valid():
                 updated_subscription = serializer.save()
                 
-                # Calculate additional amount for Income
                 old_paid_amount = subscription.paid_amount or Decimal('0')
-                old_private_training_price = subscription.private_training_price or Decimal('0')
+                old_coach_compensation_value = (subscription.coach_compensation_value or Decimal('0')) if (subscription.coach and subscription.coach_compensation_type == 'external') else Decimal('0')
                 new_paid_amount = updated_subscription.paid_amount or Decimal('0')
-                new_private_training_price = updated_subscription.private_training_price or Decimal('0')
-                additional_amount = (new_paid_amount - old_paid_amount) + (new_private_training_price - old_private_training_price)
+                new_coach_compensation_value = (updated_subscription.coach_compensation_value or Decimal('0')) if (updated_subscription.coach and updated_subscription.coach_compensation_type == 'external') else Decimal('0')
+                additional_amount = (new_paid_amount - old_paid_amount) + (new_coach_compensation_value - old_coach_compensation_value)
 
                 if additional_amount > 0:
                     source, _ = IncomeSource.objects.get_or_create(
@@ -279,13 +280,18 @@ def subscription_detail(request, pk):
                         name='Subscription', 
                         defaults={'description': 'ايراد عن اشتراك'}
                     )
+                    description = f"ايراد اضافي لاشتراك {updated_subscription.member.name}"
+                    if updated_subscription.coach:
+                        if updated_subscription.coach_compensation_type == 'external':
+                            description += f" مع الكابتن {updated_subscription.coach.username} بمبلغ خارجي {updated_subscription.coach_compensation_value} جنيه"
+                        elif updated_subscription.coach_compensation_type == 'from_subscription':
+                            description += f" مع الكابتن {updated_subscription.coach.username} بنسبة {updated_subscription.coach_compensation_value}% من الاشتراك"
+                    
                     income = Income(
                         club=updated_subscription.club,
                         source=source,
                         amount=additional_amount,
-                        description=f"ايراد اضافي لاشتراك {updated_subscription.member.name}" +
-                                    (f" مع الكابتن {updated_subscription.coach.username} بسعر {updated_subscription.private_training_price}" 
-                                     if updated_subscription.coach else ""),
+                        description=description,
                         date=timezone.now().date(),
                         received_by=request.user
                     )
@@ -297,7 +303,6 @@ def subscription_detail(request, pk):
     elif request.method == 'DELETE':
         subscription.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -310,7 +315,7 @@ def active_subscriptions(request):
     )
 
     if request.user.role in ['reception', 'accountant']:
-        is_search_mode = bool(request.query_params)  # Any query params indicate a search
+        is_search_mode = bool(request.query_params)
         if not is_search_mode:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
@@ -341,7 +346,7 @@ def expired_subscriptions(request):
     )
 
     if request.user.role in ['reception', 'accountant']:
-        is_search_mode = bool(request.query_params)  # Any query params indicate a search
+        is_search_mode = bool(request.query_params)
         if not is_search_mode:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
@@ -372,7 +377,7 @@ def upcoming_subscriptions(request):
     )
 
     if request.user.role in ['reception', 'accountant']:
-        is_search_mode = bool(request.query_params)  # Any query params indicate a search
+        is_search_mode = bool(request.query_params)
         if not is_search_mode:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user,
@@ -405,7 +410,7 @@ def renew_subscription(request, pk):
     subscription.end_date = new_end_date
     subscription.paid_amount = subscription.type.price
     subscription.remaining_amount = 0
-    subscription.entry_count = 0  # Reset entry count on renewal
+    subscription.entry_count = 0
     subscription.save()
 
     source, created = IncomeSource.objects.get_or_create(
@@ -417,7 +422,7 @@ def renew_subscription(request, pk):
         club=subscription.club,
         source=source,
         amount=subscription.type.price,
-        description=f"تجديد اشتراك عن المشترك  {subscription.member.name}",
+        description=f"تجديد اشتراك عن المشترك {subscription.member.name}",
         date=timezone.now().date(),
         received_by=request.user
     )
@@ -509,17 +514,16 @@ def member_subscriptions(request):
     serializer = SubscriptionSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_stats(request):
     today = timezone.now().date()
     stats = {
-            'total': Subscription.objects.filter(club=request.user.club).count(),
-            'active': Subscription.objects.filter(start_date__lte=today, end_date__gte=today, club=request.user.club).count(),
-            'expired': Subscription.objects.filter(end_date__lt=today, club=request.user.club).count(),
-            'upcoming': Subscription.objects.filter(start_date__gt=today, club=request.user.club).count(),
-        }
+        'total': Subscription.objects.filter(club=request.user.club).count(),
+        'active': Subscription.objects.filter(start_date__lte=today, end_date__gte=today, club=request.user.club).count(),
+        'expired': Subscription.objects.filter(end_date__lt=today, club=request.user.club).count(),
+        'upcoming': Subscription.objects.filter(start_date__gt=today, club=request.user.club).count(),
+    }
     return Response(stats)
 
 @api_view(['POST'])
@@ -527,9 +531,6 @@ def subscription_stats(request):
 def request_freeze(request, pk):
     subscription = get_object_or_404(Subscription, pk=pk)
     
-    # if not IsOwnerOrRelatedToClub().has_object_permission(request, None, subscription):
-    #     return Response({'error': 'You do not have permission to request a freeze for this subscription'}, status=status.HTTP_403_FORBIDDEN)
-
     requested_days = request.data.get('requested_days', 0)
     start_date_str = request.data.get('start_date', timezone.now().date())
 
@@ -566,7 +567,6 @@ def request_freeze(request, pk):
     serializer = SubscriptionSerializer(subscription)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def cancel_freeze(request, freeze_id):
@@ -578,22 +578,19 @@ def cancel_freeze(request, freeze_id):
     if not freeze_request.is_active:
         return Response({'error': 'This freeze request is not active'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Calculate used freeze days
     today = timezone.now().date()
     used_days = (today - freeze_request.start_date).days
     if used_days < 0:
-        used_days = 0  # In case start_date is in the future
+        used_days = 0
     elif used_days > freeze_request.requested_days:
         used_days = freeze_request.requested_days
 
-    # Adjust subscription end_date
     subscription = freeze_request.subscription
     remaining_days = freeze_request.requested_days - used_days
     if remaining_days > 0:
         subscription.end_date -= timedelta(days=remaining_days)
         subscription.save()
 
-    # Mark freeze as cancelled
     freeze_request.is_active = False
     freeze_request.cancelled_at = timezone.now()
     freeze_request.save()
@@ -608,7 +605,6 @@ def coach_report(request, coach_id):
     if coach.club != request.user.club and request.user.role != 'owner':
         return Response({'error': 'غير مخول لعرض تقرير هذا الكابتن'}, status=status.HTTP_403_FORBIDDEN)
 
-    # Handle date range
     start_date = request.query_params.get('start_date', None)
     end_date = request.query_params.get('end_date', None)
     type_id = request.query_params.get('type_id', None)
@@ -619,7 +615,7 @@ def coach_report(request, coach_id):
         except ValueError:
             return Response({'error': 'صيغة تاريخ البداية غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
     else:
-        start_date = timezone.now().date().replace(day=1)  # First of the month
+        start_date = timezone.now().date().replace(day=1)
 
     if end_date:
         try:
@@ -629,7 +625,6 @@ def coach_report(request, coach_id):
     else:
         end_date = timezone.now().date()
 
-    # Get all subscriptions for the coach
     subscriptions = Subscription.objects.filter(
         coach=coach,
         club=request.user.club,
@@ -643,7 +638,6 @@ def coach_report(request, coach_id):
         except ValueError:
             return Response({'error': 'معرف نوع الاشتراك غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Previous month's clients
     prev_month_end = start_date - timedelta(days=1)
     prev_month_start = prev_month_end.replace(day=1)
     prev_month_clients = Subscription.objects.filter(
@@ -658,20 +652,21 @@ def coach_report(request, coach_id):
         prev_clients=Count('id')
     )['prev_clients'] or 0
 
-    # Aggregate data
     aggregated_data = subscriptions.aggregate(
         active_clients=Count('id', filter=Q(start_date__lte=timezone.now().date(), end_date__gte=timezone.now().date())),
-        total_private_training_amount=Sum('private_training_price'),
+        total_coach_compensation=Sum(
+            'coach_compensation_value',
+            filter=Q(coach_compensation_type='external')
+        ),
         total_paid_amount=Sum('paid_amount'),
         total_remaining_amount=Sum('remaining_amount')
     )
 
-    # Prepare report
     report = {
         'coach_id': coach.id,
         'coach_username': coach.username,
         'active_clients': aggregated_data['active_clients'] or 0,
-        'total_private_training_amount': aggregated_data['total_private_training_amount'] or 0,
+        'total_coach_compensation': aggregated_data['total_coach_compensation'] or 0,
         'total_paid_amount': aggregated_data['total_paid_amount'] or 0,
         'total_remaining_amount': aggregated_data['total_remaining_amount'] or 0,
         'previous_month_clients': prev_month_clients,
@@ -684,25 +679,17 @@ def coach_report(request, coach_id):
     serializer = CoachReportSerializer(report)
     return Response(serializer.data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_analytics(request):
-    """
-    API endpoint to retrieve analytics for subscriptions, including popular types, attendance,
-    freeze stats, revenue, member behavior, coach performance, and more.
-    """
-    # Initialize parameters
     today = timezone.now().date()
     club = request.user.club
 
-    # Get query parameters
     start = request.query_params.get('start_date')
     end = request.query_params.get('end_date')
     s_type = request.query_params.get('subscription_type')
     coach = request.query_params.get('coach')
 
-    # Validate and parse dates
     try:
         start_date = datetime.strptime(start, '%Y-%m-%d').date() if start else today - timedelta(days=90)
         end_date = datetime.strptime(end, '%Y-%m-%d').date() if end else today
@@ -712,7 +699,6 @@ def subscription_analytics(request):
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # Define base filter for Subscription model
     base_filter = {
         'club': club,
         'start_date__lte': end_date,
@@ -723,11 +709,9 @@ def subscription_analytics(request):
     if coach:
         base_filter['coach_id'] = coach
 
-    # Base queryset for subscriptions
     base_qs = Subscription.objects.filter(**base_filter).select_related('type', 'member', 'coach')
     total_subs = base_qs.count()
 
-    # 1. Popular Subscription Types
     popular_qs = SubscriptionType.objects.filter(club=club).annotate(
         total=Count(
             'subscriptions',
@@ -738,7 +722,6 @@ def subscription_analytics(request):
         )
     ).values('name', 'total').order_by('-total')[:5]
 
-    # 2. Attendance Analysis
     att_qs = base_qs.prefetch_related('attendance_attendances')
     att_stats = att_qs.values('type__name').annotate(
         total_attendance=Count(
@@ -758,7 +741,6 @@ def subscription_analytics(request):
         )
         item['avg_attendance'] = round(total_att / len(matching_subs) if matching_subs else 0, 2)
 
-    # 3. Attendance by Day of Week
     att_by_day = Attendance.objects.filter(
         subscription__club=club,
         attendance_date__range=(start_date, end_date)
@@ -770,18 +752,17 @@ def subscription_analytics(request):
 
     att_by_day = att_by_day.annotate(
         day_of_week=Case(
-            When(attendance_date__week_day=2, then=0),  # Monday
-            When(attendance_date__week_day=3, then=1),  # Tuesday
-            When(attendance_date__week_day=4, then=2),  # Wednesday
-            When(attendance_date__week_day=5, then=3),  # Thursday
-            When(attendance_date__week_day=6, then=4),  # Friday
-            When(attendance_date__week_day=7, then=5),  # Saturday
-            When(attendance_date__week_day=1, then=6),  # Sunday
+            When(attendance_date__week_day=2, then=0),
+            When(attendance_date__week_day=3, then=1),
+            When(attendance_date__week_day=4, then=2),
+            When(attendance_date__week_day=5, then=3),
+            When(attendance_date__week_day=6, then=4),
+            When(attendance_date__week_day=7, then=5),
+            When(attendance_date__week_day=1, then=6),
             output_field=IntegerField()
         )
     ).values('day_of_week').annotate(total_entries=Count('id')).order_by('day_of_week')
 
-    # 4. Freeze Analysis
     freeze_filter = {
         'subscriptions__start_date__gte': start_date,
         'subscriptions__start_date__lte': end_date,
@@ -821,7 +802,6 @@ def subscription_analytics(request):
         )
     ).values('name', 'total', 'total_freezes', 'frozen_subscriptions', 'freeze_percentage').order_by('-total_freezes')
 
-    # 5. Revenue Analysis
     revenue_filter = {
         'subscriptions__club': club,
         'subscriptions__start_date__lte': end_date,
@@ -831,14 +811,16 @@ def subscription_analytics(request):
     }
     revenue_stats = SubscriptionType.objects.filter(club=club).prefetch_related('subscriptions').annotate(
         total_revenue=Sum('subscriptions__paid_amount', filter=Q(**revenue_filter)),
-        private_revenue=Sum(
-            'subscriptions__private_training_price',
-            filter=Q(subscriptions__type__is_private_training=True, **revenue_filter)
+        coach_compensation_revenue=Sum(
+            'subscriptions__coach_compensation_value',
+            filter=Q(
+                subscriptions__coach_compensation_type='external',
+                **revenue_filter
+            )
         ),
         remaining_amount=Sum('subscriptions__remaining_amount', filter=Q(**revenue_filter))
-    ).values('name', 'total_revenue', 'private_revenue', 'remaining_amount').order_by('-total_revenue')
+    ).values('name', 'total_revenue', 'coach_compensation_revenue', 'remaining_amount').order_by('-total_revenue')
 
-    # 6. Member Behavior
     member_behavior = base_qs.annotate(
         attendance_count=Count(
             'attendance_attendances',
@@ -858,14 +840,12 @@ def subscription_analytics(request):
         )
     ).order_by('-attendance_count')[:10]
 
-    # 7. Inactive Members
     inactive_members = base_qs.annotate(
         last_attendance=Max('attendance_attendances__attendance_date')
     ).filter(
         Q(last_attendance__lte=today - timedelta(days=30)) | Q(last_attendance__isnull=True)
     ).values('member__name').annotate(subscription_count=Count('id'))[:10]
 
-    # 8. Coach Analysis
     coach_stats = User.objects.filter(role='coach', is_active=True, club=club).annotate(
         total_clients=Count(
             'private_subscriptions',
@@ -884,23 +864,21 @@ def subscription_analytics(request):
             )
         ),
         total_revenue=Sum(
-            'private_subscriptions__private_training_price',
+            'private_subscriptions__coach_compensation_value',
             filter=Q(
                 private_subscriptions__start_date__lte=end_date,
                 private_subscriptions__end_date__gte=start_date,
-                private_subscriptions__type__is_private_training=True,
+                private_subscriptions__coach_compensation_type='external',
                 **({'private_subscriptions__type_id': s_type} if s_type else {})
             )
         )
     ).values('username', 'total_clients', 'total_attendance', 'total_revenue').order_by('-total_clients')
 
-    # 9. Temporal Analysis
     temporal_stats = base_qs.annotate(month=TruncMonth('start_date')).values('month').annotate(
         total_subscriptions=Count('id'),
         total_revenue=Sum('paid_amount')
     ).order_by('month')
 
-    # 10. Renewal Rate
     renewal_filter = {
         'subscriptions__end_date__lt': end_date,
         'subscriptions__start_date__gte': start_date,
@@ -932,7 +910,6 @@ def subscription_analytics(request):
         )
     ).values('name', 'expired_subscriptions', 'renewed_subscriptions', 'renewal_rate').order_by('-renewal_rate')
 
-    # 11. Subscriptions Nearing Expiry
     nearing_expiry = Subscription.objects.filter(
         club=club,
         end_date__range=(today, today + timedelta(days=7)),
@@ -940,7 +917,6 @@ def subscription_analytics(request):
         **({'coach_id': coach} if coach else {})
     ).order_by('end_date')
 
-    # Construct response
     response = {
         'popular_subscription_types': list(popular_qs),
         'attendance_analysis': {
@@ -956,7 +932,7 @@ def subscription_analytics(request):
         'freeze_analysis': list(freeze_stats),
         'revenue_analysis': list(revenue_stats),
         'member_behavior': {
-            'active_members': MemberBehaviorSerializer(member_behavior, many=True).data,  # Fixed: Use MemberBehaviorSerializer
+            'active_members': MemberBehaviorSerializer(member_behavior, many=True).data,
             'inactive_members': list(inactive_members)
         },
         'coach_analysis': list(coach_stats),

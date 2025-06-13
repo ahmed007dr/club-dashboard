@@ -10,18 +10,15 @@ function CoachProfile() {
   const dispatch = useDispatch();
   const { data, loading, error } = useSelector((state) => state.subscriptions.coachProfile);
 
-  // States for pagination and date filters
   const [page, setPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Fetch coach profile with filters
   useEffect(() => {
     dispatch(fetchCoachProfile({ coachId, startDate, endDate }));
   }, [dispatch, coachId, startDate, endDate]);
 
-  // Memoized data
   const upcomingSubscriptions = useMemo(() => data?.upcoming_subscriptions || [], [data]);
   const expiredSubscriptions = useMemo(() => data?.expired_subscriptions || [], [data]);
   const membersDetails = useMemo(() => data?.members_details || [], [data]);
@@ -29,7 +26,6 @@ function CoachProfile() {
   const monthlyRevenue = useMemo(() => data?.monthly_revenue || [], [data]);
   const subscriptionTypes = useMemo(() => data?.subscription_types || [], [data]);
 
-  // Paginated members details
   const paginatedMembersDetails = useMemo(() => {
     const startIndex = (page - 1) * itemsPerPage;
     return membersDetails.slice(startIndex, startIndex + itemsPerPage);
@@ -37,7 +33,6 @@ function CoachProfile() {
 
   const totalPages = Math.ceil(membersDetails.length / itemsPerPage);
 
-  // Handlers
   const handleRetry = () => {
     dispatch(fetchCoachProfile({ coachId, startDate, endDate }));
   };
@@ -88,7 +83,6 @@ function CoachProfile() {
         بروفايل المدرب: {data?.coach_username || 'غير متاح'}
       </h1>
 
-      {/* Date Filters */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
         <h2 className="text-xl font-semibold text-gray-800 mb-4">تصفية حسب التاريخ</h2>
         <div className="flex flex-col md:flex-row gap-4">
@@ -118,17 +112,10 @@ function CoachProfile() {
         </div>
       </div>
 
-      {/* Financial and Clients Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-xl shadow-sm p-6 transform hover:shadow-md transition-shadow duration-300">
           <h2 className="text-xl font-semibold text-gray-800 mb-4 border-b border-gray-200 pb-2">ملخص مالي</h2>
           <div className="space-y-4">
-            <p className="flex justify-between items-center text-gray-600">
-              <span className="font-medium">إجمالي قيمة التدريبات:</span>
-              <span className="text-indigo-600 font-semibold">
-                {data?.total_private_training_amount ? `${data.total_private_training_amount} جنيه` : '—'}
-              </span>
-            </p>
             <p className="flex justify-between items-center text-gray-600">
               <span className="font-medium">إجمالي المبلغ المدفوع:</span>
               <span className="text-indigo-600 font-semibold">
@@ -179,7 +166,6 @@ function CoachProfile() {
         </div>
       </div>
 
-      {/* Financial Details */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white rounded-xl shadow-sm p-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-6 border-b border-gray-200 pb-2">الإيرادات حسب نوع الاشتراك</h2>
@@ -191,10 +177,6 @@ function CoachProfile() {
                   <p className="flex justify-between text-gray-600">
                     <span>المدفوع:</span>
                     <span className="text-indigo-600 font-semibold">{type.total_paid || 0} جنيه</span>
-                  </p>
-                  <p className="flex justify-between text-gray-600">
-                    <span>التدريب الخاص:</span>
-                    <span className="text-indigo-600 font-semibold">{type.total_private_training || 0} جنيه</span>
                   </p>
                   <p className="flex justify-between text-gray-600">
                     <span>المتبقي:</span>
@@ -220,10 +202,6 @@ function CoachProfile() {
                     <span className="text-indigo-600 font-semibold">{month.total_paid || 0} جنيه</span>
                   </p>
                   <p className="flex justify-between text-gray-600">
-                    <span>التدريب الخاص:</span>
-                    <span className="text-indigo-600 font-semibold">{month.total_private_training || 0} جنيه</span>
-                  </p>
-                  <p className="flex justify-between text-gray-600">
                     <span>المتبقي:</span>
                     <span className="text-indigo-600 font-semibold">{month.total_remaining || 0} جنيه</span>
                   </p>
@@ -236,7 +214,6 @@ function CoachProfile() {
         </div>
       </div>
 
-      {/* Members Details */}
       {membersDetails.length > 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-800 mb-6 border-b border-gray-200 pb-2">
@@ -298,12 +275,6 @@ function CoachProfile() {
                     <span className="text-gray-800">{member.fully_used ? 'نعم' : 'لا'}</span>
                   </p>
                   <p className="flex justify-between">
-                    <span className="font-medium text-gray-600">سعر التدريب:</span>
-                    <span className="text-indigo-600 font-semibold">
-                      {member.private_training_price ? `${member.private_training_price} جنيه` : '—'}
-                    </span>
-                  </p>
-                  <p className="flex justify-between">
                     <span className="font-medium text-gray-600">المدفوع:</span>
                     <span className="text-indigo-600 font-semibold">
                       {member.paid_amount ? `${member.paid_amount} جنيه` : '—'}
@@ -339,7 +310,6 @@ function CoachProfile() {
               </div>
             ))}
           </div>
-          {/* Pagination Controls */}
           {totalPages > 1 && (
             <div className="mt-6 flex justify-center gap-2">
               <Button
@@ -374,7 +344,6 @@ function CoachProfile() {
         </div>
       )}
 
-      {/* Upcoming Subscriptions */}
       {upcomingSubscriptions.length > 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
           <h2 className="text-xl font-semibold text-gray-800 mb-6 border-b border-gray-200 pb-2">
@@ -405,12 +374,6 @@ function CoachProfile() {
                     <span className="font-medium text-gray-600">تاريخ الانتهاء:</span>
                     <span className="text-gray-800">
                       {sub.end_date ? new Date(sub.end_date).toLocaleDateString('ar-EG') : '—'}
-                    </span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="font-medium text-gray-600">سعر التدريب:</span>
-                    <span className="text-indigo-600 font-semibold">
-                      {sub.private_training_price ? `${sub.private_training_price} جنيه` : '—'}
                     </span>
                   </p>
                   <p className="flex justify-between">
@@ -456,7 +419,6 @@ function CoachProfile() {
         </div>
       )}
 
-      {/* Expired Subscriptions */}
       {expiredSubscriptions.length > 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-6 border-b border-gray-200 pb-2">
@@ -487,12 +449,6 @@ function CoachProfile() {
                     <span className="font-medium text-gray-600">تاريخ الانتهاء:</span>
                     <span className="text-gray-800">
                       {sub.end_date ? new Date(sub.end_date).toLocaleDateString('ar-EG') : '—'}
-                    </span>
-                  </p>
-                  <p className="flex justify-between">
-                    <span className="font-medium text-gray-600">سعر التدريب:</span>
-                    <span className="text-indigo-600 font-semibold">
-                      {sub.private_training_price ? `${sub.private_training_price} جنيه` : '—'}
                     </span>
                   </p>
                   <p className="flex justify-between">

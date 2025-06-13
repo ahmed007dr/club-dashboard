@@ -193,9 +193,7 @@ const SubscriptionTable = ({
             <th className="py-3 px-4 text-right font-semibold">العضو</th>
             <th className="py-3 px-4 text-right font-semibold">تاريخ البدء</th>
             <th className="py-3 px-4 text-right font-semibold">تاريخ الانتهاء</th>
-            <th className="py-3 px-4 text-right font-semibold">عدد الإدخالات</th>
-            <th className="py-3 px-4 text-right font-semibold">الإدخالات المتبقية</th>
-            <th className="py-3 px-4 text-right font-semibold">المبلغ المدفوع</th>
+            <th className="py-3 px-4 text-right font-semibold">نوع الاشتراك</th>
             <th className="py-3 px-4 text-right font-semibold">المبلغ المتبقي</th>
             <th className="py-3 px-4 text-right font-semibold">الحالة</th>
             <th className="py-3 px-4 text-center font-semibold">الدفع</th>
@@ -223,11 +221,7 @@ const SubscriptionTable = ({
                 </td>
                 <td className="py-3 px-4">{subscription.start_date}</td>
                 <td className="py-3 px-4">{subscription.end_date}</td>
-                <td className="py-3 px-4">{subscription.entry_count}</td>
-                <td className="py-3 px-4">
-                  {subscription.type_details.max_entries - subscription.entry_count}
-                </td>
-                <td className="py-3 px-4">{subscription.paid_amount}</td>
+                <td className="py-3 px-4">{subscription.type_details.name}</td>
                 <td className="py-3 px-4">{subscription.remaining_amount}</td>
                 <td className="py-3 px-4">
                   <span
