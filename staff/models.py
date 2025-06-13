@@ -1,4 +1,3 @@
-
 from django.db import models
 from core.models import Club
 
@@ -27,6 +26,7 @@ class StaffAttendance(models.Model):
     check_in = models.DateTimeField()
     check_out = models.DateTimeField(null=True, blank=True)
     shift = models.ForeignKey(Shift, on_delete=models.SET_NULL, null=True, blank=True)
+    created_by = models.ForeignKey('accounts.User', related_name='created_attendances', on_delete=models.SET_NULL, null=True, blank=True)
 
     def duration_hours(self):
         if self.check_out:
@@ -43,4 +43,5 @@ class StaffAttendance(models.Model):
             models.Index(fields=['club']),
             models.Index(fields=['check_in']),
             models.Index(fields=['shift']),
+            models.Index(fields=['created_by']),
         ]
