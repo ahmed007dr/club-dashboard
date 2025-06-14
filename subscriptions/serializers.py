@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Subscription, SubscriptionType, FreezeRequest
+from .models import Subscription, SubscriptionType, FreezeRequest, Payment, PaymentMethod, Feature
 from core.serializers import ClubSerializer
 from members.serializers import MemberSerializer
 from accounts.serializers import UserSerializer
@@ -7,20 +7,85 @@ from accounts.models import User
 from members.models import Member
 from django.utils import timezone
 from django.db import models
-from django.db.models import Q, Count, Sum,F
+from django.db.models import Q, Count, Sum, F
 from django.db.models.functions import TruncMonth
 from attendance.models import Attendance
 
+class FeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Feature
+        fields = ['id', 'club', 'name', 'is_active', 'created_at']
+        extra_kwargs = {
+            'club': {'required': True},
+            'name': {'required': True},
+        }
+
+    def validate_name(self, value):
+        if Feature.objects.filter(club=self.context['request'].user.club, name=value).exists():
+            raise serializers.ValidationError("اسم الميزة موجود بالفعل.")
+        return value
+
+class PaymentMethodSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PaymentMethod
+        fields = ['id', 'club', 'name', 'is_active', 'created_at']
+        extra_kwargs = {
+            'club': {'required': True},
+            'name': {'required': True},
+        }
+
+    def validate_name(self, value):
+        if PaymentMethod.objects.filter(club=self.context['request'].user.club, name=value).exists():
+            raise serializers.ValidationError("اسم طريقة الدفع موجود بالفعل.")
+        return value
+
+class PaymentSerializer(serializers.ModelSerializer):
+    created_by_details = UserSerializer(source='created_by', read_only=True)
+    payment_method_details = PaymentMethodSerializer(source='payment_method', read_only=True)
+    payment_method_id = serializers.PrimaryKeyRelatedField(
+        queryset=PaymentMethod.objects.all(), source='payment_method', write_only=True
+    )
+
+    class Meta:
+        model = Payment
+        fields = [
+            'id', 'subscription', 'amount', 'payment_method', 'payment_method_id',
+            'payment_method_details', 'payment_date', 'created_by', 'created_by_details',
+            'transaction_id', 'notes'
+        ]
+        extra_kwargs = {
+            'subscription': {'required': True},
+            'amount': {'required': True},
+            'payment_method': {'read_only': True},
+            'payment_method_id': {'required': True},
+        }
+
+    def validate(self, data):
+        amount = data.get('amount')
+        payment_method = data.get('payment_method')
+        if amount <= 0:
+            raise serializers.ValidationError("المبلغ يجب أن يكون موجبًا.")
+        if not payment_method.is_active:
+            raise serializers.ValidationError("طريقة الدفع غير مفعلة.")
+        subscription = data.get('subscription')
+        total_paid = sum(p.amount for p in subscription.payments.all()) + amount
+        if total_paid > subscription.type.price:
+            raise serializers.ValidationError("إجمالي المدفوعات لا يمكن أن يتجاوز سعر الاشتراك.")
+        return data
 
 class SubscriptionTypeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
+    features = FeatureSerializer(many=True, read_only=True)
+    feature_ids = serializers.PrimaryKeyRelatedField(
+        queryset=Feature.objects.all(), many=True, source='features', write_only=True, required=False
+    )
 
     class Meta:
         model = SubscriptionType
         fields = [
             'id', 'club', 'club_details', 'name', 'duration_days', 'price',
-            'includes_gym', 'includes_pool', 'includes_classes', 'is_active',
-            'max_entries', 'subscriptions_count', 'max_freeze_days', 'is_private_training'
+            'features', 'feature_ids', 'is_active', 'max_entries', 'subscriptions_count',
+            'max_freeze_days', 'is_private_training'
         ]
         extra_kwargs = {
             'club': {'required': True}
@@ -57,14 +122,13 @@ class FreezeRequestSerializer(serializers.ModelSerializer):
             'cancelled_at': {'read_only': True},
         }
 
-
-
 class SubscriptionSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     member_details = MemberSerializer(source='member', read_only=True)
     type_details = SubscriptionTypeSerializer(source='type', read_only=True)
     coach_details = serializers.SerializerMethodField()
     freeze_requests = FreezeRequestSerializer(many=True, read_only=True)
+    payments = PaymentSerializer(many=True, read_only=True)
     created_by_details = UserSerializer(source='created_by', read_only=True)
     subscriptions_count = serializers.SerializerMethodField()
     coach_simple = serializers.SerializerMethodField()
@@ -77,9 +141,9 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'club', 'club_details', 'member', 'member_details',
             'type', 'type_details', 'coach', 'coach_details', 'start_date', 'end_date',
-            'paid_amount', 'remaining_amount', 'entry_count',
-            'created_by', 'created_by_details', 'freeze_requests', 'subscriptions_count',
-            'coach_simple', 'coach_identifier', 'identifier', 'status',
+            'paid_amount', 'remaining_amount', 'entry_count', 'is_cancelled', 'cancellation_date',
+            'refund_amount', 'created_by', 'created_by_details', 'freeze_requests', 'payments',
+            'subscriptions_count', 'coach_simple', 'coach_identifier', 'identifier', 'status',
             'coach_compensation_type', 'coach_compensation_value'
         ]
         extra_kwargs = {
@@ -88,6 +152,9 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'coach': {'required': False},
             'member': {'required': False},
             'remaining_amount': {'required': True},
+            'is_cancelled': {'read_only': True},
+            'cancellation_date': {'read_only': True},
+            'refund_amount': {'read_only': True},
             'coach_compensation_type': {'required': False},
             'coach_compensation_value': {'required': False},
         }
@@ -103,6 +170,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         ).exists()
         if active_freeze:
             return "Frozen"
+        if obj.is_cancelled:
+            return "Cancelled"
         is_expired_by_date = obj.end_date < today
         is_expired_by_entries = max_entries > 0 and entry_count >= max_entries
         if is_expired_by_date or is_expired_by_entries:
@@ -149,6 +218,10 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
         if remaining_amount < 0:
             raise serializers.ValidationError("المبلغ المتبقي لا يمكن أن يكون سالبًا.")
+        if paid_amount > subscription_type.price:
+            raise serializers.ValidationError("المبلغ المدفوع لا يمكن أن يتجاوز سعر الاشتراك.")
+        if paid_amount + remaining_amount != subscription_type.price:
+            raise serializers.ValidationError("المبلغ المدفوع + المتبقي يجب أن يساوي سعر الاشتراك.")
 
         if identifier and not member:
             try:
@@ -247,7 +320,6 @@ class MemberBehaviorSerializer(serializers.Serializer):
     subscription_count = serializers.IntegerField()
     is_regular = serializers.BooleanField()
     is_repeated = serializers.BooleanField()
-
 
 class CoachReportSerializer(serializers.Serializer):
     coach_id = serializers.IntegerField()
@@ -410,7 +482,7 @@ class CoachReportSerializer(serializers.Serializer):
                 'type_name': sub.type.name,
                 'start_date': sub.start_date,
                 'end_date': sub.end_date,
-                'status': 'Active' if sub.start_date <= today <= sub.end_date and not fully_used else 'Expired' if sub.end_date < today or fully_used else 'Upcoming',
+                'status': 'Active' if sub.start_date <= today <= sub.end_date and not fully_used and not sub.is_cancelled else 'Cancelled' if sub.is_cancelled else 'Expired' if sub.end_date < today or fully_used else 'Upcoming',
                 'attendance_count': attendance_count,
                 'max_entries': max_entries,
                 'entries_used': sub.entry_count,
@@ -421,4 +493,3 @@ class CoachReportSerializer(serializers.Serializer):
                 'coach_compensation_value': sub.coach_compensation_value,
             })
         return members_data
-    
