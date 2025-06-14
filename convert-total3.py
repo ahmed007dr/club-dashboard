@@ -8,9 +8,8 @@ from django.utils import timezone
 from datetime import datetime
 from django.db.models import DateTimeField, BooleanField, CharField, TextField, IntegerField, FloatField, DecimalField, DateField, TimeField
 
-
 def get_table_data(db_path, table_name):
-    """جلب بيانات الجدول من قاعدة البيانات."""
+    """Retrieve all data from a specified table in the database."""
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
@@ -18,13 +17,14 @@ def get_table_data(db_path, table_name):
         columns = [desc[0] for desc in cursor.description]
         rows = cursor.fetchall()
         conn.close()
+        print(f"Fetched {len(rows)} rows from {table_name} with columns: {columns}")
         return columns, rows
     except sqlite3.OperationalError as e:
-        print(f"خطأ في الجدول {table_name}: {e}")
+        print(f"Error accessing table {table_name}: {e}")
         return [], []
 
 def check_foreign_key(table, column, value, new_db_path):
-    """التحقق من وجود قيمة المفتاح الأجنبي في قاعدة البيانات الجديدة."""
+    """Check if a foreign key value exists in the new database."""
     try:
         if value is None:
             return True
@@ -33,69 +33,73 @@ def check_foreign_key(table, column, value, new_db_path):
         cursor.execute(f"SELECT COUNT(*) FROM \"{table}\" WHERE \"{column}\" = ?", (value,))
         count = cursor.fetchone()[0]
         conn.close()
+        if count == 0:
+            print(f"Foreign key check failed: {table}.{column} = {value} not found")
         return count > 0
     except sqlite3.OperationalError as e:
-        print(f"خطأ في المفتاح الأجنبي {table}.{column}: {e}")
+        print(f"Error checking foreign key {table}.{column}: {e}")
         return False
 
 def create_default_features(club_id, new_db_path):
-    """إنشاء ميزات افتراضية إذا لم تكن موجودة."""
+    """Create default features if they don't exist."""
     try:
         conn = sqlite3.connect(new_db_path)
         cursor = conn.cursor()
         features = [
-            ('جيم', club_id),
-            ('مسبح', club_id),
-            ('فصول', club_id),
+            ('Gym', club_id),
+            ('Pool', club_id),
+            ('Classes', club_id),
         ]
         cursor.executemany(
             "INSERT OR IGNORE INTO subscriptions_feature (name, club_id, is_active, created_at) VALUES (?, ?, 1, ?)",
             [(name, club_id, timezone.now()) for name, club_id in features]
         )
         conn.commit()
+        print(f"Created default features for club_id {club_id}")
         conn.close()
     except sqlite3.OperationalError as e:
-        print(f"خطأ في إنشاء الميزات الافتراضية: {e}")
+        print(f"Error creating default features: {e}")
 
 def create_default_payment_methods(club_id, new_db_path):
-    """إنشاء طرق دفع افتراضية إذا لم تكن موجودة."""
+    """Create default payment methods if they don't exist."""
     try:
         conn = sqlite3.connect(new_db_path)
         cursor = conn.cursor()
         methods = [
-            ('نقدي', club_id),
-            ('فيزا', club_id),
-            ('تحويل بنكي', club_id),
+            ('Cash', club_id),
+            ('Visa', club_id),
+            ('Bank Transfer', club_id),
         ]
         cursor.executemany(
             "INSERT OR IGNORE INTO subscriptions_paymentmethod (name, club_id, is_active, created_at) VALUES (?, ?, 1, ?)",
             [(name, club_id, timezone.now()) for name, club_id in methods]
         )
         conn.commit()
+        print(f"Created default payment methods for club_id {club_id}")
         conn.close()
     except sqlite3.OperationalError as e:
-        print(f"خطأ في إنشاء طرق الدفع الافتراضية: {e}")
+        print(f"Error creating default payment methods: {e}")
 
 def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary, default_values=None):
-    """نقل بيانات جدول واحد مع التحقق من الأخطاء والمفاتيح الأجنبية."""
+    """Migrate data for a single table with error handling and foreign key validation."""
     if default_values is None:
         default_values = {}
 
     model_name = f"{model._meta.app_label}.{model._meta.model_name}"
     old_columns, rows = get_table_data(old_db_path, table_name)
     if not rows:
-        print(f"الجدول {table_name} فارغ")
+        print(f"Table {table_name} is empty")
         migration_summary[table_name] = {'total': 0, 'success': 0, 'failed': 0}
         return
 
-    print(f"جارٍ نقل الجدول {table_name} ({len(rows)} سجل)...")
+    print(f"Migrating table {table_name} ({len(rows)} records)...")
     migration_summary[table_name] = {'total': len(rows), 'success': 0, 'failed': 0}
 
     new_fields = {field.name: field for field in model._meta.fields}
     new_field_names = set(new_fields.keys())
     old_field_names = set(old_columns)
     missing_fields = new_field_names - old_field_names
-    print(f"الحقول الناقصة في {table_name}: {missing_fields}")
+    print(f"Missing fields in {table_name}: {missing_fields}")
 
     if table_name == 'core_club':
         for row in rows:
@@ -106,7 +110,21 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
     batch = []
     errors = []
     feature_mappings = {}
-    invalid_type_ids = set()  # لتسجيل type_id غير صالحة
+    invalid_type_ids = set()
+
+    # Validate type_ids in subscriptions_subscription before migration
+    if table_name == 'subscriptions_subscription':
+        valid_type_ids = set()
+        try:
+            conn = sqlite3.connect(new_db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM subscriptions_subscriptiontype")
+            valid_type_ids = {row[0] for row in cursor.fetchall()}
+            conn.close()
+            print(f"Valid type_ids in new database: {valid_type_ids}")
+        except sqlite3.OperationalError as e:
+            print(f"Error fetching valid type_ids: {e}")
+
     for row_index, row in enumerate(rows):
         row_data = dict(zip(old_columns, row))
         row_data['row_index'] = row_index
@@ -124,11 +142,265 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                     feature_mappings[club_id] = {name: fid for fid, name in features}
                     conn.close()
                 except sqlite3.OperationalError as e:
-                    errors.append(f"خطأ في جلب الميزات للنادي {club_id}: {e}")
+                    errors.append(f"Error fetching features for club {club_id}: {e}")
                     migration_summary[table_name]['failed'] += 1
                     continue
 
+        if table_name == 'subscriptions_subscription':
+            # Remove private_training_price and map to coach_compensation_value if needed
+            private_training_price = row_data.pop('private_training_price', 0)
+            if private_training_price and private_training_price > 0:
+                row_data['coach_compensation_value'] = private_training_price
+
+            member_id = row_data.get('member_id')
+            if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid member_id: {member_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            type_id = row_data.get('type_id')
+            if type_id and not check_foreign_key('subscriptions_subscriptiontype', 'id', type_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid type_id: {type_id}, data: {row_data}")
+                invalid_type_ids.add(type_id)
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            coach_id = row_data.get('coach_id')
+            if coach_id and not check_foreign_key('accounts_user', 'id', coach_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid coach_id: {coach_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            created_by_id = row_data.get('created_by_id')
+            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid created_by_id: {created_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'subscriptions_payment':
+            subscription_id = row_data.get('subscription_id')
+            if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid subscription_id: {subscription_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            payment_method_id = row_data.get('payment_method_id')
+            if payment_method_id and not check_foreign_key('subscriptions_paymentmethod', 'id', payment_method_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid payment_method_id: {payment_method_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'subscriptions_freezerequest':
+            subscription_id = row_data.get('subscription_id')
+            if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid subscription_id: {subscription_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            created_by_id = row_data.get('created_by_id')
+            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid created_by_id: {created_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'subscriptions_coachprofile':
+            user_id = row_data.get('user_id')
+            if user_id and not check_foreign_key('accounts_user', 'id', user_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid user_id: {user_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'attendance_attendance':
+            subscription_id = row_data.get('subscription_id')
+            if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid subscription_id: {subscription_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            approved_by_id = row_data.get('approved_by_id')
+            if approved_by_id and not check_foreign_key('accounts_user', 'id', approved_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid approved_by_id: {approved_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'attendance_entrylog':
+            member_id = row_data.get('member_id')
+            if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid member_id: {member_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            approved_by_id = row_data.get('approved_by_id')
+            if approved_by_id and not check_foreign_key('accounts_user', 'id', approved_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid approved_by_id: {approved_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            related_subscription_id = row_data.get('related_subscription_id')
+            if related_subscription_id and not check_foreign_key('subscriptions_subscription', 'id', related_subscription_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid related_subscription_id: {related_subscription_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'staff_shift':
+            staff_id = row_data.get('staff_id')
+            if staff_id and not check_foreign_key('accounts_user', 'id', staff_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid staff_id: {staff_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            approved_by_id = row_data.get('approved_by_id')
+            if approved_by_id and not check_foreign_key('accounts_user', 'id', approved_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid approved_by_id: {approved_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'staff_staffattendance':
+            staff_id = row_data.get('staff_id')
+            if staff_id and not check_foreign_key('accounts_user', 'id', staff_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid staff_id: {staff_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            shift_id = row_data.get('shift_id')
+            if shift_id and not check_foreign_key('staff_shift', 'id', shift_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid shift_id: {shift_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            created_by_id = row_data.get('created_by_id')
+            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid created_by_id: {created_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'finance_expense':
+            category_id = row_data.get('category_id')
+            if category_id and not check_foreign_key('finance_expensecategory', 'id', category_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid category_id: {category_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            paid_by_id = row_data.get('paid_by_id')
+            if paid_by_id and not check_foreign_key('accounts_user', 'id', paid_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid paid_by_id: {paid_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            stock_item_id = row_data.get('stock_item_id')
+            if stock_item_id and not check_foreign_key('finance_stockitem', 'id', stock_item_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid stock_item_id: {stock_item_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'finance_income':
+            source_id = row_data.get('source_id')
+            if source_id and not check_foreign_key('finance_incomesource', 'id', source_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid source_id: {source_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            received_by_id = row_data.get('received_by_id')
+            if received_by_id and not check_foreign_key('accounts_user', 'id', received_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid received_by_id: {received_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            related_receipt_id = row_data.get('related_receipt_id')
+            if related_receipt_id and not check_foreign_key('receipts_receipt', 'id', related_receipt_id, new_db_path):
+                row_data['related_receipt_id'] = None
+
+        if table_name == 'finance_stocktransaction':
+            stock_item_id = row_data.get('stock_item_id')
+            if stock_item_id and not check_foreign_key('finance_stockitem', 'id', stock_item_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid stock_item_id: {stock_item_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            related_expense_id = row_data.get('related_expense_id')
+            if related_expense_id and not check_foreign_key('finance_expense', 'id', related_expense_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid related_expense_id: {related_expense_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            related_income_id = row_data.get('related_income_id')
+            if related_income_id and not check_foreign_key('finance_income', 'id', related_income_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid related_income_id: {related_income_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            created_by_id = row_data.get('created_by_id')
+            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid created_by_id: {created_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'invites_freeinvite':
+            invited_by_id = row_data.get('invited_by_id')
+            if invited_by_id and not check_foreign_key('members_member', 'id', invited_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid invited_by_id: {invited_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            created_by_id = row_data.get('created_by_id')
+            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid created_by_id: {created_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'receipts_receipt':
+            member_id = row_data.get('member_id')
+            if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid member_id: {member_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            subscription_id = row_data.get('subscription_id')
+            if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid subscription_id: {subscription_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            issued_by_id = row_data.get('issued_by_id')
+            if issued_by_id and not check_foreign_key('accounts_user', 'id', issued_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid issued_by_id: {issued_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'receipts_autocorrectionlog':
+            member_id = row_data.get('member_id')
+            if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid member_id: {member_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            old_subscription_id = row_data.get('old_subscription_id')
+            if old_subscription_id and not check_foreign_key('subscriptions_subscription', 'id', old_subscription_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid old_subscription_id: {old_subscription_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            new_subscription_id = row_data.get('new_subscription_id')
+            if new_subscription_id and not check_foreign_key('subscriptions_subscription', 'id', new_subscription_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid new_subscription_id: {new_subscription_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        if table_name == 'tickets_ticket':
+            ticket_type_id = row_data.get('ticket_type_id')
+            if ticket_type_id and not check_foreign_key('tickets_tickettype', 'id', ticket_type_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid ticket_type_id: {ticket_type_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+            issued_by_id = row_data.get('issued_by_id')
+            if issued_by_id and not check_foreign_key('accounts_user', 'id', issued_by_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid issued_by_id: {issued_by_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
         if table_name in [
+            'core_club',
             'accounts_user',
             'members_member',
             'subscriptions_subscriptiontype',
@@ -151,259 +423,12 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             'invites_freeinvite',
             'receipts_receipt',
             'tickets_tickettype',
-            'tickets_ticket'
+            'tickets_ticket',
+            'receipts_autocorrectionlog'
         ]:
             club_id = row_data.get('club_id')
             if club_id and not check_foreign_key('core_club', 'id', club_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: club_id غير صالح: {club_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'subscriptions_subscription':
-            member_id = row_data.get('member_id')
-            if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: member_id غير صالح: {member_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            type_id = row_data.get('type_id')
-            if type_id and not check_foreign_key('subscriptions_subscriptiontype', 'id', type_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: type_id غير صالح: {type_id}, data: {row_data}")
-                invalid_type_ids.add(type_id)  # تسجيل type_id غير صالح
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            coach_id = row_data.get('coach_id')
-            if coach_id and not check_foreign_key('accounts_user', 'id', coach_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: coach_id غير صالح: {coach_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            created_by_id = row_data.get('created_by_id')
-            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: created_by_id غير صالح: {created_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'subscriptions_payment':
-            subscription_id = row_data.get('subscription_id')
-            if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: subscription_id غير صالح: {subscription_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            payment_method_id = row_data.get('payment_method_id')
-            if payment_method_id and not check_foreign_key('subscriptions_paymentmethod', 'id', payment_method_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: payment_method_id غير صالح: {payment_method_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'subscriptions_freezerequest':
-            subscription_id = row_data.get('subscription_id')
-            if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: subscription_id غير صالح: {subscription_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            created_by_id = row_data.get('created_by_id')
-            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: created_by_id غير صالح: {created_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'subscriptions_coachprofile':
-            user_id = row_data.get('user_id')
-            if user_id and not check_foreign_key('accounts_user', 'id', user_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: user_id غير صالح: {user_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'attendance_attendance':
-            subscription_id = row_data.get('subscription_id')
-            if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: subscription_id غير صالح: {subscription_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            approved_by_id = row_data.get('approved_by_id')
-            if approved_by_id and not check_foreign_key('accounts_user', 'id', approved_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: approved_by_id غير صالح: {approved_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'attendance_entrylog':
-            member_id = row_data.get('member_id')
-            if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: member_id غير صالح: {member_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            approved_by_id = row_data.get('approved_by_id')
-            if approved_by_id and not check_foreign_key('accounts_user', 'id', approved_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: approved_by_id غير صالح: {approved_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            related_subscription_id = row_data.get('related_subscription_id')
-            if related_subscription_id and not check_foreign_key('subscriptions_subscription', 'id', related_subscription_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: related_subscription_id غير صالح: {related_subscription_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'staff_shift':
-            staff_id = row_data.get('staff_id')
-            if staff_id and not check_foreign_key('accounts_user', 'id', staff_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: staff_id غير صالح: {staff_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            approved_by_id = row_data.get('approved_by_id')
-            if approved_by_id and not check_foreign_key('accounts_user', 'id', approved_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: approved_by_id غير صالح: {approved_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'staff_staffattendance':
-            staff_id = row_data.get('staff_id')
-            if staff_id and not check_foreign_key('accounts_user', 'id', staff_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: staff_id غير صالح: {staff_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            shift_id = row_data.get('shift_id')
-            if shift_id and not check_foreign_key('staff_shift', 'id', shift_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: shift_id غير صالح: {shift_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            created_by_id = row_data.get('created_by_id')
-            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: created_by_id غير صالح: {created_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'finance_expense':
-            category_id = row_data.get('category_id')
-            if category_id and not check_foreign_key('finance_expensecategory', 'id', category_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: category_id غير صالح: {category_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            paid_by_id = row_data.get('paid_by_id')
-            if paid_by_id and not check_foreign_key('accounts_user', 'id', paid_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: paid_by_id غير صالح: {paid_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            stock_item_id = row_data.get('stock_item_id')
-            if stock_item_id and not check_foreign_key('finance_stockitem', 'id', stock_item_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: stock_item_id غير صالح: {stock_item_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'finance_income':
-            source_id = row_data.get('source_id')
-            if source_id and not check_foreign_key('finance_incomesource', 'id', source_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: source_id غير صالح: {source_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            received_by_id = row_data.get('received_by_id')
-            if received_by_id and not check_foreign_key('accounts_user', 'id', received_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: received_by_id غير صالح: {received_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            related_receipt_id = row_data.get('related_receipt_id')
-            if related_receipt_id and not check_foreign_key('receipts_receipt', 'id', related_receipt_id, new_db_path):
-                row_data['related_receipt_id'] = None
-
-        if table_name == 'finance_stocktransaction':
-            stock_item_id = row_data.get('stock_item_id')
-            if stock_item_id and not check_foreign_key('finance_stockitem', 'id', stock_item_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: stock_item_id غير صالح: {stock_item_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            related_expense_id = row_data.get('related_expense_id')
-            if related_expense_id and not check_foreign_key('finance_expense', 'id', related_expense_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: related_expense_id غير صالح: {related_expense_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            related_income_id = row_data.get('related_income_id')
-            if related_income_id and not check_foreign_key('finance_income', 'id', related_income_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: related_income_id غير صالح: {related_income_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            created_by_id = row_data.get('created_by_id')
-            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: created_by_id غير صالح: {created_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'invites_freeinvite':
-            invited_by_id = row_data.get('invited_by_id')
-            if invited_by_id and not check_foreign_key('members_member', 'id', invited_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: invited_by_id غير صالح: {invited_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            created_by_id = row_data.get('created_by_id')
-            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: created_by_id غير صالح: {created_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'receipts_receipt':
-            member_id = row_data.get('member_id')
-            if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: member_id غير صالح: {member_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            subscription_id = row_data.get('subscription_id')
-            if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: subscription_id غير صالح: {subscription_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            issued_by_id = row_data.get('issued_by_id')
-            if issued_by_id and not check_foreign_key('accounts_user', 'id', issued_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: issued_by_id غير صالح: {issued_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'receipts_autocorrectionlog':
-            member_id = row_data.get('member_id')
-            if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: member_id غير صالح: {member_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            old_subscription_id = row_data.get('old_subscription_id')
-            if old_subscription_id and not check_foreign_key('subscriptions_subscription', 'id', old_subscription_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: old_subscription_id غير صالح: {old_subscription_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            new_subscription_id = row_data.get('new_subscription_id')
-            if new_subscription_id and not check_foreign_key('subscriptions_subscription', 'id', new_subscription_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: new_subscription_id غير صالح: {new_subscription_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'tickets_ticket':
-            ticket_type_id = row_data.get('ticket_type_id')
-            if ticket_type_id and not check_foreign_key('tickets_tickettype', 'id', ticket_type_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: ticket_type_id غير صالح: {ticket_type_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            issued_by_id = row_data.get('issued_by_id')
-            if issued_by_id and not check_foreign_key('accounts_user', 'id', issued_by_id, new_db_path):
-                errors.append(f"تخطي سجل في {table_name}: issued_by_id غير صالح: {issued_by_id}, data: {row_data}")
+                errors.append(f"Skipping record in {table_name}: invalid club_id: {club_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
@@ -438,7 +463,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                         try:
                             value = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
                         except ValueError:
-                            errors.append(f"خطأ في تاريخ {field} في {table_name}: {value}, data: {row_data}")
+                            errors.append(f"Error parsing date {field} in {table_name}: {value}, data: {row_data}")
                             migration_summary[table_name]['failed'] += 1
                             continue
                     row_data[field] = timezone.make_aware(value)
@@ -451,7 +476,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             obj = model(**row_data)
             batch.append(obj)
         except Exception as e:
-            errors.append(f"خطأ في إنشاء كائن لـ {table_name}: {e}, data: {row_data}")
+            errors.append(f"Error creating object for {table_name}: {e}, data: {row_data}")
             migration_summary[table_name]['failed'] += 1
             continue
 
@@ -466,19 +491,19 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                         if old_row:
                             old_data = dict(zip(old_columns, old_row))
                             features_to_add = []
-                            if old_data.get('includes_gym') and feature_mappings.get(club_id, {}).get('جيم'):
-                                features_to_add.append(feature_mappings[club_id]['جيم'])
-                            if old_data.get('includes_pool') and feature_mappings.get(club_id, {}).get('مسبح'):
-                                features_to_add.append(feature_mappings[club_id]['مسبح'])
-                            if old_data.get('includes_classes') and feature_mappings.get(club_id, {}).get('فصول'):
-                                features_to_add.append(feature_mappings[club_id]['فصول'])
+                            if old_data.get('includes_gym') and feature_mappings.get(club_id, {}).get('Gym'):
+                                features_to_add.append(feature_mappings[club_id]['Gym'])
+                            if old_data.get('includes_pool') and feature_mappings.get(club_id, {}).get('Pool'):
+                                features_to_add.append(feature_mappings[club_id]['Pool'])
+                            if old_data.get('includes_classes') and feature_mappings.get(club_id, {}).get('Classes'):
+                                features_to_add.append(feature_mappings[club_id]['Classes'])
                             if features_to_add:
                                 obj.features.set(features_to_add)
                 batch = []
             except Exception as e:
-                errors.append(f"خطأ في الحفظ {table_name}: {e}, data: {[str(dict(obj.__dict__)) for obj in batch[:5]]}")
+                errors.append(f"Error saving batch for {table_name}: {e}, data: {[str(dict(obj.__dict__)) for obj in batch[:5]]}")
                 migration_summary[table_name]['failed'] += len(batch)
-                print(f"محاولة حفظ السجلات واحدًا واحدًا لـ {table_name}...")
+                print(f"Attempting to save records individually for {table_name}...")
                 batch_errors = []
                 for obj in batch:
                     try:
@@ -490,16 +515,16 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                             if old_row:
                                 old_data = dict(zip(old_columns, old_row))
                                 features_to_add = []
-                                if old_data.get('includes_gym') and feature_mappings.get(club_id, {}).get('جيم'):
-                                    features_to_add.append(feature_mappings[club_id]['جيم'])
-                                if old_data.get('includes_pool') and feature_mappings.get(club_id, {}).get('مسبح'):
-                                    features_to_add.append(feature_mappings[club_id]['مسبح'])
-                                if old_data.get('includes_classes') and feature_mappings.get(club_id, {}).get('فصول'):
-                                    features_to_add.append(feature_mappings[club_id]['فصول'])
+                                if old_data.get('includes_gym') and feature_mappings.get(club_id, {}).get('Gym'):
+                                    features_to_add.append(feature_mappings[club_id]['Gym'])
+                                if old_data.get('includes_pool') and feature_mappings.get(club_id, {}).get('Pool'):
+                                    features_to_add.append(feature_mappings[club_id]['Pool'])
+                                if old_data.get('includes_classes') and feature_mappings.get(club_id, {}).get('Classes'):
+                                    features_to_add.append(feature_mappings[club_id]['Classes'])
                                 if features_to_add:
                                     obj.features.set(features_to_add)
                     except Exception as e:
-                        batch_errors.append(f"خطأ في الحفظ {table_name}: {e}, data: {dict(obj.__dict__)}")
+                        batch_errors.append(f"Error saving individual record for {table_name}: {e}, data: {dict(obj.__dict__)}")
                         migration_summary[table_name]['failed'] += 1
                 if batch_errors:
                     errors.extend(batch_errors[:10])
@@ -516,18 +541,18 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                     if old_row:
                         old_data = dict(zip(old_columns, old_row))
                         features_to_add = []
-                        if old_data.get('includes_gym') and feature_mappings.get(club_id, {}).get('جيم'):
-                            features_to_add.append(feature_mappings[club_id]['جيم'])
-                        if old_data.get('includes_pool') and feature_mappings.get(club_id, {}).get('مسبح'):
-                            features_to_add.append(feature_mappings[club_id]['مسبح'])
-                        if old_data.get('includes_classes') and feature_mappings.get(club_id, {}).get('فصول'):
-                            features_to_add.append(feature_mappings[club_id]['فصول'])
+                        if old_data.get('includes_gym') and feature_mappings.get(club_id, {}).get('Gym'):
+                            features_to_add.append(feature_mappings[club_id]['Gym'])
+                        if old_data.get('includes_pool') and feature_mappings.get(club_id, {}).get('Pool'):
+                            features_to_add.append(feature_mappings[club_id]['Pool'])
+                        if old_data.get('includes_classes') and feature_mappings.get(club_id, {}).get('Classes'):
+                            features_to_add.append(feature_mappings[club_id]['Classes'])
                         if features_to_add:
                             obj.features.set(features_to_add)
         except Exception as e:
-            errors.append(f"خطأ في الحفظ {table_name}: {e}, data: {[str(dict(obj.__dict__)) for obj in batch[:5]]}")
+            errors.append(f"Error saving final batch for {table_name}: {e}, data: {[str(dict(obj.__dict__)) for obj in batch[:5]]}")
             migration_summary[table_name]['failed'] += len(batch)
-            print(f"محاولة حفظ السجلات واحدًا واحدًا لـ {table_name}...")
+            print(f"Attempting to save final records individually for {table_name}...")
             batch_errors = []
             for obj in batch:
                 try:
@@ -539,45 +564,45 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                         if old_row:
                             old_data = dict(zip(old_columns, old_row))
                             features_to_add = []
-                            if old_data.get('includes_gym') and feature_mappings.get(club_id, {}).get('جيم'):
-                                features_to_add.append(feature_mappings[club_id]['جيم'])
-                            if old_data.get('includes_pool') and feature_mappings.get(club_id, {}).get('مسبح'):
-                                features_to_add.append(feature_mappings[club_id]['مسبح'])
-                            if old_data.get('includes_classes') and feature_mappings.get(club_id, {}).get('فصول'):
-                                features_to_add.append(feature_mappings[club_id]['فصول'])
+                            if old_data.get('includes_gym') and feature_mappings.get(club_id, {}).get('Gym'):
+                                features_to_add.append(feature_mappings[club_id]['Gym'])
+                            if old_data.get('includes_pool') and feature_mappings.get(club_id, {}).get('Pool'):
+                                features_to_add.append(feature_mappings[club_id]['Pool'])
+                            if old_data.get('includes_classes') and feature_mappings.get(club_id, {}).get('Classes'):
+                                features_to_add.append(feature_mappings[club_id]['Classes'])
                             if features_to_add:
                                 obj.features.set(features_to_add)
                 except Exception as e:
-                    batch_errors.append(f"خطأ في الحفظ {table_name}: {e}, data: {dict(obj.__dict__)}")
+                    batch_errors.append(f"Error saving final individual record for {table_name}: {e}, data: {dict(obj.__dict__)}")
                     migration_summary[table_name]['failed'] += 1
             if batch_errors:
                 errors.extend(batch_errors[:10])
 
     if errors:
-        print(f"انتهى نقل الجدول {table_name} مع {len(errors)} خطأ:")
+        print(f"Completed migration of {table_name} with {len(errors)} errors:")
         for error in errors[:10]:
             print(error)
         if table_name == 'subscriptions_subscription' and invalid_type_ids:
-            print(f"قيم type_id غير صالحة تم العثور عليها: {invalid_type_ids}")
+            print(f"Invalid type_ids found: {invalid_type_ids}")
     else:
-        print(f"انتهى نقل الجدول {table_name} بنجاح")
+        print(f"Completed migration of {table_name} successfully")
 
 def migrate_all_required_tables(old_db_path, new_db_path):
-    """نقل بيانات جميع الجداول المطلوبة."""
+    """Migrate data for all required tables."""
     settings.DATABASES['default']['NAME'] = new_db_path
-    print("جارٍ تهيئة قاعدة البيانات...")
+    print("Flushing database...")
     call_command('flush', interactive=False)
-    print("جارٍ تطبيق الهجرات...")
+    print("Applying migrations...")
     try:
         call_command('migrate')
     except Exception as e:
-        print(f"خطأ في الهجرة: {e}")
+        print(f"Error applying migrations: {e}")
         return
 
     with connection.cursor() as cursor:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [row[0] for row in cursor.fetchall()]
-        print(f"الجداول في قاعدة البيانات الجديدة: {tables}")
+        print(f"Tables in new database: {tables}")
 
     migration_summary = {}
     global models
@@ -642,10 +667,11 @@ def migrate_all_required_tables(old_db_path, new_db_path):
 
     for table in tables:
         if not models.get(table):
-            print(f"لم يتم العثور على النموذج {table}")
+            print(f"Model {table} not found")
             migration_summary[table] = {'total': 0, 'success': 0, 'failed': 0}
             continue
 
+    core_club_defaults = {}
     accounts_user_defaults = {
         'accounts.User.phone_number': None,
         'accounts.User.card_number': None,
@@ -655,27 +681,22 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'accounts.User.hourly_rate': 0.00,
         'accounts.User.expected_hours': 160.0,
     }
-
     members_member_defaults = {
         'members.Member.club': None,
         'members.Member.referred_by': None,
     }
-
+    feature_defaults = {
+        'subscriptions.Feature.is_active': True,
+    }
     subscriptiontype_defaults = {
         'subscriptions.SubscriptionType.is_private_training': False,
         'subscriptions.SubscriptionType.max_freeze_days': 0,
         'subscriptions.SubscriptionType.max_entries': 0,
         'subscriptions.SubscriptionType.is_active': True,
     }
-
-    feature_defaults = {
-        'subscriptions.Feature.is_active': True,
-    }
-
     paymentmethod_defaults = {
         'subscriptions.PaymentMethod.is_active': True,
     }
-
     subscription_defaults = {
         'subscriptions.Subscription.coach': None,
         'subscriptions.Subscription.created_by': None,
@@ -687,41 +708,32 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'subscriptions.Subscription.paid_amount': 0.00,
         'subscriptions.Subscription.entry_count': 0,
     }
-
     payment_defaults = {
         'subscriptions.Payment.transaction_id': None,
         'subscriptions.Payment.notes': "",
     }
-
     freezerequest_defaults = {
         'subscriptions.FreezeRequest.is_active': True,
         'subscriptions.FreezeRequest.cancelled_at': None,
     }
-
     coachprofile_defaults = {
         'subscriptions.CoachProfile.max_trainees': 0,
     }
-
     attendance_defaults = {
         'attendance.Attendance.approved_by': None,
     }
-
     entrylog_defaults = {
         'attendance.EntryLog.approved_by': None,
     }
-
     shift_defaults = {
         'staff.Shift.approved_by': None,
     }
-
     staffattendance_defaults = {
         'staff.StaffAttendance.created_by': None,
     }
-
     expensecategory_defaults = {
         'finance.ExpenseCategory.is_stock_related': False,
     }
-
     expense_defaults = {
         'finance.Expense.description': "",
         'finance.Expense.paid_by': None,
@@ -729,61 +741,71 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'finance.Expense.stock_item': None,
         'finance.Expense.stock_quantity': None,
     }
-
     incomesource_defaults = {
         'finance.IncomeSource.price': 0.00,
         'finance.IncomeSource.description': "",
         'finance.IncomeSource.stock_item': None,
     }
-
     income_defaults = {
         'finance.Income.received_by': None,
         'finance.Income.description': "",
         'finance.Income.related_receipt': None,
         'finance.Income.stock_transaction': None,
     }
-
     stockitem_defaults = {
         'finance.StockItem.description': "",
         'finance.StockItem.initial_quantity': 0,
         'finance.StockItem.current_quantity': 0,
         'finance.StockItem.is_sellable': True,
     }
-
     stocktransaction_defaults = {
         'finance.StockTransaction.description': "",
         'finance.StockTransaction.related_expense': None,
         'finance.StockTransaction.related_income': None,
         'finance.StockTransaction.created_by': None,
     }
-
     freeinvite_defaults = {
         'invites.FreeInvite.invited_by': None,
         'invites.FreeInvite.created_by': None,
     }
-
     autocorrectionlog_defaults = {
         'receipts.AutoCorrectionLog.note': "",
     }
-
     receipt_defaults = {
         'receipts.Receipt.note': "",
     }
-
     tickettype_defaults = {
         'tickets.TicketType.description': "",
     }
-
     ticket_defaults = {
         'tickets.Ticket.serial_number': None,
     }
 
-    migrate_table(models['core_club'], 'core_club', old_db_path, new_db_path, migration_summary)
+    # Validate type_ids in old database
+    print("Validating type_ids in old subscriptions_subscription...")
+    type_ids_old = set()
+    try:
+        conn = sqlite3.connect(old_db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT type_id FROM subscriptions_subscription")
+        type_ids_old = {row[0] for row in cursor.fetchall() if row[0] is not None}
+        print(f"Type_ids found in old subscriptions_subscription: {type_ids_old}")
+        cursor.execute("SELECT id FROM subscriptions_subscriptiontype")
+        valid_type_ids_old = {row[0] for row in cursor.fetchall()}
+        print(f"Valid type_ids in old subscriptions_subscriptiontype: {valid_type_ids_old}")
+        invalid_type_ids_old = type_ids_old - valid_type_ids_old
+        if invalid_type_ids_old:
+            print(f"Invalid type_ids in old subscriptions_subscription: {invalid_type_ids_old}")
+        conn.close()
+    except sqlite3.OperationalError as e:
+        print(f"Error validating type_ids in old database: {e}")
+
+    migrate_table(models['core_club'], 'core_club', old_db_path, new_db_path, migration_summary, core_club_defaults)
     migrate_table(models['accounts_user'], 'accounts_user', old_db_path, new_db_path, migration_summary, accounts_user_defaults)
+    migrate_table(models['members_member'], 'members_member', old_db_path, new_db_path, migration_summary, members_member_defaults)
     migrate_table(models['subscriptions_feature'], 'subscriptions_feature', old_db_path, new_db_path, migration_summary, feature_defaults)
     migrate_table(models['subscriptions_subscriptiontype'], 'subscriptions_subscriptiontype', old_db_path, new_db_path, migration_summary, subscriptiontype_defaults)
     migrate_table(models['subscriptions_paymentmethod'], 'subscriptions_paymentmethod', old_db_path, new_db_path, migration_summary, paymentmethod_defaults)
-    migrate_table(models['members_member'], 'members_member', old_db_path, new_db_path, migration_summary, members_member_defaults)
     migrate_table(models['subscriptions_subscription'], 'subscriptions_subscription', old_db_path, new_db_path, migration_summary, subscription_defaults)
     migrate_table(models['subscriptions_payment'], 'subscriptions_payment', old_db_path, new_db_path, migration_summary, payment_defaults)
     migrate_table(models['subscriptions_freezerequest'], 'subscriptions_freezerequest', old_db_path, new_db_path, migration_summary, freezerequest_defaults)
@@ -804,12 +826,23 @@ def migrate_all_required_tables(old_db_path, new_db_path):
     migrate_table(models['tickets_tickettype'], 'tickets_tickettype', old_db_path, new_db_path, migration_summary, tickettype_defaults)
     migrate_table(models['tickets_ticket'], 'tickets_ticket', old_db_path, new_db_path, migration_summary, ticket_defaults)
 
-    print_summary(migration_summary)
+    print("Listing migrated subscription types in new database...")
+    try:
+        conn = sqlite3.connect(new_db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name FROM subscriptions_subscriptiontype")
+        types = cursor.fetchall()
+        print(f"Migrated subscription types: {types}")
+        conn.close()
+    except sqlite3.OperationalError as e:
+        print(f"Error listing subscription types: {e}")
+
+    return migration_summary
 
 def print_summary(migration_summary):
-    """طباعة ملخص الهجرة."""
-    print("\n=== ملخص الهجرة ===")
-    print(f"{'الجدول':<30} {'الإجمالي':>10} {'الناجح':>10} {'الفاشل':>10}")
+    """Print migration summary."""
+    print("\n=== Migration Summary ===")
+    print(f"{'Table':<30} {'Total':>10} {'Success':>10} {'Failed':>10}")
     print("-" * 62)
     for table, stats in migration_summary.items():
         print(f"{table:<30} {stats['total']:>10} {stats['success']:>10} {stats['failed']:>10}")
@@ -821,4 +854,5 @@ if __name__ == "__main__":
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings")
     import django
     django.setup()
-    migrate_all_required_tables(OLD_DB_PATH, NEW_DB_PATH)
+    migration_summary = migrate_all_required_tables(OLD_DB_PATH, NEW_DB_PATH)
+    print_summary(migration_summary)
