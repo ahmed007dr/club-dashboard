@@ -4,7 +4,7 @@ import { addAttendance, deleteAttendance, fetchAttendances } from "@/redux/slice
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { FiUsers, FiTrash, FiCalendar, FiSearch, FiFileText, FiPlus, FiAlertTriangle, FiEye, FiEyeOff, FiTag } from "react-icons/fi";
+import { FiUsers,FiUser, FiHash,FiTrash,FiDollarSign, FiCalendar, FiSearch, FiFileText, FiPlus,FiList,FiPhone,FiAlertTriangle, FiEye, FiEyeOff, FiTag } from "react-icons/fi";
 import { Loader2, MoreVertical } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "react-hot-toast";
@@ -329,18 +329,46 @@ const Attendance = () => {
                       <Loader2 className="animate-spin w-6 h-6 text-blue-600" />
                     </div>
                   )}
-                  {foundSubscription && (
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 space-y-2 text-sm">
-                      <p className="font-medium">{foundSubscription.member_details?.name}</p>
-                      <p className="text-gray-500">#{foundSubscription.member_details?.membership_number}</p>
-                      <p className="text-red-600">المبلغ المتبقي: {foundSubscription.remaining_amount}</p>
-                      <p>
-                        الإدخالات المتبقية:{" "}
-                        <span className={foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0 ? "text-red-600" : "text-green-600"}>
-                          {foundSubscription.type_details.max_entries - foundSubscription.entry_count}
-                        </span>{" "}
-                        / {foundSubscription.type_details.max_entries}
-                      </p>
+                 {foundSubscription && (
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                        <p className="flex items-center gap-2">
+                          <FiUser className="text-blue-600" />
+                          {foundSubscription.member_details?.name}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <FiHash className="text-blue-600" />
+                          #{foundSubscription.member_details?.membership_number}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <FiDollarSign className="text-blue-600" />
+                          المبلغ المتبقي: {foundSubscription.remaining_amount}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <FiList className="text-blue-600" />
+                          الإدخالات المتبقية:{" "}
+                          <span className={foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0 ? "text-red-600" : "text-green-600"}>
+                            {foundSubscription.type_details.max_entries - foundSubscription.entry_count}
+                          </span>{" "}
+                          / {foundSubscription.type_details.max_entries}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <FiTag className="text-blue-600" />
+                          اسم الاشتراك: {foundSubscription.type_details?.name || "غير متاح"}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <FiPhone className="text-blue-600" />
+                          رقم الهاتف: {foundSubscription.member_details?.phone || "غير متاح"}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <FiCalendar className="text-blue-600" />
+                          بداية الاشتراك: {new Date(foundSubscription.start_date).toLocaleDateString("ar-EG")}
+                        </p>
+                        <p className="flex items-center gap-2">
+                          <FiCalendar className="text-blue-600" />
+                          نهاية الاشتراك: {new Date(foundSubscription.end_date).toLocaleDateString("ar-EG")}
+                        </p>
+                      </div>
                     </div>
                   )}
                   {!searchLoading && newAttendance.identifier && !foundSubscription && (
