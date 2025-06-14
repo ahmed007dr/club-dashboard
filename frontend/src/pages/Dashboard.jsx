@@ -62,6 +62,7 @@ const Dashboard = () => {
         { path: 'income-sources', name: 'الإيرادات', icon: <GiReceiveMoney /> },
         { path: 'expense', name: 'المصروفات', icon: <GiPayMoney /> },
         { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
+        { path: 'reports', name: 'تقرير الإيرادات', icon: <GiReceiveMoney /> },
       ],
     },
     {
