@@ -72,6 +72,11 @@ def attendance_list_api(request):
         subscription__club=request.user.club
     )
 
+    is_search_mode = rfid or member_name
+    if not is_search_mode and not attendance_date:
+        start_date = timezone.now().date() - timedelta(days=2)
+        attendances = attendances.filter(attendance_date__gte=start_date)
+
     if rfid:
         attendances = attendances.filter(subscription__member__rfid_code__iexact=rfid)
     if attendance_date:
@@ -83,7 +88,9 @@ def attendance_list_api(request):
     if member_name:
         attendances = attendances.filter(subscription__member__name__icontains=member_name)
 
-    attendances = attendances.order_by('-attendance_date')
+
+    attendances = attendances.order_by('-attendance_date', '-entry_time')
+
     paginator = PageNumberPagination()
     paginator.page_size = page_size
     result_page = paginator.paginate_queryset(attendances, request)

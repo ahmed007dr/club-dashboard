@@ -76,7 +76,7 @@ export const deleteAttendance = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.delete(`${BASE_URL}attendance/api/attendances/${id}/delete/`, {
+      const response = await axios.delete(`${BASE_URL}attendance/api/attendances/${id}/`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
