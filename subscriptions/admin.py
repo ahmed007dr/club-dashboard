@@ -3,11 +3,12 @@ from django.contrib.admin import AdminSite
 from django.core.exceptions import ValidationError
 from django.db.models import Q, Sum
 from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404
 from django.urls import reverse
 from django.utils import timezone, html
 from datetime import timedelta
 from decimal import Decimal
+from import_export.admin import ImportExportModelAdmin
+from import_export import resources
 
 from .models import SubscriptionType, Subscription, FreezeRequest, CoachProfile, Feature, PaymentMethod, Payment
 from finance.models import Income, IncomeSource
@@ -15,8 +16,53 @@ from core.models import Club
 from accounts.models import User
 from members.models import Member
 
+# Resources for Import/Export
+class FeatureResource(resources.ModelResource):
+    class Meta:
+        model = Feature
+        fields = ('id', 'club__name', 'name', 'is_active', 'created_at')
+
+class PaymentMethodResource(resources.ModelResource):
+    class Meta:
+        model = PaymentMethod
+        fields = ('id', 'club__name', 'name', 'is_active', 'created_at')
+
+class PaymentResource(resources.ModelResource):
+    class Meta:
+        model = Payment
+        fields = ('id', 'subscription__member__name', 'amount', 'payment_method__name', 'payment_date', 'created_by__username', 'transaction_id', 'notes')
+
+class SubscriptionTypeResource(resources.ModelResource):
+    class Meta:
+        model = SubscriptionType
+        fields = ('id', 'club__name', 'name', 'duration_days', 'price', 'max_freeze_days', 'is_active', 'max_entries', 'is_private_training')
+
+class SubscriptionResource(resources.ModelResource):
+    class Meta:
+        model = Subscription
+        fields = (
+            'id', 'club__name', 'member__name', 'type__name', 'coach__username', 'start_date', 'end_date',
+            'paid_amount', 'remaining_amount', 'entry_count', 'created_by__username', 'is_cancelled',
+            'cancellation_date', 'refund_amount', 'coach_compensation_type', 'coach_compensation_value'
+        )
+
+class FreezeRequestResource(resources.ModelResource):
+    class Meta:
+        model = FreezeRequest
+        fields = (
+            'id', 'subscription__member__name', 'requested_days', 'start_date', 'end_date',
+            'is_active', 'cancelled_at', 'created_by__username', 'created_at'
+        )
+
+class CoachProfileResource(resources.ModelResource):
+    class Meta:
+        model = CoachProfile
+        fields = ('id', 'user__username', 'max_trainees')
+
+# Admin Classes
 @admin.register(Feature)
-class FeatureAdmin(admin.ModelAdmin):
+class FeatureAdmin(ImportExportModelAdmin):
+    resource_class = FeatureResource
     list_display = ('name', 'club', 'is_active', 'created_at')
     list_filter = ('club', 'is_active')
     search_fields = ('name', 'club__name')
@@ -36,7 +82,8 @@ class FeatureAdmin(admin.ModelAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 @admin.register(PaymentMethod)
-class PaymentMethodAdmin(admin.ModelAdmin):
+class PaymentMethodAdmin(ImportExportModelAdmin):
+    resource_class = PaymentMethodResource
     list_display = ('name', 'club', 'is_active', 'created_at')
     list_filter = ('club', 'is_active')
     search_fields = ('name', 'club__name')
@@ -56,7 +103,8 @@ class PaymentMethodAdmin(admin.ModelAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(ImportExportModelAdmin):
+    resource_class = PaymentResource
     list_display = ('subscription', 'amount', 'payment_method', 'payment_date', 'created_by', 'transaction_id')
     list_filter = ('payment_method', 'payment_date', 'subscription__club')
     search_fields = ('subscription__member__name', 'payment_method__name', 'transaction_id', 'notes')
@@ -90,7 +138,8 @@ class PaymentAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 @admin.register(SubscriptionType)
-class SubscriptionTypeAdmin(admin.ModelAdmin):
+class SubscriptionTypeAdmin(ImportExportModelAdmin):
+    resource_class = SubscriptionTypeResource
     list_display = (
         'name', 'club', 'duration_days', 'price', 'max_freeze_days', 'subscriptions_count',
         'features_list', 'is_active',
@@ -131,7 +180,8 @@ class SubscriptionTypeAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 @admin.register(Subscription)
-class SubscriptionAdmin(admin.ModelAdmin):
+class SubscriptionAdmin(ImportExportModelAdmin):
+    resource_class = SubscriptionResource
     list_display = (
         'member', 'type', 'club', 'start_date', 'end_date', 'paid_amount',
         'remaining_amount', 'entry_count', 'is_cancelled', 'refund_amount',
@@ -234,7 +284,8 @@ class SubscriptionAdmin(admin.ModelAdmin):
     cancel_subscription.short_description = "إلغاء الاشتراكات المحددة"
 
 @admin.register(FreezeRequest)
-class FreezeRequestAdmin(admin.ModelAdmin):
+class FreezeRequestAdmin(ImportExportModelAdmin):
+    resource_class = FreezeRequestResource
     list_display = (
         'subscription', 'requested_days', 'start_date', 'end_date',
         'is_active', 'cancelled_at', 'created_by', 'created_at', 'cancel_link'
@@ -315,7 +366,8 @@ class FreezeRequestAdmin(admin.ModelAdmin):
         return HttpResponseRedirect(reverse('admin:subscriptions_freezerequest_changelist'))
 
 @admin.register(CoachProfile)
-class CoachProfileAdmin(admin.ModelAdmin):
+class CoachProfileAdmin(ImportExportModelAdmin):
+    resource_class = CoachProfileResource
     list_display = ('user', 'max_trainees', 'user_role', 'user_active')
     list_filter = ('user__role', 'user__is_active')
     search_fields = ('user__username',)

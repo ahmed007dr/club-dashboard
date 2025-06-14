@@ -180,22 +180,15 @@ def active_subscription_types(request):
 def subscription_list(request):
     """List or create subscriptions."""
     if request.method == 'GET':
-        search_term = request.GET.get('searchTerm', request.GET.get('search_term', ''))
+        search_term = request.GET.get('searchTerm', request.GET.get('search_term', '')).strip()
         subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
 
         if search_term:
-            try:
-                subscription = subscriptions.get(
-                    Q(member__rfid_code__exact=search_term) |
-                    Q(member__phone__exact=search_term) |
-                    Q(member__name__exact=search_term)
-                )
-                serializer = SubscriptionSerializer(subscription)
-                return Response(serializer.data)
-            except Subscription.DoesNotExist:
-                return Response({'error': 'لا يوجد اشتراك مطابق'}, status=status.HTTP_404_NOT_FOUND)
-            except Subscription.MultipleObjectsReturned:
-                return Response({'error': 'تم العثور على أكثر من اشتراك مطابق.'}, status=status.HTTP_400_BAD_REQUEST)
+            subscriptions = subscriptions.filter(
+                Q(member__rfid_code__icontains=search_term) |
+                Q(member__phone__icontains=search_term) |
+                Q(member__name__icontains=search_term)
+            )
 
         if request.query_params.get('member_id'):
             subscriptions = subscriptions.filter(member_id=request.query_params.get('member_id'))
@@ -268,6 +261,8 @@ def subscription_list(request):
 
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

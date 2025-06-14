@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ImportExportModelAdmin
 from import_export import resources
 from django.utils.html import format_html
-from .models import Expense, ExpenseCategory, Income, IncomeSource, StockItem, StockTransaction
+from .models import Expense, ExpenseCategory, Income, IncomeSource, StockItem, StockTransaction,Schedule
 
 
 # Resources for Import/Export
@@ -164,4 +164,12 @@ class StockTransactionAdmin(ImportExportModelAdmin):
         return "-"
     related_income_link.short_description = "إيراد مرتبط"
 
+@admin.register(Schedule)
+class ScheduleAdmin(admin.ModelAdmin):
+    list_display = ('title', 'club', 'type', 'start', 'end', 'created_by')
+    search_fields = ('title', 'type')
+    list_filter = ('club', 'type', 'start')
+    date_hierarchy = 'start'
+    raw_id_fields = ('club', 'created_by')
+    list_select_related = ('club', 'created_by')
     

@@ -11,9 +11,7 @@ export const fetchSubscriptionTypes = createAsyncThunk(
       searchQuery = '',
       statusFilter = 'all',
       durationFilter = '',
-      includesGym = '',
-      includesPool = '',
-      includesClasses = '',
+      featureId = '',
     } = {},
     { rejectWithValue }
   ) => {
@@ -23,14 +21,13 @@ export const fetchSubscriptionTypes = createAsyncThunk(
         throw new Error('Authentication token is missing.');
       }
 
+      const cleanSearchQuery = searchQuery.trim();
       const params = new URLSearchParams({
         page,
-        ...(searchQuery && { q: searchQuery }),
+        ...(cleanSearchQuery && { q: cleanSearchQuery }),
         ...(statusFilter !== 'all' && { status: statusFilter }),
         ...(durationFilter && { duration: durationFilter }),
-        ...(includesGym && { includes_gym: includesGym }),
-        ...(includesPool && { includes_pool: includesPool }),
-        ...(includesClasses && { includes_classes: includesClasses }),
+        ...(featureId && { feature_id: featureId }),
       });
 
       const response = await axios.get(
@@ -53,13 +50,15 @@ export const fetchSubscriptionTypes = createAsyncThunk(
       console.error('Error fetching subscription types:', error);
       return rejectWithValue(
         error.response?.data?.detail ||
-        error.response?.data?.message ||
-        error.message ||
-        'Failed to fetch subscription types'
+          error.response?.data?.message ||
+          error.message ||
+          'Failed to fetch subscription types'
       );
     }
   }
+  
 );
+
 
 // جلب أنواع الاشتراكات النشطة
 export const fetchActiveSubscriptionTypes = createAsyncThunk(
@@ -439,7 +438,7 @@ export const renewSubscription = createAsyncThunk(
   }
 );
 
-// جلب كل الاشتراكات مع دعم التصفية
+
 export const fetchSubscriptions = createAsyncThunk(
   'subscriptions/fetchSubscriptions',
   async (params = {}, { rejectWithValue }) => {

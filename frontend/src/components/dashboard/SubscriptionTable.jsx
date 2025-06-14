@@ -1,3 +1,4 @@
+
 import React, { useCallback } from "react";
 import { useDispatch } from "react-redux";
 import { Link } from "react-router-dom";
@@ -18,6 +19,7 @@ import {
   FaRedo,
   FaSnowflake,
   FaUndo,
+  FaBan,
 } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import {
@@ -45,6 +47,7 @@ const SubscriptionTable = ({
   const dispatch = useDispatch();
   const canUpdateSubscription = usePermission("change_subscription");
   const canDeleteSubscription = usePermission("delete_subscription");
+  const canCancelSubscription = usePermission("change_subscription"); // Assuming same permission as update
 
   const normalizeStatus = useCallback((status) => {
     if (!status || status === "unknown") return "غير معروف";
@@ -150,7 +153,7 @@ const SubscriptionTable = ({
         toast.error("لا يوجد تجميد نشط لهذا الاشتراك");
         return;
       }
-      fetch(`${BASE_URL}/subscriptions/api/freeze-requests/${activeFreeze.id}/cancel/`, {
+      fetch(`${BASE_URL}subscriptions/api/freeze-requests/${activeFreeze.id}/cancel/`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -169,6 +172,30 @@ const SubscriptionTable = ({
         });
     },
     []
+  );
+
+  const handleCancelSubscription = useCallback(
+    (subscription) => {
+      fetch(`${BASE_URL}subscriptions/api/subscriptions/${subscription.id}/cancel/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          'Content-Type': 'application/json',
+        },
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error('فشل في إلغاء الاشتراك');
+          return response.json();
+        })
+        .then(() => {
+          toast.success('تم إلغاء الاشتراك بنجاح!');
+          dispatch(fetchSubscriptions({ page: 1 })); // Refresh subscriptions
+        })
+        .catch((err) => {
+          toast.error(`فشل في إلغاء الاشتراك: ${err.message || 'حدث خطأ'}`);
+        });
+    },
+    [dispatch]
   );
 
   if (isLoading) {
@@ -305,6 +332,14 @@ const SubscriptionTable = ({
                           className="cursor-pointer text-purple-600 hover:bg-purple-50"
                         >
                           <FaUndo className="mr-2" /> إلغاء التجميد
+                        </DropdownMenuItem>
+                      )}
+                      {canCancelSubscription && !subscription.is_cancelled && (
+                        <DropdownMenuItem
+                          onClick={() => handleCancelSubscription(subscription)}
+                          className="cursor-pointer text-red-600 hover:bg-red-50"
+                        >
+                          <FaBan className="mr-2" /> إلغاء الاشتراك
                         </DropdownMenuItem>
                       )}
                       {canDeleteSubscription && (

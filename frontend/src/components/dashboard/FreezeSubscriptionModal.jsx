@@ -31,7 +31,7 @@ const FreezeSubscriptionModal = ({
       toast.error("الرجاء إدخال عدد أيام صالح");
       return;
     }
-    fetch(`${BASE_URL}/subscriptions/api/subscriptions/${subscription.id}/request-freeze/`, {
+    fetch(`${BASE_URL}subscriptions/api/subscriptions/${subscription.id}/request-freeze/`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,

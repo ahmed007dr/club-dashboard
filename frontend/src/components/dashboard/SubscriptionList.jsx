@@ -20,9 +20,8 @@ const SubscriptionList = () => {
   const { subscriptions, pagination, status, error: reduxError } = useSelector(
     (state) => state.subscriptions
   );
-  
   const canAddSubscription = usePermission("add_subscription");
-  
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -40,7 +39,6 @@ const SubscriptionList = () => {
     status: "",
   });
   const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
 
   const itemsPerPage = 20;
   const totalItems = pagination.count || 0;
@@ -69,32 +67,45 @@ const SubscriptionList = () => {
   }, [totalPages]);
 
   useEffect(() => {
-    setIsLoading(true);
     const query = {
       page: currentPage,
       pageSize: itemsPerPage,
+      searchTerm: filters.memberName.trim(),
       startDate: filters.startDate,
       endDate: filters.endDate,
       entryCount: filters.entryCount,
       status: filters.status,
-      ...(filters.memberName.trim() && { searchTerm: filters.memberName.trim() }),
     };
-    console.log("Fetch query:", query); // تسجيل الاستعلام
+    console.log("Fetch query:", query);
     dispatch(fetchSubscriptions(query))
       .unwrap()
       .then((data) => {
         console.log("Fetched subscriptions:", data.subscriptions);
+        if (data.subscriptions.length === 0 && filters.memberName.trim()) {
+          setError("لا توجد اشتراكات مطابقة للبحث.");
+        } else {
+          setError(null);
+        }
       })
       .catch((err) => {
-        setError("فشل في جلب الاشتراكات: " + (err.message || "حدث خطأ"));
-      })
-      .finally(() => {
-        setIsLoading(false);
+        setError(err === "لا يوجد اشتراكات مطابقة للبحث" ? err : "فشل في جلب الاشتراكات: " + (err || "حدث خطأ"));
       });
   }, [dispatch, currentPage, filters, itemsPerPage]);
-  
+
+  const handleFilterChange = (newFilters) => {
+    setFilters(newFilters);
+    setCurrentPage(1); // إعادة تعيين الصفحة عند تغيير الفلاتر
+    setError(null); // مسح الخطأ عند تغيير الفلاتر
+  };
+
   return (
-    <div className="mx-auto p-4 sm:p-6 bg-gray-100 min-h-screen" dir="rtl">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="mx-auto p-4 sm:p-6 bg-gray-100 min-h-screen"
+      dir="rtl"
+    >
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
         <div className="flex items-center space-x-3 space-x-reverse">
           <CiCircleList className="text-blue-600 w-8 h-8" />
@@ -110,30 +121,45 @@ const SubscriptionList = () => {
         )}
       </div>
 
-      {error && (
-        <div className="bg-red-100 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-2">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-          </svg>
-          {error}
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-red-100 text-red-700 p-4 rounded-lg mb-6 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                clipRule="evenodd"
+              />
+            </svg>
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <SubscriptionFilters
         filters={filters}
-        setFilters={setFilters}
+        setFilters={handleFilterChange}
         setCurrentPage={setCurrentPage}
         setError={setError}
-        isLoading={isLoading}
-        setIsLoading={setIsLoading}
+        isLoading={status === "loading"}
         itemsPerPage={itemsPerPage}
       />
 
-      <div className="bg-white rounded-lg shadow-sm">
+      <motion.div
+        className="bg-white rounded-lg shadow-sm"
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+      >
         <div className="hidden md:block">
           <SubscriptionTable
             subscriptions={subscriptions}
-            isLoading={isLoading}
+            isLoading={status === "loading"}
             paymentAmounts={paymentAmounts}
             setPaymentAmounts={setPaymentAmounts}
             setSelectedSubscription={setSelectedSubscription}
@@ -147,7 +173,7 @@ const SubscriptionList = () => {
         <div className="md:hidden">
           <SubscriptionCards
             subscriptions={subscriptions}
-            isLoading={isLoading}
+            isLoading={status === "loading"}
             paymentAmounts={paymentAmounts}
             setPaymentAmounts={setPaymentAmounts}
             setSelectedSubscription={setSelectedSubscription}
@@ -158,7 +184,7 @@ const SubscriptionList = () => {
             setDetailSubscription={setDetailSubscription}
           />
         </div>
-      </div>
+      </motion.div>
 
       <PaginationControls
         currentPage={currentPage}
@@ -175,7 +201,7 @@ const SubscriptionList = () => {
             onClose={() => setIsCreateModalOpen(false)}
           />
         )}
-        {isUpdateModalOpen && (
+        {isUpdateModalOpen && selectedSubscription && (
           <UpdateSubscriptionModal
             isOpen={isUpdateModalOpen}
             onClose={() => setIsUpdateModalOpen(false)}
@@ -185,7 +211,7 @@ const SubscriptionList = () => {
             itemsPerPage={itemsPerPage}
           />
         )}
-        {isDeleteModalOpen && (
+        {isDeleteModalOpen && selectedSubscription && (
           <DeleteSubscriptionModal
             isOpen={isDeleteModalOpen}
             onClose={() => setIsDeleteModalOpen(false)}
@@ -196,7 +222,7 @@ const SubscriptionList = () => {
             subscriptionsLength={subscriptions.length}
           />
         )}
-        {isFreezeModalOpen && (
+        {isFreezeModalOpen && selectedSubscription && (
           <FreezeSubscriptionModal
             isOpen={isFreezeModalOpen}
             onClose={() => setIsFreezeModalOpen(false)}
@@ -214,7 +240,7 @@ const SubscriptionList = () => {
           />
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 };
 
