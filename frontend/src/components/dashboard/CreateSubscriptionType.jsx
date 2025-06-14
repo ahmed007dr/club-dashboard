@@ -3,8 +3,8 @@ import { useDispatch } from 'react-redux';
 import { addSubscriptionType, fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';
 import { fetchClubs } from '../../redux/slices/clubSlice';
 import { toast } from "react-hot-toast";
-
-
+import axios from 'axios';
+import BASE_URL from '../../config/api';
 
 const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
   const dispatch = useDispatch();
@@ -13,28 +13,33 @@ const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
     name: '',
     price: '',
     duration_days: '',
-    includes_gym: false,
-    includes_pool: false,
-    includes_classes: false,
     club: '',
     is_active: true,
     max_entries: '',
     max_freeze_days: 0,
     is_private_training: false,
+    features: [], 
   });
 
   const [clubs, setClubs] = useState([]);
+  const [features, setFeatures] = useState([]);
   const [error, setError] = useState(null);
 
-  // Fetch clubs on mount
+  // Fetch clubs and features on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await dispatch(fetchClubs()).unwrap();
-        setClubs(res);
+        const [clubsRes, featuresRes] = await Promise.all([
+          dispatch(fetchClubs()).unwrap(),
+          axios.get(`${BASE_URL}subscriptions/api/features/`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          })
+        ]);
+        setClubs(clubsRes);
+        setFeatures(Array.isArray(featuresRes.data) ? featuresRes.data : []);
       } catch (error) {
-        console.error('Error fetching clubs:', error);
-        toast.error('فشل في جلب الأندية');
+        console.error('Error fetching data:', error);
+        toast.error('فشل في جلب البيانات');
       }
     };
 
@@ -46,6 +51,15 @@ const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
     setFormData((prevData) => ({
       ...prevData,
       [name]: type === 'checkbox' ? checked : value,
+    }));
+  };
+
+  // Handle multi-select for features
+  const handleFeatureChange = (e) => {
+    const selectedOptions = Array.from(e.target.selectedOptions).map(option => option.value);
+    setFormData(prevData => ({
+      ...prevData,
+      features: selectedOptions,
     }));
   };
 
@@ -70,11 +84,15 @@ const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
       return;
     }
     if (parseInt(formData.max_entries) <= 0) {
-      setError('عدد المشاركين يجب أن يكون إيجابيًا');
+      setError('عدد الحضور يجب أن يكون إيجابيًا');
       return;
     }
     if (parseInt(formData.max_freeze_days) < 0) {
       setError('أيام التجميد لا يمكن أن تكون سالبة');
+      return;
+    }
+    if (formData.features.length === 0) {
+      setError('يجب اختيار ميزة واحدة على الأقل');
       return;
     }
 
@@ -85,35 +103,20 @@ const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
       duration_days: parseInt(formData.duration_days, 10),
       max_entries: parseInt(formData.max_entries, 10),
       max_freeze_days: parseInt(formData.max_freeze_days, 10),
+      features: formData.features.map(id => parseInt(id)), // تحويل إلى أعداد
     };
 
     try {
       await dispatch(addSubscriptionType(submissionData)).unwrap();
       toast.success('تم إنشاء نوع الاشتراك بنجاح!');
 
-      // Re-fetch subscription types with default filters and page 1
+      // Re-fetch subscription types
       await dispatch(
         fetchSubscriptionTypes({
           page: 1,
           searchQuery: '',
           statusFilter: 'all',
           durationFilter: '',
-          includesGym: '',
-          includesPool: '',
-          includesClasses: '',
-        })
-      ).unwrap();
-      toast.success("تم إنشاء نوع الاشتراك بنجاح!");
-      // Re-fetch subscription types to update the list
-      await dispatch(
-        fetchSubscriptionTypes({
-          page: 1,
-          searchQuery: '',
-          statusFilter: 'all',
-          durationFilter: '',
-          includesGym: '',
-          includesPool: '',
-          includesClasses: '',
         })
       ).unwrap();
 
@@ -122,17 +125,15 @@ const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
         name: '',
         price: '',
         duration_days: '',
-        includes_gym: false,
-        includes_pool: false,
-        includes_classes: false,
         club: '',
         is_active: true,
         max_entries: '',
         max_freeze_days: 0,
         is_private_training: false,
+        features: [],
       });
-     onClose();
-      // Notify parent component to reset page and close modal
+
+      onClose();
       if (onSuccess) onSuccess();
     } catch (err) {
       console.error('فشل في إنشاء نوع الاشتراك:', err);
@@ -237,6 +238,25 @@ const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
           </div>
         </div>
 
+        {/* Features Multi-Select */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">الميزات المشمولة</label>
+          <select
+            multiple
+            name="features"
+            value={formData.features}
+            onChange={handleFeatureChange}
+            className="w-full p-2 border border-gray-300 rounded-md"
+            size={Math.min(features.length, 5)}
+          >
+            {features.map((feature) => (
+              <option key={feature.id} value={feature.id}>
+                {feature.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Active Status + Private Training */}
         <div className="flex gap-4">
           <div className="flex-1 flex items-end gap-2 pb-1">
@@ -258,43 +278,6 @@ const CreateSubscriptionTypes = ({ onClose, onSuccess }) => {
               className="h-4 w-4 text-blue-600"
             />
             <label className="text-sm font-medium text-gray-700">هل يشمل تدريبًا خاصًا؟</label>
-          </div>
-        </div>
-
-        {/* Facilities Checkboxes */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">المرافق المشمولة:</label>
-          <div className="flex flex-wrap gap-4">
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="includes_gym"
-                checked={formData.includes_gym}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600"
-              />
-              <span className="text-sm text-gray-700">صالة الألعاب الرياضية</span>
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="includes_pool"
-                checked={formData.includes_pool}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600"
-              />
-              <span className="text-sm text-gray-700">المسبح</span>
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="includes_classes"
-                checked={formData.includes_classes}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600"
-              />
-              <span className="text-sm text-gray-700">الحصص التدريبية</span>
-            </label>
           </div>
         </div>
       </div>

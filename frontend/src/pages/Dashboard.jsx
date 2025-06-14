@@ -15,8 +15,8 @@ import { AiOutlineSchedule } from 'react-icons/ai';
 import { MdOutlineSubscriptions } from 'react-icons/md';
 import { IoMdAnalytics } from 'react-icons/io';
 import { HiOutlineDocumentReport } from 'react-icons/hi';
-import { GiTeamIdea, GiMoneyStack, GiTicket } from 'react-icons/gi';
-import { BiLogIn, BiLogOut } from 'react-icons/bi';
+import { GiTicket } from 'react-icons/gi';
+import { BiLogIn } from 'react-icons/bi';
 import { TbReportAnalytics } from "react-icons/tb";
 import { GiReceiveMoney } from "react-icons/gi";
 import { MdCategory } from "react-icons/md";
@@ -41,55 +41,59 @@ const Dashboard = () => {
       children: [
         { path: 'members', name: 'الأعضاء', icon: <RiGroupLine /> },
         { path: 'subscriptions', name: 'الاشتراكات', icon: <MdOutlineSubscriptions /> },
-        { path: 'attendance', name: 'الحضور', icon: <AiOutlineSchedule /> },
+        { path: 'attendance', name: 'حضور الأعضاء', icon: <AiOutlineSchedule /> },
         { path: 'free-invites', name: 'الدعوات المجانية', icon: <RiVipCrown2Line /> },
         { path: 'tickets', name: 'التذاكر', icon: <GiTicket /> },
-        { path: 'dashboard/subscription-report', name: 'تقرير الاشتراكات', icon: <HiOutlineDocumentReport /> },
-        { path: 'dashboard/subscription-analytics', name: 'تحليل الاشتراكات الشامل', icon: <IoMdAnalytics /> }, // العنصر الجديد
       ],
     },
     {
-      name: 'الإدارة',
-      icon: <FaRegBuilding />,
+      name: 'إدارة الموظفين',
+      icon: <RiUserLine />,
       children: [
-        { path: 'staff', name: 'شيفت الموظفين', icon: <RiUserLine /> },
-        { path: 'manage-users', name: 'إدارة الموظفين', icon: <FiUsers /> },
-        { path: 'attendance-form', name: 'بصمه الدخول والخروج', icon: <BiLogIn /> },
-        { path: 'shift-attendance', name: 'بيان حضور الموظفي', icon: <AiOutlineSchedule /> },
-        { path: 'club', name: 'النادي', icon: <HiOutlineDocumentReport /> },
-        { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
-      ],
-    },
-    {
-      name: 'تقارير الموظفين',
-      icon: <TbReportAnalytics />,
-      children: [
-        { path: 'staff-reports', name: 'تقارير الموظفين', icon: <RiUserLine /> },
-        { path: 'reports', name: 'تقرير الايراد', icon: <HiOutlineDocumentReport /> },
+        { path: 'staff', name: 'شيفتات الموظفين', icon: <AiOutlineSchedule /> },
+        { path: 'attendance-form', name: 'بصمة الدخول والخروج', icon: <BiLogIn /> },
+        { path: 'shift-attendance', name: 'حضور الموظفين', icon: <AiOutlineSchedule /> },
       ],
     },
     {
       name: 'المالية',
-      icon: <GiMoneyStack />,
+      icon: <TbMoneybag />,
       children: [
-        { path: 'income-sources', name: 'الايرادات', icon: <GiReceiveMoney /> },
+        { path: 'income-sources', name: 'الإيرادات', icon: <GiReceiveMoney /> },
         { path: 'expense', name: 'المصروفات', icon: <GiPayMoney /> },
+        { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
+      ],
+    },
+    {
+      name: 'إدارة النادي',
+      icon: <FaRegBuilding />,
+      children: [
+        { path: 'club', name: 'بيانات النادي', icon: <FaRegBuilding /> },
+      ],
+    },
+    {
+      name: 'التقارير والتحليلات',
+      icon: <TbReportAnalytics />,
+      children: [
+        { path: 'dashboard/subscription-report', name: 'تقرير الاشتراكات', icon: <HiOutlineDocumentReport /> },
+        { path: 'dashboard/subscription-analytics', name: 'تحليل الاشتراكات', icon: <IoMdAnalytics /> },
+        { path: 'attendance-StaffSalaryReport', name: 'تقرير رواتب الموظفين', icon: <HiOutlineDocumentReport /> },
+        { path: 'staff-reports', name: 'تقارير حضور الموظفين', icon: <RiUserLine /> },
+        { path: 'reports', name: 'تقرير الإيرادات', icon: <GiReceiveMoney /> },
         { path: 'dashboard/financial-analysis', name: 'التحليل المالي', icon: <TbReportAnalytics /> },
-        { path: 'dashboard/StockAnalytics', name: 'تحليل المخزون', icon: <IoMdAnalytics /> }, 
+        { path: 'dashboard/StockAnalytics', name: 'تحليل المخزون', icon: <IoMdAnalytics /> },
+        { path: 'manage-users', name: 'إدارة الموظفين', icon: <FiUsers /> },
       ],
     },
   ];
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* منطقة المحتوى الرئيسية */}
       <div className="flex-1 flex flex-col min-w-0 overflow-auto">
         <main className="flex-1 p-4 overflow-auto">
           <Outlet />
         </main>
       </div>
-
-      {/* الشريط الجانبي على اليمين */}
       <Sidebar
         className="sidebar-right"
         navItems={navItems}
