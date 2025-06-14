@@ -372,11 +372,11 @@ def upcoming_subscriptions(request):
     page = paginator.paginate_queryset(subscriptions, request)
     serializer = SubscriptionSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+
+
 def renew_subscription(request, pk):
-    """Renew a subscription with new payment details."""
     subscription = get_object_or_404(Subscription, pk=pk)
     if subscription.is_cancelled:
         return Response({"error": "لا يمكن تجديد اشتراك ملغى"}, status=status.HTTP_400_BAD_REQUEST)
@@ -406,18 +406,25 @@ def renew_subscription(request, pk):
         subscription.remaining_amount = subscription.type.price - total_paid
         subscription.save()
 
-        if total_paid > 0:
-            source, _ = IncomeSource.objects.get_or_create(
-                club=subscription.club, name='Renewal', defaults={'description': 'إيراد عن تجديد اشتراك'}
-            )
-            Income.objects.create(
-                club=subscription.club, source=source, amount=total_paid,
-                description=f"تجديد اشتراك {subscription.member.name}",
-                date=timezone.now().date(), received_by=request.user
-            )
+
+        source, _ = IncomeSource.objects.get_or_create(
+            club=subscription.club, name='Renewal', defaults={'description': 'إيراد عن تجديد اشتراك'}
+        )
+        amount = subscription.type.price  # استخدم سعر الاشتراك الكلي
+        if subscription.coach and subscription.coach_compensation_type == 'external':
+            amount += subscription.coach_compensation_value or Decimal('0')
+        Income.objects.create(
+            club=subscription.club, source=source, amount=amount,
+            description=f"تجديد اشتراك {subscription.member.name}" + (
+                f" مع الكابتن {subscription.coach.username} بمبلغ خارجي {subscription.coach_compensation_value} جنيه"
+                if subscription.coach and subscription.coach_compensation_type == 'external' else ""
+            ),
+            date=timezone.now().date(), received_by=request.user
+        )
 
         serializer = SubscriptionSerializer(subscription)
         return Response(serializer.data)
+    
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
