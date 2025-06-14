@@ -161,37 +161,31 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
     def get_status(self, obj):
         today = timezone.now().date()
-        max_entries = obj.type.max_entries
-        entry_count = obj.entry_count
-        active_freeze = obj.freeze_requests.filter(
-            is_active=True,
-            start_date__lte=today,
-            end_date__gte=today
+        is_expired = (
+            obj.end_date < today or
+            (obj.type.max_entries > 0 and obj.entry_count >= obj.type.max_entries)
+        )
+        has_active_freeze = obj.freeze_requests.filter(
+            is_active=True, start_date__lte=today, end_date__gte=today
         ).exists()
-        if active_freeze:
-            return "Frozen"
+
         if obj.is_cancelled:
-            return "Cancelled"
-        is_expired_by_date = obj.end_date < today
-        is_expired_by_entries = max_entries > 0 and entry_count >= max_entries
-        if is_expired_by_date or is_expired_by_entries:
-            return "Expired"
-        elif obj.start_date > today:
-            return "Upcoming"
-        elif obj.start_date <= today <= obj.end_date and obj.type.is_active:
-            return "Active"
-        return "Unknown"
+            return "ملغي"
+        if has_active_freeze:
+            return "مجمد"
+        if is_expired:
+            return "منتهي"
+        if obj.start_date > today:
+            return "قادم"
+        if obj.start_date <= today <= obj.end_date and obj.type.is_active:
+            return "نشط"
+        return "غير معروف"
 
     def get_subscriptions_count(self, obj):
         return Subscription.objects.filter(member=obj.member).count()
 
     def get_coach_simple(self, obj):
-        if obj.coach:
-            return {
-                'id': obj.coach.id,
-                'username': obj.coach.username
-            }
-        return None
+        return {'id': obj.coach.id, 'username': obj.coach.username} if obj.coach else None
 
     def get_coach_details(self, obj):
         if obj.coach and hasattr(obj.coach, 'coach_profile'):
@@ -200,7 +194,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 'id': obj.coach.id,
                 'username': obj.coach.username,
                 'role': obj.coach.role,
-                'max_trainees': profile.max_trainees
+                'max_trainees': profile.max_traines
             }
         return None
 
@@ -216,6 +210,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         coach_compensation_type = data.get('coach_compensation_type')
         coach_compensation_value = data.get('coach_compensation_value', getattr(self.instance, 'coach_compensation_value', 0)) or 0
 
+        # التحقق من المبالغ
         if remaining_amount < 0:
             raise serializers.ValidationError("المبلغ المتبقي لا يمكن أن يكون سالبًا.")
         if paid_amount > subscription_type.price:
@@ -223,6 +218,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         if paid_amount + remaining_amount != subscription_type.price:
             raise serializers.ValidationError("المبلغ المدفوع + المتبقي يجب أن يساوي سعر الاشتراك.")
 
+        # التحقق من العضو
         if identifier and not member:
             try:
                 member = Member.objects.get(
@@ -233,13 +229,12 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             except Member.DoesNotExist:
                 raise serializers.ValidationError("لا يوجد عضو بهذا المعرف (هاتف، RFID، أو اسم).")
 
+        # التحقق من المدرب
         if coach_identifier and not coach:
             try:
                 coach = User.objects.get(
                     Q(username=coach_identifier) | Q(rfid_code=coach_identifier),
-                    role='coach',
-                    is_active=True,
-                    club=club
+                    role='coach', is_active=True, club=club
                 )
                 data['coach'] = coach
             except User.DoesNotExist:
@@ -252,8 +247,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 profile = coach.coach_profile
                 if profile.max_trainees > 0:
                     active_subscriptions = Subscription.objects.filter(
-                        coach=coach,
-                        club=club,
+                        coach=coach, club=club,
                         start_date__lte=timezone.now().date(),
                         end_date__gte=timezone.now().date()
                     ).exclude(pk=self.instance.pk if self.instance else None).count()
@@ -268,9 +262,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("نوع تعويض الكابتن غير صالح.")
             if coach_compensation_value < 0:
                 raise serializers.ValidationError("قيمة تعويض الكابتن لا يمكن أن تكون سالبة.")
-            if coach_compensation_type == 'from_subscription':
-                if coach_compensation_value > 100:
-                    raise serializers.ValidationError("نسبة الكابتن لا يمكن أن تتجاوز 100%.")
+            if coach_compensation_type == 'from_subscription' and coach_compensation_value > 100:
+                raise serializers.ValidationError("نسبة الكابتن لا يمكن أن تتجاوز 100%.")
             if not coach_compensation_type:
                 data['coach_compensation_type'] = 'from_subscription'
                 data['coach_compensation_value'] = 0
@@ -280,29 +273,28 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             data['coach_compensation_type'] = None
             data['coach_compensation_value'] = 0
 
+        # التحقق من النادي ونوع الاشتراك
         if club and subscription_type and subscription_type.club != club:
             raise serializers.ValidationError("نوع الاشتراك يجب أن يكون لنفس النادي.")
 
+        # التحقق من الاشتراكات النشطة والمدفوعات المستحقة
         if member:
             today = timezone.now().date()
             active_subscriptions = Subscription.objects.filter(
-                member=member,
-                club=club,
-                start_date__lte=today,
-                end_date__gte=today
+                member=member, club=club,
+                start_date__lte=today, end_date__gte=today
             ).exclude(entry_count__gte=F('type__max_entries')).exclude(type__max_entries=0)
             if active_subscriptions.exists() and not self.instance:
                 latest_active_subscription = active_subscriptions.order_by('-end_date').first()
-                if latest_active_subscription:
-                    max_end_date = latest_active_subscription.end_date
-                    if (latest_active_subscription.entry_count >= latest_active_subscription.type.max_entries and
-                            latest_active_subscription.type.max_entries > 0):
-                        max_end_date = today
-                    start_date = data.get('start_date', today)
-                    if start_date <= max_end_date:
-                        raise serializers.ValidationError(
-                            f"لا يمكن إنشاء اشتراك جديد يبدأ قبل {max_end_date} بسبب وجود اشتراك نشط."
-                        )
+                max_end_date = latest_active_subscription.end_date
+                if (latest_active_subscription.entry_count >= latest_active_subscription.type.max_entries and
+                        latest_active_subscription.type.max_entries > 0):
+                    max_end_date = today
+                start_date = data.get('start_date', today)
+                if start_date <= max_end_date:
+                    raise serializers.ValidationError(
+                        f"لا يمكن إنشاء اشتراك جديد يبدأ قبل {max_end_date} بسبب وجود اشتراك نشط."
+                    )
             unpaid_subscriptions = Subscription.objects.filter(member=member, club=club, remaining_amount__gt=0)
             if unpaid_subscriptions.exists() and not self.instance:
                 raise serializers.ValidationError("يجب تسوية المدفوعات المستحقة أولاً.")
@@ -313,7 +305,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         validated_data.pop('coach_identifier', None)
         validated_data.pop('identifier', None)
         return Subscription.objects.create(**validated_data)
-
+    
 class MemberBehaviorSerializer(serializers.Serializer):
     member_name = serializers.CharField(source='member__name')
     attendance_count = serializers.IntegerField()

@@ -36,7 +36,7 @@ const SubscriptionList = () => {
     startDate: "",
     endDate: "",
     entryCount: "",
-    status: "",
+    status: "", // دعم تصفية الحالة
   });
   const [error, setError] = useState(null);
 
@@ -74,7 +74,7 @@ const SubscriptionList = () => {
       startDate: filters.startDate,
       endDate: filters.endDate,
       entryCount: filters.entryCount,
-      status: filters.status,
+      status: filters.status.toLowerCase(), // تمرير الحالة للـ backend
     };
     console.log("Fetch query:", query);
     dispatch(fetchSubscriptions(query))
@@ -94,8 +94,8 @@ const SubscriptionList = () => {
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
-    setCurrentPage(1); // إعادة تعيين الصفحة عند تغيير الفلاتر
-    setError(null); // مسح الخطأ عند تغيير الفلاتر
+    setCurrentPage(1);
+    setError(null);
   };
 
   return (
