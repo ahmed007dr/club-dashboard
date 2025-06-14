@@ -20,7 +20,7 @@ from decimal import Decimal
 from django.db import transaction
 from accounts.models import User
 from staff.models import StaffAttendance
-from .models import Expense, Income, ExpenseCategory, IncomeSource, StockTransaction, StockItem
+from .models import Expense, Income, ExpenseCategory, IncomeSource, StockTransaction, StockItem,Schedule
 from .serializers import (
     ExpenseSerializer, IncomeSerializer, ExpenseCategorySerializer, IncomeSourceSerializer,
     ExpenseDetailSerializer, IncomeDetailSerializer, IncomeSummarySerializer, StockItemSerializer
@@ -863,3 +863,54 @@ def stock_sales_analysis_api(request):
             'sale_gaps': sale_gaps
         })
     return Response(analysis_data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def generate_inventory_pdf(request):
+    stock_items = StockItem.objects.filter(club=request.user.club)
+    if request.query_params.get('stock_item_id'):
+        stock_items = stock_items.filter(id=request.query_params.get('stock_item_id'))
+    report_data = {
+        'items': [
+            {'name': item.name, 'unit': item.unit, 'quantity': item.current_quantity}
+            for item in stock_items
+        ],
+        'print_date': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+    }
+    latex_template_path = os.path.join(os.path.dirname(__file__), 'templates', 'inventory_report.tex')
+    with open(latex_template_path, 'r', encoding='utf-8') as file:
+        template = Template(file.read())
+    latex_content = template.render(**report_data)
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        latex_file_path = os.path.join(tmpdirname, 'report.tex')
+        with open(latex_file_path, 'w', encoding='utf-8') as f:
+            f.write(latex_content)
+        result = subprocess.run(
+            ['pdflatex', '-output-directory', tmpdirname, latex_file_path], capture_output=True, text=True
+        )
+        if result.returncode != 0:
+            return Response({'error': 'فشل إنشاء PDF'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        pdf_file_path = os.path.join(tmpdirname, 'report.pdf')
+        with open(pdf_file_path, 'rb') as pdf_file:
+            response = FileResponse(pdf_file, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="inventory_report_{timezone.now().strftime("%Y%m%d")}.pdf"'
+            return response
+        
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def schedule_api(request):
+    if request.method == 'GET':
+        schedules = Schedule.objects.filter(club=request.user.club)
+        return Response([{
+            'id': s.id, 'title': s.title, 'start': s.start.isoformat(), 'end': s.end.isoformat(), 'type': s.type
+        } for s in schedules], status=status.HTTP_200_OK)
+    elif request.method == 'POST':
+        data = request.data.copy()
+        data['club'] = request.user.club.id
+        data['created_by'] = request.user.id
+        schedule = Schedule.objects.create(**data)
+        return Response({
+            'id': schedule.id, 'title': schedule.title, 'start': schedule.start.isoformat(),
+            'end': schedule.end.isoformat(), 'type': schedule.type
+        }, status=status.HTTP_201_CREATED)
+    

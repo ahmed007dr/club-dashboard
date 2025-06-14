@@ -154,3 +154,14 @@ class StockTransaction(models.Model):
             models.Index(fields=['created_by']),
         ]
         ordering = ['-date']
+
+class Schedule(models.Model):
+    club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
+    title = models.CharField(max_length=100)
+    start = models.DateTimeField()
+    end = models.DateTimeField()
+    type = models.CharField(max_length=50, choices=[('inventory_check', 'فحص جرد'), ('patrol', 'دورية')])
+    created_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
+
+    def __str__(self):
+        return self.title
