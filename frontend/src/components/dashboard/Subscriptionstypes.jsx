@@ -1,49 +1,47 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSubscriptionTypes } from '../../redux/slices/subscriptionsSlice';
 import UpdateSubscriptionTypes from './UpdateSubscriptionTypes';
 import DeleteSubscriptionTypesModal from './DeleteSubscriptionTypesModal';
 import SubscriptionTypeDetails from './SubscriptionTypeDetails';
 import CreateSubscriptionType from './CreateSubscriptionType';
-import { FaEye, FaEdit, FaTrash, FaPlus, FaSearch } from 'react-icons/fa';
+import { FaEye, FaEdit, FaTrash, FaPlus, FaSearch, FaSortUp, FaSortDown } from 'react-icons/fa';
 import { CiShoppingTag } from 'react-icons/ci';
 import { RiForbidLine } from 'react-icons/ri';
 import usePermission from '@/hooks/usePermission';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { motion, AnimatePresence } from 'framer-motion';
 import BASE_URL from '../../config/api';
 
 const SubscriptionsTypes = () => {
   const dispatch = useDispatch();
   const { subscriptionTypes, loading, error } = useSelector((state) => state.subscriptions);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedSubscription, setSelectedSubscription] = useState(null);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [subscriptionToDelete, setSubscriptionToDelete] = useState(null);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [subscriptionToView, setSubscriptionToView] = useState(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [selectedSubscription, setSelectedSubscription] = useState(null);
+  const [subscriptionToDelete, setSubscriptionToDelete] = useState(null);
+  const [subscriptionToView, setSubscriptionToView] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [durationFilter, setDurationFilter] = useState('');
   const [featureId, setFeatureId] = useState('');
   const [features, setFeatures] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [sortConfig, setSortConfig] = useState({ key: 'active_subscribers', direction: 'desc' });
   const itemsPerPage = 20;
   const maxButtons = 5;
 
-  // Permission checks
+  // التحقق من الصلاحيات
   const canViewSubscriptionTypes = usePermission('view_subscriptiontype');
   const canAddSubscriptionTypes = usePermission('add_subscriptiontype');
   const canEditSubscriptionTypes = usePermission('change_subscriptiontype');
   const canDeleteSubscriptionTypes = usePermission('delete_subscriptiontype');
 
-  const openCreateModal = () => setIsCreateModalOpen(true);
-  const closeCreateModal = () => setIsCreateModalOpen(false);
-
-  // Fetch features for filter
-  const fetchFeatures = async () => {
+  // جلب الميزات للفلتر
+  const fetchFeatures = useCallback(async () => {
     try {
       const response = await fetch(`${BASE_URL}/subscriptions/api/features/`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
@@ -52,79 +50,76 @@ const SubscriptionsTypes = () => {
       const data = await response.json();
       setFeatures(data);
     } catch (err) {
-      console.error(err);
+      console.error('خطأ جلب الميزات:', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchFeatures();
-  }, []);
+  }, [fetchFeatures]);
 
-  // Handle search button click
-  const handleSearch = () => {
-    dispatch(
-      fetchSubscriptionTypes({
-        page: 1,
-        searchQuery,
-        statusFilter,
-        durationFilter,
-        feature_id: featureId,
-      })
-    )
-      .unwrap()
-      .catch((err) => {
-        if (err.includes('Page not found')) {
-          setCurrentPage(1);
-          dispatch(
-            fetchSubscriptionTypes({
-              page: 1,
-              searchQuery,
-              statusFilter,
-              durationFilter,
-              feature_id: featureId,
-            })
-          );
-        }
-      });
+  // معالجة الفرز
+  const handleSort = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc',
+    }));
     setCurrentPage(1);
   };
 
-  // Fetch subscriptions when page changes
-  useEffect(() => {
-    dispatch(
-      fetchSubscriptionTypes({
-        page: currentPage,
-        searchQuery,
-        statusFilter,
-        durationFilter,
-        feature_id: featureId,
-      })
-    )
+  // جلب أنواع الاشتراكات مع الفرز
+  const fetchData = useCallback(() => {
+    const ordering = `${sortConfig.direction === 'desc' ? '-' : ''}${sortConfig.key}`;
+    const query = {
+      page: currentPage,
+      searchQuery: searchQuery.trim(),
+      statusFilter,
+      durationFilter,
+      feature_id: featureId,
+      ordering,
+    };
+    dispatch(fetchSubscriptionTypes(query))
       .unwrap()
       .catch((err) => {
         if (err.includes('Page not found')) {
           setCurrentPage(1);
-          dispatch(
-            fetchSubscriptionTypes({
-              page: 1,
-              searchQuery,
-              statusFilter,
-              durationFilter,
-              feature_id: featureId,
-            })
-          );
+          dispatch(fetchSubscriptionTypes({ ...query, page: 1 }));
         }
       });
-  }, [dispatch, currentPage, featureId]);
+  }, [dispatch, currentPage, searchQuery, statusFilter, durationFilter, featureId, sortConfig]);
 
-  const openModal = (subscription) => {
-    setSelectedSubscription(subscription);
-    setIsModalOpen(true);
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // معالجة البحث
+  const handleSearch = () => {
+    setCurrentPage(1);
+    fetchData();
   };
 
-  const closeModal = () => {
+  // إعادة تعيين الفلاتر
+  const resetFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+    setDurationFilter('');
+    setFeatureId('');
+    setCurrentPage(1);
+    setSortConfig({ key: 'active_subscribers', direction: 'desc' });
+  };
+
+  // فتح وإغلاق المودالات
+  const openCreateModal = () => setIsCreateModalOpen(true);
+  const closeCreateModal = () => setIsCreateModalOpen(false);
+
+  const openUpdateModal = (subscription) => {
+    setSelectedSubscription(subscription);
+    setIsUpdateModalOpen(true);
+  };
+
+  const closeUpdateModal = () => {
     setSelectedSubscription(null);
-    setIsModalOpen(false);
+    setIsUpdateModalOpen(false);
   };
 
   const openDeleteModal = (subscription) => {
@@ -147,32 +142,28 @@ const SubscriptionsTypes = () => {
     setIsDetailsModalOpen(false);
   };
 
-  // Pagination logic
+  // منطق الترقيم
   const totalPages = Math.ceil((subscriptionTypes.count || 0) / itemsPerPage);
 
-  const getPageButtons = () => {
-    const buttons = [];
+  const getPageButtons = useCallback(() => {
     const half = Math.floor(maxButtons / 2);
     let startPage = Math.max(1, currentPage - half);
     let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-
     if (endPage - startPage + 1 < maxButtons) {
       startPage = Math.max(1, endPage - maxButtons + 1);
     }
+    return Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i);
+  }, [currentPage, totalPages]);
 
-    for (let i = startPage; i <= endPage; i++) {
-      buttons.push(i);
-    }
-    return buttons;
-  };
-
-  if (loading) return <div className="text-right p-6">جاري التحميل...</div>;
-  if (error) return <div className="text-right p-6 text-red-600">خطأ: {error}</div>;
-
-  // Early return if no view permission
+  // إذا لم يكن لديك صلاحية العرض
   if (!canViewSubscriptionTypes) {
     return (
-      <div className="flex flex-col items-center justify-center h-screen text-center p-4" dir="rtl">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex flex-col items-center justify-center h-screen text-center p-4"
+        dir="rtl"
+      >
         <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center mb-4">
           <RiForbidLine className="text-red-600 text-2xl" />
         </div>
@@ -180,49 +171,60 @@ const SubscriptionsTypes = () => {
         <p className="text-gray-500 max-w-md">
           ليس لديك الصلاحيات اللازمة لعرض أنواع الاشتراكات. يرجى التواصل مع المسؤول.
         </p>
-      </div>
+      </motion.div>
     );
   }
 
   return (
-    <div className="p-6" dir="rtl">
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center space-x-3">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+      className="p-6 bg-gray-100 min-h-screen"
+      dir="rtl"
+    >
+      {/* العنوان وزر الإضافة */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div className="flex items-center gap-3 mb-4 sm:mb-0">
           <CiShoppingTag className="text-blue-600 w-9 h-9" />
-          <h1 className="text-2xl font-bold">أنواع الاشتراكات</h1>
+          <h1 className="text-2xl font-bold text-gray-700">أنواع الاشتراكات</h1>
         </div>
         {canAddSubscriptionTypes && (
           <Button
             onClick={openCreateModal}
-            className="flex items-center btn"
+            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
           >
-            <FaPlus className="mr-2" />
+            <FaPlus />
             إضافة نوع جديد
           </Button>
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="flex items-center space-x-2">
+      {/* فلاتر البحث */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="flex items-center gap-2">
           <Input
             type="text"
             placeholder="بحث بالاسم"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="border px-3 py-2 rounded-md w-full text-right"
+            className="w-full text-right"
+            disabled={loading}
           />
           <Button
             onClick={handleSearch}
-            className="flex items-center gap-2 btn"
+            className="bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+            disabled={loading}
           >
-            <FaSearch className="mr-2" />
+            <FaSearch />
             بحث
           </Button>
         </div>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="border px-3 py-2 rounded-md w-full text-right"
+          className="border rounded-md px-3 py-2 w-full text-right"
+          disabled={loading}
         >
           <option value="all">الحالة (الكل)</option>
           <option value="active">نشط</option>
@@ -233,12 +235,14 @@ const SubscriptionsTypes = () => {
           placeholder="المدة (أيام)"
           value={durationFilter}
           onChange={(e) => setDurationFilter(e.target.value)}
-          className="border px-3 py-2 rounded-md w-full text-right"
+          className="w-full text-right"
+          disabled={loading}
         />
         <select
           value={featureId}
           onChange={(e) => setFeatureId(e.target.value)}
-          className="border px-3 py-2 rounded-md w-full text-right"
+          className="border rounded-md px-3 py-2 w-full text-right"
+          disabled={loading}
         >
           <option value="">اختر ميزة</option>
           {features.map((feature) => (
@@ -248,86 +252,150 @@ const SubscriptionsTypes = () => {
           ))}
         </select>
       </div>
-
       <div className="mb-6">
         <Button
-          onClick={handleSearch}
-          className="flex items-center gap-2 btn"
+          onClick={resetFilters}
+          className="bg-gray-600 hover:bg-gray-700 text-white flex items-center gap-2"
+          disabled={loading}
         >
-          <FaSearch className="mr-2" />
-          تطبيق الفلاتر
+          إعادة تعيين
         </Button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse bg-white shadow-sm rounded-lg">
+      {/* الجدول */}
+      <div className="overflow-x-auto bg-white rounded-lg shadow-sm">
+        <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="bg-gray-100 text-right">
-              <th className="px-4 py-3 text-sm font-semibold text-gray-700 border-b">الاسم</th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-700 border-b">الحالة</th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-700 border-b">المشتركين</th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-700 border-b">أيام التجميد</th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-700 border-b">تدريب خاص</th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-700 border-b">الحد الأقصى للدخول</th>
-              <th className="px-4 py-3 text-sm font-semibold text-gray-700 border-b">الإجراءات</th>
+            <tr className="bg-gray-100">
+              <th
+                className="px-4 py-3 font-semibold text-gray-700 border-b text-center cursor-pointer"
+                onClick={() => handleSort('name')}
+              >
+                <div className="inline-flex items-center gap-1">
+                  الاسم
+                  {sortConfig.key === 'name' && (
+                    sortConfig.direction === 'desc' ? <FaSortDown /> : <FaSortUp />
+                  )}
+                </div>
+              </th>
+              <th
+                className="px-4 py-3 font-semibold text-gray-700 border-b text-center cursor-pointer"
+                onClick={() => handleSort('is_active')}
+              >
+                <div className="inline-flex items-center gap-1">
+                  الحالة
+                  {sortConfig.key === 'is_active' && (
+                    sortConfig.direction === 'desc' ? <FaSortDown /> : <FaSortUp />
+                  )}
+                </div>
+              </th>
+              <th
+                className="px-4 py-3 font-semibold text-gray-700 border-b text-center cursor-pointer"
+                onClick={() => handleSort('active_subscribers')}
+              >
+                <div className="inline-flex items-center gap-1">
+                  المشتركين النشطين
+                  {sortConfig.key === 'active_subscribers' && (
+                    sortConfig.direction === 'desc' ? <FaSortDown /> : <FaSortUp />
+                  )}
+                </div>
+              </th>
+              <th
+                className="px-4 py-3 font-semibold text-gray-700 border-b text-center cursor-pointer"
+                onClick={() => handleSort('max_freeze_days')}
+              >
+                <div className="inline-flex items-center gap-1">
+                  أيام التجميد
+                  {sortConfig.key === 'max_freeze_days' && (
+                    sortConfig.direction === 'desc' ? <FaSortDown /> : <FaSortUp />
+                  )}
+                </div>
+              </th>
+              <th
+                className="px-4 py-3 font-semibold text-gray-700 border-b text-center cursor-pointer"
+                onClick={() => handleSort('is_private_training')}
+              >
+                <div className="inline-flex items-center gap-1">
+                  تدريب خاص
+                  {sortConfig.key === 'is_private_training' && (
+                    sortConfig.direction === 'desc' ? <FaSortDown /> : <FaSortUp />
+                  )}
+                </div>
+              </th>
+              <th
+                className="px-4 py-3 font-semibold text-gray-700 border-b text-center cursor-pointer"
+                onClick={() => handleSort('max_entries')}
+              >
+                <div className="inline-flex items-center gap-1">
+                  الحد الأقصى للدخول
+                  {sortConfig.key === 'max_entries' && (
+                    sortConfig.direction === 'desc' ? <FaSortDown /> : <FaSortUp />
+                  )}
+                </div>
+              </th>
+              <th className="px-4 py-3 font-semibold text-gray-700 border-b text-center">الإجراءات</th>
             </tr>
           </thead>
           <tbody>
-            {(subscriptionTypes.results || []).length > 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan="7" className="px-4 py-8 text-center text-gray-600">
+                  جاري التحميل...
+                </td>
+              </tr>
+            ) : (subscriptionTypes.results || []).length > 0 ? (
               subscriptionTypes.results.map((type) => (
-                <tr key={type.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-700">{type.name}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
-                    <div className="flex items-center justify-end">
-                      {type.is_active ? (
-                        <>
-                          <span className="w-2 h-2 bg-emerald-500 rounded-full ml-2"></span>
-                          <span>نشط</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-2 h-2 bg-rose-500 rounded-full ml-2"></span>
-                          <span>غير نشط</span>
-                        </>
-                      )}
+                <motion.tr
+                  key={type.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="border-b hover:bg-gray-50 transition-colors duration-200"
+                >
+                  <td className="px-4 py-3 text-gray-700 text-center">{type.name}</td>
+                  <td className="px-4 py-3 text-gray-700 text-center">
+                    <div className="inline-flex items-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          type.is_active ? "bg-emerald-500" : "bg-rose-500"
+                        }`}
+                      ></span>
+                      <span>{type.is_active ? "نشط" : "غير نشط"}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{type.subscriptions_count}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{type.max_freeze_days}</td>
-                  <td className="px-4 py-3 text-sm text-gray-700">
-                    <div className="flex items-center justify-end">
-                      {type.is_private_training ? (
-                        <>
-                          <span className="w-2 h-2 bg-indigo-500 rounded-full ml-2"></span>
-                          <span>نعم</span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="w-2 h-2 bg-gray-400 rounded-full ml-2"></span>
-                          <span>لا</span>
-                        </>
-                      )}
+                  <td className="px-4 py-3 text-gray-700 text-center">{type.active_subscribers || 0}</td>
+                  <td className="px-4 py-3 text-gray-700 text-center">{type.max_freeze_days}</td>
+                  <td className="px-4 py-3 text-gray-700 text-center">
+                    <div className="inline-flex items-center gap-2">
+                      <span
+                        className={`w-2 h-2 rounded-full ${
+                          type.is_private_training ? "bg-indigo-500" : "bg-gray-400"
+                        }`}
+                      ></span>
+                      <span>{type.is_private_training ? "نعم" : "لا"}</span>
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-700">{type.max_entries || 'غير محدود'}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <div className="flex justify-end space-x-2 rtl:space-x-reverse">
+                  <td className="px-4 py-3 text-gray-700 text-center">{type.max_entries || "غير محدود"}</td>
+                  <td className="px-4 py-3 text-center">
+                    <div className="inline-flex gap-2">
                       <button
                         onClick={() => openDetailsModal(type)}
-                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-full relative group"
+                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-full relative group transition-colors"
+                        title="عرض التفاصيل"
                       >
                         <FaEye className="w-4 h-4" />
-                        <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          عرض التفاصيل
+                        <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                          عرض
                         </span>
                       </button>
                       {canEditSubscriptionTypes && (
                         <button
-                          onClick={() => openModal(type)}
-                          className="p-2 text-blue-600 hover:bg-blue-100 rounded-full relative group"
+                          onClick={() => openUpdateModal(type)}
+                          className="p-2 text-blue-600 hover:bg-blue-100 rounded-full relative group transition-colors"
+                          title="تعديل"
                         >
                           <FaEdit className="w-4 h-4" />
-                          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
                             تعديل
                           </span>
                         </button>
@@ -335,17 +403,18 @@ const SubscriptionsTypes = () => {
                       {canDeleteSubscriptionTypes && (
                         <button
                           onClick={() => openDeleteModal(type)}
-                          className="p-2 text-rose-600 hover:bg-rose-100 rounded-full relative group"
+                          className="p-2 text-rose-600 hover:bg-rose-100 rounded-full relative group transition-colors"
+                          title="حذف"
                         >
                           <FaTrash className="w-4 h-4" />
-                          <span className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
                             حذف
                           </span>
                         </button>
                       )}
                     </div>
                   </td>
-                </tr>
+                </motion.tr>
               ))
             ) : (
               <tr>
@@ -358,20 +427,15 @@ const SubscriptionsTypes = () => {
         </table>
       </div>
 
-      <style jsx>{`
-        .group:hover .absolute {
-          opacity: 1;
-        }
-      `}</style>
-
+      {/* الترقيم */}
       <div className="flex justify-between items-center mt-6">
         <Button
-          onClick={() => setCurrentPage(currentPage - 1)}
-          disabled={currentPage === 1}
+          onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+          disabled={currentPage === 1 || loading}
           className={`px-4 py-2 rounded-md ${
-            currentPage === 1
+            currentPage === 1 || loading
               ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
           }`}
         >
           السابق
@@ -383,82 +447,100 @@ const SubscriptionsTypes = () => {
               onClick={() => setCurrentPage(pageNum)}
               className={`px-4 py-2 rounded-md ${
                 currentPage === pageNum
-                  ? 'bg-blue-500 text-white'
+                  ? 'bg-blue-600 text-white'
                   : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
               }`}
+              disabled={loading}
             >
               {pageNum}
             </Button>
           ))}
         </div>
         <Button
-          onClick={() => setCurrentPage(currentPage + 1)}
-          disabled={currentPage >= totalPages || totalPages === 0}
+          onClick={() => setCurrentPage((prev) => prev + 1)}
+          disabled={currentPage >= totalPages || totalPages === 0 || loading}
           className={`px-4 py-2 rounded-md ${
-            currentPage >= totalPages || totalPages === 0
+            currentPage >= totalPages || totalPages === 0 || loading
               ? 'bg-gray-300 cursor-not-allowed'
-              : 'bg-blue-500 text-white hover:bg-blue-600'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
           }`}
         >
           التالي
         </Button>
       </div>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-              onClick={closeModal}
-            >
-              ✕
-            </button>
-            <h2 className="text-xl font-semibold mb-4 text-right">تحديث نوع الاشتراك</h2>
-            <UpdateSubscriptionTypes
-              subscriptionId={selectedSubscription.id}
-              subscriptionData={selectedSubscription}
-              closeModal={closeModal}
-            />
-          </div>
-        </div>
-      )}
-
-      <DeleteSubscriptionTypesModal
-        isOpen={isDeleteModalOpen}
-        onClose={closeDeleteModal}
-        subscription={subscriptionToDelete}
-      />
-
-      {isDetailsModalOpen && subscriptionToView && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg max-w-6xl relative">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-              onClick={closeDetailsModal}
-            >
-              ✕
-            </button>
-            <h2 className="text-xl font-semibold mb-4 text-right">تفاصيل نوع الاشتراك</h2>
-            <SubscriptionTypeDetails id={subscriptionToView.id} />
-          </div>
-        </div>
-      )}
-
-      {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
-            <button
-              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
-              onClick={closeCreateModal}
-            >
-              ✕
-            </button>
-            <h2 className="text-xl font-semibold mb-4 text-right">إنشاء نوع اشتراك جديد</h2>
-            <CreateSubscriptionType onClose={closeCreateModal} />
-          </div>
-        </div>
-      )}
-    </div>
+      {/* المودالات */}
+      <AnimatePresence>
+        {isCreateModalOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          >
+            <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
+              <button
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                onClick={closeCreateModal}
+              >
+                ✕
+              </button>
+              <h2 className="text-xl font-semibold mb-4 text-right">إنشاء نوع اشتراك جديد</h2>
+              <CreateSubscriptionType onClose={closeCreateModal} />
+            </div>
+          </motion.div>
+        )}
+        {isUpdateModalOpen && selectedSubscription && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          >
+            <div className="bg-white p-6 rounded-lg w-full max-w-md relative">
+              <button
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                onClick={closeUpdateModal}
+              >
+                ✕
+              </button>
+              <h2 className="text-xl font-semibold mb-4 text-right">تحديث نوع الاشتراك</h2>
+              <UpdateSubscriptionTypes
+                subscriptionId={selectedSubscription.id}
+                subscriptionData={selectedSubscription}
+                closeModal={closeUpdateModal}
+              />
+            </div>
+          </motion.div>
+        )}
+        {isDeleteModalOpen && subscriptionToDelete && (
+          <DeleteSubscriptionTypesModal
+            isOpen={isDeleteModalOpen}
+            onClose={closeDeleteModal}
+            subscription={subscriptionToDelete}
+          />
+        )}
+        {isDetailsModalOpen && subscriptionToView && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          >
+            <div className="bg-white p-6 rounded-lg max-w-6xl relative">
+              <button
+                className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+                onClick={closeDetailsModal}
+              >
+                ✕
+              </button>
+              <h2 className="text-xl font-semibold mb-4 text-right">تفاصيل نوع الاشتراك</h2>
+              <SubscriptionTypeDetails id={subscriptionToView.id} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };
 

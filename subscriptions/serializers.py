@@ -79,17 +79,27 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
     feature_ids = serializers.PrimaryKeyRelatedField(
         queryset=Feature.objects.all(), many=True, source='features', write_only=True, required=False
     )
+    active_subscribers = serializers.SerializerMethodField()  
 
     class Meta:
         model = SubscriptionType
         fields = [
             'id', 'club', 'club_details', 'name', 'duration_days', 'price',
             'features', 'feature_ids', 'is_active', 'max_entries', 'subscriptions_count',
-            'max_freeze_days', 'is_private_training'
+            'max_freeze_days', 'is_private_training', 'active_subscribers'
         ]
         extra_kwargs = {
             'club': {'required': True}
         }
+
+    def get_active_subscribers(self, obj):
+        today = timezone.now().date()
+        return Subscription.objects.filter(
+            type=obj,
+            start_date__lte=today,
+            end_date__gte=today,
+            is_cancelled=False
+        ).count()
 
     def validate(self, data):
         max_freeze_days = data.get('max_freeze_days', getattr(self.instance, 'max_freeze_days', 0))
@@ -107,7 +117,7 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
                         'is_private_training': 'لا يمكن إلغاء التدريب الخاص لوجود اشتراكات نشطة'
                     })
         return data
-
+    
 class FreezeRequestSerializer(serializers.ModelSerializer):
     created_by_details = UserSerializer(source='created_by', read_only=True)
 

@@ -109,6 +109,7 @@ def subscription_type_list(request):
         status_filter = request.GET.get('status', 'all')
         duration = request.GET.get('duration', '')
         feature_id = request.GET.get('feature_id', '')
+        ordering = request.GET.get('ordering', '') 
 
         types = SubscriptionType.objects.filter(club=request.user.club).annotate(
             active_subscriptions_count=Count('subscriptions', filter=Q(subscriptions__end_date__gte=timezone.now().date()))
@@ -128,8 +129,15 @@ def subscription_type_list(request):
                 types = types.filter(features__id=int(feature_id))
             except ValueError:
                 pass
+        if ordering:
+            if ordering == '-active_subscribers':
+                types = types.order_by('-active_subscribers', '-id')
+            elif ordering == 'active_subscribers':
+                types = types.order_by('active_subscribers', '-id')
+            else:
+                types = types.order_by(ordering)
 
-        types = types.order_by('-id')
+
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(types, request)
         serializer = SubscriptionTypeSerializer(page, many=True, context={'request': request})
