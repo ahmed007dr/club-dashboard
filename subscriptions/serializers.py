@@ -204,7 +204,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 'id': obj.coach.id,
                 'username': obj.coach.username,
                 'role': obj.coach.role,
-                'max_trainees': profile.max_traines
+                'max_trainees': profile.max_trainees
             }
         return None
 

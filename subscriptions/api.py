@@ -216,7 +216,21 @@ def subscription_list(request):
                 subscriptions = subscriptions.filter(end_date__lt=today)
             elif request.query_params.get('status') == 'upcoming':
                 subscriptions = subscriptions.filter(start_date__gt=today)
-
+            if request.query_params.get('status'):
+                today = timezone.now().date()
+                if request.query_params.get('status') == 'active':
+                    subscriptions = subscriptions.filter(
+                        start_date__lte=today,
+                        end_date__gte=today,
+                        entry_count__lt=F('type__max_entries') | Q(type__max_entries=0)
+                    )
+                elif request.query_params.get('status') == 'expired':
+                    subscriptions = subscriptions.filter(
+                        Q(end_date__lt=today) | Q(entry_count__gte=F('type__max_entries'), type__max_entries__gt=0)
+                    )
+                elif request.query_params.get('status') == 'upcoming':
+                    subscriptions = subscriptions.filter(start_date__gt=today)
+                    
         subscriptions = subscriptions.order_by('-start_date')
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(subscriptions, request)
@@ -320,7 +334,12 @@ def subscription_detail(request, pk):
 def active_subscriptions(request):
     """List active subscriptions."""
     today = timezone.now().date()
-    subscriptions = Subscription.objects.filter(start_date__lte=today, end_date__gte=today, club=request.user.club)
+    subscriptions = Subscription.objects.filter(
+        start_date__lte=today,
+        end_date__gte=today,
+        entry_count__lt=F('type__max_entries') | Q(type__max_entries=0),
+        club=request.user.club
+    )
     subscriptions = subscriptions.order_by('-start_date')
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
@@ -332,7 +351,10 @@ def active_subscriptions(request):
 def expired_subscriptions(request):
     """List expired subscriptions."""
     today = timezone.now().date()
-    subscriptions = Subscription.objects.filter(end_date__lt=today, club=request.user.club)
+    subscriptions = Subscription.objects.filter(
+        Q(end_date__lt=today) | Q(entry_count__gte=F('type__max_entries'), type__max_entries__gt=0),
+        club=request.user.club
+    )
     subscriptions = subscriptions.order_by('-end_date')
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)

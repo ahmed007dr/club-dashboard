@@ -126,10 +126,11 @@ class Subscription(models.Model):
     def __str__(self):
         coach_str = f" مع الكابتن {self.coach.username}" if self.coach else ""
         return f"{self.member.name} - {self.type.name}{coach_str}"
-
+    
     def can_enter(self):
-        active_freeze = self.freeze_requests.filter(is_active=True, start_date__lte=timezone.now().date()).first()
-        if active_freeze or self.is_cancelled:
+        today = timezone.now().date()
+        active_freeze = self.freeze_requests.filter(is_active=True, start_date__lte=today).first()
+        if active_freeze or self.is_cancelled or self.end_date < today:
             return False
         if self.type.max_entries == 0:
             return True

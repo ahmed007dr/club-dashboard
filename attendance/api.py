@@ -121,7 +121,8 @@ def add_attendance_api(request):
         subscription = attendance.subscription
         if not subscription.can_enter():
             attendance.delete()
-            if subscription.start_date > timezone.now().date() or subscription.end_date < timezone.now().date():
+            today = timezone.now().date()
+            if subscription.start_date > today or subscription.end_date < today:
                 return Response({'error': 'لا يمكن تسجيل الحضور: الاشتراك غير نشط'}, status=status.HTTP_400_BAD_REQUEST)
             if not subscription.type.is_active:
                 return Response({'error': 'لا يمكن تسجيل الحضور: نوع الاشتراك غير نشط'}, status=status.HTTP_400_BAD_REQUEST)
