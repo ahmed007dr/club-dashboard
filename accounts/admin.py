@@ -56,7 +56,7 @@ class CustomUserAdmin(ExportMixin, UserAdmin):
 
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
-        ('Personal Info', {'fields': ('first_name', 'last_name', 'email', 'role', 'club', 'rfid_code', 'hourly_rate')}),
+        ('Personal Info', {'fields': ('first_name', 'last_name', 'email', 'role', 'club', 'rfid_code', 'hourly_rate','expected_hours')}),
         ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser', 'groups', 'user_permissions')}),
         ('Important Dates', {'fields': ('last_login', 'date_joined')}),
     )
