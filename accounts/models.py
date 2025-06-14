@@ -17,6 +17,8 @@ class User(AbstractUser):
     notes = models.TextField(null=True, blank=True, help_text="Additional notes about the user")
     card_number = models.CharField(max_length=50, null=True, blank=True, help_text="User's card number")
     address = models.TextField(null=True, blank=True, help_text="User's address")
+    hourly_rate = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, default=0.00)
+    expected_hours = models.FloatField(default=160.0, null=True, blank=True)
     groups = models.ManyToManyField(
         Group,
         related_name='custom_user_set',

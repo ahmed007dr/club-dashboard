@@ -95,12 +95,15 @@ class StaffAttendanceSerializer(serializers.ModelSerializer):
     def get_duration_hours(self, obj):
         """Calculate the duration of attendance in hours."""
         return obj.duration_hours()
-    
+  
 
 class MonthlyDataSerializer(serializers.Serializer):
     month = serializers.CharField()
     total_hours = serializers.FloatField()
+    expected_hours = serializers.FloatField()
+    hours_status = serializers.CharField()
     attendance_days = serializers.IntegerField()
+    total_salary = serializers.FloatField()
     hours_change = serializers.FloatField()
     percentage_change = serializers.FloatField()
 
@@ -108,6 +111,7 @@ class StaffMonthlyHoursSerializer(serializers.Serializer):
     staff_id = serializers.IntegerField()
     staff_name = serializers.CharField()
     rfid_code = serializers.CharField()
+    hourly_rate = serializers.FloatField(required=False, allow_null=True, default=0.0)
     monthly_data = MonthlyDataSerializer(many=True)
 
     class Meta:
@@ -115,5 +119,6 @@ class StaffMonthlyHoursSerializer(serializers.Serializer):
             'staff_id',
             'staff_name',
             'rfid_code',
+            'hourly_rate',
             'monthly_data'
         ]

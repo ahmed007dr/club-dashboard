@@ -21,16 +21,20 @@ const CreateSubscription = ({ onClose }) => {
     start_date: "",
     paid_amount: "",
     coach: "",
-    remaining_amount: "0",
     coach_compensation_type: "from_subscription",
     coach_compensation_value: "0",
+    payment_method: "",
+    feature: "", // لتحديد الميزة (جيم، ألعاب قتالية، سباحة)
   });
 
   // Data state
   const [clubs, setClubs] = useState([]);
   const [allMembers, setAllMembers] = useState({ results: [] });
   const [allSubscriptionTypes, setAllSubscriptionTypes] = useState([]);
+  const [filteredSubscriptionTypes, setFilteredSubscriptionTypes] = useState([]); // لفلترة أنواع الاشتراكات بناءً على الميزة
   const [allCoaches, setAllCoaches] = useState([]);
+  const [allPaymentMethods, setAllPaymentMethods] = useState([]);
+  const [allFeatures, setAllFeatures] = useState([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [foundMember, setFoundMember] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -66,6 +70,34 @@ const CreateSubscription = ({ onClose }) => {
         toast.error("فشل في تحميل بيانات النادي");
       });
   }, []);
+
+  // Fetch payment methods
+  const fetchAllPaymentMethods = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}subscriptions/api/payment-methods/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error('❌ Failed to fetch payment methods:', error);
+      throw error;
+    }
+  };
+
+  // Fetch features
+  const fetchAllFeatures = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}subscriptions/api/features/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return Array.isArray(response.data) ? response.data : [];
+    } catch (error) {
+      console.error('❌ Failed to fetch features:', error);
+      throw error;
+    }
+  };
 
   const fetchAllCoaches = async () => {
     try {
@@ -134,10 +166,12 @@ const CreateSubscription = ({ onClose }) => {
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [membersResult, subscriptionTypesResult, coachesResult] = await Promise.all([
+        const [membersResult, subscriptionTypesResult, coachesResult, paymentMethodsResult, featuresResult] = await Promise.all([
           fetchAllMembers(),
           fetchAllSubscriptionTypes(),
           fetchAllCoaches(),
+          fetchAllPaymentMethods(),
+          fetchAllFeatures(),
         ]);
 
         const uniqueClubs = Array.from(
@@ -152,7 +186,10 @@ const CreateSubscription = ({ onClose }) => {
         setClubs(uniqueClubs);
         setAllMembers(membersResult);
         setAllSubscriptionTypes(subscriptionTypesResult);
+        setFilteredSubscriptionTypes(subscriptionTypesResult); // تعيين القائمة الأولية
         setAllCoaches(coachesResult);
+        setAllPaymentMethods(paymentMethodsResult);
+        setAllFeatures(featuresResult);
       } catch (error) {
         setErrorMessage("فشل في تحميل البيانات الأولية");
         setIsModalOpen(true);
@@ -163,6 +200,22 @@ const CreateSubscription = ({ onClose }) => {
 
     fetchInitialData();
   }, [dispatch]);
+
+  // Filter subscription types based on selected feature
+  useEffect(() => {
+    if (formData.feature) {
+      const filteredTypes = allSubscriptionTypes.filter(type =>
+        type.features.some(feature => feature.id.toString() === formData.feature)
+      );
+      setFilteredSubscriptionTypes(filteredTypes);
+      // إعادة تعيين نوع الاشتراك إذا لم يكن موجودًا في القائمة المفلترة
+      if (formData.type && !filteredTypes.find(type => type.id.toString() === formData.type)) {
+        setFormData(prev => ({ ...prev, type: "" }));
+      }
+    } else {
+      setFilteredSubscriptionTypes(allSubscriptionTypes);
+    }
+  }, [formData.feature, allSubscriptionTypes]);
 
   useEffect(() => {
     if (!formData.identifier || !formData.club) {
@@ -203,9 +256,9 @@ const CreateSubscription = ({ onClose }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { club, identifier, type, start_date, paid_amount, coach, remaining_amount, coach_compensation_type, coach_compensation_value } = formData;
+    const { club, identifier, type, start_date, paid_amount, coach, coach_compensation_type, coach_compensation_value, payment_method } = formData;
 
-    if (!club || !identifier || !type || !start_date || !paid_amount || !remaining_amount) {
+    if (!club || !identifier || !type || !start_date || !paid_amount || !payment_method) {
       setErrorMessage("يرجى ملء جميع الحقول المطلوبة");
       setIsModalOpen(true);
       return;
@@ -217,8 +270,14 @@ const CreateSubscription = ({ onClose }) => {
       return;
     }
 
-    if (isNaN(parseFloat(remaining_amount)) || parseFloat(remaining_amount) < 0) {
-      setErrorMessage("المبلغ المتبقي يجب أن يكون رقمًا غير سالب");
+    const selectedType = allSubscriptionTypes.find(t => t.id.toString() === type.toString());
+    if (!selectedType) {
+      setErrorMessage("نوع الاشتراك المحدد غير موجود");
+      setIsModalOpen(true);
+      return;
+    }
+    if (parseFloat(paid_amount) > parseFloat(selectedType.price)) {
+      setErrorMessage("المبلغ المدفوع لا يمكن أن يتجاوز سعر الاشتراك");
       setIsModalOpen(true);
       return;
     }
@@ -244,9 +303,12 @@ const CreateSubscription = ({ onClose }) => {
       start_date,
       paid_amount: parseFloat(paid_amount),
       coach: coach ? parseInt(coach) : null,
-      remaining_amount: parseFloat(remaining_amount),
       coach_compensation_type: coach ? coach_compensation_type : null,
       coach_compensation_value: coach ? parseFloat(coach_compensation_value) : 0,
+      payments: [{
+        amount: parseFloat(paid_amount),
+        payment_method: parseInt(payment_method),
+      }],
     };
 
     try {
@@ -273,15 +335,16 @@ const CreateSubscription = ({ onClose }) => {
         start_date: "",
         paid_amount: "",
         coach: "",
-        remaining_amount: "0",
         coach_compensation_type: "from_subscription",
-        coach_compensation_value: "0"
+        coach_compensation_value: "0",
+        payment_method: "",
+        feature: "",
       });
       setFoundMember(null);
       onClose();
     } catch (error) {
       console.error("Error creating subscription:", JSON.stringify(error, null, 2));
-      const errorData = error.payload || error.data || error.response || error;
+      const errorData = error || {};
       setErrorMessage(
         errorData?.non_field_errors?.[0] ||
         errorData?.message ||
@@ -375,6 +438,23 @@ const CreateSubscription = ({ onClose }) => {
 
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">نوع النشاط</label>
+                  <select
+                    value={formData.feature}
+                    onChange={(e) => setFormData({ ...formData, feature: e.target.value })}
+                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    disabled={isSubmitting || !foundMember}
+                  >
+                    <option value="">اختر نوع النشاط</option>
+                    {allFeatures.map((feature) => (
+                      <option key={feature.id} value={feature.id}>
+                        {feature.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
                   <select
                     value={formData.type}
@@ -384,7 +464,7 @@ const CreateSubscription = ({ onClose }) => {
                     required
                   >
                     <option value="">اختر النوع</option>
-                    {allSubscriptionTypes
+                    {filteredSubscriptionTypes
                       .filter((type) => type.club_details.id.toString() === formData.club?.toString())
                       .map((type) => (
                         <option key={type.id} value={type.id}>
@@ -393,7 +473,9 @@ const CreateSubscription = ({ onClose }) => {
                       ))}
                   </select>
                 </div>
-                
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-4">
                 <div className="w-full md:w-1/2">
                   <label className="block text-sm font-medium mb-2">المدرب</label>
                   <select
@@ -406,6 +488,24 @@ const CreateSubscription = ({ onClose }) => {
                     {allCoaches.map((coach) => (
                       <option key={coach.id} value={coach.id}>
                         {coach.username}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">طريقة الدفع</label>
+                  <select
+                    value={formData.payment_method}
+                    onChange={(e) => setFormData({ ...formData, payment_method: e.target.value })}
+                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    disabled={isSubmitting || !foundMember}
+                    required
+                  >
+                    <option value="">اختر طريقة الدفع</option>
+                    {allPaymentMethods.map((method) => (
+                      <option key={method.id} value={method.id}>
+                        {method.name}
                       </option>
                     ))}
                   </select>
@@ -437,25 +537,6 @@ const CreateSubscription = ({ onClose }) => {
                     value={formData.paid_amount}
                     onChange={(e) =>
                       setFormData({ ...formData, paid_amount: e.target.value })
-                    }
-                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-                    placeholder="0.00"
-                    disabled={isSubmitting || !foundMember}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-medium mb-2">المبلغ المتبقي</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={formData.remaining_amount}
-                    onChange={(e) =>
-                      setFormData({ ...formData, remaining_amount: e.target.value })
                     }
                     className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
                     placeholder="0.00"

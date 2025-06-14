@@ -10,16 +10,95 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
-from subscriptions.models import Subscription, SubscriptionType, FreezeRequest
-from subscriptions.serializers import SubscriptionSerializer, SubscriptionTypeSerializer, CoachReportSerializer, MemberBehaviorSerializer
+import logging
+
+from .models import Subscription, SubscriptionType, FreezeRequest, Feature, PaymentMethod, Payment
+from .serializers import SubscriptionSerializer, SubscriptionTypeSerializer, CoachReportSerializer, MemberBehaviorSerializer, FeatureSerializer, PaymentMethodSerializer, PaymentSerializer
 from finance.models import Income, IncomeSource
 from members.models import Member
 from accounts.models import User
 from attendance.models import Attendance
 from utils.permissions import IsOwnerOrRelatedToClub
-import logging
 
 logger = logging.getLogger(__name__)
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def feature_list(request):
+    """List or create features."""
+    if request.method == 'GET':
+        features = Feature.objects.filter(club=request.user.club, is_active=True)
+        serializer = FeatureSerializer(features, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = FeatureSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(club=request.user.club)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def feature_detail(request, pk):
+    """Retrieve, update, or delete a feature."""
+    feature = get_object_or_404(Feature, pk=pk, club=request.user.club)
+    
+    if request.method == 'GET':
+        serializer = FeatureSerializer(feature)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        serializer = FeatureSerializer(feature, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        if SubscriptionType.objects.filter(features=feature).exists():
+            return Response({"error": "لا يمكن حذف ميزة مرتبطة بنوع اشتراك."}, status=status.HTTP_400_BAD_REQUEST)
+        feature.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def payment_method_list(request):
+    """List or create payment methods."""
+    if request.method == 'GET':
+        methods = PaymentMethod.objects.filter(club=request.user.club, is_active=True)
+        serializer = PaymentMethodSerializer(methods, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        serializer = PaymentMethodSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(club=request.user.club)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def payment_method_detail(request, pk):
+    """Retrieve, update, or delete a payment method."""
+    method = get_object_or_404(PaymentMethod, pk=pk, club=request.user.club)
+    
+    if request.method == 'GET':
+        serializer = PaymentMethodSerializer(method)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        serializer = PaymentMethodSerializer(method, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        if Payment.objects.filter(payment_method=method).exists():
+            return Response({"error": "لا يمكن حذف طريقة دفع مستخدمة في مدفوعات."}, status=status.HTTP_400_BAD_REQUEST)
+        method.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -29,9 +108,7 @@ def subscription_type_list(request):
         search_term = request.GET.get('q', '')
         status_filter = request.GET.get('status', 'all')
         duration = request.GET.get('duration', '')
-        includes_gym = request.GET.get('includes_gym', '')
-        includes_pool = request.GET.get('includes_pool', '')
-        includes_classes = request.GET.get('includes_classes', '')
+        feature_id = request.GET.get('feature_id', '')
 
         types = SubscriptionType.objects.filter(club=request.user.club).annotate(
             active_subscriptions_count=Count('subscriptions', filter=Q(subscriptions__end_date__gte=timezone.now().date()))
@@ -46,12 +123,11 @@ def subscription_type_list(request):
                 types = types.filter(duration_days=int(duration))
             except ValueError:
                 pass
-        if includes_gym in ('yes', 'no'):
-            types = types.filter(includes_gym=includes_gym == 'yes')
-        if includes_pool in ('yes', 'no'):
-            types = types.filter(includes_pool=includes_pool == 'yes')
-        if includes_classes in ('yes', 'no'):
-            types = types.filter(includes_classes=includes_classes == 'yes')
+        if feature_id:
+            try:
+                types = types.filter(features__id=int(feature_id))
+            except ValueError:
+                pass
 
         types = types.order_by('-id')
         paginator = PageNumberPagination()
@@ -62,9 +138,42 @@ def subscription_type_list(request):
     elif request.method == 'POST':
         serializer = SubscriptionTypeSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
-            subscription_type = serializer.save()
+            subscription_type = serializer.save(club=request.user.club)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def subscription_type_detail(request, pk):
+    """Retrieve, update, or delete a subscription type (Owner/Admin only for PUT/DELETE)."""
+    subscription_type = get_object_or_404(SubscriptionType, pk=pk)
+    if request.method != 'GET' and request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == 'GET':
+        serializer = SubscriptionTypeSerializer(subscription_type)
+        return Response(serializer.data)
+    elif request.method == 'PUT':
+        serializer = SubscriptionTypeSerializer(subscription_type, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        if Subscription.objects.filter(type=subscription_type).exists():
+            return Response({'error': 'لا يمكن حذف نوع اشتراك مرتبط باشتراكات نشطة'}, status=status.HTTP_400_BAD_REQUEST)
+        subscription_type.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def active_subscription_types(request):
+    """List active subscription types."""
+    types = SubscriptionType.objects.filter(is_active=True, club=request.user.club).order_by('id')
+    paginator = PageNumberPagination()
+    page = paginator.paginate_queryset(types, request)
+    serializer = SubscriptionTypeSerializer(page, many=True)
+    return paginator.get_paginated_response(serializer.data)
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -117,61 +226,48 @@ def subscription_list(request):
         mutable_data = request.data.copy()
         mutable_data['created_by'] = request.user.id
         mutable_data['club'] = request.user.club.id
-        serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
-        if serializer.is_valid():
-            subscription = serializer.save()
-            if subscription.paid_amount > 0 or (subscription.coach and subscription.coach_compensation_type == 'external' and subscription.coach_compensation_value > 0):
-                source, _ = IncomeSource.objects.get_or_create(
-                    club=subscription.club, name='Subscription', defaults={'description': 'إيراد عن اشتراك'}
-                )
-                amount = subscription.paid_amount
-                if subscription.coach and subscription.coach_compensation_type == 'external':
-                    amount += subscription.coach_compensation_value or 0
-                description = f"اشتراك {subscription.member.name}"
-                if subscription.coach:
-                    description += f" مع الكابتن {subscription.coach.username}" + (
-                        f" بمبلغ خارجي {subscription.coach_compensation_value} جنيه" if subscription.coach_compensation_type == 'external'
-                        else f" بنسبة {subscription.coach_compensation_value}% من الاشتراك"
+        payment_data = mutable_data.pop('payments', [])
+
+        with transaction.atomic():
+            serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
+            if serializer.is_valid():
+                subscription = serializer.save()
+                
+                total_paid = Decimal('0')
+                for payment in payment_data:
+                    payment['subscription'] = subscription.id
+                    payment['created_by'] = request.user.id
+                    payment_serializer = PaymentSerializer(data=payment, context={'request': request})
+                    if payment_serializer.is_valid():
+                        payment_serializer.save()
+                        total_paid += Decimal(payment['amount'])
+                    else:
+                        return Response(payment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+                subscription.paid_amount = total_paid
+                subscription.remaining_amount = subscription.type.price - total_paid
+                subscription.save()
+
+                if total_paid > 0 or (subscription.coach and subscription.coach_compensation_type == 'external' and subscription.coach_compensation_value > 0):
+                    source, _ = IncomeSource.objects.get_or_create(
+                        club=subscription.club, name='Subscription', defaults={'description': 'إيراد عن اشتراك'}
                     )
-                Income.objects.create(
-                    club=subscription.club, source=source, amount=amount, description=description,
-                    date=timezone.now().date(), received_by=request.user
-                )
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+                    amount = total_paid
+                    if subscription.coach and subscription.coach_compensation_type == 'external':
+                        amount += subscription.coach_compensation_value or 0
+                    description = f"اشتراك {subscription.member.name}"
+                    if subscription.coach:
+                        description += f" مع الكابتن {subscription.coach.username}" + (
+                            f" بمبلغ خارجي {subscription.coach_compensation_value} جنيه" if subscription.coach_compensation_type == 'external'
+                            else f" بنسبة {subscription.coach_compensation_value}% من الاشتراك"
+                        )
+                    Income.objects.create(
+                        club=subscription.club, source=source, amount=amount, description=description,
+                        date=timezone.now().date(), received_by=request.user
+                    )
 
-@api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def subscription_type_detail(request, pk):
-    """Retrieve, update, or delete a subscription type (Owner/Admin only for PUT/DELETE)."""
-    subscription_type = get_object_or_404(SubscriptionType, pk=pk)
-    if request.method != 'GET' and request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-
-    if request.method == 'GET':
-        serializer = SubscriptionTypeSerializer(subscription_type)
-        return Response(serializer.data)
-    elif request.method == 'PUT':
-        serializer = SubscriptionTypeSerializer(subscription_type, data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    elif request.method == 'DELETE':
-        if Subscription.objects.filter(type=subscription_type).exists():
-            return Response({'error': 'لا يمكن حذف نوع اشتراك مرتبط باشتراكات نشطة'}, status=status.HTTP_400_BAD_REQUEST)
-        subscription_type.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def active_subscription_types(request):
-    """List active subscription types."""
-    types = SubscriptionType.objects.filter(is_active=True, club=request.user.club).order_by('id')
-    paginator = PageNumberPagination()
-    page = paginator.paginate_queryset(types, request)
-    serializer = SubscriptionTypeSerializer(page, many=True)
-    return paginator.get_paginated_response(serializer.data)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -255,48 +351,113 @@ def upcoming_subscriptions(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def renew_subscription(request, pk):
-    """Renew a subscription."""
+    """Renew a subscription with new payment details."""
     subscription = get_object_or_404(Subscription, pk=pk)
-    new_end_date = subscription.end_date + timedelta(days=subscription.type.duration_days)
-    subscription.end_date = new_end_date
-    subscription.paid_amount = subscription.type.price
-    subscription.remaining_amount = 0
-    subscription.entry_count = 0
-    subscription.save()
-    source, _ = IncomeSource.objects.get_or_create(
-        club=subscription.club, name='Renewal', defaults={'description': 'إيراد عن تجديد اشتراك'}
-    )
-    Income.objects.create(
-        club=subscription.club, source=source, amount=subscription.type.price,
-        description=f"تجديد اشتراك {subscription.member.name}", date=timezone.now().date(), received_by=request.user
-    )
-    serializer = SubscriptionSerializer(subscription)
-    return Response(serializer.data)
+    if subscription.is_cancelled:
+        return Response({"error": "لا يمكن تجديد اشتراك ملغى"}, status=status.HTTP_400_BAD_REQUEST)
+
+    payment_data = request.data.get('payments', [])
+    
+    with transaction.atomic():
+        new_end_date = subscription.end_date + timedelta(days=subscription.type.duration_days)
+        subscription.end_date = new_end_date
+        subscription.entry_count = 0
+        subscription.paid_amount = Decimal('0')
+        subscription.remaining_amount = subscription.type.price
+        subscription.save()
+
+        total_paid = Decimal('0')
+        for payment in payment_data:
+            payment['subscription'] = subscription.id
+            payment['created_by'] = request.user.id
+            payment_serializer = PaymentSerializer(data=payment, context={'request': request})
+            if payment_serializer.is_valid():
+                payment_serializer.save()
+                total_paid += Decimal(payment['amount'])
+            else:
+                return Response(payment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        subscription.paid_amount = total_paid
+        subscription.remaining_amount = subscription.type.price - total_paid
+        subscription.save()
+
+        if total_paid > 0:
+            source, _ = IncomeSource.objects.get_or_create(
+                club=subscription.club, name='Renewal', defaults={'description': 'إيراد عن تجديد اشتراك'}
+            )
+            Income.objects.create(
+                club=subscription.club, source=source, amount=total_paid,
+                description=f"تجديد اشتراك {subscription.member.name}",
+                date=timezone.now().date(), received_by=request.user
+            )
+
+        serializer = SubscriptionSerializer(subscription)
+        return Response(serializer.data)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def make_payment(request, pk):
-    """Make a payment for a subscription."""
+    """Add a payment to an existing subscription."""
     subscription = get_object_or_404(Subscription, pk=pk)
+    if subscription.is_cancelled:
+        return Response({"error": "لا يمكن إضافة دفعات لاشتراك ملغى"}, status=status.HTTP_400_BAD_REQUEST)
     if subscription.remaining_amount <= 0:
         return Response({"error": "لا يوجد مبلغ متبقي للدفع"}, status=status.HTTP_400_BAD_REQUEST)
-    amount = Decimal(request.data.get('amount', 0))
-    if amount <= 0:
-        return Response({"error": "يجب أن يكون المبلغ موجبًا"}, status=status.HTTP_400_BAD_REQUEST)
-    if amount > subscription.remaining_amount:
-        return Response({"error": f"المبلغ لا يمكن أن يتجاوز المتبقي {subscription.remaining_amount}"}, status=status.HTTP_400_BAD_REQUEST)
-    subscription.paid_amount += amount
-    subscription.remaining_amount = max(Decimal('0'), subscription.type.price - subscription.paid_amount)
-    subscription.save()
-    source, _ = IncomeSource.objects.get_or_create(
-        club=subscription.club, name='Subscription', defaults={'description': 'إيراد عن اشتراك'}
-    )
-    Income.objects.create(
-        club=subscription.club, source=source, amount=amount, description=f"إيراد اشتراك {subscription.member.name}",
-        date=timezone.now().date(), received_by=request.user
-    )
-    serializer = SubscriptionSerializer(subscription)
-    return Response(serializer.data)
+
+    payment_data = request.data.copy()
+    payment_data['subscription'] = subscription.id
+    payment_data['created_by'] = request.user.id
+
+    with transaction.atomic():
+        payment_serializer = PaymentSerializer(data=payment_data, context={'request': request})
+        if payment_serializer.is_valid():
+            payment = payment_serializer.save()
+            subscription.paid_amount += payment.amount
+            subscription.remaining_amount = max(Decimal('0'), subscription.type.price - subscription.paid_amount)
+            subscription.save()
+
+            source, _ = IncomeSource.objects.get_or_create(
+                club=subscription.club, name='Subscription', defaults={'description': 'إيراد عن اشتراك'}
+            )
+            Income.objects.create(
+                club=subscription.club, source=source, amount=payment.amount,
+                description=f"إيراد اشتراك {subscription.member.name}",
+                date=timezone.now().date(), received_by=request.user
+            )
+
+            serializer = SubscriptionSerializer(subscription)
+            return Response(serializer.data)
+        return Response(payment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def cancel_subscription(request, pk):
+    """Cancel a subscription and process refund."""
+    subscription = get_object_or_404(Subscription, pk=pk)
+    if subscription.is_cancelled:
+        return Response({"error": "الاشتراك ملغى بالفعل"}, status=status.HTTP_400_BAD_REQUEST)
+    if request.user.role not in ['owner', 'admin']:
+        return Response({'error': 'غير مسموح بالإلغاء. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+
+    with transaction.atomic():
+        refund_amount = subscription.calculate_refunded_amount()
+        subscription.is_cancelled = True
+        subscription.cancellation_date = timezone.now().date()
+        subscription.refund_amount = refund_amount
+        subscription.save()
+
+        if refund_amount > 0:
+            source, _ = IncomeSource.objects.get_or_create(
+                club=subscription.club, name='Refund', defaults={'description': 'إيراد سالب عن استرداد اشتراك'}
+            )
+            Income.objects.create(
+                club=subscription.club, source=source, amount=-refund_amount,
+                description=f"استرداد اشتراك {subscription.member.name}",
+                date=timezone.now().date(), received_by=request.user
+            )
+
+        serializer = SubscriptionSerializer(subscription)
+        return Response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -327,95 +488,9 @@ def subscription_stats(request):
         'active': Subscription.objects.filter(start_date__lte=today, end_date__gte=today, club=request.user.club).count(),
         'expired': Subscription.objects.filter(end_date__lt=today, club=request.user.club).count(),
         'upcoming': Subscription.objects.filter(start_date__gt=today, club=request.user.club).count(),
+        'cancelled': Subscription.objects.filter(is_cancelled=True, club=request.user.club).count(),
     }
     return Response(stats)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def request_freeze(request, pk):
-    """Request a freeze for a subscription."""
-    subscription = get_object_or_404(Subscription, pk=pk)
-    requested_days = request.data.get('requested_days', 0)
-    start_date_str = request.data.get('start_date', timezone.now().date())
-    try:
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if isinstance(start_date_str, str) else start_date_str
-    except ValueError:
-        return Response({'error': 'صيغة تاريخ البدء غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
-    if requested_days <= 0:
-        return Response({'error': 'عدد أيام التجميد يجب أن يكون موجبًا'}, status=status.HTTP_400_BAD_REQUEST)
-    if start_date < timezone.now().date():
-        return Response({'error': 'لا يمكن أن يكون تاريخ البدء في الماضي'}, status=status.HTTP_400_BAD_REQUEST)
-    if subscription.freeze_requests.filter(is_active=True).exists():
-        return Response({'error': 'هذا الاشتراك لديه تجميد نشط بالفعل'}, status=status.HTTP_400_BAD_REQUEST)
-    total_freeze_days = sum(fr.requested_days for fr in subscription.freeze_requests.filter(is_active=False, cancelled_at__isnull=True))
-    if total_freeze_days + requested_days > subscription.type.max_freeze_days:
-        return Response({'error': f'إجمالي أيام التجميد ({total_freeze_days + requested_days}) يتجاوز الحد الأقصى ({subscription.type.max_freeze_days})'}, status=status.HTTP_400_BAD_REQUEST)
-    freeze_request = FreezeRequest(subscription=subscription, requested_days=requested_days, start_date=start_date, is_active=True, created_by=request.user)
-    freeze_request.save()
-    serializer = SubscriptionSerializer(subscription)
-    return Response(serializer.data, status=status.HTTP_201_CREATED)
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def cancel_freeze(request, freeze_id):
-    """Cancel a freeze request."""
-    freeze_request = get_object_or_404(FreezeRequest, pk=freeze_id)
-    if not freeze_request.is_active:
-        return Response({'error': 'طلب التجميد غير نشط'}, status=status.HTTP_400_BAD_REQUEST)
-    today = timezone.now().date()
-    used_days = (today - freeze_request.start_date).days
-    used_days = max(0, min(used_days, freeze_request.requested_days))
-    subscription = freeze_request.subscription
-    remaining_days = freeze_request.requested_days - used_days
-    if remaining_days > 0:
-        subscription.end_date -= timedelta(days=remaining_days)
-        subscription.save()
-    freeze_request.is_active = False
-    freeze_request.cancelled_at = timezone.now()
-    freeze_request.save()
-    serializer = SubscriptionSerializer(subscription)
-    return Response(serializer.data)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def coach_report(request, coach_id):
-    """Get report for a specific coach."""
-    coach = get_object_or_404(User, pk=coach_id, role='coach', is_active=True)
-    if coach.club != request.user.club and request.user.role != 'owner':
-        return Response({'error': 'غير مخول لعرض تقرير هذا الكابتن'}, status=status.HTTP_403_FORBIDDEN)
-    start_date = request.query_params.get('start_date')
-    end_date = request.query_params.get('end_date')
-    type_id = request.query_params.get('type_id')
-    try:
-        start_date = datetime.strptime(start_date, '%Y-%m-%d').date() if start_date else timezone.now().date().replace(day=1)
-        end_date = datetime.strptime(end_date, '%Y-%m-%d').date() if end_date else timezone.now().date()
-    except ValueError:
-        return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
-    subscriptions = Subscription.objects.filter(coach=coach, club=request.user.club, start_date__lte=end_date, end_date__gte=start_date).select_related('member', 'type').prefetch_related('attendance_attendances')
-    if type_id:
-        try:
-            subscriptions = subscriptions.filter(type_id=int(type_id))
-        except ValueError:
-            return Response({'error': 'معرف نوع الاشتراك غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
-    prev_month_end = start_date - timedelta(days=1)
-    prev_month_start = prev_month_end.replace(day=1)
-    prev_month_clients = Subscription.objects.filter(
-        coach=coach, club=request.user.club, start_date__lte=prev_month_end, end_date__gte=prev_month_start
-    ).filter(type_id=type_id if type_id else Q()).aggregate(prev_clients=Count('id'))['prev_clients'] or 0
-    aggregated_data = subscriptions.aggregate(
-        active_clients=Count('id', filter=Q(start_date__lte=timezone.now().date(), end_date__gte=timezone.now().date())),
-        total_coach_compensation=Sum('coach_compensation_value', filter=Q(coach_compensation_type='external')),
-        total_paid_amount=Sum('paid_amount'),
-        total_remaining_amount=Sum('remaining_amount')
-    )
-    report = {
-        'coach_id': coach.id, 'coach_username': coach.username, 'active_clients': aggregated_data['active_clients'] or 0,
-        'total_coach_compensation': aggregated_data['total_coach_compensation'] or 0, 'total_paid_amount': aggregated_data['total_paid_amount'] or 0,
-        'total_remaining_amount': aggregated_data['total_remaining_amount'] or 0, 'previous_month_clients': prev_month_clients,
-        'subscriptions': subscriptions, 'club': request.user.club, 'start_date': start_date, 'end_date': end_date
-    }
-    serializer = CoachReportSerializer(report)
-    return Response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -573,3 +648,89 @@ def subscription_analytics(request):
         'date_range': {'start_date': str(start_date), 'end_date': str(end_date)}
     }
     return Response(response)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def request_freeze(request, pk):
+    """Request a freeze for a subscription."""
+    subscription = get_object_or_404(Subscription, pk=pk)
+    requested_days = request.data.get('requested_days', 0)
+    start_date_str = request.data.get('start_date', timezone.now().date())
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if isinstance(start_date_str, str) else start_date_str
+    except ValueError:
+        return Response({'error': 'صيغة تاريخ البدء غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+    if requested_days <= 0:
+        return Response({'error': 'عدد أيام التجميد يجب أن يكون موجبًا'}, status=status.HTTP_400_BAD_REQUEST)
+    if start_date < timezone.now().date():
+        return Response({'error': 'لا يمكن أن يكون تاريخ البدء في الماضي'}, status=status.HTTP_400_BAD_REQUEST)
+    if subscription.freeze_requests.filter(is_active=True).exists():
+        return Response({'error': 'هذا الاشتراك لديه تجميد نشط بالفعل'}, status=status.HTTP_400_BAD_REQUEST)
+    total_freeze_days = sum(fr.requested_days for fr in subscription.freeze_requests.filter(is_active=False, cancelled_at__isnull=True))
+    if total_freeze_days + requested_days > subscription.type.max_freeze_days:
+        return Response({'error': f'إجمالي أيام التجميد ({total_freeze_days + requested_days}) يتجاوز الحد الأقصى ({subscription.type.max_freeze_days})'}, status=status.HTTP_400_BAD_REQUEST)
+    freeze_request = FreezeRequest(subscription=subscription, requested_days=requested_days, start_date=start_date, is_active=True, created_by=request.user)
+    freeze_request.save()
+    serializer = SubscriptionSerializer(subscription)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def cancel_freeze(request, freeze_id):
+    """Cancel a freeze request."""
+    freeze_request = get_object_or_404(FreezeRequest, pk=freeze_id)
+    if not freeze_request.is_active:
+        return Response({'error': 'طلب التجميد غير نشط'}, status=status.HTTP_400_BAD_REQUEST)
+    today = timezone.now().date()
+    used_days = max(0, min((today - freeze_request.start_date).days, freeze_request.requested_days))
+    subscription = freeze_request.subscription
+    remaining_days = freeze_request.requested_days - used_days
+    if remaining_days > 0:
+        subscription.end_date -= timedelta(days=remaining_days)
+        subscription.save()
+    freeze_request.is_active = False
+    freeze_request.cancelled_at = timezone.now()
+    freeze_request.save()
+    serializer = SubscriptionSerializer(subscription)
+    return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def coach_report(request, coach_id):
+    """Get report for a specific coach."""
+    coach = get_object_or_404(User, pk=coach_id, role='coach', is_active=True)
+    if coach.club != request.user.club and request.user.role != 'owner':
+        return Response({'error': 'غير مخول لعرض تقرير هذا الكابتن'}, status=status.HTTP_403_FORBIDDEN)
+    start_date = request.query_params.get('start_date')
+    end_date = request.query_params.get('end_date')
+    type_id = request.query_params.get('type_id')
+    try:
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date() if start_date else timezone.now().date().replace(day=1)
+        end_date = datetime.strptime(end_date, '%Y-%m-%d').date() if end_date else timezone.now().date()
+    except ValueError:
+        return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+    subscriptions = Subscription.objects.filter(coach=coach, club=request.user.club, start_date__lte=end_date, end_date__gte=start_date).select_related('member', 'type').prefetch_related('attendance_attendances')
+    if type_id:
+        try:
+            subscriptions = subscriptions.filter(type_id=int(type_id))
+        except ValueError:
+            return Response({'error': 'معرف نوع الاشتراك غير صحيح'}, status=status.HTTP_400_BAD_REQUEST)
+    prev_month_end = start_date - timedelta(days=1)
+    prev_month_start = prev_month_end.replace(day=1)
+    prev_month_clients = Subscription.objects.filter(
+        coach=coach, club=request.user.club, start_date__lte=prev_month_end, end_date__gte=prev_month_start
+    ).filter(type_id=type_id if type_id else Q()).aggregate(prev_clients=Count('id'))['prev_clients'] or 0
+    aggregated_data = subscriptions.aggregate(
+        active_clients=Count('id', filter=Q(start_date__lte=timezone.now().date(), end_date__gte=timezone.now().date())),
+        total_coach_compensation=Sum('coach_compensation_value', filter=Q(coach_compensation_type='external')),
+        total_paid_amount=Sum('paid_amount'),
+        total_remaining_amount=Sum('remaining_amount')
+    )
+    report = {
+        'coach_id': coach.id, 'coach_username': coach.username, 'active_clients': aggregated_data['active_clients'] or 0,
+        'total_coach_compensation': aggregated_data['total_coach_compensation'] or 0, 'total_paid_amount': aggregated_data['total_paid_amount'] or 0,
+        'total_remaining_amount': aggregated_data['total_remaining_amount'] or 0, 'previous_month_clients': prev_month_clients,
+        'subscriptions': subscriptions, 'club': request.user.club, 'start_date': start_date, 'end_date': end_date
+    }
+    serializer = CoachReportSerializer(report)
+    return Response(serializer.data)

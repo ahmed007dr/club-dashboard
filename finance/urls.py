@@ -34,4 +34,7 @@ urlpatterns = [
     path('api/stock-inventory/', api.stock_inventory_api, name='api-stock-inventory'),
     path('api/stock-profit/', api.stock_profit_api, name='api-stock-profit'),
     path('api/stock-sales-analysis/', api.stock_sales_analysis_api, name='api-stock-sales-analysis'),
+    path('api/schedule/', api.schedule_api, name='schedule_api'),
+    path('api/stock-inventory-pdf/', api.generate_inventory_pdf, name='generate_inventory_pdf'),
+
     ]
