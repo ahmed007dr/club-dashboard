@@ -410,7 +410,7 @@ def renew_subscription(request, pk):
         source, _ = IncomeSource.objects.get_or_create(
             club=subscription.club, name='Renewal', defaults={'description': 'إيراد عن تجديد اشتراك'}
         )
-        amount = subscription.type.price  # استخدم سعر الاشتراك الكلي
+        amount = subscription.type.price  
         if subscription.coach and subscription.coach_compensation_type == 'external':
             amount += subscription.coach_compensation_value or Decimal('0')
         Income.objects.create(

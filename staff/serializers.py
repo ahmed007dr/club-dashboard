@@ -71,32 +71,34 @@ class ShiftSerializer(serializers.ModelSerializer):
         return data
 
 class StaffAttendanceSerializer(serializers.ModelSerializer):
-    """Serializer for StaffAttendance model, including duration and shift details."""
     duration_hours = serializers.SerializerMethodField()
     shift_details = ShiftSerializer(source='shift', read_only=True)
     staff_details = UserSerializer(source='staff', read_only=True)
     club_details = ClubSerializer(source='club', read_only=True)
+    rfid_code = serializers.CharField(source='staff.rfid_code', read_only=True)
+    member_name = serializers.CharField(source='staff.username', read_only=True)
 
     class Meta:
         model = StaffAttendance
         fields = [
-            'id',
-            'staff',
-            'staff_details',
-            'club',
-            'club_details',
-            'check_in',
-            'check_out',
-            'shift',
-            'shift_details',
-            'duration_hours'
+            'id', 'staff', 'staff_details', 'club', 'club_details',
+            'check_in', 'check_out', 'shift', 'shift_details',
+            'duration_hours', 'rfid_code', 'member_name'
         ]
 
     def get_duration_hours(self, obj):
-        """Calculate the duration of attendance in hours."""
         return obj.duration_hours()
-  
 
+    def validate(self, data):
+        check_in = data.get('check_in')
+        staff = data.get('staff')
+        check_in_date = check_in.date()
+        if StaffAttendance.objects.filter(staff=staff, check_in__date=check_in_date).exists():
+            raise serializers.ValidationError({
+                'check_in': 'تم تسجيل حضور لهذا الموظف اليوم.'
+            })
+        return data
+    
 class MonthlyDataSerializer(serializers.Serializer):
     month = serializers.CharField()
     total_hours = serializers.FloatField()

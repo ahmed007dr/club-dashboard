@@ -338,7 +338,7 @@ const Attendance = () => {
                         </p>
                         <p className="flex items-center gap-2">
                           <FiHash className="text-blue-600" />
-                          #{foundSubscription.member_details?.membership_number}
+                          #{foundSubscription.member_details?.rfid_code}
                         </p>
                         <p className="flex items-center gap-2">
                           <FiDollarSign className="text-blue-600" />
