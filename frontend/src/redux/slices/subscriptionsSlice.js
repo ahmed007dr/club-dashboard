@@ -155,7 +155,6 @@ export const deleteSubscriptionById = createAsyncThunk(
 );
 
 // إضافة اشتراك جديد
-
 export const postSubscription = createAsyncThunk(
   'subscriptions/postSubscription',
   async (subscriptionData, { rejectWithValue }) => {
@@ -177,20 +176,14 @@ export const postSubscription = createAsyncThunk(
       );
       return response.data;
     } catch (error) {
-      console.error('Error posting subscription:', {
-        message: error.message,
-        status: error.response?.status,
-        data: error.response?.data,
-        error: error,
-      });
+      console.error('Error posting subscription:', error);
       return rejectWithValue({
-        status: error.response?.status,
-        data: error.response?.data || { message: error.message },
-        errors: error.response?.data?.non_field_errors || error.response?.data || [error.message],
+        message: error.response?.data?.non_field_errors?.[0] || error.response?.data?.message || error.message,
       });
     }
   }
 );
+
 
 // تحديث نوع اشتراك
 export const putSubscriptionType = createAsyncThunk(

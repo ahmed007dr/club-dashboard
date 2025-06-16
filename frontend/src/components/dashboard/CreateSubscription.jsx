@@ -24,7 +24,7 @@ const CreateSubscription = ({ onClose }) => {
     coach_compensation_value: "0",
     payment_method: "",
     transaction_id: "",
-    notes: "", 
+    notes: "",
   });
 
   // Data state
@@ -298,27 +298,11 @@ const CreateSubscription = ({ onClose }) => {
         notes: "",
       });
       setFoundMember(null);
+      setIsModalOpen(false); // إغلاق الـ pop-up إذا كان مفتوحًا
       onClose();
     } catch (error) {
-      const errorData = error.payload?.data || {};
-      const nonFieldErrors = error.payload?.errors || errorData.non_field_errors || [];
-      let errorMsg = nonFieldErrors[0] ||
-        errorData.payment_method_id?.[0] ||
-        errorData.identifier?.[0] ||
-        errorData.type?.[0] ||
-        errorData.message ||
-        error.payload?.data?.message ||
-        Object.values(errorData)?.flat()?.[0] ||
-        JSON.stringify(errorData) ||
-        error.message ||
-        "حدث خطأ غير متوقع أثناء إنشاء الاشتراك";
-
-      if (errorMsg.includes("يجب تسوية المدفوعات المستحقة أولاً")) {
-        errorMsg = "لا يمكن إنشاء اشتراك جديد لأن العضو لديه مدفوعات مستحقة. يرجى تسوية المبالغ المتبقية أولاً.";
-      } else if (errorMsg.includes("لا يمكن إنشاء اشتراك جديد يبدأ قبل")) {
-        errorMsg = `لا يمكن إنشاء اشتراك جديد لأن العضو لديه اشتراك نشط حتى ${errorMsg.match(/\d{4}-\d{2}-\d{2}/)?.[0] || 'تاريخ غير محدد'}.`;
-      }
-
+      console.log('Error:', error); // للتصحيح
+      const errorMsg = error.payload?.message || "حدث خطأ غير متوقع أثناء إنشاء الاشتراك";
       setErrorMessage(errorMsg);
       setIsModalOpen(true);
     } finally {
