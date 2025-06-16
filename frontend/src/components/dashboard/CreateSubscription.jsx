@@ -222,48 +222,49 @@ const CreateSubscription = ({ onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { identifier, type, start_date, paid_amount, coach, coach_compensation_type, coach_compensation_value, payment_method, transaction_id, notes } = formData;
-
+  
+    // Client-side validation
     if (!userClub || !identifier || !type || !start_date || !paid_amount || !payment_method) {
       setErrorMessage("يرجى ملء جميع الحقول المطلوبة، بما في ذلك طريقة الدفع");
       setIsModalOpen(true);
       return;
     }
-
+  
     const paidAmount = parseFloat(paid_amount) || 0;
     if (isNaN(paidAmount) || paidAmount < 0) {
       setErrorMessage("المبلغ المدفوع يجب أن يكون رقمًا صحيحًا وغير سالب");
       setIsModalOpen(true);
       return;
     }
-
+  
     const paymentMethodId = parseInt(payment_method);
     if (isNaN(paymentMethodId)) {
       setErrorMessage("يرجى اختيار طريقة دفع صالحة");
       setIsModalOpen(true);
       return;
     }
-
+  
     const selectedType = allSubscriptionTypes.find(t => t.id.toString() === type.toString());
     if (!selectedType) {
       setErrorMessage("نوع الاشتراك المحدد غير موجود");
       setIsModalOpen(true);
       return;
     }
-
+  
     if (coach && (!coach_compensation_type || isNaN(parseFloat(coach_compensation_value)) || parseFloat(coach_compensation_value) < 0)) {
       setErrorMessage("يرجى تحديد نوع تعويض الكابتن وقيمة صالحة غير سالبة");
       setIsModalOpen(true);
       return;
     }
-
+  
     if (coach_compensation_type === 'from_subscription' && parseFloat(coach_compensation_value) > 100) {
       setErrorMessage("نسبة الكابتن لا يمكن أن تتجاوز 100%");
       setIsModalOpen(true);
       return;
     }
-
+  
     setIsSubmitting(true);
-
+  
     const payload = {
       club: userClub.id,
       identifier,
@@ -279,7 +280,7 @@ const CreateSubscription = ({ onClose }) => {
         notes: notes || "",
       }],
     };
-
+  
     try {
       const response = await dispatch(postSubscription(payload)).unwrap();
       toast.success("تم إنشاء الاشتراك بنجاح!");
@@ -298,18 +299,30 @@ const CreateSubscription = ({ onClose }) => {
         notes: "",
       });
       setFoundMember(null);
-      setIsModalOpen(false); // إغلاق الـ pop-up إذا كان مفتوحًا
+      setIsModalOpen(false);
       onClose();
     } catch (error) {
-      console.log('Error:', error); // للتصحيح
-      const errorMsg = error.payload?.message || "حدث خطأ غير متوقع أثناء إنشاء الاشتراك";
-      setErrorMessage(errorMsg);
+      console.log("Full error object:", JSON.stringify(error, null, 2));
+      let errorData = error.payload || error.data || error.response?.data || error;
+      if (errorData?.non_field_errors && Array.isArray(errorData.non_field_errors)) {
+        setErrorMessage(errorData.non_field_errors[0]);
+      } else if (errorData?.identifier) {
+        setErrorMessage(errorData.identifier[0]);
+      } else if (errorData?.type) {
+        setErrorMessage(errorData.type[0]);
+      } else if (errorData?.payments && Array.isArray(errorData.payments)) {
+        setErrorMessage(errorData.payments[0]?.amount || errorData.payments[0]?.payment_method_id || "خطأ في بيانات الدفع");
+      } else if (errorData?.message) {
+        setErrorMessage(errorData.message);
+      } else {
+        setErrorMessage("حدث خطأ غير متوقع أثناء إنشاء الاشتراك");
+      }
       setIsModalOpen(true);
     } finally {
       setIsSubmitting(false);
     }
   };
-
+  
   return (
     <div className="container w-full mx-auto p-4" dir="rtl">
       <h2 className="text-xl font-bold mb-6">إنشاء اشتراك جديد</h2>
