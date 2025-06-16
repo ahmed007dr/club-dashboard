@@ -23,8 +23,8 @@ const CreateSubscription = ({ onClose }) => {
     coach_compensation_type: "from_subscription",
     coach_compensation_value: "0",
     payment_method: "",
-    transaction_id: "", // إضافة transaction_id
-    notes: "", // إضافة notes
+    transaction_id: "",
+    notes: "", 
   });
 
   // Data state

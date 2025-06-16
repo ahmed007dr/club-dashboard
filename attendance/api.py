@@ -111,6 +111,7 @@ def delete_attendance_api(request, attendance_id):
     attendance.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_attendance_api(request):
@@ -121,16 +122,14 @@ def add_attendance_api(request):
         subscription = attendance.subscription
         if not subscription.can_enter():
             attendance.delete()
-            today = timezone.now().date()
-            if subscription.start_date > today or subscription.end_date < today:
-                return Response({'error': 'لا يمكن تسجيل الحضور: الاشتراك غير نشط'}, status=status.HTTP_400_BAD_REQUEST)
             if not subscription.type.is_active:
                 return Response({'error': 'لا يمكن تسجيل الحضور: نوع الاشتراك غير نشط'}, status=status.HTTP_400_BAD_REQUEST)
-            return Response({'error': 'لا يمكن تسجيل الحضور: تم الوصول للحد الأقصى لعدد الدخول'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'لا يمكن تسجيل الحضور: الاشتراك غير نشط أو تم الوصول للحد الأقصى لعدد الدخول'}, status=status.HTTP_400_BAD_REQUEST)
         subscription.entry_count += 1
         subscription.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
