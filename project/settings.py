@@ -80,6 +80,18 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5173",
     # "https://club-ft.com", # setting c panel
 ]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'cache-control',  # أضف هذا
+]
 
 DEFAULT_ALLOWED_IPS = ['127.0.0.1', '197.38.235.139','197.38.113.240']
 

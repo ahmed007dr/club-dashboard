@@ -197,30 +197,48 @@ const Attendance = () => {
     const updatedAttendance = { ...newAttendance, [name]: name === "identifier" ? value.trim().toUpperCase() : value };
     setNewAttendance(updatedAttendance);
     setFoundSubscription(null);
-
+  
     if (!updatedAttendance.identifier || !updatedAttendance.club) {
       setSearchLoading(false);
       return;
     }
-
+  
     setSearchLoading(true);
     try {
       const response = await fetch(`${BASE_URL}subscriptions/api/subscriptions/?identifier=${updatedAttendance.identifier}&club=${updatedAttendance.club}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
+          "Cache-Control": "no-cache", // منع التخزين المؤقت
         },
       });
       if (!response.ok) throw new Error("فشل في جلب الاشتراك");
       const data = await response.json();
-      setFoundSubscription(data.results[0] || null);
+      console.log("API Response:", data); // تسجيل الاستجابة للتحقق
+  
+      // البحث عن اشتراك يطابق identifier بدقة
+      const subscription = data.results.find((sub) => {
+        const member = sub.member_details || {};
+        return (
+          member.rfid_code?.toUpperCase() === updatedAttendance.identifier ||
+          member.phone?.trim() === updatedAttendance.identifier
+        );
+      });
+  
+      if (!subscription) {
+        toast.error("لم يتم العثور على اشتراك فعال لهذا المعرف");
+        setFoundSubscription(null);
+      } else {
+        setFoundSubscription(subscription);
+      }
     } catch (err) {
-      toast.error("فشل في البحث عن الاشتراك");
+      toast.error("فشل في البحث عن الاشتراك: " + err.message);
     } finally {
       setSearchLoading(false);
     }
   };
 
+  
   // تسجيل حضور جديد
   const handleAddAttendance = async (e) => {
     e.preventDefault();

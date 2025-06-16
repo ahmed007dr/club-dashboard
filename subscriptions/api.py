@@ -218,41 +218,55 @@ def subscription_list(request):
     """List or create subscriptions with applied special offer discounts."""
     if request.method == 'GET':
         search_term = request.GET.get('searchTerm', request.GET.get('search_term', '')).strip()
-        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
+        identifier = request.GET.get('identifier', '')  # دعم معلمة identifier صراحة
+        club_id = request.GET.get('club', request.user.club.id)
+        today = timezone.now().date()
 
-        # تطبيق فلاتر البحث
-        if search_term:
+        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=club_id)
+
+        # إذا تم تمرير identifier (كما في Attendance.js)
+        if identifier:
             subscriptions = subscriptions.filter(
-                Q(member__rfid_code__icontains=search_term) |
-                Q(member__phone__icontains=search_term) |
-                Q(member__name__icontains=search_term)
-            )
-        if request.query_params.get('member_id'):
-            subscriptions = subscriptions.filter(member_id=request.query_params.get('member_id'))
-        if request.query_params.get('type_id'):
-            subscriptions = subscriptions.filter(type_id=request.query_params.get('type_id'))
-        if request.query_params.get('club_id'):
-            subscriptions = subscriptions.filter(club_id=request.query_params.get('club_id'))
-        if request.query_params.get('start_date'):
-            subscriptions = subscriptions.filter(start_date__gte=request.query_params.get('start_date'))
-        if request.query_params.get('end_date'):
-            subscriptions = subscriptions.filter(end_date__lte=request.query_params.get('end_date'))
-        if request.query_params.get('status'):
-            today = timezone.now().date()
-            if request.query_params.get('status') == 'active':
+                Q(member__rfid_code=identifier) | Q(member__phone=identifier),
+                start_date__lte=today,
+                end_date__gte=today,
+                type__is_active=True
+            ).order_by('-start_date')[:1]  
+            logger.info(f"Found {subscriptions.count()} subscriptions for identifier={identifier}, club={club_id}")
+        else:
+            # تطبيق فلاتر البحث الأخرى
+            if search_term:
                 subscriptions = subscriptions.filter(
-                    start_date__lte=today,
-                    end_date__gte=today,
-                    entry_count__lt=F('type__max_entries') | Q(type__max_entries=0)
+                    Q(member__rfid_code__icontains=search_term) |
+                    Q(member__phone__icontains=search_term) |
+                    Q(member__name__icontains=search_term)
                 )
-            elif request.query_params.get('status') == 'expired':
-                subscriptions = subscriptions.filter(
-                    Q(end_date__lt=today) | Q(entry_count__gte=F('type__max_entries'), type__max_entries__gt=0)
-                )
-            elif request.query_params.get('status') == 'upcoming':
-                subscriptions = subscriptions.filter(start_date__gt=today)
+            if request.query_params.get('member_id'):
+                subscriptions = subscriptions.filter(member_id=request.query_params.get('member_id'))
+            if request.query_params.get('type_id'):
+                subscriptions = subscriptions.filter(type_id=request.query_params.get('type_id'))
+            if request.query_params.get('club_id'):
+                subscriptions = subscriptions.filter(club_id=request.query_params.get('club_id'))
+            if request.query_params.get('start_date'):
+                subscriptions = subscriptions.filter(start_date__gte=request.query_params.get('start_date'))
+            if request.query_params.get('end_date'):
+                subscriptions = subscriptions.filter(end_date__lte=request.query_params.get('end_date'))
+            if request.query_params.get('status'):
+                if request.query_params.get('status') == 'active':
+                    subscriptions = subscriptions.filter(
+                        start_date__lte=today,
+                        end_date__gte=today,
+                        entry_count__lt=F('type__max_entries') | Q(type__max_entries=0)
+                    )
+                elif request.query_params.get('status') == 'expired':
+                    subscriptions = subscriptions.filter(
+                        Q(end_date__lt=today) | Q(entry_count__gte=F('type__max_entries'), type__max_entries__gt=0)
+                    )
+                elif request.query_params.get('status') == 'upcoming':
+                    subscriptions = subscriptions.filter(start_date__gt=today)
 
-        subscriptions = subscriptions.order_by('-start_date')
+            subscriptions = subscriptions.order_by('-start_date')
+
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page, many=True)
