@@ -60,7 +60,6 @@ def api_user_list(request):
         club=request.user.club
     )
 
-    # For Reception/Accounting/Coach, limit to last week's data unless searching
     if request.user.role not in ['owner', 'admin']:
         attendance = StaffAttendance.objects.filter(
             staff=request.user,
@@ -71,7 +70,7 @@ def api_user_list(request):
             return Response({'error': 'يجب أن تكون في وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
         if not search_query:
             week_ago = timezone.now() - timedelta(days=7)
-            users = users.filter(created_at__gte=week_ago)
+            users = users.filter(date_joined__gte=week_ago)  
 
     if search_query:
         is_active_filter = None
@@ -86,8 +85,8 @@ def api_user_list(request):
             Q(first_name__icontains=search_query) |
             Q(last_name__icontains=search_query) |
             Q(role__icontains=search_query) |
-            Q(rfid_code__icontains=search_query) |
-            Q(phone_number__icontains=search_query) |
+            Q(rfid_code__iexact=search_query) | 
+            Q(phone_number__iexact=search_query) | 
             Q(card_number__icontains=search_query)
         )
 
@@ -96,11 +95,13 @@ def api_user_list(request):
 
         users = users.filter(query)
 
+    users = users.order_by('-date_joined') 
     paginator = PageNumberPagination()
     paginator.page_size = 20
     result_page = paginator.paginate_queryset(users, request)
     serializer = UserProfileSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
