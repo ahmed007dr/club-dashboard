@@ -64,10 +64,9 @@ function Receipts() {
     { value: "member_name", label: "اسم العضو" },
   ];
 
-  // Fetch subscriptions for dropdowns (limited or summarized data)
+  // Fetch subscriptions for dropdowns
   const fetchDropdownSubscriptions = async () => {
     try {
-      // Fetch only the first page or a summarized endpoint for subscriptions
       const response = await dispatch(fetchSubscriptions({ page: 1 })).unwrap();
       const results = Array.isArray(response)
         ? response
@@ -331,26 +330,26 @@ function Receipts() {
     setReceiptToDelete(null);
   };
 
-  const handleEdit = (receiptId) => {
-    dispatch(fetchReceiptById(receiptId));
-    setShowEditModal(true);
-  };
-
-  useEffect(() => {
-    if (currentReceipt) {
+  const handleEdit = async (receiptId) => {
+    try {
+      const response = await dispatch(fetchReceiptById(receiptId)).unwrap();
       setEditData({
-        id: currentReceipt.id,
-        club: currentReceipt.club?.toString() || "",
-        identifier: currentReceipt.member_details?.name || "",
-        member: currentReceipt.member?.toString() || "",
-        subscription: currentReceipt.subscription?.toString() || "",
-        amount: currentReceipt.amount || "",
-        payment_method: currentReceipt.payment_method || "cash",
-        note: currentReceipt.note || "",
-        invoice_number: currentReceipt.invoice_number || "",
+        id: response.id,
+        club: response.club?.toString() || "",
+        identifier: response.member_details?.name || "",
+        member: response.member?.toString() || "",
+        subscription: response.subscription?.toString() || "",
+        amount: response.amount || "",
+        payment_method: response.payment_method || "cash",
+        note: response.note || "",
+        invoice_number: response.invoice_number || "",
       });
+      setShowEditModal(true);
+    } catch (error) {
+      console.error("Failed to fetch receipt:", error);
+      toast.error("فشل في جلب بيانات الإيصال");
     }
-  }, [currentReceipt]);
+  };
 
   useEffect(() => {
     const sortedReceipts = [...receipts].sort((a, b) =>
