@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 from django.db import transaction
-from django.db.models import Count, Sum, Avg, Q, Case, When, F, Max, IntegerField, FloatField, Value, ExpressionWrapper
+from django.db.models import Count, Sum, Avg, Q, Case, When, F, Max, IntegerField, FloatField, Value, ExpressionWrapper,DecimalField,OuterRef,Subquery,Case
 from django.db.models.functions import TruncMonth, TruncWeek
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -11,9 +11,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 import logging
+from decimal import Decimal, ROUND_HALF_UP
 
-from .models import Subscription, SubscriptionType, FreezeRequest, Feature, PaymentMethod, Payment
-from .serializers import SubscriptionSerializer, SubscriptionTypeSerializer, CoachReportSerializer, MemberBehaviorSerializer, FeatureSerializer, PaymentMethodSerializer, PaymentSerializer
+from .models import Subscription, SubscriptionType, FreezeRequest, Feature, PaymentMethod, Payment,SpecialOffer
+from .serializers import SubscriptionSerializer, SubscriptionTypeSerializer, CoachReportSerializer, MemberBehaviorSerializer, FeatureSerializer, PaymentMethodSerializer, PaymentSerializer,SpecialOfferSerializer
 from finance.models import Income, IncomeSource
 from members.models import Member
 from accounts.models import User
@@ -100,25 +101,54 @@ def payment_method_detail(request, pk):
         method.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_type_list(request):
-    """List or create subscription types."""
+    """List or create subscription types with active special offers."""
     if request.method == 'GET':
+        now = timezone.now()
         search_term = request.GET.get('q', '')
         status_filter = request.GET.get('status', 'all')
         duration = request.GET.get('duration', '')
         feature_id = request.GET.get('feature_id', '')
-        ordering = request.GET.get('ordering', '') 
+        ordering = request.GET.get('ordering', '')
 
         types = SubscriptionType.objects.filter(club=request.user.club).annotate(
-            active_subscriptions_count=Count('subscriptions', filter=Q(subscriptions__end_date__gte=timezone.now().date()))
+            active_subscriptions_count=Count('subscriptions', filter=Q(subscriptions__end_date__gte=now.date())),
+            current_discount=Subquery(
+                SpecialOffer.objects.filter(
+                    subscription_type=OuterRef('pk'),
+                    start_datetime__lte=now,
+                    end_datetime__gte=now,
+                    is_active=True
+                ).values('discount_percentage')[:1]
+            ),
+            discounted_price=Case(
+                When(current_discount__isnull=False,
+                     then=ExpressionWrapper(
+                         F('price') * (100 - F('current_discount')) / 100,
+                         output_field=DecimalField(max_digits=10, decimal_places=2)
+                     )),
+                default=F('price'),
+                output_field=DecimalField(max_digits=10, decimal_places=2)
+            )
         )
 
+        types = types.filter(
+            Q(is_golden_only=False) |
+            (Q(is_golden_only=True) &
+             Q(specialoffer__start_datetime__lte=now,
+               specialoffer__end_datetime__gte=now,
+               specialoffer__is_golden=True,
+               specialoffer__is_active=True))
+        )
+
+        # تطبيق الفلاتر
         if search_term:
             types = types.filter(Q(name__icontains=search_term))
         if status_filter != 'all':
-            types = types.filter(is_active=status_filter == 'active')
+            types = types.filter(is_active=(status_filter == 'active'))
         if duration:
             try:
                 types = types.filter(duration_days=int(duration))
@@ -130,14 +160,12 @@ def subscription_type_list(request):
             except ValueError:
                 pass
         if ordering:
-            if ordering == '-active_subscribers':
-                types = types.order_by('-active_subscribers', '-id')
-            elif ordering == 'active_subscribers':
-                types = types.order_by('active_subscribers', '-id')
+            if ordering in ['active_subscribers', '-active_subscribers']:
+                types = types.order_by(f'{"" if ordering.startswith("-") else "-"}{ordering.lstrip("-")}', '-id')
             else:
                 types = types.order_by(ordering)
 
-
+        # التصفح
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(types, request)
         serializer = SubscriptionTypeSerializer(page, many=True, context={'request': request})
@@ -149,6 +177,7 @@ def subscription_type_list(request):
             subscription_type = serializer.save(club=request.user.club)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -186,18 +215,18 @@ def active_subscription_types(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
-    """List or create subscriptions."""
+    """List or create subscriptions with applied special offer discounts."""
     if request.method == 'GET':
         search_term = request.GET.get('searchTerm', request.GET.get('search_term', '')).strip()
         subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club)
 
+        # تطبيق فلاتر البحث
         if search_term:
             subscriptions = subscriptions.filter(
                 Q(member__rfid_code__icontains=search_term) |
                 Q(member__phone__icontains=search_term) |
                 Q(member__name__icontains=search_term)
             )
-
         if request.query_params.get('member_id'):
             subscriptions = subscriptions.filter(member_id=request.query_params.get('member_id'))
         if request.query_params.get('type_id'):
@@ -211,43 +240,55 @@ def subscription_list(request):
         if request.query_params.get('status'):
             today = timezone.now().date()
             if request.query_params.get('status') == 'active':
-                subscriptions = subscriptions.filter(start_date__lte=today, end_date__gte=today)
+                subscriptions = subscriptions.filter(
+                    start_date__lte=today,
+                    end_date__gte=today,
+                    entry_count__lt=F('type__max_entries') | Q(type__max_entries=0)
+                )
             elif request.query_params.get('status') == 'expired':
-                subscriptions = subscriptions.filter(end_date__lt=today)
+                subscriptions = subscriptions.filter(
+                    Q(end_date__lt=today) | Q(entry_count__gte=F('type__max_entries'), type__max_entries__gt=0)
+                )
             elif request.query_params.get('status') == 'upcoming':
                 subscriptions = subscriptions.filter(start_date__gt=today)
-            if request.query_params.get('status'):
-                today = timezone.now().date()
-                if request.query_params.get('status') == 'active':
-                    subscriptions = subscriptions.filter(
-                        start_date__lte=today,
-                        end_date__gte=today,
-                        entry_count__lt=F('type__max_entries') | Q(type__max_entries=0)
-                    )
-                elif request.query_params.get('status') == 'expired':
-                    subscriptions = subscriptions.filter(
-                        Q(end_date__lt=today) | Q(entry_count__gte=F('type__max_entries'), type__max_entries__gt=0)
-                    )
-                elif request.query_params.get('status') == 'upcoming':
-                    subscriptions = subscriptions.filter(start_date__gt=today)
-                    
+
         subscriptions = subscriptions.order_by('-start_date')
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
 
-    elif request.method == 'POST':
+    if request.method == 'POST':
         mutable_data = request.data.copy()
         mutable_data['created_by'] = request.user.id
         mutable_data['club'] = request.user.club.id
         payment_data = mutable_data.pop('payments', [])
+        mutable_data.pop('paid_amount', None)  # إزالة paid_amount من الـ body
+        mutable_data.pop('remaining_amount', None)  # إزالة remaining_amount من الـ body
 
         with transaction.atomic():
+            subscription_type = get_object_or_404(SubscriptionType, id=mutable_data['type'], club=request.user.club)
+            now = timezone.now()
+
+            # حساب السعر الفعلي بعد الخصم
+            active_offer = SpecialOffer.objects.filter(
+                subscription_type=subscription_type,
+                start_datetime__lte=now,
+                end_datetime__gte=now,
+                is_active=True
+            ).first()
+
+            if active_offer:
+                discount = active_offer.discount_percentage
+                effective_price = (subscription_type.price * (100 - discount) / 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            else:
+                effective_price = subscription_type.price
+
             serializer = SubscriptionSerializer(data=mutable_data, context={'request': request})
             if serializer.is_valid():
                 subscription = serializer.save()
-                
+
+                # حساب المبلغ المدفوع من الدفعات
                 total_paid = Decimal('0')
                 for payment in payment_data:
                     payment['subscription'] = subscription.id
@@ -259,10 +300,12 @@ def subscription_list(request):
                     else:
                         return Response(payment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+                # تعيين القيم تلقائيًا
                 subscription.paid_amount = total_paid
-                subscription.remaining_amount = subscription.type.price - total_paid
+                subscription.remaining_amount = (effective_price - total_paid).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                 subscription.save()
 
+                # تسجيل الإيراد
                 if total_paid > 0 or (subscription.coach and subscription.coach_compensation_type == 'external' and subscription.coach_compensation_value > 0):
                     source, _ = IncomeSource.objects.get_or_create(
                         club=subscription.club, name='Subscription', defaults={'description': 'إيراد عن اشتراك'}
@@ -283,8 +326,6 @@ def subscription_list(request):
 
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -766,3 +807,36 @@ def coach_report(request, coach_id):
     }
     serializer = CoachReportSerializer(report)
     return Response(serializer.data)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def special_offer_list(request):
+    if request.method == 'GET':
+        offers = SpecialOffer.objects.filter(club=request.user.club, is_active=True)
+        serializer = SpecialOfferSerializer(offers, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = SpecialOfferSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(club=request.user.club)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def special_offer_detail(request, pk):
+    offer = get_object_or_404(SpecialOffer, pk=pk, club=request.user.club)
+    if request.method == 'GET':
+        serializer = SpecialOfferSerializer(offer)
+        return Response(serializer.data)
+    elif request.method == 'PUT':
+        serializer = SpecialOfferSerializer(offer, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    elif request.method == 'DELETE':
+        offer.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)

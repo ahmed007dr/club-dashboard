@@ -1,13 +1,12 @@
-
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchSubscriptionTypes, postSubscription, fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
-import { fetchUsers } from "../../redux/slices/memberSlice";
 import { Button } from "@/components/ui/button";
 import { FaUser } from 'react-icons/fa';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 import { toast } from "react-hot-toast";
+import debounce from 'lodash/debounce';
 
 const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
@@ -15,26 +14,23 @@ const CreateSubscription = ({ onClose }) => {
 
   // Form state
   const [formData, setFormData] = useState({
-    club: "",
     identifier: "",
     type: "",
+    selectedList: "",
     start_date: "",
     paid_amount: "",
     coach: "",
     coach_compensation_type: "from_subscription",
     coach_compensation_value: "0",
     payment_method: "",
-    feature: "", // لتحديد الميزة (جيم، ألعاب قتالية، سباحة)
   });
 
   // Data state
-  const [clubs, setClubs] = useState([]);
-  const [allMembers, setAllMembers] = useState({ results: [] });
   const [allSubscriptionTypes, setAllSubscriptionTypes] = useState([]);
-  const [filteredSubscriptionTypes, setFilteredSubscriptionTypes] = useState([]); // لفلترة أنواع الاشتراكات بناءً على الميزة
+  const [discountedTypes, setDiscountedTypes] = useState([]);
+  const [regularTypes, setRegularTypes] = useState([]);
   const [allCoaches, setAllCoaches] = useState([]);
   const [allPaymentMethods, setAllPaymentMethods] = useState([]);
-  const [allFeatures, setAllFeatures] = useState([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [foundMember, setFoundMember] = useState(null);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -60,10 +56,6 @@ const CreateSubscription = ({ onClose }) => {
           id: data.club.id,
           name: data.club.name,
         });
-        setFormData(prev => ({
-          ...prev,
-          club: data.club.id.toString()
-        }));
       })
       .catch((err) => {
         console.error("Failed to fetch user profile:", err);
@@ -85,25 +77,10 @@ const CreateSubscription = ({ onClose }) => {
     }
   };
 
-  // Fetch features
-  const fetchAllFeatures = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${BASE_URL}subscriptions/api/features/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      return Array.isArray(response.data) ? response.data : [];
-    } catch (error) {
-      console.error('❌ Failed to fetch features:', error);
-      throw error;
-    }
-  };
-
   const fetchAllCoaches = async () => {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
-      
       let allCoaches = [];
       let nextUrl = `${BASE_URL}accounts/api/users/`;
       
@@ -121,41 +98,23 @@ const CreateSubscription = ({ onClose }) => {
     }
   };
 
-  const fetchAllMembers = async () => {
-    try {
-      let allResults = [];
-      let currentPage = 1;
-      let hasMore = true;
-
-      while (hasMore) {
-        const response = await dispatch(fetchUsers({ page: currentPage })).unwrap();
-        const results = Array.isArray(response) ? response : response.results || [];
-        allResults = [...allResults, ...results];
-        hasMore = !!response.next;
-        currentPage += 1;
-      }
-
-      return { results: allResults };
-    } catch (error) {
-      console.error("Failed to fetch all members:", error.message);
-      throw error;
-    }
-  };
-
   const fetchAllSubscriptionTypes = async () => {
     try {
+      const token = localStorage.getItem('token');
       let allResults = [];
       let currentPage = 1;
       let hasMore = true;
 
       while (hasMore) {
-        const response = await dispatch(fetchSubscriptionTypes({ page: currentPage })).unwrap();
-        const results = Array.isArray(response.results) ? response.results : [];
+        const response = await axios.get(
+          `${BASE_URL}subscriptions/api/subscription-types/?page=${currentPage}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        const results = Array.isArray(response.data.results) ? response.data.results : [];
         allResults = [...allResults, ...results];
-        hasMore = !!response.next;
+        hasMore = !!response.data.next;
         currentPage += 1;
       }
-
       return allResults;
     } catch (error) {
       console.error("Failed to fetch all subscription types:", error.message);
@@ -163,33 +122,90 @@ const CreateSubscription = ({ onClose }) => {
     }
   };
 
+  // دالة البحث عن عضو بناءً على identifier
+  const searchMember = useCallback(async (identifier, clubId) => {
+    if (!identifier || !clubId) {
+      setFoundMember(null);
+      setSearchLoading(false);
+      return;
+    }
+
+    try {
+      setSearchLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `${BASE_URL}members/api/members/?search=${encodeURIComponent(identifier)}&club=${clubId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      const members = Array.isArray(response.data.results) ? response.data.results : [];
+      const member = members.length > 0 ? members[0] : null;
+
+      if (member) {
+        setFoundMember({
+          id: member.id,
+          name: member.name,
+          photo: member.photo,
+          membership_number: member.membership_number,
+          phone: member.phone,
+          rfid_code: member.rfid_code,
+          club_id: member.club,
+          club_name: member.club_name,
+          address: member.address,
+          birth_date: member.birth_date,
+          job: member.job,
+          national_id: member.national_id,
+        });
+      } else {
+        setFoundMember(null);
+      }
+    } catch (error) {
+      console.error("Failed to search member:", error.message);
+      toast.error("فشل في البحث عن العضو");
+      setFoundMember(null);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  // Debounce لتأخير البحث
+  const debouncedSearch = useCallback(
+    debounce((identifier, clubId) => {
+      searchMember(identifier, clubId);
+    }, 500),
+    [searchMember]
+  );
+
+  // البحث عن العضو بناءً على identifier
+  useEffect(() => {
+    if (!formData.identifier || !userClub) {
+      setFoundMember(null);
+      return;
+    }
+
+    debouncedSearch(formData.identifier.trim(), userClub.id);
+  }, [formData.identifier, userClub, debouncedSearch]);
+
+  // Fetch initial data
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
-        const [membersResult, subscriptionTypesResult, coachesResult, paymentMethodsResult, featuresResult] = await Promise.all([
-          fetchAllMembers(),
+        const [subscriptionTypesResult, coachesResult, paymentMethodsResult] = await Promise.all([
           fetchAllSubscriptionTypes(),
           fetchAllCoaches(),
           fetchAllPaymentMethods(),
-          fetchAllFeatures(),
         ]);
 
-        const uniqueClubs = Array.from(
-          new Map(
-            membersResult.results.map((m) => [
-              m.club,
-              { club_id: m.club, club_name: m.club_name },
-            ])
-          ).values()
-        );
-
-        setClubs(uniqueClubs);
-        setAllMembers(membersResult);
         setAllSubscriptionTypes(subscriptionTypesResult);
-        setFilteredSubscriptionTypes(subscriptionTypesResult); // تعيين القائمة الأولية
+        const discounted = subscriptionTypesResult.filter(type => type.current_discount);
+        const regular = subscriptionTypesResult.filter(type => !type.current_discount);
+
+        setDiscountedTypes(discounted);
+        setRegularTypes(regular);
         setAllCoaches(coachesResult);
         setAllPaymentMethods(paymentMethodsResult);
-        setAllFeatures(featuresResult);
       } catch (error) {
         setErrorMessage("فشل في تحميل البيانات الأولية");
         setIsModalOpen(true);
@@ -201,71 +217,26 @@ const CreateSubscription = ({ onClose }) => {
     fetchInitialData();
   }, [dispatch]);
 
-  // Filter subscription types based on selected feature
-  useEffect(() => {
-    if (formData.feature) {
-      const filteredTypes = allSubscriptionTypes.filter(type =>
-        type.features.some(feature => feature.id.toString() === formData.feature)
-      );
-      setFilteredSubscriptionTypes(filteredTypes);
-      // إعادة تعيين نوع الاشتراك إذا لم يكن موجودًا في القائمة المفلترة
-      if (formData.type && !filteredTypes.find(type => type.id.toString() === formData.type)) {
-        setFormData(prev => ({ ...prev, type: "" }));
-      }
-    } else {
-      setFilteredSubscriptionTypes(allSubscriptionTypes);
-    }
-  }, [formData.feature, allSubscriptionTypes]);
-
-  useEffect(() => {
-    if (!formData.identifier || !formData.club) {
-      setFoundMember(null);
-      return;
-    }
-
-    const searchValue = formData.identifier.trim().toUpperCase();
-    setSearchLoading(true);
-
-    const member = allMembers.results.find(m => 
-      m.club.toString() === formData.club.toString() && (
-        (m.rfid_code && m.rfid_code.toUpperCase() === searchValue) ||
-        (m.phone && m.phone.trim() === searchValue) ||
-        (m.name && m.name.trim().toUpperCase() === searchValue.toUpperCase())
-      )
-    );
-
-    if (member) {
-      setFoundMember({
-        id: member.id,
-        name: member.name,
-        photo: member.photo,
-        membership_number: member.membership_number,
-        phone: member.phone,
-        rfid_code: member.rfid_code,
-        club_id: member.club,
-        club_name: member.club_name,
-        address: member.address,
-        birth_date: member.birth_date,
-        job: member.job,
-        national_id: member.national_id
-      });
-    }
-
-    setSearchLoading(false);
-  }, [formData.identifier, formData.club, allMembers.results]);
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { club, identifier, type, start_date, paid_amount, coach, coach_compensation_type, coach_compensation_value, payment_method } = formData;
+    const { identifier, type, start_date, paid_amount, coach, coach_compensation_type, coach_compensation_value, payment_method } = formData;
 
-    if (!club || !identifier || !type || !start_date || !paid_amount || !payment_method) {
-      setErrorMessage("يرجى ملء جميع الحقول المطلوبة");
+    if (!userClub || !identifier || !type || !start_date || !paid_amount || !payment_method) {
+      setErrorMessage("يرجى ملء جميع الحقول المطلوبة، بما في ذلك طريقة الدفع");
       setIsModalOpen(true);
       return;
     }
 
-    if (isNaN(parseFloat(paid_amount))) {
-      setErrorMessage("المبلغ المدفوع يجب أن يكون رقمًا صحيحًا");
+    const paidAmount = parseFloat(paid_amount) || 0;
+    if (isNaN(paidAmount) || paidAmount < 0) {
+      setErrorMessage("المبلغ المدفوع يجب أن يكون رقمًا صحيحًا وغير سالب");
+      setIsModalOpen(true);
+      return;
+    }
+
+    const paymentMethodId = parseInt(payment_method);
+    if (isNaN(paymentMethodId)) {
+      setErrorMessage("يرجى اختيار طريقة دفع صالحة");
       setIsModalOpen(true);
       return;
     }
@@ -273,11 +244,6 @@ const CreateSubscription = ({ onClose }) => {
     const selectedType = allSubscriptionTypes.find(t => t.id.toString() === type.toString());
     if (!selectedType) {
       setErrorMessage("نوع الاشتراك المحدد غير موجود");
-      setIsModalOpen(true);
-      return;
-    }
-    if (parseFloat(paid_amount) > parseFloat(selectedType.price)) {
-      setErrorMessage("المبلغ المدفوع لا يمكن أن يتجاوز سعر الاشتراك");
       setIsModalOpen(true);
       return;
     }
@@ -297,60 +263,54 @@ const CreateSubscription = ({ onClose }) => {
     setIsSubmitting(true);
 
     const payload = {
-      club: parseInt(club),
+      club: userClub.id,
       identifier,
       type: parseInt(type),
+      special_offer: selectedType.special_offer || null,
       start_date,
-      paid_amount: parseFloat(paid_amount),
       coach: coach ? parseInt(coach) : null,
       coach_compensation_type: coach ? coach_compensation_type : null,
-      coach_compensation_value: coach ? parseFloat(coach_compensation_value) : 0,
+      coach_compensation_value: coach ? parseFloat(coach_compensation_value).toFixed(2) : "0.00",
       payments: [{
-        amount: parseFloat(paid_amount),
-        payment_method: parseInt(payment_method),
+        amount: paidAmount.toFixed(2),
+        payment_method_id: paymentMethodId,
+        transaction_id: "",
+        notes: "",
       }],
     };
 
     try {
-      await dispatch(postSubscription(payload)).unwrap();
+      const response = await dispatch(postSubscription(payload)).unwrap();
       toast.success("تم إنشاء الاشتراك بنجاح!");
-
-      await dispatch(
-        fetchSubscriptions({
-          page: 1,
-          pageSize: 20,
-          searchTerm: "",
-          clubName: "",
-          startDate: "",
-          endDate: "",
-          entryCount: "",
-          status: ""
-        })
-      ).unwrap();
-
+      await dispatch(fetchSubscriptions({ page: 1, pageSize: 20, searchTerm: "", clubName: "", startDate: "", endDate: "", entryCount: "", status: "" })).unwrap();
       setFormData({
-        club: userClub?.id?.toString() || "",
         identifier: "",
         type: "",
+        selectedList: "",
         start_date: "",
         paid_amount: "",
         coach: "",
         coach_compensation_type: "from_subscription",
         coach_compensation_value: "0",
         payment_method: "",
-        feature: "",
       });
       setFoundMember(null);
       onClose();
     } catch (error) {
-      console.error("Error creating subscription:", JSON.stringify(error, null, 2));
-      const errorData = error || {};
-      setErrorMessage(
-        errorData?.non_field_errors?.[0] ||
-        errorData?.message ||
+      const errorData = error.payload?.data || {};
+      const errorMsg =
+        errorData.non_field_errors?.[0] ||
+        errorData.payment_method_id?.[0] ||
+        errorData.identifier?.[0] ||
+        errorData.special_offer?.[0] ||
+        errorData.type?.[0] ||
+        errorData.message ||
+        error.payload?.data?.message ||
+        Object.values(errorData)?.flat()?.[0] ||
+        JSON.stringify(errorData) ||
         error.message ||
-        "حدث خطأ غير متوقع"
-      );
+        "حدث خطأ غير متوقع أثناء إنشاء الاشتراك";
+      setErrorMessage(errorMsg);
       setIsModalOpen(true);
     } finally {
       setIsSubmitting(false);
@@ -376,48 +336,22 @@ const CreateSubscription = ({ onClose }) => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-5 w-full">
-        <div className="flex flex-col md:flex-row gap-8">
-          <div className="w-full flex-1">
-            <div>
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-medium mb-2">النادي</label>
-                  <select
-                    name="club"
-                    value={formData.club}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        club: e.target.value,
-                        identifier: "",
-                      })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-green-200 text-right text-sm"
-                    disabled={!userClub || isSubmitting}
-                    required
-                  >
-                    {userClub ? (
-                      <option value={userClub.id}>{userClub.name}</option>
-                    ) : (
-                      <option value="">جاري التحميل...</option>
-                    )}
-                  </select>
-                </div>
-
-                <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-medium mb-2">RFID أو الاسم أو رقم الهاتف</label>
-                  <input
-                    type="text"
-                    value={formData.identifier}
-                    onChange={(e) =>
-                      setFormData({ ...formData, identifier: e.target.value })
-                    }
-                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-                    placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
-                    disabled={!formData.club || isSubmitting}
-                    required
-                  />
-                </div>
+        <div className="flex flex-col lg:flex-row gap-8">
+          <div className="w-full lg:w-2/3 min-w-0">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">RFID أو الاسم أو رقم الهاتف</label>
+                <input
+                  type="text"
+                  value={formData.identifier}
+                  onChange={(e) =>
+                    setFormData({ ...formData, identifier: e.target.value })
+                  }
+                  className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                  placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
+                  disabled={isSubmitting}
+                  required
+                />
               </div>
 
               {searchLoading && (
@@ -428,49 +362,56 @@ const CreateSubscription = ({ onClose }) => {
 
               {formData.identifier && !foundMember && !searchLoading && (
                 <div className="text-red-500 text-sm">
-                  <p>
-                    {formData.identifier.match(/[A-Za-z]/)
-                      ? "لا يوجد عضو مسجل بهذا الكود RFID في النادي المحدد"
-                      : "لا يوجد عضو مسجل بهذا الرقم أو الاسم في النادي المحدد"}
-                  </p>
+                  <p>لا يوجد عضو مسجل بهذا الاسم، الهاتف، أو RFID</p>
                 </div>
               )}
 
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-medium mb-2">نوع النشاط</label>
+                  <label className="block text-sm font-medium mb-2">اشتراكات مخفضة</label>
                   <select
-                    value={formData.feature}
-                    onChange={(e) => setFormData({ ...formData, feature: e.target.value })}
+                    value={formData.selectedList === "discounted" ? formData.type : ""}
+                    onChange={(e) => 
+                      setFormData({ 
+                        ...formData, 
+                        type: e.target.value, 
+                        selectedList: e.target.value ? "discounted" : ""
+                      })
+                    }
                     className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-                    disabled={isSubmitting || !foundMember}
+                    disabled={isSubmitting || !foundMember || formData.selectedList === "regular"}
+                    required={formData.selectedList === "discounted"}
                   >
-                    <option value="">اختر نوع النشاط</option>
-                    {allFeatures.map((feature) => (
-                      <option key={feature.id} value={feature.id}>
-                        {feature.name}
+                    <option value="">اختر اشتراك مخفض</option>
+                    {discountedTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name} - {type.discounted_price} جنيه (خصم {type.current_discount}%)
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="w-full md:w-1/2">
-                  <label className="block text-sm font-medium mb-2">نوع الاشتراك</label>
+                  <label className="block text-sm font-medium mb-2">اشتراكات عادية</label>
                   <select
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                    value={formData.selectedList === "regular" ? formData.type : ""}
+                    onChange={(e) => 
+                      setFormData({ 
+                        ...formData, 
+                        type: e.target.value, 
+                        selectedList: e.target.value ? "regular" : ""
+                      })
+                    }
                     className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
-                    disabled={isSubmitting || !foundMember}
-                    required
+                    disabled={isSubmitting || !foundMember || formData.selectedList === "discounted"}
+                    required={formData.selectedList === "regular"}
                   >
-                    <option value="">اختر النوع</option>
-                    {filteredSubscriptionTypes
-                      .filter((type) => type.club_details.id.toString() === formData.club?.toString())
-                      .map((type) => (
-                        <option key={type.id} value={type.id}>
-                          {type.name} - {type.price} جنيها
-                        </option>
-                      ))}
+                    <option value="">اختر اشتراك عادي</option>
+                    {regularTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name} - {type.price} جنيه
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -543,6 +484,16 @@ const CreateSubscription = ({ onClose }) => {
                     disabled={isSubmitting || !foundMember}
                     required
                   />
+                  {formData.type && (
+                    (() => {
+                      const type = allSubscriptionTypes.find(t => t.id.toString() === formData.type);
+                      return type ? (
+                        <p className="text-sm text-gray-600 mt-1">
+                          السعر الكلي: {type.discounted_price || type.price} جنيه
+                        </p>
+                      ) : null;
+                    })()
+                  )}
                 </div>
               </div>
 
@@ -584,7 +535,7 @@ const CreateSubscription = ({ onClose }) => {
               )}
             </div>
           </div>
-          <div>
+          <div className="w-full lg:w-1/3 max-w-xs shrink-0">
             {foundMember && (
               <div className="border rounded-lg p-4 bg-gray-50">
                 <div className="flex items-start gap-4">
@@ -599,26 +550,14 @@ const CreateSubscription = ({ onClose }) => {
                       <FaUser />
                     </div>
                   )}
-                  <div className="flex-1">
+                  <div className="flex-1 space-y-1 text-sm">
                     <h3 className="font-bold text-lg">{foundMember.name}</h3>
                     <p className="text-gray-600">#{foundMember.membership_number}</p>
-                    <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-                      <p>
-                        <span className="font-medium">الهاتف:</span> {foundMember.phone || "غير متوفر"}
-                      </p>
-                      <p>
-                        <span className="font-medium">RFID:</span> {foundMember.rfid_code || "غير مسجل"}
-                      </p>
-                      <p>
-                        <span className="font-medium">النادي:</span> {foundMember.club_name}
-                      </p>
-                      <p>
-                        <span className="font-medium">العنوان:</span> {foundMember.address || "غير متوفر"}
-                      </p>
-                      <p>
-                        <span className="font-medium">الرقم القومي:</span> {foundMember.national_id || "غير متوفر"}
-                      </p>
-                    </div>
+                    <p><span className="font-medium">الهاتف:</span> {foundMember.phone || "غير متوفر"}</p>
+                    <p><span className="font-medium">RFID:</span> {foundMember.rfid_code || "غير مسجل"}</p>
+                    <p><span className="font-medium">النادي:</span> {foundMember.club_name}</p>
+                    <p><span className="font-medium">العنوان:</span> {foundMember.address || "غير متوفر"}</p>
+                    <p><span className="font-medium">الرقم القومي:</span> {foundMember.national_id || "غير متوفر"}</p>
                   </div>
                 </div>
               </div>
@@ -629,7 +568,7 @@ const CreateSubscription = ({ onClose }) => {
         <Button
           type="submit"
           className="w-full mt-6"
-          disabled={isSubmitting || !foundMember}
+          disabled={isSubmitting || !foundMember || !formData.type || !formData.payment_method}
         >
           {isSubmitting ? (
             <span className="flex items-center justify-center">

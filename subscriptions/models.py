@@ -32,7 +32,7 @@ class SubscriptionType(models.Model):
     is_active = models.BooleanField(default=True)
     max_entries = models.PositiveIntegerField(default=0, help_text="Maximum allowed entries during subscription period (0 means unlimited)")
     max_freeze_days = models.PositiveIntegerField(default=0, help_text="Maximum allowed freeze days for this subscription type")
-
+    is_golden_only = models.BooleanField(default=False, help_text="يظهر فقط أثناء عروض ذهبية")
     def __str__(self):
         return f"{self.name} ({self.club.name})"
 
@@ -225,3 +225,24 @@ def update_coach_profile(sender, instance, **kwargs):
         CoachProfile.objects.get_or_create(user=instance, defaults={'max_trainees': 0})
     elif hasattr(instance, 'coach_profile') and (instance.role != 'coach' or not instance.is_active):
         instance.coach_profile.delete()
+
+
+class SpecialOffer(models.Model):
+    club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
+    subscription_type = models.ForeignKey(SubscriptionType, on_delete=models.CASCADE, null=True, blank=True)
+    name = models.CharField(max_length=100, help_text="اسم العرض")
+    discount_percentage = models.DecimalField(max_digits=5, decimal_places=2, help_text="نسبة الخصم (0-99)")
+    start_datetime = models.DateTimeField(help_text="تاريخ ووقت بداية العرض")
+    end_datetime = models.DateTimeField(help_text="تاريخ ووقت نهاية العرض")
+    is_active = models.BooleanField(default=True)
+    is_golden = models.BooleanField(default=False, help_text="اشتراك ذهبي يظهر فقط أثناء العرض")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.discount_percentage}%"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['club', 'start_datetime', 'end_datetime']),
+            models.Index(fields=['is_active']),
+        ]

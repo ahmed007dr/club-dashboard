@@ -41,4 +41,8 @@ urlpatterns = [
     # Features
     path('api/features/', api.feature_list, name='api-feature-list'),
     path('api/features/<int:pk>/', api.feature_detail, name='api-feature-detail'),
+
+    
+    path('api/special-offers/', api.special_offer_list, name='api-special-offer-list'),
+    path('api/special-offers/<int:pk>/', api.special_offer_detail, name='api-special-offer-detail'),
 ]

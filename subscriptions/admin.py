@@ -10,7 +10,7 @@ from decimal import Decimal
 from import_export.admin import ImportExportModelAdmin
 from import_export import resources
 
-from .models import SubscriptionType, Subscription, FreezeRequest, CoachProfile, Feature, PaymentMethod, Payment
+from .models import SubscriptionType, Subscription, FreezeRequest, CoachProfile, Feature, PaymentMethod, Payment, SpecialOffer
 from finance.models import Income, IncomeSource
 from core.models import Club
 from accounts.models import User
@@ -35,7 +35,7 @@ class PaymentResource(resources.ModelResource):
 class SubscriptionTypeResource(resources.ModelResource):
     class Meta:
         model = SubscriptionType
-        fields = ('id', 'club__name', 'name', 'duration_days', 'price', 'max_freeze_days', 'is_active', 'max_entries', 'is_private_training')
+        fields = ('id', 'club__name', 'name', 'duration_days', 'price', 'max_freeze_days', 'is_active', 'max_entries', 'is_private_training', 'is_golden_only')
 
 class SubscriptionResource(resources.ModelResource):
     class Meta:
@@ -58,6 +58,14 @@ class CoachProfileResource(resources.ModelResource):
     class Meta:
         model = CoachProfile
         fields = ('id', 'user__username', 'max_trainees')
+
+class SpecialOfferResource(resources.ModelResource):
+    class Meta:
+        model = SpecialOffer
+        fields = (
+            'id', 'club__name', 'subscription_type__name', 'name', 'discount_percentage',
+            'start_datetime', 'end_datetime', 'is_active', 'is_golden', 'created_at'
+        )
 
 # Admin Classes
 @admin.register(Feature)
@@ -142,19 +150,32 @@ class SubscriptionTypeAdmin(ImportExportModelAdmin):
     resource_class = SubscriptionTypeResource
     list_display = (
         'name', 'club', 'duration_days', 'price', 'max_freeze_days', 'subscriptions_count',
-        'features_list', 'is_active',
+        'features_list', 'is_active', 'is_golden_only', 'current_discount',
     )
-    list_filter = ('club', 'is_active', 'features')
+    list_filter = ('club', 'is_active', 'features', 'is_golden_only')
     search_fields = ('name', 'club__name')
-    list_editable = ('is_active', 'max_freeze_days')
+    list_editable = ('is_active', 'max_freeze_days', 'is_golden_only')
     list_select_related = ('club',)
     filter_horizontal = ('features',)
     ordering = ('-id',)
-    readonly_fields = ('subscriptions_count',)
+    readonly_fields = ('subscriptions_count', 'current_discount')
 
     def features_list(self, obj):
         return ", ".join(f.name for f in obj.features.filter(is_active=True)) or "-"
     features_list.short_description = 'الميزات'
+
+    def current_discount(self, obj):
+        now = timezone.now()
+        offer = SpecialOffer.objects.filter(
+            subscription_type=obj,
+            start_datetime__lte=now,
+            end_datetime__gte=now,
+            is_active=True
+        ).first()
+        if offer:
+            return f"{offer.discount_percentage}% (حتى {offer.end_datetime.strftime('%Y-%m-%d %H:%M')})"
+        return "-"
+    current_discount.short_description = 'الخصم الحالي'
 
     def get_queryset(self, request):
         qs = super().get_queryset(request).prefetch_related('features')
@@ -268,7 +289,7 @@ class SubscriptionAdmin(ImportExportModelAdmin):
             refund_amount = subscription.calculate_refunded_amount()
             subscription.is_cancelled = True
             subscription.cancellation_date = timezone.now().date()
-            subscription.refund_amount = refund_amount
+            subscription.refunded_amount = refund_amount
             subscription.save()
             if refund_amount > 0:
                 source, _ = IncomeSource.objects.get_or_create(
@@ -392,6 +413,42 @@ class CoachProfileAdmin(ImportExportModelAdmin):
         if db_field.name == 'user' and not request.user.is_superuser:
             kwargs['queryset'] = User.objects.filter(club=request.user.club, role='coach', is_active=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+@admin.register(SpecialOffer)
+class SpecialOfferAdmin(ImportExportModelAdmin):
+    resource_class = SpecialOfferResource
+    list_display = (
+        'name', 'club', 'subscription_type', 'discount_percentage', 'start_datetime',
+        'end_datetime', 'is_active', 'is_golden', 'created_at'
+    )
+    list_filter = ('club', 'is_active', 'is_golden', 'start_datetime', 'end_datetime')
+    search_fields = ('name', 'club__name', 'subscription_type__name')
+    list_editable = ('is_active', 'is_golden')
+    list_select_related = ('club', 'subscription_type')
+    autocomplete_fields = ('club', 'subscription_type')
+    ordering = ('-created_at',)
+    readonly_fields = ('created_at',)
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(club=request.user.club)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name in ['club', 'subscription_type'] and not request.user.is_superuser:
+            if db_field.name == 'club':
+                kwargs['queryset'] = Club.objects.filter(id=request.user.club.id)
+            elif db_field.name == 'subscription_type':
+                kwargs['queryset'] = SubscriptionType.objects.filter(club=request.user.club)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request, obj, form, change):
+        if obj.discount_percentage < 0 or obj.discount_percentage > 99:
+            raise ValidationError("نسبة الخصم يجب أن تكون بين 0 و99.")
+        if obj.start_datetime >= obj.end_datetime:
+            raise ValidationError("تاريخ البداية يجب أن يكون قبل تاريخ النهاية.")
+        super().save_model(request, obj, form, change)
 
 AdminSite.site_header = "نظام إدارة النادي"
 AdminSite.site_title = "إدارة النادي"
