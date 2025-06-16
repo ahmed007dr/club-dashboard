@@ -23,6 +23,8 @@ const CreateSubscription = ({ onClose }) => {
     coach_compensation_type: "from_subscription",
     coach_compensation_value: "0",
     payment_method: "",
+    transaction_id: "", // إضافة transaction_id
+    notes: "", // إضافة notes
   });
 
   // Data state
@@ -219,7 +221,7 @@ const CreateSubscription = ({ onClose }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const { identifier, type, start_date, paid_amount, coach, coach_compensation_type, coach_compensation_value, payment_method } = formData;
+    const { identifier, type, start_date, paid_amount, coach, coach_compensation_type, coach_compensation_value, payment_method, transaction_id, notes } = formData;
 
     if (!userClub || !identifier || !type || !start_date || !paid_amount || !payment_method) {
       setErrorMessage("يرجى ملء جميع الحقول المطلوبة، بما في ذلك طريقة الدفع");
@@ -266,7 +268,6 @@ const CreateSubscription = ({ onClose }) => {
       club: userClub.id,
       identifier,
       type: parseInt(type),
-      special_offer: selectedType.special_offer || null,
       start_date,
       coach: coach ? parseInt(coach) : null,
       coach_compensation_type: coach ? coach_compensation_type : null,
@@ -274,8 +275,8 @@ const CreateSubscription = ({ onClose }) => {
       payments: [{
         amount: paidAmount.toFixed(2),
         payment_method_id: paymentMethodId,
-        transaction_id: "",
-        notes: "",
+        transaction_id: transaction_id || "",
+        notes: notes || "",
       }],
     };
 
@@ -293,16 +294,17 @@ const CreateSubscription = ({ onClose }) => {
         coach_compensation_type: "from_subscription",
         coach_compensation_value: "0",
         payment_method: "",
+        transaction_id: "",
+        notes: "",
       });
       setFoundMember(null);
       onClose();
     } catch (error) {
       const errorData = error.payload?.data || {};
-      const errorMsg =
-        errorData.non_field_errors?.[0] ||
+      const nonFieldErrors = error.payload?.errors || errorData.non_field_errors || [];
+      let errorMsg = nonFieldErrors[0] ||
         errorData.payment_method_id?.[0] ||
         errorData.identifier?.[0] ||
-        errorData.special_offer?.[0] ||
         errorData.type?.[0] ||
         errorData.message ||
         error.payload?.data?.message ||
@@ -310,6 +312,13 @@ const CreateSubscription = ({ onClose }) => {
         JSON.stringify(errorData) ||
         error.message ||
         "حدث خطأ غير متوقع أثناء إنشاء الاشتراك";
+
+      if (errorMsg.includes("يجب تسوية المدفوعات المستحقة أولاً")) {
+        errorMsg = "لا يمكن إنشاء اشتراك جديد لأن العضو لديه مدفوعات مستحقة. يرجى تسوية المبالغ المتبقية أولاً.";
+      } else if (errorMsg.includes("لا يمكن إنشاء اشتراك جديد يبدأ قبل")) {
+        errorMsg = `لا يمكن إنشاء اشتراك جديد لأن العضو لديه اشتراك نشط حتى ${errorMsg.match(/\d{4}-\d{2}-\d{2}/)?.[0] || 'تاريخ غير محدد'}.`;
+      }
+
       setErrorMessage(errorMsg);
       setIsModalOpen(true);
     } finally {
@@ -326,7 +335,15 @@ const CreateSubscription = ({ onClose }) => {
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full max-h-[70vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">حدث خطأ</h3>
             <p className="text-red-600">{errorMessage}</p>
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex justify-end gap-2">
+              {errorMessage.includes("مدفوعات مستحقة") && foundMember && (
+                <Button
+                  onClick={() => window.location.href = `/member/${foundMember.id}/payments`}
+                  variant="outline"
+                >
+                  تسوية المدفوعات
+                </Button>
+              )}
               <Button onClick={() => setIsModalOpen(false)} variant="destructive">
                 إغلاق
               </Button>
@@ -494,6 +511,31 @@ const CreateSubscription = ({ onClose }) => {
                       ) : null;
                     })()
                   )}
+                </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">رقم العملية (اختياري)</label>
+                  <input
+                    type="text"
+                    value={formData.transaction_id || ""}
+                    onChange={(e) => setFormData({ ...formData, transaction_id: e.target.value })}
+                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    placeholder="أدخل رقم العملية"
+                    disabled={isSubmitting || !foundMember}
+                  />
+                </div>
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-medium mb-2">ملاحظات (اختياري)</label>
+                  <input
+                    type="text"
+                    value={formData.notes || ""}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+                    placeholder="أدخل ملاحظات"
+                    disabled={isSubmitting || !foundMember}
+                  />
                 </div>
               </div>
 

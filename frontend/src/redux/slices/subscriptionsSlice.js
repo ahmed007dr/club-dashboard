@@ -186,6 +186,7 @@ export const postSubscription = createAsyncThunk(
       return rejectWithValue({
         status: error.response?.status,
         data: error.response?.data || { message: error.message },
+        errors: error.response?.data?.non_field_errors || error.response?.data || [error.message],
       });
     }
   }

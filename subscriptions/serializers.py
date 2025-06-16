@@ -271,15 +271,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         else:
             effective_price = subscription_type.price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
             
-        # # التحقق من المبالغ
-        # if remaining_amount < 0:
-        #     raise serializers.ValidationError("المبلغ المتبقي لا يمكن أن يكون سالبًا.")
-        # if paid_amount > effective_price:
-        #     raise serializers.ValidationError(f"المبلغ المدفوع لا يمكن أن يتجاوز {effective_price} جنيه.")
-        # if (paid_amount + remaining_amount).quantize(Decimal('0.01')) != effective_price:
-        #     raise serializers.ValidationError("المبلغ المدفوع + المتبقي يجب أن يساوي سعر الاشتراك الفعلي.")
-            
-
         # التحقق من العضو
         if identifier and not member:
             try:
@@ -342,16 +333,18 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         # التحقق من الاشتراكات النشطة والمدفوعات المستحقة
         if member:
             today = timezone.now().date()
+            # تعديل التحقق ليشمل حالة استهلاك max_entries
             active_subscriptions = Subscription.objects.filter(
-                member=member, club=club,
-                start_date__lte=today, end_date__gte=today
-            ).exclude(entry_count__gte=F('type__max_entries')).exclude(type__max_entries=0)
+                member=member,
+                club=club,
+                start_date__lte=today,
+                end_date__gte=today,
+                entry_count__lt=F('type__max_entries'),  # الاشتراكات التي لم تستنفد max_entries
+                type__max_entries__gt=0  # الاشتراكات التي لها max_entries محدد
+            ).exclude(is_cancelled=True)  # استبعاد الاشتراكات الملغاة
             if active_subscriptions.exists() and not self.instance:
                 latest_active_subscription = active_subscriptions.order_by('-end_date').first()
                 max_end_date = latest_active_subscription.end_date
-                if (latest_active_subscription.entry_count >= latest_active_subscription.type.max_entries and
-                        latest_active_subscription.type.max_entries > 0):
-                    max_end_date = today
                 start_date = data.get('start_date', today)
                 if start_date <= max_end_date:
                     raise serializers.ValidationError(
@@ -362,7 +355,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("يجب تسوية المدفوعات المستحقة أولاً.")
 
         return data
-
     def create(self, validated_data):
         validated_data.pop('coach_identifier', None)
         validated_data.pop('identifier', None)

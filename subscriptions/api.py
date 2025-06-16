@@ -263,8 +263,9 @@ def subscription_list(request):
         mutable_data['created_by'] = request.user.id
         mutable_data['club'] = request.user.club.id
         payment_data = mutable_data.pop('payments', [])
-        mutable_data.pop('paid_amount', None)  # إزالة paid_amount من الـ body
-        mutable_data.pop('remaining_amount', None)  # إزالة remaining_amount من الـ body
+        mutable_data.pop('paid_amount', None) 
+        mutable_data.pop('remaining_amount', None)
+        mutable_data.pop('special_offer', None)  
 
         with transaction.atomic():
             subscription_type = get_object_or_404(SubscriptionType, id=mutable_data['type'], club=request.user.club)
