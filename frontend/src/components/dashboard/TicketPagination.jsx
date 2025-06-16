@@ -13,7 +13,7 @@ const TicketPagination = ({
   const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
 
   const getPageNumbers = () => {
-    const maxPagesToShow = 20;
+    const maxPagesToShow = 5;
     const halfPages = Math.floor(maxPagesToShow / 2);
     let startPage = Math.max(1, currentPage - halfPages);
     let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);

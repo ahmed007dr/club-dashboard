@@ -4,7 +4,7 @@ import { addAttendance, deleteAttendance, fetchAttendances } from "@/redux/slice
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { FiUsers,FiUser, FiHash,FiTrash,FiDollarSign, FiCalendar, FiSearch, FiFileText, FiPlus,FiList,FiPhone,FiAlertTriangle, FiEye, FiEyeOff, FiTag } from "react-icons/fi";
+import { FiUsers, FiUser, FiHash, FiTrash, FiDollarSign, FiCalendar, FiSearch, FiFileText, FiPlus, FiList, FiPhone, FiAlertTriangle, FiEye, FiEyeOff, FiTag } from "react-icons/fi";
 import { Loader2, MoreVertical } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "react-hot-toast";
@@ -122,6 +122,7 @@ const Attendance = () => {
   const [showTable, setShowTable] = useState(false);
   const [dailyAttendance, setDailyAttendance] = useState(0);
   const [weeklyAttendance, setWeeklyAttendance] = useState(0);
+  const [lastHourAttendance, setLastHourAttendance] = useState(0); // حالة جديدة
   const itemsPerPage = 20;
 
   // جلب بيانات الملف الشخصي للنادي
@@ -146,11 +147,11 @@ const Attendance = () => {
     fetchProfile();
   }, []);
 
-  // جلب إحصائيات الحضور اليومي والأسبوعي
+  // جلب إحصائيات الحضور اليومي، الأسبوعي، وآخر ساعة
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [dailyResponse, weeklyResponse] = await Promise.all([
+        const [dailyResponse, weeklyResponse, lastHourResponse] = await Promise.all([
           fetch(`${BASE_URL}attendance/api/attendances/hourly/`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -158,6 +159,12 @@ const Attendance = () => {
             },
           }),
           fetch(`${BASE_URL}attendance/api/attendances/weekly/`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "Content-Type": "application/json",
+            },
+          }),
+          fetch(`${BASE_URL}attendance/api/attendances/last-hour/`, {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
               "Content-Type": "application/json",
@@ -173,11 +180,18 @@ const Attendance = () => {
           const weeklyData = await weeklyResponse.json();
           setWeeklyAttendance(weeklyData.reduce((sum, entry) => sum + entry.count, 0));
         }
+        if (lastHourResponse.ok) {
+          const lastHourData = await lastHourResponse.json();
+          setLastHourAttendance(lastHourData.count || 0);
+        }
       } catch (err) {
         toast.error("فشل في جلب إحصائيات الحضور");
       }
     };
+
     fetchStats();
+    const interval = setInterval(fetchStats, 60000); // تحديث كل دقيقة
+    return () => clearInterval(interval); // تنظيف عند إلغاء التأثير
   }, []);
 
   // جلب سجلات الحضور
@@ -197,26 +211,25 @@ const Attendance = () => {
     const updatedAttendance = { ...newAttendance, [name]: name === "identifier" ? value.trim().toUpperCase() : value };
     setNewAttendance(updatedAttendance);
     setFoundSubscription(null);
-  
+
     if (!updatedAttendance.identifier || !updatedAttendance.club) {
       setSearchLoading(false);
       return;
     }
-  
+
     setSearchLoading(true);
     try {
       const response = await fetch(`${BASE_URL}subscriptions/api/subscriptions/?identifier=${updatedAttendance.identifier}&club=${updatedAttendance.club}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "application/json",
-          "Cache-Control": "no-cache", // منع التخزين المؤقت
+          "Cache-Control": "no-cache",
         },
       });
       if (!response.ok) throw new Error("فشل في جلب الاشتراك");
       const data = await response.json();
-      console.log("API Response:", data); // تسجيل الاستجابة للتحقق
-  
-      // البحث عن اشتراك يطابق identifier بدقة
+      console.log("API Response:", data);
+
       const subscription = data.results.find((sub) => {
         const member = sub.member_details || {};
         return (
@@ -224,7 +237,7 @@ const Attendance = () => {
           member.phone?.trim() === updatedAttendance.identifier
         );
       });
-  
+
       if (!subscription) {
         toast.error("لم يتم العثور على اشتراك فعال لهذا المعرف");
         setFoundSubscription(null);
@@ -238,7 +251,6 @@ const Attendance = () => {
     }
   };
 
-  
   // تسجيل حضور جديد
   const handleAddAttendance = async (e) => {
     e.preventDefault();
@@ -347,7 +359,7 @@ const Attendance = () => {
                       <Loader2 className="animate-spin w-6 h-6 text-blue-600" />
                     </div>
                   )}
-                 {foundSubscription && (
+                  {foundSubscription && (
                     <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm">
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         <p className="flex items-center gap-2">
@@ -421,6 +433,10 @@ const Attendance = () => {
                 <div>
                   <p className="text-sm text-gray-600 text-right">الحضور هذا الأسبوع</p>
                   <p className="text-xl font-bold text-blue-600 text-right">{weeklyAttendance}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 text-right">الحضور في آخر ساعة</p>
+                  <p className="text-xl font-bold text-blue-600 text-right">{lastHourAttendance}</p>
                 </div>
               </div>
             </div>
