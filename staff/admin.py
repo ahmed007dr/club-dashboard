@@ -1,10 +1,18 @@
 from django.contrib import admin
+from django import forms
+from django.utils import timezone
+from django.shortcuts import render
+from django.contrib import messages
 from import_export.admin import ImportExportModelAdmin
 from import_export import resources, fields
+from datetime import date, time, datetime
+from dateutil.relativedelta import relativedelta
 from .models import Shift, StaffAttendance
+from accounts.models import User
+from core.models import Club
 
 # =======================
-# Shift Resource & Admin
+# Shift Resource
 # =======================
 
 class ShiftResource(resources.ModelResource):
@@ -34,6 +42,75 @@ class ShiftResource(resources.ModelResource):
         )
         export_order = fields
 
+# =======================
+# Bulk Shift Form
+# =======================
+
+class BulkShiftForm(forms.Form):
+    staff = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(is_active=True),
+        label="الموظفون",
+        widget=forms.CheckboxSelectMultiple,
+        required=False
+    )
+    apply_to_all_staff = forms.BooleanField(
+        label="تطبيق على جميع الموظفين النشطين في النادي",
+        required=False
+    )
+    start_date = forms.DateField(
+        label="تاريخ البداية",
+        initial=date.today,
+        widget=forms.DateInput(attrs={'type': 'date'})
+    )
+    end_date = forms.DateField(
+        label="تاريخ النهاية",
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        required=False
+    )
+    shift_start = forms.TimeField(
+        label="وقت البداية",
+        initial=time(9, 0),
+        widget=forms.TimeInput(attrs={'type': 'time'})
+    )
+    shift_end = forms.TimeField(
+        label="وقت النهاية",
+        initial=time(17, 0),
+        widget=forms.TimeInput(attrs={'type': 'time'})
+    )
+    days_of_week = forms.MultipleChoiceField(
+        label="أيام الأسبوع",
+        choices=[
+            ('0', 'الأحد'), ('1', 'الإثنين'), ('2', 'الثلاثاء'),
+            ('3', 'الأربعاء'), ('4', 'الخميس'), ('5', 'الجمعة'), ('6', 'السبت')
+        ],
+        widget=forms.CheckboxSelectMultiple,
+        required=False
+    )
+    action_type = forms.ChoiceField(
+        label="نوع الإجراء",
+        choices=[
+            ('create', 'إنشاء دوامات'),
+            ('update', 'تعديل دوامات'),
+            ('delete', 'حذف دوامات'),
+        ]
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
+        apply_to_all = cleaned_data.get('apply_to_all_staff')
+        staff = cleaned_data.get('staff')
+
+        if not apply_to_all and not staff:
+            raise forms.ValidationError("يجب اختيار موظف واحد على الأقل أو تفعيل 'تطبيق على جميع الموظفين'.")
+        if end_date and end_date < start_date:
+            raise forms.ValidationError("تاريخ النهاية يجب أن يكون بعد تاريخ البداية.")
+        return cleaned_data
+
+# =======================
+# Shift Admin
+# =======================
 
 @admin.register(Shift)
 class ShiftAdmin(ImportExportModelAdmin):
@@ -44,10 +121,85 @@ class ShiftAdmin(ImportExportModelAdmin):
     raw_id_fields = ('staff', 'approved_by', 'club')
     date_hierarchy = 'date'
     ordering = ['-date']
+    actions = ['manage_bulk_shifts']
 
+    def manage_bulk_shifts(self, request, queryset):
+        """Custom action to create, update, or delete shifts for selected staff."""
+        if 'apply' in request.POST:
+            form = BulkShiftForm(request.POST)
+            if form.is_valid():
+                club = request.user.club
+                start_date = form.cleaned_data['start_date']
+                end_date = form.cleaned_data['end_date'] or start_date + relativedelta(months=1)
+                shift_start = form.cleaned_data['shift_start']
+                shift_end = form.cleaned_data['shift_end']
+                days_of_week = [int(d) for d in form.cleaned_data['days_of_week']] if form.cleaned_data['days_of_week'] else list(range(7))
+                apply_to_all = form.cleaned_data['apply_to_all_staff']
+                staff_list = User.objects.filter(club=club, is_active=True) if apply_to_all else form.cleaned_data['staff']
+                action_type = form.cleaned_data['action_type']
+
+                current_date = start_date
+                affected_shifts = 0
+
+                while current_date <= end_date:
+                    if current_date.weekday() in days_of_week:
+                        for staff in staff_list:
+                            if action_type == 'create':
+                                if not Shift.objects.filter(staff=staff, date=current_date, club=club).exists():
+                                    Shift.objects.create(
+                                        club=club,
+                                        staff=staff,
+                                        date=current_date,
+                                        shift_start=shift_start,
+                                        shift_end=shift_end,
+                                        approved_by=request.user,
+                                        shift_end_date=(
+                                            current_date if shift_end > shift_start
+                                            else current_date + timezone.timedelta(days=1)
+                                        )
+                                    )
+                                    affected_shifts += 1
+                            elif action_type == 'update':
+                                shifts = Shift.objects.filter(staff=staff, date=current_date, club=club)
+                                for shift in shifts:
+                                    shift.shift_start = shift_start
+                                    shift.shift_end = shift_end
+                                    shift.shift_end_date = (
+                                        current_date if shift_end > shift_start
+                                        else current_date + timezone.timedelta(days=1)
+                                    )
+                                    shift.approved_by = request.user
+                                    shift.save()
+                                    affected_shifts += 1
+                            elif action_type == 'delete':
+                                affected_shifts += Shift.objects.filter(staff=staff, date=current_date, club=club).delete()[0]
+                    current_date += timezone.timedelta(days=1)
+
+                action_messages = {
+                    'create': f"تم إنشاء {affected_shifts} دوام بنجاح.",
+                    'update': f"تم تعديل {affected_shifts} دوام بنجاح.",
+                    'delete': f"تم حذف {affected_shifts} دوام بنجاح.",
+                }
+                self.message_user(request, action_messages[action_type], messages.SUCCESS)
+                return None
+        else:
+            form = BulkShiftForm()
+
+        return render(
+            request,
+            'admin/bulk_shift_form.html',
+            {
+                'form': form,
+                'title': 'إدارة دوامات الموظفين',
+                'action': 'manage_bulk_shifts',
+                'queryset': queryset,
+            }
+        )
+
+    manage_bulk_shifts.short_description = "إنشاء/تعديل/حذف دوامات الموظفين"
 
 # =============================
-# Staff Attendance Resource
+# Staff Attendance Resource & Admin
 # =============================
 
 class StaffAttendanceResource(resources.ModelResource):
@@ -80,7 +232,6 @@ class StaffAttendanceResource(resources.ModelResource):
             'duration',
         )
         export_order = fields
-
 
 @admin.register(StaffAttendance)
 class StaffAttendanceAdmin(ImportExportModelAdmin):
