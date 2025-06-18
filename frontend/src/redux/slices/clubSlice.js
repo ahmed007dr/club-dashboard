@@ -90,7 +90,10 @@ export const fetchClubList = createAsyncThunk(
   'clubs/fetchClubList',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token'); // ✅ Define token here
+      const token = localStorage.getItem('token');
+      if (!token) {
+        return rejectWithValue('No token found. Please log in.');
+      }
 
       const response = await fetch(`${BASE_URL}core/api/clubs-list/`, {
         method: 'GET',
@@ -102,13 +105,12 @@ export const fetchClubList = createAsyncThunk(
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Fetch failed:', errorData); // 🔍 log the error response
+        console.error('Fetch failed:', errorData);
         return rejectWithValue(errorData.message || 'Failed to fetch club list.');
       }
 
       const data = await response.json();
-      console.log('Fetched club list:', data); // 🔍 log the success response
-
+      console.log('Fetched club list:', data);
       return Array.isArray(data) ? data : [data];
     } catch (error) {
       console.error('Error fetching club list:', error);
@@ -116,7 +118,6 @@ export const fetchClubList = createAsyncThunk(
     }
   }
 );
-
 
 const clubSlice = createSlice({
   name: 'clubSlice',

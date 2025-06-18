@@ -12,6 +12,8 @@ from utils.permissions import IsOwnerOrRelatedToClub
 from staff.models import StaffAttendance
 from django.utils import timezone
 from datetime import timedelta
+import logging
+logger = logging.getLogger(__name__)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
@@ -51,26 +53,19 @@ def api_user_profile(request):
     user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=request.user.id)
     serializer = UserProfileSerializer(user)
     return Response(serializer.data)
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def api_user_list(request):
+    """Retrieve a list of users from the same club without additional restrictions."""
+    logger.debug(f"User list request: User={request.user.username}, Query={request.query_params}")
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
+
     search_query = request.query_params.get('search', '').strip()
     users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(
         club=request.user.club
     )
-
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club,
-            check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance and not search_query:
-            return Response({'error': 'يجب أن تكون في وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
-        if not search_query:
-            week_ago = timezone.now() - timedelta(days=7)
-            users = users.filter(date_joined__gte=week_ago)  
 
     if search_query:
         is_active_filter = None
@@ -85,8 +80,8 @@ def api_user_list(request):
             Q(first_name__icontains=search_query) |
             Q(last_name__icontains=search_query) |
             Q(role__icontains=search_query) |
-            Q(rfid_code__iexact=search_query) | 
-            Q(phone_number__iexact=search_query) | 
+            Q(rfid_code__iexact=search_query) |
+            Q(phone_number__iexact=search_query) |
             Q(card_number__icontains=search_query)
         )
 
@@ -94,8 +89,9 @@ def api_user_list(request):
             query &= Q(is_active=is_active_filter)
 
         users = users.filter(query)
+        logger.debug(f"Search query: {search_query}, Result count: {users.count()}")
 
-    users = users.order_by('-date_joined') 
+    users = users.order_by('-date_joined')
     paginator = PageNumberPagination()
     paginator.page_size = 20
     result_page = paginator.paginate_queryset(users, request)

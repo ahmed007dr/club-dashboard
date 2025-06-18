@@ -66,59 +66,109 @@ const Staff = () => {
   const canEditStaffAttendance = usePermission("change_staffattendance");
   const canDeleteStaffAttendance = usePermission("delete_staffattendance");
 
-  // Fetch initial data and load club users
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const usersResponse = await axios.get(`${BASE_URL}accounts/api/users/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        const clubsMap = {};
-        usersResponse.data.results.forEach((user) => {
-          if (!user.club) return;
-          if (!clubsMap[user.club.id]) {
-            clubsMap[user.club.id] = {
-              club_id: user.club.id,
-              club_name: user.club.name,
-              users: [],
-            };
-          }
-          clubsMap[user.club.id].users.push({
-            id: user.id,
-            username: user.username,
-            first_name: user.first_name,
-            last_name: user.last_name,
-          });
-        });
-        setClubs(Object.values(clubsMap));
-
-        const profileResponse = await axios.get(`${BASE_URL}accounts/api/profile/`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const profileData = profileResponse.data;
-        const club = { id: profileData.club.id, name: profileData.club.name };
-        setUserClub(club);
-        setProfileUser({ id: profileData.id, username: profileData.username });
-
-        // تحميل موظفي النادي الحالي تلقائيًا
-        const selectedClub = clubsMap[club.id];
-        setSelectedClubUsers(selectedClub ? selectedClub.users : []);
-        setFormData((prev) => ({
-          ...prev,
-          club: club.id,
-          approved_by: profileData.id, // تعيين الموافق تلقائيًا
-        }));
+// Fetch initial data and load club users
+useEffect(() => {
+  const fetchInitialData = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        console.error("No token found");
+        toast.error("يرجى تسجيل الدخول");
         setLoadingProfile(false);
-      } catch (error) {
-        console.error("Initial data fetch error:", error);
-        toast.error("فشل في تحميل البيانات الأولية");
-        setLoadingProfile(false);
+        window.location.href = "/login";
+        return;
       }
-    };
-    fetchInitialData();
-  }, []);
+
+      const usersResponse = await axios.get(`${BASE_URL}accounts/api/users/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      // Log the full response to debug
+      console.log("Users API response:", usersResponse.data);
+
+      // Check if response.data exists
+      if (!usersResponse.data || typeof usersResponse.data !== "object") {
+        console.error("Invalid usersResponse.data:", usersResponse.data);
+        toast.error("فشل في تحميل بيانات المستخدمين: استجابة غير صالحة");
+        setClubs([]);
+        setLoadingProfile(false);
+        return;
+      }
+
+      // Check if results exists and is an array
+      const usersData = usersResponse.data.results;
+      if (!usersData || !Array.isArray(usersData)) {
+        console.error("Expected an array in usersResponse.data.results, got:", usersData);
+        toast.warn("لا يوجد مستخدمين متاحين في ناديك");
+        setClubs([]);
+        setSelectedClubUsers([]);
+        setLoadingProfile(false);
+        return;
+      }
+
+      const clubsMap = {};
+      usersData.forEach((user) => {
+        if (!user.club) return;
+        if (!clubsMap[user.club.id]) {
+          clubsMap[user.club.id] = {
+            club_id: user.club.id,
+            club_name: user.club.name,
+            users: [],
+          };
+        }
+        clubsMap[user.club.id].users.push({
+          id: user.id,
+          username: user.username,
+          first_name: user.first_name,
+          last_name: user.last_name,
+        });
+      });
+      setClubs(Object.values(clubsMap));
+
+      const profileResponse = await axios.get(`${BASE_URL}accounts/api/profile/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const profileData = profileResponse.data;
+      if (!profileData.club) {
+        console.error("No club associated with user:", profileData);
+        toast.error("لا يوجد نادي مرتبط بك");
+        setLoadingProfile(false);
+        return;
+      }
+
+      const club = { id: profileData.club.id, name: profileData.club.name };
+      setUserClub(club);
+      setProfileUser({ id: profileData.id, username: profileData.username });
+
+      // تحميل موظفي النادي الحالي تلقائيًا
+      const selectedClub = clubsMap[club.id];
+      setSelectedClubUsers(selectedClub ? selectedClub.users : []);
+      setFormData((prev) => ({
+        ...prev,
+        club: club.id,
+        approved_by: profileData.id, // تعيين الموافق تلقائيًا
+      }));
+      setLoadingProfile(false);
+    } catch (error) {
+      console.error("Initial data fetch error:", error.response?.data || error.message);
+      if (error.response?.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("refreshToken");
+        toast.error("انتهت صلاحية الجلسة. يرجى تسجيل الدخول مرة أخرى");
+        window.location.href = "/login";
+      } else if (error.response?.status === 403) {
+        toast.error("ليس لديك صلاحية للوصول إلى بيانات المستخدمين");
+      } else if (error.response?.status === 400) {
+        toast.error(error.response?.data?.error || "فشل في تحميل البيانات: خطأ في النادي");
+      } else {
+        toast.error("فشل في تحميل البيانات الأولية");
+      }
+      setLoadingProfile(false);
+    }
+  };
+  fetchInitialData();
+}, []);
+
 
   // Fetch staff data with pagination and filters
   useEffect(() => {

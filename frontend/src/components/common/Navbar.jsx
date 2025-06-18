@@ -51,8 +51,13 @@ const Navbar = ({ hideMenuButton = false }) => {
     const fetchProfile = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) return;
-
+        if (!token) {
+          console.error('No token found');
+          setIsLoggedIn(false);
+          navigate('/login');
+          return;
+        }
+  
         const res = await axios.get(`${BASE_URL}accounts/api/profile/`, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -61,14 +66,20 @@ const Navbar = ({ hideMenuButton = false }) => {
         setProfile(res.data);
       } catch (error) {
         console.error('Error fetching profile:', error.response?.data || error.message);
+        if (error.response?.status === 401) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          setIsLoggedIn(false);
+          navigate('/login');
+        }
       }
     };
-
+  
     if (isLoggedIn) {
       fetchProfile();
     }
-  }, [isLoggedIn]);
-
+  }, [isLoggedIn, navigate]);
+  
   // Fetch clubs for all logged-in users
   useEffect(() => {
     if (isLoggedIn) {

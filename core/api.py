@@ -52,9 +52,10 @@ def api_switch_club(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def api_list_clubs(request):
-    """List all clubs (Owner only)."""
-    if request.user.role != 'owner':
-        return Response({'error': 'ADMIN ONLY '}, status=status.HTTP_403_FORBIDDEN)
-    clubs = Club.objects.all()
+    """List all clubs for Owner, or the user's club for other roles."""
+    if request.user.role == 'owner':
+        clubs = Club.objects.all()
+    else:
+        clubs = Club.objects.filter(id=request.user.club_id)
     serializer = ClubSerializer(clubs, many=True)
     return Response(serializer.data)

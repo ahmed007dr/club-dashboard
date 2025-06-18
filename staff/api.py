@@ -13,6 +13,8 @@ from .models import Shift, StaffAttendance
 from .serializers import ShiftSerializer, StaffAttendanceSerializer, StaffMonthlyHoursSerializer
 from accounts.models import User
 from utils.permissions import IsOwnerOrRelatedToClub
+import logging
+logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
@@ -132,49 +134,73 @@ def find_current_shift(user):
     return None
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def staff_check_in_by_code_api(request):
-    """Record staff check-in using RFID code."""
+    """Record staff check-in using RFID code, restricted to same club."""
+    logger.debug(f"Check-in request: {request.data}, User: {request.user.username}")
     rfid_code = request.data.get('rfid_code')
     if not rfid_code:
+        logger.error("No RFID code provided")
         return Response({'error': 'رمز RFID مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
         user = User.objects.get(rfid_code=rfid_code, is_active=True, club=request.user.club)
+        logger.debug(f"Found user: {user.username}")
     except User.DoesNotExist:
-        return Response({'error': 'رمز RFID غير صالح أو المستخدم غير نشط'}, status=status.HTTP_404_NOT_FOUND)
+        logger.error(f"Invalid RFID code: {rfid_code}")
+        return Response({'error': 'رمز RFID غير صالح أو المستخدم غير نشط أو غير مرتبط بناديك'}, status=status.HTTP_404_NOT_FOUND)
+
+    # Close any open attendances
     open_attendances = StaffAttendance.objects.filter(staff=user, check_out__isnull=True)
     for attendance in open_attendances:
-        if attendance.shift:
-            shift_end_date = attendance.shift.shift_end_date or attendance.shift.date
-            shift_end_dt = datetime.combine(shift_end_date, attendance.shift.shift_end)
-            shift_end_dt = timezone.make_aware(shift_end_dt)
-            attendance.check_out = shift_end_dt if shift_end_dt < timezone.now() else timezone.now()
-        else:
-            attendance.check_out = timezone.now()
+        logger.debug(f"Closing open attendance: {attendance.id}")
+        attendance.check_out = timezone.now()
         attendance.save()
-    shift = find_current_shift(user)
+
+    # Create new check-in without requiring a shift
     attendance = StaffAttendance.objects.create(
-        staff=user, club=user.club, shift=shift, check_in=timezone.now(), created_by=request.user
+        staff=user,
+        club=user.club,
+        check_in=timezone.now(),
+        created_by=request.user
     )
+    logger.info(f"Check-in created: {attendance.id} for user: {user.username}")
     return Response(StaffAttendanceSerializer(attendance).data, status=status.HTTP_201_CREATED)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def staff_check_out_by_code_api(request):
-    """Record staff check-out using RFID code."""
+    """Record staff check-out using RFID code, restricted to same club."""
+    logger.debug(f"Check-out request: {request.data}, User: {request.user.username}")
     rfid_code = request.data.get('rfid_code')
     if not rfid_code:
+        logger.error("No RFID code provided")
         return Response({'error': 'رمز RFID مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
+
     try:
         user = User.objects.get(rfid_code=rfid_code, is_active=True, club=request.user.club)
+        logger.debug(f"Found user: {user.username}")
     except User.DoesNotExist:
-        return Response({'error': 'رمز RFID غير صالح أو المستخدم غير نشط'}, status=status.HTTP_404_NOT_FOUND)
+        logger.error(f"Invalid RFID code: {rfid_code}")
+        return Response({'error': 'رمز RFID غير صالح أو المستخدم غير نشط أو غير مرتبط بناديك'}, status=status.HTTP_404_NOT_FOUND)
+
     attendance = StaffAttendance.objects.filter(staff=user, check_out__isnull=True).order_by('-check_in').first()
     if not attendance:
+        logger.error(f"No active attendance found for user: {user.username}")
         return Response({'error': 'لا يوجد تسجيل حضور نشط'}, status=status.HTTP_400_BAD_REQUEST)
+    
     attendance.check_out = timezone.now()
     attendance.save()
-    return Response(StaffAttendanceSerializer(attendance).data)
+    logger.info(f"Check-out recorded: {attendance.id} for user: {user.username}")
+    return Response(StaffAttendanceSerializer(attendance).data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
