@@ -419,22 +419,32 @@ def finance_overview(request):
     }, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def employee_daily_report_api(request):
-    """Generate daily report for an employee."""
+    """Generate daily report for an employee based on their shift."""
+    logger.debug(f"Daily report request: User={request.user.username}, Role={request.user.role}, Params={request.query_params}")
     employee_id = request.query_params.get('employee_id')
     start_date = request.query_params.get('start_date')
     end_date = request.query_params.get('end_date')
+
     if request.user.role not in ['owner', 'admin']:
-        if employee_id and str(employee_id) != str(request.user.id):
-            return Response({'error': 'غير مسموح برؤية تقرير موظف آخر.'}, status=status.HTTP_403_FORBIDDEN)
-        employee_id = request.user.id
-    if employee_id:
-        employee = get_object_or_404(User, id=employee_id, club=request.user.club)
+        # Non-owner/admin can only view their own report
+        employee_id = request.user.id  # Force current user ID
+    else:
+        # Owner/admin can view any employee's report
+        employee_id = employee_id if employee_id else request.user.id
+
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
+
+    employee = get_object_or_404(User, id=employee_id, club=request.user.club)
+
     data, status_code = get_employee_report_data(
         user=request.user, employee_id=employee_id, start_date=start_date, end_date=end_date
     )
     return Response(data, status=status_code)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

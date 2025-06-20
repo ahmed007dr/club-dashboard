@@ -79,6 +79,7 @@ const CreateSubscription = ({ onClose }) => {
     }
   };
 
+  // Fetch all coaches
   const fetchAllCoaches = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -92,14 +93,14 @@ const CreateSubscription = ({ onClose }) => {
         nextUrl = response.data.next;
       }
       
-      const coaches = allCoaches.filter(user => user.role === 'coach');
-      return coaches;
+      return allCoaches.filter(user => user.role === 'coach');
     } catch (error) {
       console.error('❌ Failed to fetch all coaches:', error);
       throw error;
     }
   };
 
+  // Fetch all subscription types
   const fetchAllSubscriptionTypes = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -124,7 +125,7 @@ const CreateSubscription = ({ onClose }) => {
     }
   };
 
-  // دالة البحث عن عضو بناءً على identifier
+  // Search member by identifier
   const searchMember = useCallback(async (identifier, clubId) => {
     if (!identifier || !clubId) {
       setFoundMember(null);
@@ -142,27 +143,24 @@ const CreateSubscription = ({ onClose }) => {
         }
       );
 
+      console.log("Search API Response:", response.data); // Debug API response
       const members = Array.isArray(response.data.results) ? response.data.results : [];
       const member = members.length > 0 ? members[0] : null;
 
-      if (member) {
-        setFoundMember({
-          id: member.id,
-          name: member.name,
-          photo: member.photo,
-          membership_number: member.membership_number,
-          phone: member.phone,
-          rfid_code: member.rfid_code,
-          club_id: member.club,
-          club_name: member.club_name,
-          address: member.address,
-          birth_date: member.birth_date,
-          job: member.job,
-          national_id: member.national_id,
-        });
-      } else {
-        setFoundMember(null);
-      }
+      setFoundMember(member ? {
+        id: member.id,
+        name: member.name,
+        photo: member.photo,
+        membership_number: member.membership_number,
+        phone: member.phone,
+        rfid_code: member.rfid_code,
+        club_id: member.club,
+        club_name: member.club_name,
+        address: member.address,
+        birth_date: member.birth_date,
+        job: member.job,
+        national_id: member.national_id,
+      } : null);
     } catch (error) {
       console.error("Failed to search member:", error.message);
       toast.error("فشل في البحث عن العضو");
@@ -172,21 +170,23 @@ const CreateSubscription = ({ onClose }) => {
     }
   }, []);
 
-  // Debounce لتأخير البحث
+  // Debounced search
   const debouncedSearch = useCallback(
     debounce((identifier, clubId) => {
+      console.log("Debounced search triggered:", identifier, clubId); // Debug debounce
       searchMember(identifier, clubId);
     }, 500),
     [searchMember]
   );
 
-  // البحث عن العضو بناءً على identifier
+  // Handle identifier change and search
   useEffect(() => {
-    if (!formData.identifier || !userClub) {
+    console.log("Effect triggered - Identifier:", formData.identifier, "Club ID:", userClub?.id); // Debug effect
+    if (!formData.identifier || !userClub?.id) {
       setFoundMember(null);
+      setSearchLoading(false);
       return;
     }
-
     debouncedSearch(formData.identifier.trim(), userClub.id);
   }, [formData.identifier, userClub, debouncedSearch]);
 
@@ -201,11 +201,8 @@ const CreateSubscription = ({ onClose }) => {
         ]);
 
         setAllSubscriptionTypes(subscriptionTypesResult);
-        const discounted = subscriptionTypesResult.filter(type => type.current_discount);
-        const regular = subscriptionTypesResult.filter(type => !type.current_discount);
-
-        setDiscountedTypes(discounted);
-        setRegularTypes(regular);
+        setDiscountedTypes(subscriptionTypesResult.filter(type => type.current_discount));
+        setRegularTypes(subscriptionTypesResult.filter(type => !type.current_discount));
         setAllCoaches(coachesResult);
         setAllPaymentMethods(paymentMethodsResult);
       } catch (error) {
@@ -217,54 +214,55 @@ const CreateSubscription = ({ onClose }) => {
     };
 
     fetchInitialData();
-  }, [dispatch]);
+  }, []);
 
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     const { identifier, type, start_date, paid_amount, coach, coach_compensation_type, coach_compensation_value, payment_method, transaction_id, notes } = formData;
-  
+
     // Client-side validation
     if (!userClub || !identifier || !type || !start_date || !paid_amount || !payment_method) {
       setErrorMessage("يرجى ملء جميع الحقول المطلوبة، بما في ذلك طريقة الدفع");
       setIsModalOpen(true);
       return;
     }
-  
+
     const paidAmount = parseFloat(paid_amount) || 0;
     if (isNaN(paidAmount) || paidAmount < 0) {
       setErrorMessage("المبلغ المدفوع يجب أن يكون رقمًا صحيحًا وغير سالب");
       setIsModalOpen(true);
       return;
     }
-  
+
     const paymentMethodId = parseInt(payment_method);
     if (isNaN(paymentMethodId)) {
       setErrorMessage("يرجى اختيار طريقة دفع صالحة");
       setIsModalOpen(true);
       return;
     }
-  
+
     const selectedType = allSubscriptionTypes.find(t => t.id.toString() === type.toString());
     if (!selectedType) {
       setErrorMessage("نوع الاشتراك المحدد غير موجود");
       setIsModalOpen(true);
       return;
     }
-  
+
     if (coach && (!coach_compensation_type || isNaN(parseFloat(coach_compensation_value)) || parseFloat(coach_compensation_value) < 0)) {
       setErrorMessage("يرجى تحديد نوع تعويض الكابتن وقيمة صالحة غير سالبة");
       setIsModalOpen(true);
       return;
     }
-  
+
     if (coach_compensation_type === 'from_subscription' && parseFloat(coach_compensation_value) > 100) {
       setErrorMessage("نسبة الكابتن لا يمكن أن تتجاوز 100%");
       setIsModalOpen(true);
       return;
     }
-  
+
     setIsSubmitting(true);
-  
+
     const payload = {
       club: userClub.id,
       identifier,
@@ -273,14 +271,16 @@ const CreateSubscription = ({ onClose }) => {
       coach: coach ? parseInt(coach) : null,
       coach_compensation_type: coach ? coach_compensation_type : null,
       coach_compensation_value: coach ? parseFloat(coach_compensation_value).toFixed(2) : "0.00",
-      payments: [{
-        amount: paidAmount.toFixed(2),
-        payment_method_id: paymentMethodId,
-        transaction_id: transaction_id || "",
-        notes: notes || "",
-      }],
+      payments: [
+        {
+          amount: paidAmount.toFixed(2),
+          payment_method_id: paymentMethodId,
+          transaction_id: transaction_id || "",
+          notes: notes || "",
+        },
+      ],
     };
-  
+
     try {
       const response = await dispatch(postSubscription(payload)).unwrap();
       toast.success("تم إنشاء الاشتراك بنجاح!");
@@ -322,7 +322,16 @@ const CreateSubscription = ({ onClose }) => {
       setIsSubmitting(false);
     }
   };
-  
+
+  // Handle identifier input change
+  const handleIdentifierChange = (e) => {
+    const newIdentifier = e.target.value;
+    setFormData({ ...formData, identifier: newIdentifier });
+    if (!newIdentifier) {
+      setFoundMember(null); // Reset foundMember when identifier is cleared
+    }
+  };
+
   return (
     <div className="container w-full mx-auto p-4" dir="rtl">
       <h2 className="text-xl font-bold mb-6">إنشاء اشتراك جديد</h2>
@@ -358,9 +367,7 @@ const CreateSubscription = ({ onClose }) => {
                 <input
                   type="text"
                   value={formData.identifier}
-                  onChange={(e) =>
-                    setFormData({ ...formData, identifier: e.target.value })
-                  }
+                  onChange={handleIdentifierChange}
                   className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
                   placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
                   disabled={isSubmitting}
@@ -473,9 +480,7 @@ const CreateSubscription = ({ onClose }) => {
                   <input
                     type="date"
                     value={formData.start_date}
-                    onChange={(e) =>
-                      setFormData({ ...formData, start_date: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
                     className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
                     min={new Date().toISOString().split("T")[0]}
                     disabled={isSubmitting || !foundMember}
@@ -490,9 +495,7 @@ const CreateSubscription = ({ onClose }) => {
                     step="0.01"
                     min="0"
                     value={formData.paid_amount}
-                    onChange={(e) =>
-                      setFormData({ ...formData, paid_amount: e.target.value })
-                    }
+                    onChange={(e) => setFormData({ ...formData, paid_amount: e.target.value })}
                     className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
                     placeholder="0.00"
                     disabled={isSubmitting || !foundMember}
@@ -542,9 +545,7 @@ const CreateSubscription = ({ onClose }) => {
                     <label className="block text-sm font-medium mb-2">نوع تعويض الكابتن</label>
                     <select
                       value={formData.coach_compensation_type}
-                      onChange={(e) =>
-                        setFormData({ ...formData, coach_compensation_type: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, coach_compensation_type: e.target.value })}
                       className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
                       disabled={isSubmitting || !foundMember}
                     >
@@ -562,9 +563,7 @@ const CreateSubscription = ({ onClose }) => {
                       step={formData.coach_compensation_type === 'from_subscription' ? "0.1" : "0.01"}
                       min="0"
                       value={formData.coach_compensation_value}
-                      onChange={(e) =>
-                        setFormData({ ...formData, coach_compensation_value: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, coach_compensation_value: e.target.value })}
                       className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
                       placeholder="0.00"
                       disabled={isSubmitting || !foundMember}

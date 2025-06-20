@@ -4,11 +4,13 @@ from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from accounts.models import User
 from finance.models import Income, Expense
-from staff.models import StaffAttendance 
+from staff.models import StaffAttendance
 import logging
 
 logger = logging.getLogger(__name__)
+
 def get_employee_report_data(user, employee_id=None, start_date=None, end_date=None):
+    """Generate employee report data based on shift for non-owner/admin."""
     if employee_id and user.role in ['owner', 'admin']:
         try:
             query = User.objects.filter(id=employee_id)
@@ -24,7 +26,8 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
     else:
         employee = user
         if user.role not in ['owner', 'admin'] and employee_id:
-            logger.warning("Non-admin user attempted to access another employee's report: user=%s, employee_id=%s", user.username, employee_id)
+            logger.warning("Non-admin user attempted to access another employee's report: user=%s, employee_id=%s", 
+                          user.username, employee_id)
             return {'error': 'غير مسموح لك بمشاهدة تقارير موظف آخر'}, status.HTTP_403_FORBIDDEN
 
     # تحديد الفترة الزمنية
@@ -38,34 +41,23 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
             start = timezone.make_aware(start) if timezone.is_naive(start) else start
             end = timezone.make_aware(end) if timezone.is_naive(end) else end
         else:
-            logger.error("Start date and end date are required for admin/owner")
-            return {'error': 'يجب تحديد تاريخ البداية والنهاية'}, status.HTTP_400_BAD_REQUEST
+            start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            end = timezone.now()
     else:
         attendance = StaffAttendance.objects.filter(
-            staff=employee,
-            club=employee.club,
-            check_out__isnull=True
+            staff=employee, club=employee.club, check_out__isnull=True
         ).order_by('-check_in').first()
         if not attendance:
             logger.warning("No open shift found for user: %s", employee.username)
             return {'error': 'لا توجد وردية مفتوحة. يجب تسجيل حضور أولاً.'}, status.HTTP_404_NOT_FOUND
-
         start = attendance.check_in
-        end = timezone.now()
+        end = attendance.check_out or timezone.now()
 
-    income_filters = {'club': employee.club, 'date__gte': start, 'date__lte': end}
-    expense_filters = {'club': employee.club, 'date__gte': start, 'date__lte': end}
-
-    if employee_id or user.role not in ['owner', 'admin']:
-        income_filters['received_by'] = employee
-        expense_filters['paid_by'] = employee
-    elif employee_id is None and user.role not in ['owner', 'admin']:
-        logger.warning("Non-admin user attempted to access club-wide report: user=%s", user.username)
-        return {'error': 'غير مسموح لك بمشاهدة تقرير النادي بالكامل'}, status.HTTP_403_FORBIDDEN
+    income_filters = {'club': employee.club, 'date__gte': start, 'date__lte': end, 'received_by': employee}
+    expense_filters = {'club': employee.club, 'date__gte': start, 'date__lte': end, 'paid_by': employee}
 
     incomes = Income.objects.filter(**income_filters).values('source__name').annotate(
-        count=Count('id'),
-        total=Sum('amount')
+        count=Count('id'), total=Sum('amount')
     )
 
     expenses = Expense.objects.filter(**expense_filters).values('category__name', 'description').annotate(
@@ -77,23 +69,18 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
     net_profit = total_income - total_expenses
 
     report_data = {
-        'employee_name': employee.username if employee_id else 'جميع الموظفين',
+        'employee_name': employee.username,
         'club_name': employee.club.name if employee.club else 'غير محدد',
         'check_in': timezone.localtime(start).isoformat(),
         'check_out': timezone.localtime(end).isoformat(),
         'incomes': [
-            {
-                'source': item['source__name'] or 'غير محدد',
-                'count': item['count'],
-                'total': float(item['total'])
-            } for item in incomes
+            {'source': item['source__name'] or 'غير محدد', 'count': item['count'], 'total': float(item['total'])}
+            for item in incomes
         ],
         'expenses': [
-            {
-                'category': item['category__name'] or 'غير محدد',
-                'description': item['description'] or 'بدون وصف',
-                'total': float(item['total'])
-            } for item in expenses
+            {'category': item['category__name'] or 'غير محدد', 'description': item['description'] or 'بدون وصف', 
+             'total': float(item['total'])}
+            for item in expenses
         ],
         'total_income': float(total_income),
         'total_expenses': float(total_expenses),

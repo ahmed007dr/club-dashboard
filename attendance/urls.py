@@ -13,6 +13,7 @@ urlpatterns = [
     path('api/attendances/hourly/', api.attendance_hourly_api, name='attendance_hourly'),
     path('api/attendances/weekly/', api.attendance_weekly_api, name='attendance_weekly'),
     path('api/attendances/monthly/', api.attendance_monthly_api, name='attendance_monthly'),
+    path('api/attendances/last-hour/', api.attendance_last_hour_api, name='attendance_last_hour'),
 ]
 
 # urlpatterns = [

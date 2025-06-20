@@ -189,19 +189,12 @@ def create_member_api(request):
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def update_member_api(request, member_id):
-    member = get_object_or_404(Member, pk=member_id, club=request.user.club)
     if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club,
-            check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response(
-                {'error': 'You can only update members during an active shift.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
+        return Response(
+            {'error': 'Only owners or admins can update members.'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    member = get_object_or_404(Member, pk=member_id, club=request.user.club)
     data = request.data.copy()
     serializer = MemberSerializer(member, data=data, partial=True, context={'request': request})
     if serializer.is_valid():

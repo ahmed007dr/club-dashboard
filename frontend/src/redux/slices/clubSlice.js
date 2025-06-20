@@ -2,29 +2,29 @@ import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import BASE_URL from '../../config/api';
 
 const token = localStorage.getItem('token');
-
 export const fetchClubs = createAsyncThunk('clubs/fetchClubs', async (_, { rejectWithValue }) => {
   try {
+    const token = localStorage.getItem('token');
+    if (!token) return rejectWithValue('No token found. Please log in.');
+
     const response = await fetch(`${BASE_URL}core/api/club/`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`, // Make sure token is included
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      return rejectWithValue(errorData.message || "Failed to fetch clubs.");
+      return rejectWithValue(errorData.message || 'Failed to fetch clubs.');
     }
 
     const data = await response.json();
-
-    // Normalize the response to always be an array
     return Array.isArray(data) ? data : [data];
   } catch (error) {
-    console.error("Error fetching clubs:", error);
-    return rejectWithValue(error.message || "An unexpected error occurred.");
+    console.error('Error fetching clubs:', error);
+    return rejectWithValue(error.message || 'An unexpected error occurred.');
   }
 });
 

@@ -130,6 +130,21 @@ def add_attendance_api(request):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+def attendance_last_hour_api(request):
+    """Get attendance data for the last 60 minutes."""
+    now = timezone.now()
+    one_hour_ago = now - timedelta(hours=1)
+    
+    attendances = Attendance.objects.filter(
+        subscription__club=request.user.club,
+        entry_time__gte=one_hour_ago,
+        entry_time__lte=now
+    )
+    
+    serializer = AttendanceSerializer(attendances, many=True)
+    return Response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

@@ -393,15 +393,20 @@ export const fetchUpcomingSubscriptions = createAsyncThunk(
   }
 );
 
-// إجراء دفعة
 export const makePayment = createAsyncThunk(
   'subscriptions/makePayment',
-  async ({ subscriptionId, amount }, { rejectWithValue }) => {
+  async ({ subscriptionId, amount, paymentMethodId }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token is missing.');
+      }
       const response = await axios.post(
         `${BASE_URL}subscriptions/api/subscriptions/${subscriptionId}/make-payment/`,
-        { amount },
+        {
+          amount,
+          payment_method_id: paymentMethodId,
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -412,6 +417,25 @@ export const makePayment = createAsyncThunk(
       return { subscriptionId, ...response.data };
     } catch (error) {
       console.error('Error making payment:', error);
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+export const fetchPaymentMethods = createAsyncThunk(
+  'subscriptions/fetchPaymentMethods',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(
+        `${BASE_URL}subscriptions/api/payment-methods/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching payment methods:', error);
       return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
@@ -599,15 +623,11 @@ export const fetchCoachProfile = createAsyncThunk(
   }
 );
 
+
 const subscriptionsSlice = createSlice({
   name: 'subscriptions',
   initialState: {
-    subscriptionTypes: {
-      count: 0,
-      results: [],
-      next: null,
-      previous: null,
-    },
+    subscriptionTypes: { count: 0, results: [], next: null, previous: null },
     activeSubscriptionTypes: [],
     activeSubscriptions: [],
     subscriptions: [],
@@ -615,22 +635,15 @@ const subscriptionsSlice = createSlice({
     memberSubscriptions: { results: [], count: 0, next: null, previous: null },
     upcomingSubscriptions: [],
     attendances: [],
-    pagination: {
-      page: 1,
-      count: 0,
-      next: null,
-      previous: null,
-    },
-    coachProfile: {
-      data: null,
-      loading: false,
-      error: null,
-      lastFetch: null,
-    },
+    pagination: { page: 1, count: 0, next: null, previous: null },
+    coachProfile: { data: null, loading: false, error: null, lastFetch: null },
     stats: null,
     subscriptionType: null,
     subscription: null,
     paymentStatus: null,
+    paymentMethods: [],
+    paymentMethodsLoading: false,
+    paymentMethodsError: null,
     loading: false,
     error: null,
     status: 'idle',
@@ -652,16 +665,24 @@ const subscriptionsSlice = createSlice({
       delete state.cancelSuccess[id];
     },
     clearCoachProfile: (state) => {
-      state.coachProfile = {
-        data: null,
-        loading: false,
-        error: null,
-        lastFetch: null,
-      };
+      state.coachProfile = { data: null, loading: false, error: null, lastFetch: null };
     },
   },
   extraReducers: (builder) => {
     builder
+      // جلب طرق الدفع
+      .addCase(fetchPaymentMethods.pending, (state) => {
+        state.paymentMethodsLoading = true;
+        state.paymentMethodsError = null;
+      })
+      .addCase(fetchPaymentMethods.fulfilled, (state, action) => {
+        state.paymentMethodsLoading = false;
+        state.paymentMethods = action.payload;
+      })
+      .addCase(fetchPaymentMethods.rejected, (state, action) => {
+        state.paymentMethodsLoading = false;
+        state.paymentMethodsError = action.payload;
+      })
       // جلب أنواع الاشتراكات
       .addCase(fetchSubscriptionTypes.pending, (state) => {
         state.loading = true;
@@ -675,7 +696,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // إضافة نوع اشتراك
       .addCase(addSubscriptionType.pending, (state) => {
         state.loading = true;
@@ -690,7 +710,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // جلب نوع اشتراك معين
       .addCase(fetchSubscriptionTypeById.pending, (state) => {
         state.loading = true;
@@ -704,7 +723,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // تحديث اشتراك
       .addCase(updateSubscription.pending, (state) => {
         state.loading = true;
@@ -724,7 +742,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // حذف اشتراك
       .addCase(deleteSubscriptionById.pending, (state) => {
         state.loading = true;
@@ -741,7 +758,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // جلب الاشتراكات
       .addCase(fetchSubscriptions.pending, (state) => {
         state.status = 'loading';
@@ -760,7 +776,6 @@ const subscriptionsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
-
       // إضافة اشتراك
       .addCase(postSubscription.pending, (state) => {
         state.loading = true;
@@ -775,7 +790,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // تحديث نوع اشتراك
       .addCase(putSubscriptionType.pending, (state) => {
         state.loading = true;
@@ -792,7 +806,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // حذف نوع اشتراك
       .addCase(deleteSubscriptionType.pending, (state) => {
         state.loading = true;
@@ -809,7 +822,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // جلب اشتراك معين
       .addCase(fetchSubscriptionById.pending, (state) => {
         state.status = 'loading';
@@ -823,7 +835,6 @@ const subscriptionsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
-
       // جلب الاشتراكات النشطة
       .addCase(fetchActiveSubscriptions.pending, (state) => {
         state.loading = true;
@@ -837,7 +848,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // جلب الاشتراكات المنتهية
       .addCase(fetchExpiredSubscriptions.pending, (state) => {
         state.loading = true;
@@ -851,7 +861,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // جلب إحصائيات الاشتراكات
       .addCase(fetchSubscriptionStats.pending, (state) => {
         state.loading = true;
@@ -865,7 +874,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // جلب الاشتراكات القادمة
       .addCase(fetchUpcomingSubscriptions.pending, (state) => {
         state.loading = true;
@@ -879,7 +887,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // إجراء دفعة
       .addCase(makePayment.pending, (state) => {
         state.loading = true;
@@ -901,7 +908,6 @@ const subscriptionsSlice = createSlice({
         state.paymentStatus = 'failed';
         state.error = action.payload;
       })
-
       // تجديد اشتراك
       .addCase(renewSubscription.pending, (state) => {
         state.loading = true;
@@ -923,7 +929,6 @@ const subscriptionsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
-
       // جلب اشتراكات عضو
       .addCase(fetchMemberSubscriptions.pending, (state) => {
         state.status = 'loading';
@@ -937,7 +942,6 @@ const subscriptionsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
-
       // إضافة حضور
       .addCase(addAttendance.pending, (state) => {
         state.loading = true;
@@ -951,7 +955,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-
       // طلب تجميد اشتراك
       .addCase(requestSubscriptionFreeze.pending, (state, action) => {
         const { subscriptionId } = action.meta.arg;
@@ -977,7 +980,6 @@ const subscriptionsSlice = createSlice({
         state.freezeStatus[subscriptionId] = 'failed';
         state.freezeError[subscriptionId] = error;
       })
-
       // إلغاء تجميد اشتراك
       .addCase(cancelSubscriptionFreeze.pending, (state, action) => {
         const { freezeRequestId } = action.meta.arg;
@@ -1003,7 +1005,6 @@ const subscriptionsSlice = createSlice({
         state.cancelStatus[freezeRequestId] = 'failed';
         state.cancelError[freezeRequestId] = error;
       })
-
       // جلب ملف المدرب
       .addCase(fetchCoachProfile.pending, (state) => {
         state.coachProfile.loading = true;

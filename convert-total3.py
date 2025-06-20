@@ -1,5 +1,8 @@
 import sqlite3
 import os
+import logging
+from contextlib import contextmanager
+from dateutil.parser import parse
 from django.conf import settings
 from django.apps import apps
 from django.core.management import call_command
@@ -8,19 +11,35 @@ from django.utils import timezone
 from datetime import datetime
 from django.db.models import DateTimeField, BooleanField, CharField, TextField, IntegerField, FloatField, DecimalField, DateField, TimeField
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    filename='migration.log',
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+@contextmanager
+def get_db_connection(db_path):
+    """Context manager for SQLite database connections."""
+    conn = sqlite3.connect(db_path)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
 def get_table_data(db_path, table_name):
     """Retrieve all data from a specified table in the database."""
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT * FROM \"{table_name}\"")
-        columns = [desc[0] for desc in cursor.description]
-        rows = cursor.fetchall()
-        conn.close()
-        print(f"Fetched {len(rows)} rows from {table_name} with columns: {columns}")
+        with get_db_connection(db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT * FROM \"{table_name}\"")
+            columns = [desc[0] for desc in cursor.description]
+            rows = cursor.fetchall()
+        logger.info(f"Fetched {len(rows)} rows from {table_name} with columns: {columns}")
         return columns, rows
     except sqlite3.OperationalError as e:
-        print(f"Error accessing table {table_name}: {e}")
+        logger.error(f"Error accessing table {table_name}: {e}")
         return [], []
 
 def check_foreign_key(table, column, value, new_db_path):
@@ -28,57 +47,16 @@ def check_foreign_key(table, column, value, new_db_path):
     try:
         if value is None:
             return True
-        conn = sqlite3.connect(new_db_path)
-        cursor = conn.cursor()
-        cursor.execute(f"SELECT COUNT(*) FROM \"{table}\" WHERE \"{column}\" = ?", (value,))
-        count = cursor.fetchone()[0]
-        conn.close()
+        with get_db_connection(new_db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"SELECT COUNT(*) FROM \"{table}\" WHERE \"{column}\" = ?", (value,))
+            count = cursor.fetchone()[0]
         if count == 0:
-            print(f"Foreign key check failed: {table}.{column} = {value} not found")
+            logger.warning(f"Foreign key check failed: {table}.{column} = {value} not found")
         return count > 0
     except sqlite3.OperationalError as e:
-        print(f"Error checking foreign key {table}.{column}: {e}")
+        logger.error(f"Error checking foreign key {table}.{column}: {e}")
         return False
-
-def create_default_features(club_id, new_db_path):
-    """Create default features if they don't exist."""
-    try:
-        conn = sqlite3.connect(new_db_path)
-        cursor = conn.cursor()
-        features = [
-            ('Gym', club_id),
-            ('Pool', club_id),
-            ('Classes', club_id),
-        ]
-        cursor.executemany(
-            "INSERT OR IGNORE INTO subscriptions_feature (name, club_id, is_active, created_at) VALUES (?, ?, 1, ?)",
-            [(name, club_id, timezone.now()) for name, club_id in features]
-        )
-        conn.commit()
-        print(f"Created default features for club_id {club_id}")
-        conn.close()
-    except sqlite3.OperationalError as e:
-        print(f"Error creating default features: {e}")
-
-def create_default_payment_methods(club_id, new_db_path):
-    """Create default payment methods if they don't exist."""
-    try:
-        conn = sqlite3.connect(new_db_path)
-        cursor = conn.cursor()
-        methods = [
-            ('Cash', club_id),
-            ('Visa', club_id),
-            ('Bank Transfer', club_id),
-        ]
-        cursor.executemany(
-            "INSERT OR IGNORE INTO subscriptions_paymentmethod (name, club_id, is_active, created_at) VALUES (?, ?, 1, ?)",
-            [(name, club_id, timezone.now()) for name, club_id in methods]
-        )
-        conn.commit()
-        print(f"Created default payment methods for club_id {club_id}")
-        conn.close()
-    except sqlite3.OperationalError as e:
-        print(f"Error creating default payment methods: {e}")
 
 def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary, default_values=None):
     """Migrate data for a single table with error handling and foreign key validation."""
@@ -88,24 +66,18 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
     model_name = f"{model._meta.app_label}.{model._meta.model_name}"
     old_columns, rows = get_table_data(old_db_path, table_name)
     if not rows:
-        print(f"Table {table_name} is empty")
+        logger.info(f"Table {table_name} is empty")
         migration_summary[table_name] = {'total': 0, 'success': 0, 'failed': 0}
         return
 
-    print(f"Migrating table {table_name} ({len(rows)} records)...")
+    logger.info(f"Migrating table {table_name} ({len(rows)} records)...")
     migration_summary[table_name] = {'total': len(rows), 'success': 0, 'failed': 0}
 
     new_fields = {field.name: field for field in model._meta.fields}
     new_field_names = set(new_fields.keys())
     old_field_names = set(old_columns)
     missing_fields = new_field_names - old_field_names
-    print(f"Missing fields in {table_name}: {missing_fields}")
-
-    if table_name == 'core_club':
-        for row in rows:
-            club_id = row[old_columns.index('id')]
-            create_default_features(club_id, new_db_path)
-            create_default_payment_methods(club_id, new_db_path)
+    logger.info(f"Missing fields in {table_name}: {missing_fields}")
 
     batch = []
     errors = []
@@ -116,14 +88,13 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
     if table_name == 'subscriptions_subscription':
         valid_type_ids = set()
         try:
-            conn = sqlite3.connect(new_db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT id FROM subscriptions_subscriptiontype")
-            valid_type_ids = {row[0] for row in cursor.fetchall()}
-            conn.close()
-            print(f"Valid type_ids in new database: {valid_type_ids}")
+            with get_db_connection(new_db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id FROM subscriptions_subscriptiontype")
+                valid_type_ids = {row[0] for row in cursor.fetchall()}
+            logger.info(f"Valid type_ids in new database: {valid_type_ids}")
         except sqlite3.OperationalError as e:
-            print(f"Error fetching valid type_ids: {e}")
+            logger.error(f"Error fetching valid type_ids: {e}")
 
     for row_index, row in enumerate(rows):
         row_data = dict(zip(old_columns, row))
@@ -135,19 +106,17 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             club_id = row_data.get('club_id')
             if club_id:
                 try:
-                    conn = sqlite3.connect(new_db_path)
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT id, name FROM subscriptions_feature WHERE club_id = ?", (club_id,))
-                    features = cursor.fetchall()
-                    feature_mappings[club_id] = {name: fid for fid, name in features}
-                    conn.close()
+                    with get_db_connection(new_db_path) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("SELECT id, name FROM subscriptions_feature WHERE club_id = ?", (club_id,))
+                        features = cursor.fetchall()
+                        feature_mappings[club_id] = {name: fid for fid, name in features}
                 except sqlite3.OperationalError as e:
                     errors.append(f"Error fetching features for club {club_id}: {e}")
                     migration_summary[table_name]['failed'] += 1
                     continue
 
         if table_name == 'subscriptions_subscription':
-            # Remove private_training_price and map to coach_compensation_value if needed
             private_training_price = row_data.pop('private_training_price', 0)
             if private_training_price and private_training_price > 0:
                 row_data['coach_compensation_value'] = private_training_price
@@ -458,15 +427,12 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             if isinstance(new_fields.get(field), DateTimeField) and value:
                 if isinstance(value, str):
                     try:
-                        value = datetime.strptime(value, '%Y-%m-%d %H:%M:%S.%f')
-                    except ValueError:
-                        try:
-                            value = datetime.strptime(value, '%Y-%m-%d %H:%M:%S')
-                        except ValueError:
-                            errors.append(f"Error parsing date {field} in {table_name}: {value}, data: {row_data}")
-                            migration_summary[table_name]['failed'] += 1
-                            continue
-                    row_data[field] = timezone.make_aware(value)
+                        value = parse(value)
+                        row_data[field] = timezone.make_aware(value) if timezone.is_naive(value) else value
+                    except ValueError as e:
+                        errors.append(f"Error parsing date {field} in {table_name}: {value}, error: {e}")
+                        migration_summary[table_name]['failed'] += 1
+                        continue
                 elif isinstance(value, datetime) and timezone.is_naive(value):
                     row_data[field] = timezone.make_aware(value)
 
@@ -503,7 +469,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             except Exception as e:
                 errors.append(f"Error saving batch for {table_name}: {e}, data: {[str(dict(obj.__dict__)) for obj in batch[:5]]}")
                 migration_summary[table_name]['failed'] += len(batch)
-                print(f"Attempting to save records individually for {table_name}...")
+                logger.info(f"Attempting to save records individually for {table_name}...")
                 batch_errors = []
                 for obj in batch:
                     try:
@@ -552,7 +518,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
         except Exception as e:
             errors.append(f"Error saving final batch for {table_name}: {e}, data: {[str(dict(obj.__dict__)) for obj in batch[:5]]}")
             migration_summary[table_name]['failed'] += len(batch)
-            print(f"Attempting to save final records individually for {table_name}...")
+            logger.info(f"Attempting to save final records individually for {table_name}...")
             batch_errors = []
             for obj in batch:
                 try:
@@ -579,30 +545,30 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                 errors.extend(batch_errors[:10])
 
     if errors:
-        print(f"Completed migration of {table_name} with {len(errors)} errors:")
+        logger.info(f"Completed migration of {table_name} with {len(errors)} errors")
         for error in errors[:10]:
-            print(error)
+            logger.error(error)
         if table_name == 'subscriptions_subscription' and invalid_type_ids:
-            print(f"Invalid type_ids found: {invalid_type_ids}")
+            logger.warning(f"Invalid type_ids found: {invalid_type_ids}")
     else:
-        print(f"Completed migration of {table_name} successfully")
+        logger.info(f"Completed migration of {table_name} successfully")
 
 def migrate_all_required_tables(old_db_path, new_db_path):
     """Migrate data for all required tables."""
     settings.DATABASES['default']['NAME'] = new_db_path
-    print("Flushing database...")
+    logger.info("Flushing database...")
     call_command('flush', interactive=False)
-    print("Applying migrations...")
+    logger.info("Applying migrations...")
     try:
         call_command('migrate')
     except Exception as e:
-        print(f"Error applying migrations: {e}")
+        logger.error(f"Error applying migrations: {e}")
         return
 
     with connection.cursor() as cursor:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [row[0] for row in cursor.fetchall()]
-        print(f"Tables in new database: {tables}")
+        logger.info(f"Tables in new database: {tables}")
 
     migration_summary = {}
     global models
@@ -667,7 +633,7 @@ def migrate_all_required_tables(old_db_path, new_db_path):
 
     for table in tables:
         if not models.get(table):
-            print(f"Model {table} not found")
+            logger.warning(f"Model {table} not found")
             migration_summary[table] = {'total': 0, 'success': 0, 'failed': 0}
             continue
 
@@ -781,24 +747,22 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'tickets.Ticket.serial_number': None,
     }
 
-    # Validate type_ids in old database
-    print("Validating type_ids in old subscriptions_subscription...")
+    logger.info("Validating type_ids in old subscriptions_subscription...")
     type_ids_old = set()
     try:
-        conn = sqlite3.connect(old_db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT type_id FROM subscriptions_subscription")
-        type_ids_old = {row[0] for row in cursor.fetchall() if row[0] is not None}
-        print(f"Type_ids found in old subscriptions_subscription: {type_ids_old}")
-        cursor.execute("SELECT id FROM subscriptions_subscriptiontype")
-        valid_type_ids_old = {row[0] for row in cursor.fetchall()}
-        print(f"Valid type_ids in old subscriptions_subscriptiontype: {valid_type_ids_old}")
-        invalid_type_ids_old = type_ids_old - valid_type_ids_old
-        if invalid_type_ids_old:
-            print(f"Invalid type_ids in old subscriptions_subscription: {invalid_type_ids_old}")
-        conn.close()
+        with get_db_connection(old_db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT type_id FROM subscriptions_subscription")
+            type_ids_old = {row[0] for row in cursor.fetchall() if row[0] is not None}
+            logger.info(f"Type_ids found in old subscriptions_subscription: {type_ids_old}")
+            cursor.execute("SELECT id FROM subscriptions_subscriptiontype")
+            valid_type_ids_old = {row[0] for row in cursor.fetchall()}
+            logger.info(f"Valid type_ids in old subscriptions_subscriptiontype: {valid_type_ids_old}")
+            invalid_type_ids_old = type_ids_old - valid_type_ids_old
+            if invalid_type_ids_old:
+                logger.warning(f"Invalid type_ids in old subscriptions_subscription: {invalid_type_ids_old}")
     except sqlite3.OperationalError as e:
-        print(f"Error validating type_ids in old database: {e}")
+        logger.error(f"Error validating type_ids in old database: {e}")
 
     migrate_table(models['core_club'], 'core_club', old_db_path, new_db_path, migration_summary, core_club_defaults)
     migrate_table(models['accounts_user'], 'accounts_user', old_db_path, new_db_path, migration_summary, accounts_user_defaults)
@@ -826,27 +790,26 @@ def migrate_all_required_tables(old_db_path, new_db_path):
     migrate_table(models['tickets_tickettype'], 'tickets_tickettype', old_db_path, new_db_path, migration_summary, tickettype_defaults)
     migrate_table(models['tickets_ticket'], 'tickets_ticket', old_db_path, new_db_path, migration_summary, ticket_defaults)
 
-    print("Listing migrated subscription types in new database...")
+    logger.info("Listing migrated subscription types in new database...")
     try:
-        conn = sqlite3.connect(new_db_path)
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name FROM subscriptions_subscriptiontype")
-        types = cursor.fetchall()
-        print(f"Migrated subscription types: {types}")
-        conn.close()
+        with get_db_connection(new_db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, name FROM subscriptions_subscriptiontype")
+            types = cursor.fetchall()
+            logger.info(f"Migrated subscription types: {types}")
     except sqlite3.OperationalError as e:
-        print(f"Error listing subscription types: {e}")
+        logger.error(f"Error listing subscription types: {e}")
 
     return migration_summary
 
 def print_summary(migration_summary):
     """Print migration summary."""
-    print("\n=== Migration Summary ===")
-    print(f"{'Table':<30} {'Total':>10} {'Success':>10} {'Failed':>10}")
-    print("-" * 62)
+    logger.info("\n=== Migration Summary ===")
+    logger.info(f"{'Table':<30} {'Total':>10} {'Success':>10} {'Failed':>10}")
+    logger.info("-" * 62)
     for table, stats in migration_summary.items():
-        print(f"{table:<30} {stats['total']:>10} {stats['success']:>10} {stats['failed']:>10}")
-    print("========================")
+        logger.info(f"{table:<30} {stats['total']:>10} {stats['success']:>10} {stats['failed']:>10}")
+    logger.info("========================")
 
 if __name__ == "__main__":
     OLD_DB_PATH = r"F:\club\gym\src\db_old.sqlite3"
