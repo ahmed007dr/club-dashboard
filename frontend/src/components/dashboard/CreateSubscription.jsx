@@ -6,7 +6,6 @@ import { FaUser } from 'react-icons/fa';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 import { toast } from "react-hot-toast";
-import debounce from 'lodash/debounce';
 
 const CreateSubscription = ({ onClose }) => {
   const dispatch = useDispatch();
@@ -50,9 +49,15 @@ const CreateSubscription = ({ onClose }) => {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
         "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
       },
     })
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("فشل في جلب بيانات النادي");
+        }
+        return response.json();
+      })
       .then((data) => {
         setUserClub({
           id: data.club.id,
@@ -70,7 +75,10 @@ const CreateSubscription = ({ onClose }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.get(`${BASE_URL}subscriptions/api/payment-methods/`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache",
+        },
       });
       return Array.isArray(response.data) ? response.data : [];
     } catch (error) {
@@ -83,7 +91,10 @@ const CreateSubscription = ({ onClose }) => {
   const fetchAllCoaches = async () => {
     try {
       const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        "Cache-Control": "no-cache",
+      };
       let allCoaches = [];
       let nextUrl = `${BASE_URL}accounts/api/users/`;
       
@@ -111,7 +122,12 @@ const CreateSubscription = ({ onClose }) => {
       while (hasMore) {
         const response = await axios.get(
           `${BASE_URL}subscriptions/api/subscription-types/?page=${currentPage}`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Cache-Control": "no-cache",
+            },
+          }
         );
         const results = Array.isArray(response.data.results) ? response.data.results : [];
         allResults = [...allResults, ...results];
@@ -137,15 +153,24 @@ const CreateSubscription = ({ onClose }) => {
       setSearchLoading(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        `${BASE_URL}members/api/members/?search=${encodeURIComponent(identifier)}&club=${clubId}`,
+        `${BASE_URL}members/api/members/?q=${identifier}&club=${clubId}`,
         {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Cache-Control": "no-cache",
+          },
         }
       );
 
-      console.log("Search API Response:", response.data); // Debug API response
+      if (!response.data.results) {
+        throw new Error("No results found");
+      }
+
       const members = Array.isArray(response.data.results) ? response.data.results : [];
-      const member = members.length > 0 ? members[0] : null;
+      const member = members.find((m) =>
+        m.rfid_code?.toUpperCase() === identifier.toUpperCase() ||
+        m.phone?.trim() === identifier.trim()
+      );
 
       setFoundMember(member ? {
         id: member.id,
@@ -170,25 +195,15 @@ const CreateSubscription = ({ onClose }) => {
     }
   }, []);
 
-  // Debounced search
-  const debouncedSearch = useCallback(
-    debounce((identifier, clubId) => {
-      console.log("Debounced search triggered:", identifier, clubId); // Debug debounce
-      searchMember(identifier, clubId);
-    }, 500),
-    [searchMember]
-  );
-
   // Handle identifier change and search
   useEffect(() => {
-    console.log("Effect triggered - Identifier:", formData.identifier, "Club ID:", userClub?.id); // Debug effect
     if (!formData.identifier || !userClub?.id) {
       setFoundMember(null);
       setSearchLoading(false);
       return;
     }
-    debouncedSearch(formData.identifier.trim(), userClub.id);
-  }, [formData.identifier, userClub, debouncedSearch]);
+    searchMember(formData.identifier.trim(), userClub.id);
+  }, [formData.identifier, userClub, searchMember]);
 
   // Fetch initial data
   useEffect(() => {
