@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from django.db import transaction
-from django.db.models import Count, Sum, Avg, Q, Case, When, F, Max, IntegerField, FloatField, Value, ExpressionWrapper, DecimalField, OuterRef, Subquery
+from django.db.models import Count, Sum, Avg, Q,BooleanField, Case, When, F, Max, IntegerField, FloatField, Value, ExpressionWrapper, DecimalField, OuterRef, Subquery
 from django.db.models.functions import TruncMonth, TruncWeek
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -298,13 +298,29 @@ def subscription_list(request):
             subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=club_id)
 
         if identifier:
-            subscriptions = subscriptions.filter(
+            subscriptions = subscriptions.annotate(
+                can_enter=Case(
+                    When(
+                        start_date__lte=today,
+                        end_date__gte=today,
+                        type__is_active=True,
+                        type__max_entries=0,
+                        then=True
+                    ),
+                    When(
+                        start_date__lte=today,
+                        end_date__gte=today,
+                        type__is_active=True,
+                        entry_count__lt=F('type__max_entries'),
+                        then=True
+                    ),
+                    default=False,
+                    output_field=BooleanField()
+                )
+            ).filter(
                 Q(member__rfid_code=identifier) | Q(member__phone=identifier),
-                start_date__lte=today,
-                end_date__gte=today,
-                type__is_active=True
+                can_enter=True
             ).order_by('-start_date')[:1]
-            logger.info(f"Found {subscriptions.count()} subscriptions for identifier={identifier}, club={club_id}")
         else:
             if search_term:
                 subscriptions = subscriptions.filter(
@@ -342,7 +358,7 @@ def subscription_list(request):
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
-
+        
     if request.method == 'POST':
         if request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(

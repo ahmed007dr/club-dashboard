@@ -270,7 +270,13 @@ const Attendance = () => {
       setFoundSubscription(null);
       fetchAttendancesData();
     } catch (err) {
-      toast.error("فشل في إضافة الحضور: " + (err.message || "حدث خطأ"));
+      const errorMsg =
+        err?.response?.data?.error ||
+        err?.response?.data?.detail ||
+        err?.message ||
+        "حدث خطأ غير متوقع أثناء تسجيل الحضور";
+    
+      toast.error(errorMsg);  
     } finally {
       setIsSubmitting(false);
     }
