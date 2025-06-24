@@ -304,15 +304,14 @@ def subscription_list(request):
                         start_date__lte=today,
                         end_date__gte=today,
                         type__is_active=True,
-                        type__max_entries=0,
-                        then=True
-                    ),
-                    When(
-                        start_date__lte=today,
-                        end_date__gte=today,
-                        type__is_active=True,
-                        entry_count__lt=F('type__max_entries'),
-                        then=True
+                        is_cancelled=False,
+                        freeze_requests__isnull=True,
+                        then=Case(
+                            When(type__max_entries=0, then=True),
+                            When(entry_count__lt=F('type__max_entries'), then=True),
+                            default=False,
+                            output_field=BooleanField()
+                        )
                     ),
                     default=False,
                     output_field=BooleanField()

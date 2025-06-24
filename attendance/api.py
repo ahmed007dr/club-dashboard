@@ -12,6 +12,7 @@ from rest_framework.pagination import PageNumberPagination
 from utils.permissions import IsOwnerOrRelatedToClub
 from .models import Attendance, EntryLog
 from .serializers import AttendanceSerializer, EntryLogSerializer
+from django.db.models import Case, When, F, BooleanField
 
 logger = logging.getLogger(__name__)
 
@@ -120,7 +121,7 @@ def add_attendance_api(request):
     if serializer.is_valid():
         attendance = serializer.save()
         subscription = attendance.subscription
-        if not subscription.can_enter():
+        if not subscription.can_enter:
             attendance.delete()
             if not subscription.type.is_active:
                 return Response({'error': 'لا يمكن تسجيل الحضور: نوع الاشتراك غير نشط'}, status=status.HTTP_400_BAD_REQUEST)

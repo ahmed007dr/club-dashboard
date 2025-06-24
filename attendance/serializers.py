@@ -8,6 +8,7 @@ from core.serializers import ClubSerializer
 from accounts.serializers import UserSerializer
 from django.db.models import Q
 from django.utils import timezone
+from django.db.models import Case, When, F, BooleanField
 
 class AttendanceSerializer(serializers.ModelSerializer):
     identifier = serializers.CharField(write_only=True)
@@ -48,11 +49,15 @@ class AttendanceSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'identifier': 'لم يتم العثور على عضو'})
         today = timezone.now().date()
         active_subscription = Subscription.objects.filter(
-            member=member,
-            start_date__lte=today,
-            end_date__gte=today,
-            type__is_active=True
-        ).first()
+        member=member,
+        start_date__lte=today,
+        end_date__gte=today,
+        type__is_active=True,
+        is_cancelled=False).annotate(can_enter=Case(When(type__max_entries=0, then=True),When(entry_count__lt=F('type__max_entries'), then=True),
+            default=False,
+            output_field=BooleanField()
+        )).filter(can_enter=True).first()
+
         if not active_subscription:
             raise serializers.ValidationError({'subscription': 'لا يوجد اشتراك فعال لهذا العضو'})
         validated_data['subscription'] = active_subscription
@@ -64,7 +69,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
 class EntryLogSerializer(serializers.ModelSerializer):
     identifier = serializers.CharField(write_only=True)
     member_name = serializers.SerializerMethodField()
-    rfid_code = serializers.SerializerMethodField()  # New field for rfid_code
+    rfid_code = serializers.SerializerMethodField()  
     club_details = ClubSerializer(source='club', read_only=True)
     approved_by_details = UserSerializer(source='approved_by', read_only=True)
     subscription_details = SubscriptionSerializer(source='related_subscription', read_only=True)
