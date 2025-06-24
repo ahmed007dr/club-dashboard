@@ -2,7 +2,6 @@ import logging
 from datetime import datetime, timedelta
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db.models import Count
 from django.db.models.functions import ExtractHour
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -11,8 +10,9 @@ from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 from utils.permissions import IsOwnerOrRelatedToClub
 from .models import Attendance, EntryLog
+from members.models import Member
 from .serializers import AttendanceSerializer, EntryLogSerializer
-from django.db.models import Case, When, F, BooleanField
+from django.db.models import Case, When, F, BooleanField,Q,Count
 
 logger = logging.getLogger(__name__)
 
@@ -116,9 +116,45 @@ def delete_attendance_api(request, attendance_id):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_attendance_api(request):
-    """Create a new attendance record."""
+    """Create a new attendance record with rate limiting per member."""
     serializer = AttendanceSerializer(data=request.data)
     if serializer.is_valid():
+        # Get identifier from request data
+        identifier = serializer.validated_data.get('identifier')
+        if not identifier:
+            logger.error("Missing 'identifier' in request data")
+            return Response(
+                {'error': 'حقل identifier مطلوب'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Find member using identifier
+        try:
+            member = Member.objects.get(Q(rfid_code=identifier) | Q(phone=identifier))
+        except Member.DoesNotExist:
+            logger.error(f"No member found for identifier {identifier}")
+            return Response(
+                {'error': 'لم يتم العثور على عضو بالـ RFID أو رقم الهاتف المقدم'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check rate limit per member
+        now = timezone.now()
+        one_minute_ago = now - timedelta(seconds=60)
+        recent_count = Attendance.objects.filter(
+            subscription__member_id=member.id,
+            entry_time__gte=one_minute_ago,
+            entry_time__lte=now
+        ).count()
+        
+        if recent_count >= 1:
+            logger.warning(f"Rate limit exceeded for member {member.id}")
+            return Response(
+                {'error': 'تم تجاوز الحد الأقصى لتسجيل الدخول: مرة واحدة في الدقيقة لكل عضو'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+        
+        # Create attendance
         attendance = serializer.save()
         subscription = attendance.subscription
         if not subscription.can_enter:
@@ -130,6 +166,7 @@ def add_attendance_api(request):
         subscription.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
