@@ -14,7 +14,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from .models import Feature
 from decimal import Decimal, ROUND_HALF_UP
-
+from datetime import timedelta
 
 
 
@@ -170,10 +170,10 @@ class FreezeRequestSerializer(serializers.ModelSerializer):
 class SubscriptionSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     member_details = MemberSerializer(source='member', read_only=True)
-    type_details = SubscriptionTypeSerializer(source='type', read_only=True)
+    type_details = serializers.SerializerMethodField()
     coach_details = serializers.SerializerMethodField()
-    freeze_requests = FreezeRequestSerializer(many=True, read_only=True)
-    payments = PaymentSerializer(many=True, read_only=True)
+    freeze_requests = serializers.SerializerMethodField()
+    payments = serializers.SerializerMethodField()
     created_by_details = UserSerializer(source='created_by', read_only=True)
     subscriptions_count = serializers.SerializerMethodField()
     coach_simple = serializers.SerializerMethodField()
@@ -246,9 +246,42 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             }
         return None
 
+    def get_type_details(self, obj):
+        return {
+            'id': obj.type.id,
+            'name': obj.type.name,
+            'duration_days': obj.type.duration_days,
+            'price': obj.type.price,
+            'is_active': obj.type.is_active
+        }
+
+    def get_freeze_requests(self, obj):
+        return [
+            {
+                'id': fr.id,
+                'requested_days': fr.requested_days,
+                'start_date': fr.start_date,
+                'end_date': fr.end_date,
+                'is_active': fr.is_active
+            }
+            for fr in obj.freeze_requests.all()
+        ]
+
+    def get_payments(self, obj):
+        return [
+            {
+                'id': p.id,
+                'amount': p.amount,
+                'payment_method': p.payment_method.name,
+                'payment_date': p.payment_date
+            }
+            for p in obj.payments.all()
+        ]
+
     def validate(self, data):
         club = data.get('club')
         subscription_type = data.get('type', getattr(self.instance, 'type', None))
+        start_date = data.get('start_date', getattr(self.instance, 'start_date', timezone.now().date()))
         special_offer = data.get('special_offer')
         coach = data.get('coach')
         coach_identifier = data.get('coach_identifier', '')
@@ -257,7 +290,23 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         paid_amount = Decimal(str(data.get('paid_amount', getattr(self.instance, 'paid_amount', 0) or 0)))
         remaining_amount = Decimal(str(data.get('remaining_amount', getattr(self.instance, 'remaining_amount', 0) or 0)))
         coach_compensation_type = data.get('coach_compensation_type')
-        coach_compensation_value = Decimal(str(data.get('coach_compensation_value', getattr(self.instance, 'coach_compensation_value', 0) or 0)))
+        coach_compensation_value = data.get('coach_compensation_value', None)
+
+        # إزالة end_date من البيانات إذا تم إرساله
+        if 'end_date' in data:
+            data.pop('end_date')
+
+        # حساب end_date بناءً على start_date و duration_days
+        if subscription_type:
+            data['end_date'] = start_date + timedelta(days=subscription_type.duration_days)
+
+        # التعامل مع coach_compensation_value
+        if coach_compensation_value is None:
+            data['coach_compensation_value'] = Decimal('0.00')
+            if not coach:
+                data['coach_compensation_type'] = None
+            elif not coach_compensation_type:
+                data['coach_compensation_type'] = 'from_subscription'
 
         # حساب السعر الفعلي بناءً على العرض
         effective_price = subscription_type.price
@@ -270,7 +319,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             effective_price = (subscription_type.price * (100 - special_offer.discount_percentage) / 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
         else:
             effective_price = subscription_type.price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
-            
+
         # التحقق من العضو
         if identifier and not member:
             try:
@@ -313,15 +362,12 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
             if coach_compensation_type not in ['from_subscription', 'external', None]:
                 raise serializers.ValidationError("نوع تعويض الكابتن غير صالح.")
-            if coach_compensation_value < 0:
+            if data['coach_compensation_value'] < 0:
                 raise serializers.ValidationError("قيمة تعويض الكابتن لا يمكن أن تكون سالبة.")
-            if coach_compensation_type == 'from_subscription' and coach_compensation_value > 100:
+            if coach_compensation_type == 'from_subscription' and data['coach_compensation_value'] > 100:
                 raise serializers.ValidationError("نسبة الكابتن لا يمكن أن تتجاوز 100%.")
-            if not coach_compensation_type:
-                data['coach_compensation_type'] = 'from_subscription'
-                data['coach_compensation_value'] = Decimal('0.00')
         else:
-            if coach_compensation_type or coach_compensation_value > 0:
+            if coach_compensation_type or data['coach_compensation_value'] > 0:
                 raise serializers.ValidationError("لا يمكن تحديد تعويض كابتن بدون اختيار كابتن.")
             data['coach_compensation_type'] = None
             data['coach_compensation_value'] = Decimal('0.00')
@@ -333,19 +379,17 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         # التحقق من الاشتراكات النشطة والمدفوعات المستحقة
         if member:
             today = timezone.now().date()
-            # تعديل التحقق ليشمل حالة استهلاك max_entries
             active_subscriptions = Subscription.objects.filter(
                 member=member,
                 club=club,
                 start_date__lte=today,
                 end_date__gte=today,
-                entry_count__lt=F('type__max_entries'),  # الاشتراكات التي لم تستنفد max_entries
-                type__max_entries__gt=0  # الاشتراكات التي لها max_entries محدد
-            ).exclude(is_cancelled=True)  # استبعاد الاشتراكات الملغاة
+                entry_count__lt=F('type__max_entries'),
+                type__max_entries__gt=0
+            ).exclude(is_cancelled=True)
             if active_subscriptions.exists() and not self.instance:
                 latest_active_subscription = active_subscriptions.order_by('-end_date').first()
                 max_end_date = latest_active_subscription.end_date
-                start_date = data.get('start_date', today)
                 if start_date <= max_end_date:
                     raise serializers.ValidationError(
                         f"لا يمكن إنشاء اشتراك جديد يبدأ قبل {max_end_date} بسبب وجود اشتراك نشط."
@@ -355,10 +399,10 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("يجب تسوية المدفوعات المستحقة أولاً.")
 
         return data
+
     def create(self, validated_data):
         validated_data.pop('coach_identifier', None)
         validated_data.pop('identifier', None)
-        # validated_data.pop('special_offer', None)  
         return Subscription.objects.create(**validated_data)
     
 

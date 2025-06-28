@@ -56,9 +56,7 @@ export const fetchSubscriptionTypes = createAsyncThunk(
       );
     }
   }
-  
 );
-
 
 // جلب أنواع الاشتراكات النشطة
 export const fetchActiveSubscriptionTypes = createAsyncThunk(
@@ -114,9 +112,21 @@ export const updateSubscription = createAsyncThunk(
         throw new Error('Authorization token is missing.');
       }
 
+      // تنظيف البيانات لضمان إرسال القيم الصحيحة
+      const cleanedData = {
+        ...subscriptionData,
+        coach: subscriptionData.coach ? parseInt(subscriptionData.coach) : null,
+        coach_compensation_type: subscriptionData.coach ? subscriptionData.coach_compensation_type : null,
+        coach_compensation_value: subscriptionData.coach ? parseFloat(subscriptionData.coach_compensation_value).toFixed(2) : '0.00',
+        private_training_price: subscriptionData.private_training_price ? parseFloat(subscriptionData.private_training_price).toFixed(2) : null,
+      };
+
+      // إزالة end_date من البيانات المرسلة لأنه يتم حسابه في الخلفية
+      delete cleanedData.end_date;
+
       const response = await axios.put(
         `${BASE_URL}subscriptions/api/subscriptions/${id}/`,
-        subscriptionData,
+        cleanedData,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -127,7 +137,9 @@ export const updateSubscription = createAsyncThunk(
       return response.data;
     } catch (error) {
       console.error('Error updating subscription:', error);
-      return rejectWithValue(error.response?.data?.message || error.message);
+      return rejectWithValue(
+        error.response?.data || error.message
+      );
     }
   }
 );
@@ -183,7 +195,6 @@ export const postSubscription = createAsyncThunk(
     }
   }
 );
-
 
 // تحديث نوع اشتراك
 export const putSubscriptionType = createAsyncThunk(
@@ -465,7 +476,6 @@ export const renewSubscription = createAsyncThunk(
   }
 );
 
-
 export const fetchSubscriptions = createAsyncThunk(
   'subscriptions/fetchSubscriptions',
   async (params = {}, { rejectWithValue }) => {
@@ -622,7 +632,6 @@ export const fetchCoachProfile = createAsyncThunk(
     }
   }
 );
-
 
 const subscriptionsSlice = createSlice({
   name: 'subscriptions',

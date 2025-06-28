@@ -435,9 +435,7 @@ def subscription_list(request):
 def subscription_detail(request, pk):
     """Retrieve, update, or delete a subscription (Owner/Admin only for PUT/DELETE)."""
     subscription = get_object_or_404(Subscription, pk=pk)
-    if request.method != 'GET' and request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-
+    
     if request.method == 'GET':
         if request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
@@ -454,37 +452,100 @@ def subscription_detail(request, pk):
                 return Response({'error': 'This subscription is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
         serializer = SubscriptionSerializer(subscription)
         return Response(serializer.data)
+    
     elif request.method == 'PUT':
+        if request.user.role not in ['owner', 'admin']:
+            return Response({'error': 'غير مسموح بالتعديل. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+        
         mutable_data = request.data.copy()
         mutable_data['club'] = request.user.club.id
+        
         with transaction.atomic():
             serializer = SubscriptionSerializer(subscription, data=mutable_data, partial=True, context={'request': request})
             if serializer.is_valid():
-                updated_subscription = serializer.save()
+                # حفظ القيم القديمة للمقارنة
+                old_type = subscription.type
                 old_paid_amount = subscription.paid_amount or Decimal('0')
-                old_coach_compensation_value = (subscription.coach_compensation_value or Decimal('0')) if (subscription.coach and subscription.coach_compensation_type == 'external') else Decimal('0')
+                old_coach_compensation_value = (
+                    subscription.coach_compensation_value or Decimal('0')
+                ) if (subscription.coach and subscription.coach_compensation_type == 'external') else Decimal('0')
+                
+                # تحديث الاشتراك
+                updated_subscription = serializer.save()
+                
+                # الحصول على القيم الجديدة
+                new_type = updated_subscription.type
                 new_paid_amount = updated_subscription.paid_amount or Decimal('0')
-                new_coach_compensation_value = (updated_subscription.coach_compensation_value or Decimal('0')) if (updated_subscription.coach and updated_subscription.coach_compensation_type == 'external') else Decimal('0')
+                new_coach_compensation_value = (
+                    updated_subscription.coach_compensation_value or Decimal('0')
+                ) if (updated_subscription.coach and updated_subscription.coach_compensation_type == 'external') else Decimal('0')
+                
+                # حساب السعر الفعلي بناءً على نوع الاشتراك الجديد
+                now = timezone.now()
+                active_offer = SpecialOffer.objects.filter(
+                    subscription_type=new_type,
+                    start_datetime__lte=now,
+                    end_datetime__gte=now,
+                    is_active=True
+                ).first()
+                effective_price = (
+                    (new_type.price * (100 - active_offer.discount_percentage) / 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    if active_offer else new_type.price
+                )
+                
+                # تحديث remaining_amount إذا تغير نوع الاشتراك
+                if old_type != new_type:
+                    updated_subscription.remaining_amount = (effective_price - new_paid_amount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                    updated_subscription.save()
+                
+                # حساب الفرق الإضافي للإيرادات
                 additional_amount = (new_paid_amount - old_paid_amount) + (new_coach_compensation_value - old_coach_compensation_value)
+                
+                # إضافة فرق السعر إذا تغير نوع الاشتراك
+                if old_type != new_type:
+                    old_effective_price = (
+                        (old_type.price * (100 - active_offer.discount_percentage) / 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                        if active_offer and active_offer.subscription_type == old_type
+                        else old_type.price
+                    )
+                    price_difference = effective_price - old_effective_price
+                    if price_difference > 0:
+                        additional_amount += price_difference
+                
+                # تسجيل الإيراد الإضافي إذا وجد
                 if additional_amount > 0:
                     source, _ = IncomeSource.objects.get_or_create(
-                        club=updated_subscription.club, name='Subscription', defaults={'description': 'إيراد عن اشتراك'}
+                        club=updated_subscription.club, 
+                        name='Subscription', 
+                        defaults={'description': 'إيراد عن اشتراك'}
                     )
                     description = f"إيراد إضافي لاشتراك {updated_subscription.member.name}"
+                    if old_type != new_type:
+                        description += f" (تغيير نوع الاشتراك من {old_type.name} إلى {new_type.name})"
                     if updated_subscription.coach:
                         description += f" مع الكابتن {updated_subscription.coach.username}" + (
-                            f" بمبلغ خارجي {updated_subscription.coach_compensation_value} جنيه" if updated_subscription.coach_compensation_type == 'external'
+                            f" بمبلغ خارجي {updated_subscription.coach_compensation_value} جنيه"
+                            if updated_subscription.coach_compensation_type == 'external'
                             else f" بنسبة {updated_subscription.coach_compensation_value}% من الاشتراك"
                         )
                     Income.objects.create(
-                        club=updated_subscription.club, source=source, amount=additional_amount, description=description,
-                        date=timezone.now().date(), received_by=request.user
+                        club=updated_subscription.club,
+                        source=source,
+                        amount=additional_amount,
+                        description=description,
+                        date=timezone.now().date(),
+                        received_by=request.user
                     )
+                
                 return Response(serializer.data)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
     elif request.method == 'DELETE':
+        if request.user.role not in ['owner', 'admin']:
+            return Response({'error': 'غير مسموح بالحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
         subscription.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
