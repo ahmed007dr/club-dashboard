@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSubscriptionTypes, updateSubscription, fetchSubscriptions } from '../../redux/slices/subscriptionsSlice';
@@ -32,13 +33,12 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
   const [isModalOpen, setErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Fetch all coaches
   const fetchAllCoaches = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       const headers = { Authorization: `Bearer ${token}` };
       let allCoaches = [];
-      let nextUrl = `${BASE_URL}accounts/api/users/`;
+      let nextUrl = `${BASE_URL}/accounts/api/users/`;
       while (nextUrl) {
         const response = await axios.get(nextUrl, { headers });
         allCoaches = [...allCoaches, ...response.data.results];
@@ -51,13 +51,12 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
     }
   }, []);
 
-  // Fetch clubs and coaches on mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
-        const response = await axios.get(`${BASE_URL}members/api/members/`, { headers });
+        const response = await axios.get(`${BASE_URL}/members/api/members/`, { headers });
         const uniqueClubs = Array.from(
           new Map(
             response.data.results.map((m) => [
@@ -80,7 +79,6 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
     dispatch(fetchSubscriptionTypes());
   }, [dispatch, fetchAllCoaches]);
 
-  // Populate form data and foundMember when subscription changes
   useEffect(() => {
     if (subscription && subscription.member_details) {
       setFormData({
@@ -119,7 +117,6 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      // Reset coach compensation fields when coach is cleared
       ...(name === 'coach' && !value ? {
         coach_compensation_type: 'from_subscription',
         coach_compensation_value: '0.00',
@@ -129,8 +126,8 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    console.log('handleSubmit triggered', { formData, foundMember });
 
-    // Client-side validation
     if (!formData.club || !formData.type || !formData.start_date || !formData.paid_amount) {
       setErrorMessage('يرجى ملء جميع الحقول المطلوبة');
       setErrorModal(true);
@@ -198,9 +195,9 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
   if (typesStatus === 'loading' || loading) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md relative animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-3/4 mx-auto mb-4"></div>
-          <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
+        <div className="bg-white p-4 rounded-lg shadow-lg w-full max-w-sm">
+          <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-2"></div>
+          <div className="h-3 bg-gray-200 rounded w-1/2 mx-auto"></div>
         </div>
       </div>
     );
@@ -209,10 +206,10 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
   if (typesError || error) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-        <div className="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-md relative animate-fade-in">
-          <p className="text-red-500 text-center">{typesError || error}</p>
+        <div className="bg-white p-4 rounded-lg shadow-lg w-full max-w-sm">
+          <p className="text-red-500 text-center text-xs">{typesError || error}</p>
           <button
-            className="mt-4 px-4 py-2 bg-gray-200 rounded-lg w-full hover:bg-gray-300 transition duration-200"
+            className="mt-3 px-4 py-1 bg-gray-200 rounded hover:bg-gray-300 text-xs"
             onClick={onClose}
           >
             إغلاق
@@ -223,16 +220,16 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm">
-      <div className="bg-gradient-to-br from-white to-gray-50 p-8 rounded-2xl shadow-2xl w-full max-w-lg relative animate-fade-in" dir="rtl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60">
+      <div className="bg-white p-4 rounded-lg shadow-lg w-full max-w-xl" dir="rtl">
         {isModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
-            <div className="bg-white p-6 rounded-2xl shadow-lg max-w-sm w-full animate-fade-in">
-              <h3 className="text-lg font-bold mb-4 text-right">حدث خطأ</h3>
-              <p className="text-red-600 text-right">{errorMessage}</p>
-              <div className="mt-4 flex justify-end">
+            <div className="bg-white p-4 rounded-lg shadow-lg max-w-sm w-full">
+              <h3 className="text-base font-bold mb-3 text-right">حدث خطأ</h3>
+              <p className="text-red-600 text-right text-xs">{errorMessage}</p>
+              <div className="mt-3 flex justify-end">
                 <button
-                  className="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-200"
+                  className="px-4 py-1 bg-gray-200 rounded hover:bg-gray-300 text-xs"
                   onClick={() => setErrorModal(false)}
                 >
                   إغلاق
@@ -243,89 +240,83 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
         )}
 
         <button
-          className="absolute top-4 left-4 text-gray-500 hover:text-gray-800 transition duration-200"
+          className="absolute top-2 left-2 text-gray-500 hover:text-gray-800 text-sm"
           onClick={onClose}
         >
           ✕
         </button>
-        <h2 className="text-2xl font-bold mb-6 text-right text-blue-600">تعديل الاشتراك</h2>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <h2 className="text-lg font-bold mb-3 text-right text-blue-600">تعديل الاشتراك</h2>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium mb-2 text-right text-gray-700">النادي</label>
+              <label className="block text-xs font-medium mb-1 text-gray-700">النادي</label>
               <select
                 name="club"
                 value={formData.club}
                 onChange={handleInputChange}
-                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 bg-gray-100 cursor-not-allowed"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 bg-gray-100 cursor-not-allowed"
                 required
                 disabled
               >
-                <option value={formData.club}>{foundMember?.club_name || 'اختر النادي'}</option>
+                <option value="none">{foundMember?.club_name || 'اختر النادي'}</option>
               </select>
             </div>
-
             <div>
-              <label className="block text-sm font-medium mb-2 text-right text-gray-700">RFID أو الاسم أو رقم الهاتف</label>
+              <label className="block text-xs font-medium mb-1 text-gray-700">RFID أو الاسم أو رقم الهاتف</label>
               <input
                 type="text"
                 name="identifier"
                 value={formData.identifier}
                 onChange={handleInputChange}
-                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200 bg-gray-100 cursor-not-allowed"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 bg-gray-100 cursor-not-allowed"
                 placeholder="أدخل RFID أو الاسم أو رقم الهاتف"
                 disabled
               />
             </div>
-          </div>
-
-          {foundMember && (
-            <div className="border border-gray-200 rounded-lg p-4 bg-blue-50 shadow-sm transition-all duration-300 hover:shadow-md">
-              <div className="flex items-start gap-4">
-                {foundMember.photo ? (
-                  <img
-                    src={foundMember.photo}
-                    alt="Member"
-                    className="w-16 h-16 rounded-full object-cover border-2 border-blue-500"
-                  />
-                ) : (
-                  <div className="w-16 h-16 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-2xl border-2 border-blue-500">
-                    <FaUser />
-                  </div>
-                )}
-                <div className="flex-1">
-                  <h3 className="font-bold text-lg text-blue-600">{foundMember.name}</h3>
-                  <p className="text-gray-600 text-sm">#{foundMember.membership_number}</p>
-                  <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-                    <p><span className="font-medium">الهاتف:</span> {foundMember.phone || "غير متوفر"}</p>
-                    <p><span className="font-medium">RFID:</span> {foundMember.rfid_code || "غير مسجل"}</p>
-                    <p><span className="font-medium">النادي:</span> {foundMember.club_name}</p>
-                    <p><span className="font-medium">العنوان:</span> {foundMember.address || "غير متوفر"}</p>
-                    {foundMember.birth_date && (
-                      <p>
-                        <span className="font-medium">تاريخ الميلاد:</span>{" "}
-                        {new Date(foundMember.birth_date).toLocaleDateString("ar-EG")}
-                      </p>
+            <div className="col-span-2">
+              {foundMember && (
+                <div className="border border-gray-200 rounded p-3 bg-blue-50">
+                  <div className="flex items-start gap-3">
+                    {foundMember.photo ? (
+                      <img
+                        src={foundMember.photo}
+                        alt="Member"
+                        className="w-12 h-12 rounded-full object-cover border-2 border-blue-500"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 border-2 border-blue-500">
+                        <FaUser />
+                      </div>
                     )}
-                    <p><span className="font-medium">المهنة:</span> {foundMember.job || "غير متوفر"}</p>
-                    <p><span className="font-medium">الرقم القومي:</span> {foundMember.national_id || "غير متوفر"}</p>
+                    <div className="flex-1">
+                      <h3 className="font-bold text-base text-blue-600">{foundMember.name}</h3>
+                      <p className="text-gray-600 text-xs">#{foundMember.membership_number}</p>
+                      <div className="grid grid-cols-2 gap-2 mt-1 text-xs">
+                        <p><span className="font-medium">الهاتف:</span> {foundMember.phone || "غير متوفر"}</p>
+                        <p><span className="font-medium">RFID:</span> {foundMember.rfid_code || "غير مسجل"}</p>
+                        <p><span className="font-medium">النادي:</span> {foundMember.club_name}</p>
+                        <p><span className="font-medium">العنوان:</span> {foundMember.address || "غير متوفر"}</p>
+                        {foundMember.birth_date && (
+                          <p><span className="font-medium">تاريخ الميلاد:</span> {new Date(foundMember.birth_date).toLocaleDateString("ar-EG")}</p>
+                        )}
+                        <p><span className="font-medium">المهنة:</span> {foundMember.job || "غير متوفر"}</p>
+                        <p><span className="font-medium">الرقم القومي:</span> {foundMember.national_id || "غير متوفر"}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2 text-right text-gray-700">نوع الاشتراك</label>
+              <label className="block text-xs font-medium mb-1 text-gray-700">نوع الاشتراك</label>
               <select
                 name="type"
                 value={formData.type}
                 onChange={handleInputChange}
-                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                 required
               >
-                <option value="">اختر نوع الاشتراك</option>
+                <option value="none">اختر نوع الاشتراك</option>
                 {subscriptionTypes?.results
                   ?.filter((type) => type.club_details.id.toString() === formData.club?.toString())
                   .map((type) => (
@@ -335,16 +326,15 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
                   ))}
               </select>
             </div>
-
             <div>
-              <label className="block text-sm font-medium mb-2 text-right text-gray-700">المدرب</label>
+              <label className="block text-xs font-medium mb-1 text-gray-700">المدرب</label>
               <select
                 name="coach"
                 value={formData.coach}
                 onChange={handleInputChange}
-                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
               >
-                <option value="">بدون مدرب</option>
+                <option value="none">بدون مدرب</option>
                 {allCoaches.map((coach) => (
                   <option key={coach.id} value={coach.id}>
                     {coach.username}
@@ -352,56 +342,51 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
                 ))}
               </select>
             </div>
-          </div>
-
-          {formData.coach && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium mb-2 text-right text-gray-700">نوع تعويض المدرب</label>
-                <select
-                  name="coach_compensation_type"
-                  value={formData.coach_compensation_type}
-                  onChange={handleInputChange}
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
-                >
-                  <option value="from_subscription">من داخل قيمة الاشتراك (نسبة %)</option>
-                  <option value="external">مبلغ خارجي (جنيه)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-2 text-right text-gray-700">
-                  {formData.coach_compensation_type === 'from_subscription' ? 'نسبة المدرب (%)' : 'مبلغ المدرب (جنيه)'}
-                </label>
-                <input
-                  type="number"
-                  step={formData.coach_compensation_type === 'from_subscription' ? "0.1" : "0.01"}
-                  min="0"
-                  name="coach_compensation_value"
-                  value={formData.coach_compensation_value}
-                  onChange={handleInputChange}
-                  className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
-                  placeholder="0.00"
-                  required
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {formData.coach && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium mb-1 text-gray-700">نوع تعويض المدرب</label>
+                  <select
+                    name="coach_compensation_type"
+                    value={formData.coach_compensation_type}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                  >
+                    <option value="from_subscription">من داخل قيمة الاشتراك (نسبة %)</option>
+                    <option value="external">مبلغ خارجي (جنيه)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1 text-gray-700">
+                    {formData.coach_compensation_type === 'from_subscription' ? 'نسبة المدرب (%)' : 'مبلغ المدرب (جنيه)'}
+                  </label>
+                  <input
+                    type="number"
+                    step={formData.coach_compensation_type === 'from_subscription' ? "0.1" : "0.01"}
+                    min="0"
+                    name="coach_compensation_value"
+                    value={formData.coach_compensation_value}
+                    onChange={handleInputChange}
+                    className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                    placeholder="0.00"
+                    required
+                  />
+                </div>
+              </>
+            )}
             <div>
-              <label className="block text-sm font-medium mb-2 text-right text-gray-700">تاريخ البداية</label>
+              <label className="block text-xs font-medium mb-1 text-gray-700">تاريخ البداية</label>
               <input
                 type="date"
                 name="start_date"
                 value={formData.start_date}
                 onChange={handleInputChange}
-                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2 text-right text-gray-700">المبلغ المدفوع</label>
+              <label className="block text-xs font-medium mb-1 text-gray-700">المبلغ المدفوع</label>
               <input
                 type="number"
                 name="paid_amount"
@@ -409,49 +394,46 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
                 min="0"
                 value={formData.paid_amount}
                 onChange={handleInputChange}
-                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
+                className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
                 placeholder="0.00"
                 required
               />
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-2 text-right text-gray-700">سعر التدريب الخاص (اختياري)</label>
-            <input
-              type="number"
-              name="private_training_price"
-              step="0.01"
-              min="0"
-              value={formData.private_training_price}
-              onChange={handleInputChange}
-              className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition duration-200"
-              placeholder="0.00"
-            />
-          </div>
-
-          {formData.type && subscriptionTypes?.results?.find((type) => type.id.toString() === formData.type) && (
-            <div className="text-sm text-gray-600 text-right">
-              <p>تاريخ النهاية المتوقع: {
-                new Date(
-                  new Date(formData.start_date).getTime() +
-                  subscriptionTypes.results.find((type) => type.id.toString() === formData.type).duration_days * 24 * 60 * 60 * 1000
-                ).toLocaleDateString('ar-EG')
-              }</p>
+            <div className="col-span-2">
+              <label className="block text-xs font-medium mb-1 text-gray-700">سعر التدريب الخاص (اختياري)</label>
+              <input
+                type="number"
+                name="private_training_price"
+                step="0.01"
+                min="0"
+                value={formData.private_training_price}
+                onChange={handleInputChange}
+                className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-blue-500"
+                placeholder="0.00"
+              />
             </div>
-          )}
-
-          <div className="flex justify-end gap-4">
+            {formData.type && subscriptionTypes?.results?.find((type) => type.id.toString() === formData.type) && (
+              <div className="col-span-2 text-xs text-gray-600 text-right">
+                <p>تاريخ النهاية المتوقع: {
+                  new Date(
+                    new Date(formData.start_date).getTime() +
+                    subscriptionTypes.results.find((type) => type.id.toString() === formData.type).duration_days * 24 * 60 * 60 * 1000
+                  ).toLocaleDateString('ar-EG')
+                }</p>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-3">
             <button
               type="button"
-              className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition duration-200 hover:scale-105"
+              className="px-4 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 text-xs"
               onClick={onClose}
             >
               إلغاء
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:scale-105 transition duration-200 transform disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="px-4 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-xs disabled:bg-gray-400 disabled:cursor-not-allowed"
               disabled={!foundMember || loading}
             >
               تحديث الاشتراك
