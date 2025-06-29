@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchSubscriptionTypes, postSubscription, fetchSubscriptions } from "../../redux/slices/subscriptionsSlice";
 import { Button } from "@/components/ui/button";
@@ -464,7 +464,7 @@ const CreateSubscription = ({ onClose }) => {
                     <option value="">اختر مدربًا</option>
                     {allCoaches.map((coach) => (
                       <option key={coach.id} value={coach.id}>
-                        {coach.username}
+                        {coach.first_name && coach.last_name ? `${coach.first_name} ${coach.last_name}` : coach.username || 'اسم غير متوفر'}
                       </option>
                     ))}
                   </select>
