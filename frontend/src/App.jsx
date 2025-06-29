@@ -40,6 +40,7 @@ import useTokenRefresh from './hooks/useTokenRefresh';
 import StaffAttendanceReport from './components/dashboard/StaffAttendanceReport.jsx';
 import StockAnalytics from './components/dashboard/StockAnalytics.jsx';
 import StaffSalaryReport from './components/dashboard/StaffSalaryReport.jsx';
+import AttendanceDashboard from './components/dashboard/AttendanceDashboard.jsx';
 import { Toaster } from 'react-hot-toast';
 
 // Route protection component
@@ -102,6 +103,7 @@ function App() {
           <Route path="dashboard/subscription-analytics" element={<SubscriptionAnalytics />} /> 
           <Route path="attendance-report/:staffId?" element={<StaffAttendanceReport />} />
           <Route path="attendance-StaffSalaryReport" element={<StaffSalaryReport />} />
+          <Route path="AttendanceDashboard" element={<AttendanceDashboard />} />
         </Route>
       </Routes>
     </div>

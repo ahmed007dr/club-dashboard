@@ -52,7 +52,7 @@ const Dashboard = () => {
       children: [
         { path: 'staff', name: 'شيفتات الموظفين', icon: <AiOutlineSchedule /> },
         { path: 'attendance-form', name: 'بصمة الدخول والخروج', icon: <BiLogIn /> },
-        { path: 'shift-attendance', name: 'حضور الموظفين', icon: <AiOutlineSchedule /> },
+        { path: 'AttendanceDashboard', name: 'حضور الموظفين', icon: <AiOutlineSchedule /> },
       ],
     },
     {

@@ -87,12 +87,12 @@ const StaffSalaryReport = () => {
       staff.monthly_data.forEach((entry) => {
         data.push({
           الشهر: moment(entry.month, 'YYYY-MM').format('MMMM YYYY'),
-          اسم_الموظف: staff.staff_name,
-          معدل_الأجر_بالساعة: `${staff.hourly_rate} جنيه`,
-          الساعات_الفعلية: entry.total_hours,
-          الساعات_المتوقعة: entry.expected_hours,
-          حالة_الساعات: entry.hours_status,
-          إجمالي_الراتب: `${entry.total_salary} جنيه`,
+          اسم_الموظف: staff.first_name && staff.last_name ? `${staff.first_name} ${staff.last_name}` : staff.username || 'اسم غير متوفر',
+          معدل_الأجر_بالساعة: `${staff.hourly_rate || 0} جنيه`,
+          الساعات_الفعلية: entry.total_hours || 'غير محسوب',
+          الساعات_المتوقعة: entry.expected_hours || 'غير محسوب',
+          حالة_الساعات: entry.hours_status || 'غير محدد',
+          إجمالي_الراتب: `${entry.total_salary || 0} جنيه`,
         });
       });
     });
@@ -111,7 +111,7 @@ const StaffSalaryReport = () => {
   // Handle export for selected staff
   const handleExportSingle = () => {
     const staff = reportData[0];
-    exportToExcel([staff], `تقرير_رواتب_${staff.staff_name}_${selectedMonth}`);
+    exportToExcel([staff], `تقرير_رواتب_${staff.first_name && staff.last_name ? `${staff.first_name}_${staff.last_name}` : staff.username || 'اسم_غير_متوفر'}_${selectedMonth}`);
   };
 
   // Group data by month
@@ -121,7 +121,13 @@ const StaffSalaryReport = () => {
       if (!acc[month]) {
         acc[month] = [];
       }
-      acc[month].push({ ...entry, staff_name: staff.staff_name, hourly_rate: staff.hourly_rate });
+      acc[month].push({ 
+        ...entry, 
+        first_name: staff.first_name || '', 
+        last_name: staff.last_name || '', 
+        username: staff.username || 'غير متوفر',
+        hourly_rate: staff.hourly_rate 
+      });
     });
     return acc;
   }, {});
@@ -129,24 +135,26 @@ const StaffSalaryReport = () => {
   const columns = [
     {
       title: 'اسم الموظف',
-      dataIndex: 'staff_name',
       key: 'staff_name',
+      render: (record) => record.first_name && record.last_name ? `${record.first_name} ${record.last_name}` : record.username || 'اسم غير متوفر',
     },
     {
       title: 'معدل الأجر/ساعة',
       dataIndex: 'hourly_rate',
       key: 'hourly_rate',
-      render: (value) => `${value} جنيه`,
+      render: (value) => `${value || 0} جنيه`,
     },
     {
       title: 'الساعات الفعلية',
       dataIndex: 'total_hours',
       key: 'total_hours',
+      render: (value) => value || 'غير محسوب',
     },
     {
       title: 'الساعات المتوقعة',
       dataIndex: 'expected_hours',
       key: 'expected_hours',
+      render: (value) => value || 'غير محسوب',
     },
     {
       title: 'حالة الساعات',
@@ -159,7 +167,7 @@ const StaffSalaryReport = () => {
               status === 'مضبوط' ? '#52c41a' : status === 'زيادة' ? '#1890ff' : '#ff4d4f',
           }}
         >
-          {status}
+          {status || 'غير محدد'}
         </span>
       ),
     },
@@ -167,7 +175,7 @@ const StaffSalaryReport = () => {
       title: 'إجمالي الراتب',
       dataIndex: 'total_salary',
       key: 'total_salary',
-      render: (value) => `${value} جنيه`,
+      render: (value) => `${value || 0} جنيه`,
     },
   ];
 
@@ -208,11 +216,14 @@ const StaffSalaryReport = () => {
             style={{ width: '200px' }}
             showSearch
             optionFilterProp="children"
+            filterOption={(input, option) =>
+              `${option.children}`.toLowerCase().includes(input.toLowerCase())
+            }
           >
             <Option value="all">الكل</Option>
             {staffList.map((staff) => (
               <Option key={staff.id} value={staff.id}>
-                {staff.username}
+                {staff.first_name && staff.last_name ? `${staff.first_name} ${staff.last_name}` : staff.username || 'اسم غير متوفر'}
               </Option>
             ))}
           </Select>
@@ -258,7 +269,7 @@ const StaffSalaryReport = () => {
               onClick={handleExportSingle}
               style={{ background: '#fff', borderColor: '#1a3c34', color: '#1a3c34' }}
             >
-              تصدير تقرير {reportData[0]?.staff_name} (Excel)
+              تصدير تقرير {reportData[0] ? (reportData[0].first_name && reportData[0].last_name ? `${reportData[0].first_name} ${reportData[0].last_name}` : reportData[0].username || 'اسم غير متوفر') : ''} (Excel)
             </Button>
           )}
           <Button
@@ -290,7 +301,7 @@ const StaffSalaryReport = () => {
                 <Table
                   columns={columns}
                   dataSource={groupedByMonth[month]}
-                  rowKey={(record) => `${record.staff_name}-${month}`}
+                  rowKey={(record) => `${record.first_name && record.last_name ? `${record.first_name}_${record.last_name}` : record.username || 'اسم_غير_متوفر'}-${month}`}
                   pagination={false}
                   locale={{ emptyText: 'لا توجد بيانات رواتب لهذا الشهر' }}
                   style={{ background: '#fff', borderRadius: '8px' }}

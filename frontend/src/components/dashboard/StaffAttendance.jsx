@@ -234,8 +234,7 @@ const AttendanceAnalysis = () => {
                       <User className="text-gray-500 w-5 h-5" />
                       <div>
                         <p className="text-sm text-gray-600 dark:text-gray-300">الاسم</p>
-                        <p className="font-semibold text-gray-800 dark:text-white">{staffData?.staff_name || 'غير متوفر'}</p>
-                      </div>
+                        <p className="font-semibold text-gray-800 dark:text-white">{staffData ? `${staffData.first_name} ${staffData.last_name}` : 'غير متوفر'}</p>                      </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <User className="text-gray-500 w-5 h-5" />

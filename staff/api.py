@@ -13,6 +13,7 @@ from .models import Shift, StaffAttendance
 from .serializers import ShiftSerializer, StaffAttendanceSerializer, StaffMonthlyHoursSerializer
 from accounts.models import User
 from utils.permissions import IsOwnerOrRelatedToClub
+from accounts.serializers import UserProfileSerializer
 import logging
 logger = logging.getLogger(__name__)
 
@@ -237,7 +238,6 @@ def staff_attendance_analysis_api(request, attendance_id):
         "actual_hours": round(actual_hours, 2), "expected_hours": round(expected_hours, 2)
     })
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def staff_attendance_report_api(request, staff_id=None):
@@ -268,7 +268,7 @@ def staff_attendance_report_api(request, staff_id=None):
             return Response({'error': 'صيغة الشهر غير صحيحة (YYYY-MM)'}, status=status.HTTP_400_BAD_REQUEST)
     
     monthly_data = attendances.annotate(month=TruncMonth('check_in')).values(
-     'staff__id', 'staff__username', 'staff__rfid_code', 'staff__hourly_rate', 'staff__expected_hours', 'month'
+        'staff__id', 'staff__first_name', 'staff__last_name', 'staff__username', 'staff__rfid_code', 'staff__hourly_rate', 'staff__expected_hours', 'month'
     ).annotate(
         total_hours=Sum(ExpressionWrapper(F('check_out') - F('check_in'), output_field=DurationField())),
         attendance_days=Count(TruncDate('check_in'), distinct=True)
@@ -288,14 +288,16 @@ def staff_attendance_report_api(request, staff_id=None):
             'hours_change': round(total_hours - prev_hours, 2),
             'percentage_change': round(((total_hours - prev_hours) / prev_hours) * 100, 2) if prev_hours > 0 else 0,
             'expected_hours': float(entry['staff__expected_hours']) if entry['staff__expected_hours'] is not None else 200.0,
-            'hours_status': 'sufficient' if total_hours >= 00.0 else 'insufficient',
+            'hours_status': 'sufficient' if total_hours >= 0.0 else 'insufficient',
             'total_salary': round(total_hours * float(entry['staff__hourly_rate']), 2) if entry['staff__hourly_rate'] else 0.0
         }
         if staff_id not in staff_data:
             staff_data[staff_id] = {
                 'staff_id': staff_id,
-                'staff_name': entry['staff__username'],
-                'rfid_code': entry['staff__rfid_code'],
+                'first_name': entry['staff__first_name'] or '',
+                'last_name': entry['staff__last_name'] or '',
+                'username': entry['staff__username'] or 'غير متوفر',
+                'rfid_code': entry['staff__rfid_code'] or 'غير مسجل',
                 'hourly_rate': float(entry['staff__hourly_rate']) if entry['staff__hourly_rate'] is not None else 0.0,
                 'monthly_data': []
             }
@@ -308,13 +310,13 @@ def staff_attendance_report_api(request, staff_id=None):
     serializer = StaffMonthlyHoursSerializer(staff_list, many=True)
     return Response(serializer.data)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def staff_list_api(request):
     """Retrieve a list of active staff members for the user's club."""
-    staff = User.objects.filter(club=request.user.club, is_active=True).values('id', 'username', 'rfid_code')
-    return Response(list(staff))
+    staff = User.objects.filter(club=request.user.club, is_active=True)
+    serializer = UserProfileSerializer(staff, many=True)
+    return Response(serializer.data)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])

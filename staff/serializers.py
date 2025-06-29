@@ -109,9 +109,12 @@ class MonthlyDataSerializer(serializers.Serializer):
     hours_change = serializers.FloatField()
     percentage_change = serializers.FloatField()
 
+
 class StaffMonthlyHoursSerializer(serializers.Serializer):
     staff_id = serializers.IntegerField()
-    staff_name = serializers.CharField()
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    username = serializers.CharField()
     rfid_code = serializers.CharField()
     hourly_rate = serializers.FloatField(required=False, allow_null=True, default=0.0)
     monthly_data = MonthlyDataSerializer(many=True)
@@ -119,7 +122,9 @@ class StaffMonthlyHoursSerializer(serializers.Serializer):
     class Meta:
         fields = [
             'staff_id',
-            'staff_name',
+            'first_name',
+            'last_name',
+            'username',
             'rfid_code',
             'hourly_rate',
             'monthly_data'
