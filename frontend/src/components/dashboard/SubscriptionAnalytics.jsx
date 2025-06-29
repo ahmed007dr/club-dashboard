@@ -77,6 +77,9 @@ const SubscriptionAnalytics = () => {
       if (key === 'member_details.name') {
         aValue = a?.member_details?.name ?? '';
         bValue = b?.member_details?.name ?? '';
+      } else if (key === 'username') {
+        aValue = a?.first_name && a?.last_name ? `${a.first_name} ${a.last_name}` : a?.username || '';
+        bValue = b?.first_name && b?.last_name ? `${b.first_name} ${b.last_name}` : b?.username || '';
       } else {
         aValue = a?.[key] ?? '';
         bValue = b?.[key] ?? '';
@@ -220,7 +223,7 @@ const SubscriptionAnalytics = () => {
     sortedCoaches.forEach((coach) => {
       if (coach) {
         data.push([
-          coach.username ?? 'غير معروف',
+          coach.first_name && coach.last_name ? `${coach.first_name} ${coach.last_name}` : coach.username || 'اسم غير متوفر',
           coach.total_clients ?? 0,
           coach.total_attendance ?? 0,
           coach.total_revenue ?? 0,
@@ -398,7 +401,7 @@ const SubscriptionAnalytics = () => {
         ? sortData(analytics.coach_analysis || [], sortConfig.key.split('.')[1], sortConfig.direction)
         : analytics.coach_analysis || []
       ).map((coach) => [
-        coach?.username ?? 'غير معروف',
+        coach?.first_name && coach?.last_name ? `${coach.first_name} ${coach.last_name}` : coach?.username || 'اسم غير متوفر',
         coach?.total_clients ?? 0,
         coach?.total_attendance ?? 0,
         coach?.total_revenue ?? 0,
@@ -504,7 +507,7 @@ const SubscriptionAnalytics = () => {
               <option value="">الكل</option>
               {coaches.map((coach) => (
                 <option key={coach.id} value={coach.id}>
-                  {coach.username ?? 'غير معروف'}
+                  {coach.first_name && coach.last_name ? `${coach.first_name} ${coach.last_name}` : coach.username || 'اسم غير متوفر'}
                 </option>
               ))}
             </select>
@@ -799,7 +802,7 @@ const SubscriptionAnalytics = () => {
                     : analytics.coach_analysis || []
                   ).map((coach, index) => (
                     <tr key={`coach-${index}`}>
-                      <td className="table-cell">{coach?.username ?? 'غير معروف'}</td>
+                      <td className="table-cell">{coach?.first_name && coach?.last_name ? `${coach.first_name} ${coach.last_name}` : coach?.username || 'اسم غير متوفر'}</td>
                       <td className="table-cell">{coach?.total_clients ?? 0}</td>
                       <td className="table-cell">{coach?.total_attendance ?? 0}</td>
                       <td className="table-cell">{coach?.total_revenue ?? 0}</td>
