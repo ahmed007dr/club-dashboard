@@ -171,18 +171,22 @@ def add_attendance_api(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def attendance_last_hour_api(request):
-    """Get attendance data for the last 60 minutes."""
+    """Get the count of attendances for the last 60 minutes."""
     now = timezone.now()
     one_hour_ago = now - timedelta(hours=1)
     
+    # تحديد تاريخ اليوم لضمان عدم عد السجلات من أيام سابقة
+    today = now.date()
+    
     attendances = Attendance.objects.filter(
         subscription__club=request.user.club,
-        entry_time__gte=one_hour_ago,
-        entry_time__lte=now
+        attendance_date=today,  # التحقق من تاريخ الحضور
+        entry_time__gte=one_hour_ago.time(),  # وقت الدخول في آخر ساعة
+        entry_time__lte=now.time()  # وقت الدخول حتى الآن
     )
     
-    serializer = AttendanceSerializer(attendances, many=True)
-    return Response(serializer.data)
+    count = attendances.count()
+    return Response({"count": count}, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
