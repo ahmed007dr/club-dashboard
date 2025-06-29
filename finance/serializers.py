@@ -64,6 +64,9 @@ class IncomeSourceSerializer(serializers.ModelSerializer):
             }
         return None
     
+
+
+
 class IncomeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     source_details = IncomeSourceSerializer(source='source', read_only=True)
@@ -76,7 +79,8 @@ class IncomeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'club', 'club_details', 'source', 'source_details',
             'amount', 'description', 'date', 'received_by', 'received_by_details',
-            'related_receipt', 'receipt_details', 'stock_transaction', 'stock_transaction_details'
+            'related_receipt', 'receipt_details', 'stock_transaction', 'stock_transaction_details',
+            'quantity'  # إضافة حقل quantity
         ]
 
     def get_stock_transaction_details(self, obj):
@@ -85,10 +89,17 @@ class IncomeSerializer(serializers.ModelSerializer):
                 'id': obj.stock_transaction.id,
                 'transaction_type': obj.stock_transaction.transaction_type,
                 'quantity': obj.stock_transaction.quantity,
-                'date': obj.stock_transaction.date.isoformat()
+                'date': obj.stock_transaction.date.isoformat(),
+                'stock_item_details': {
+                    'id': obj.stock_transaction.stock_item.id,
+                    'name': obj.stock_transaction.stock_item.name,
+                    'unit': obj.stock_transaction.stock_item.unit
+                }
             }
         return None
+    
 
+    
 class StockItemSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
 

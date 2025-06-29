@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { FiDollarSign } from 'react-icons/fi';
 import { MoreVertical } from 'lucide-react';
@@ -8,6 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '../ui/DropdownMenu';
+
 const IncomeTable = ({ incomes, handleEditClick, handleDeleteClick }) => (
   <div className="rounded-md border border-gray-200 overflow-x-auto">
     <table className="min-w-full divide-y divide-gray-200" dir="rtl">
@@ -20,6 +20,7 @@ const IncomeTable = ({ incomes, handleEditClick, handleDeleteClick }) => (
           <th className="px-4 py-3 text-right text-sm font-semibold">المبلغ</th>
           <th className="px-4 py-3 text-right text-sm font-semibold">الوصف</th>
           <th className="px-4 py-3 text-right text-sm font-semibold">التاريخ</th>
+          <th className="px-4 py-3 text-right text-sm font-semibold">تم التسجيل بواسطة</th>
           <th className="px-4 py-3 text-right text-sm font-semibold">الإجراءات</th>
         </tr>
       </thead>
@@ -36,7 +37,7 @@ const IncomeTable = ({ incomes, handleEditClick, handleDeleteClick }) => (
               {income.stock_transaction_details?.stock_item_details?.name || 'غير متاح'}
             </td>
             <td className="px-4 py-3 text-sm text-gray-800">
-              {income.stock_transaction_details?.quantity || 'غير متاح'}
+              {income.quantity || 1}
             </td>
             <td className="px-4 py-3 text-sm text-gray-800">
               {income.amount ? `${income.amount} جنيه` : 'غير متاح'}
@@ -46,6 +47,11 @@ const IncomeTable = ({ incomes, handleEditClick, handleDeleteClick }) => (
             </td>
             <td className="px-4 py-3 text-sm text-gray-800">
               {income.date || 'غير متاح'}
+            </td>
+            <td className="px-4 py-3 text-sm text-gray-800">
+              {income.received_by_details?.first_name && income.received_by_details?.last_name
+                ? `${income.received_by_details.first_name} ${income.received_by_details.last_name}`
+                : income.received_by_details?.username || 'غير متوفر'}
             </td>
             <td className="px-4 py-3 text-sm flex gap-2 justify-end">
               <DropdownMenu dir="rtl">
@@ -73,7 +79,7 @@ const IncomeTable = ({ incomes, handleEditClick, handleDeleteClick }) => (
           </tr>
         )) : (
           <tr>
-            <td colSpan="8" className="px-4 py-3 text-center text-gray-500">
+            <td colSpan="9" className="px-4 py-3 text-center text-gray-500">
               لا توجد إيرادات متاحة
             </td>
           </tr>
@@ -82,4 +88,5 @@ const IncomeTable = ({ incomes, handleEditClick, handleDeleteClick }) => (
     </table>
   </div>
 );
+
 export default IncomeTable;

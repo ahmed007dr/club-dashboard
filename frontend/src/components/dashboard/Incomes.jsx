@@ -1,6 +1,5 @@
-
 import { FiDollarSign, FiFilter, FiDownload, FiList } from 'react-icons/fi';
-import {  Card,  CardContent,  CardDescription,  CardHeader,  CardTitle,} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Loader2 } from 'lucide-react';
@@ -14,7 +13,7 @@ import { fetchIncomes, fetchIncomeSources, fetchIncomeSummary, fetchAllIncomes }
 import { fetchStockItems } from '../../redux/slices/stockSlice';
 import StockTransactionForm from './StockTransactionForm';
 import IncomeTable from './IncomeTable';
-import IncomeSourcesList from './IncomeSourcesList';
+import IncomeSourcesList from './IncomeSourcesList'; // استيراد المكون الجديد
 import usePermission from '@/hooks/usePermission';
 import BASE_URL from '../../config/api';
 
@@ -68,7 +67,7 @@ const Incomes = () => {
     debouncedFetchIncomes(filters, page);
     dispatch(fetchIncomeSources());
     dispatch(fetchStockItems());
-  }, [dispatch, filters, page, debouncedFetchIncomes]);
+  }, [dispatch, filters, page, debouncedFetchIncomes]); // تصحيح الخطأ الإملائي
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -111,10 +110,13 @@ const Incomes = () => {
         const data = allIncomes.map((income) => ({
           'مصدر المبيعات': income.source_details?.name || 'غير متاح',
           'عنصر المخزون': income.stock_transaction_details?.stock_item_details?.name || 'غير متاح',
-          'الكمية': income.stock_transaction_details?.quantity || 'غير متاح',
+          'الكمية': income.stock_transaction_details?.quantity || '1',
           'المبلغ': income.amount ? `${income.amount} جنيه` : 'غير متاح',
           'الوصف': income.description || 'لا يوجد وصف',
           'التاريخ': income.date || 'غير متاح',
+          'تم التسجيل بواسطة': income.received_by_details?.first_name && income.received_by_details?.last_name
+            ? `${income.received_by_details.first_name} ${income.received_by_details.last_name}`
+            : income.received_by_details?.username || 'غير متوفر',
         }));
         if (isSummaryClicked && totalIncomeCount > 0) {
           data.push({
@@ -124,10 +126,11 @@ const Incomes = () => {
             'المبلغ': `${totalIncome} جنيه`,
             'الوصف': `عدد المبيعات: ${totalIncomeCount}`,
             'التاريخ': '',
+            'تم التسجيل بواسطة': '',
           });
         }
         const ws = XLSX.utils.json_to_sheet(data);
-        ws['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 15 }, { wch: 30 }, { wch: 15 }];
+        ws['!cols'] = [{ wch: 20 }, { wch: 20 }, { wch: 10 }, { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 20 }];
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'المبيعات');
         XLSX.writeFile(wb, `مبيعات_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -136,27 +139,6 @@ const Incomes = () => {
   };
 
   const pageCount = Math.ceil((incomesPagination?.count || 0) / 20);
-
-  const summaryCard = isSummaryClicked && (
-    <div className={`bg-${totalIncome > 0 ? 'green' : 'red'}-50 border border-${totalIncome > 0 ? 'green' : 'red'}-200 rounded-lg p-4 text-right mb-4`}>
-      <div className="flex items-center gap-2">
-        <FiDollarSign className={`text-${totalIncome > 0 ? 'green' : 'red'}-600 w-6 h-6`} />
-        <p className="text-lg font-semibold text-gray-800">
-          عدد المبيعات: {totalIncomeCount}
-        </p>
-      </div>
-      {totalIncome > 0 ? (
-        <p className="text-lg font-semibold text-gray-800">إجمالي المبيعات: {totalIncome} جنيه</p>
-      ) : (
-        <p className="text-lg font-semibold text-red-700">لا توجد مبيعات</p>
-      )}
-      {(filters.startDate || filters.endDate) && (
-        <p className="text-sm text-gray-600">
-          للفترة من {filters.startDate || 'غير محدد'} إلى {filters.endDate || 'غير محدد'}
-        </p>
-      )}
-    </div>
-  );
 
   const getPageButtons = useCallback((currentPage, totalPages) => {
     const maxButtons = 5;
@@ -296,7 +278,26 @@ const Incomes = () => {
                 )}
               </div>
 
-              {summaryCard}
+              {isSummaryClicked && (
+                <div className={`bg-${totalIncome > 0 ? 'green' : 'red'}-50 border border-${totalIncome > 0 ? 'green' : 'red'}-200 rounded-lg p-4 text-right mb-4`}>
+                  <div className="flex items-center gap-2">
+                    <FiDollarSign className={`text-${totalIncome > 0 ? 'green' : 'red'}-600 w-6 h-6`} />
+                    <p className="text-lg font-semibold text-gray-800">
+                      عدد المبيعات: {totalIncomeCount}
+                    </p>
+                  </div>
+                  {totalIncome > 0 ? (
+                    <p className="text-lg font-semibold text-gray-800">إجمالي المبيعات: {totalIncome} جنيه</p>
+                  ) : (
+                    <p className="text-lg font-semibold text-red-700">لا توجد مبيعات</p>
+                  )}
+                  {(filters.startDate || filters.endDate) && (
+                    <p className="text-sm text-gray-600">
+                      للفترة من {filters.startDate || 'غير محدد'} إلى {filters.endDate || 'غير محدد'}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {loading && (
                 <div className="flex justify-center py-6">
@@ -343,7 +344,6 @@ const Incomes = () => {
                   صفحة {page} من {pageCount || 1}
                 </span>
               </div>
-
             </CardContent>
           </Card>
         </TabsContent>

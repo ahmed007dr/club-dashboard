@@ -88,6 +88,7 @@ class Income(models.Model):
     received_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     related_receipt = models.ForeignKey('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True)
     stock_transaction = models.ForeignKey('StockTransaction', on_delete=models.SET_NULL, null=True, blank=True)
+    quantity = models.PositiveIntegerField(default=1)
 
     def __str__(self):
         return f"{self.source.name} - {self.amount}"

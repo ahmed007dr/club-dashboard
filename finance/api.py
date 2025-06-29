@@ -93,7 +93,6 @@ def expense_api(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_source_api(request):
-    """List or create income sources."""
     if request.method == 'GET':
         sources = IncomeSource.objects.filter(club=request.user.club)
         if request.query_params.get('name'):
@@ -110,6 +109,7 @@ def income_source_api(request):
             return Response({'error': 'غير مسموح بإنشاء مصادر إيرادات.'}, status=status.HTTP_403_FORBIDDEN)
         data = request.data.copy()
         data['club'] = request.user.club.id
+        data['created_by'] = request.user.id  # تعيين created_by
         serializer = IncomeSourceSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -165,17 +165,18 @@ def income_api(request):
             return Response({'error': 'مصدر الإيراد مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
         try:
             source = IncomeSource.objects.get(id=source_id, club=request.user.club)
+            quantity = int(quantity)
+            if quantity <= 0:
+                return Response({'error': 'الكمية يجب أن تكون أكبر من صفر'}, status=status.HTTP_400_BAD_REQUEST)
+            data['amount'] = float(source.price * quantity)  # حساب المبلغ بناءً على الكمية دائمًا
+            data['quantity'] = quantity  # حفظ الكمية في Income
             if source.stock_item:
                 if not source.stock_item.is_sellable:
                     return Response({'error': 'عنصر المخزون غير قابل للبيع'}, status=status.HTTP_400_BAD_REQUEST)
-                quantity = int(quantity)
-                if quantity <= 0:
-                    return Response({'error': 'الكمية يجب أن تكون أكبر من صفر'}, status=status.HTTP_400_BAD_REQUEST)
                 if quantity > source.stock_item.current_quantity:
                     return Response({'error': 'الكمية المطلوبة غير متوفرة في المخزون'}, status=status.HTTP_400_BAD_REQUEST)
-                data['amount'] = float(source.price * quantity)
             else:
-                data['amount'] = float(source.price)
+                data['stock_item'] = None  # عدم وجود stock_item للمبيعات غير المرتبطة بالمخزون
         except IncomeSource.DoesNotExist:
             return Response({'error': 'معرف مصدر غير صالح'}, status=status.HTTP_400_BAD_REQUEST)
         except ValueError:
@@ -194,7 +195,7 @@ def income_api(request):
                     )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_detail_api(request, pk):
@@ -294,6 +295,8 @@ def daily_summary_api(request):
     paginator = StandardPagination()
     page = paginator.paginate_queryset(summary, request)
     return paginator.get_paginated_response(page)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_summary(request):

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { FiDollarSign, FiAlertTriangle } from 'react-icons/fi';
@@ -17,7 +16,7 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
   const { stockItems } = useSelector((state) => state.stock || {});
   const { incomeSources, expenseCategories, isLoading } = useSelector((state) => state.finance || {});
   const { user } = useSelector((state) => state.auth || {});
-  const today = new Date().toISOString().slice(0, 16); 
+  const today = new Date().toISOString().slice(0, 16);
   const [formData, setFormData] = useState({
     club: user?.club?.id?.toString() || '',
     source: '',
@@ -42,7 +41,7 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
         description: currentItem.description || '',
         date: currentItem.date ? new Date(currentItem.date).toISOString().slice(0, 16) : today,
         stock_item: currentItem.stock_transaction_details?.stock_item_details?.id?.toString() || currentItem.stock_item?.toString() || '',
-        quantity: currentItem.stock_transaction_details?.quantity?.toString() || currentItem.stock_quantity?.toString() || '1',
+        quantity: currentItem.quantity?.toString() || currentItem.stock_transaction_details?.quantity?.toString() || currentItem.stock_quantity?.toString() || '1',
       });
       setSelectedPrice(selectedSource?.price || null);
     }
@@ -63,6 +62,7 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
           newFormData.stock_item = selectedSource.stock_item.id.toString();
         } else {
           newFormData.stock_item = '';
+          newFormData.quantity = '1';
         }
         setSelectedPrice(selectedSource?.price || null);
       }
@@ -75,17 +75,19 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
     const newErrors = {};
     if (!formData.source) newErrors.source = type === 'income' ? 'مصدر المبيعات مطلوب' : 'فئة المصروف مطلوبة';
     if (!formData.date) newErrors.date = 'التاريخ والساعة مطلوبين';
-    if (formData.stock_item) {
+    if (type === 'income') {
       if (!formData.quantity || parseInt(formData.quantity) <= 0) {
         newErrors.quantity = 'الكمية يجب أن تكون أكبر من صفر';
-      } else {
+      } else if (formData.stock_item) {
         const stockItem = stockItems.find((item) => item.id === parseInt(formData.stock_item));
         if (stockItem && parseInt(formData.quantity) > stockItem.current_quantity) {
           newErrors.quantity = 'الكمية المطلوبة غير متوفرة في المخزون';
         }
       }
+    } else if (formData.stock_item && (!formData.quantity || parseInt(formData.quantity) <= 0)) {
+      newErrors.quantity = 'الكمية يجب أن تكون أكبر من صفر';
     }
-    if (!selectedPrice && type === 'income') newErrors.amount = 'لا يوجد سعر لمصدر المبيعات المحدد';
+    if (!selectedPrice && type === 'income') newErrors.source = 'لا يوجد سعر لمصدر المبيعات المحدد';
     return newErrors;
   };
 
@@ -96,14 +98,15 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
       return;
     }
 
+    const quantity = parseInt(formData.quantity) || 1;
     const payload = {
       club: parseInt(formData.club) || null,
       [type === 'income' ? 'source' : 'category']: parseInt(formData.source) || null,
-      amount: selectedPrice || 0,
+      amount: selectedPrice ? parseFloat(selectedPrice * quantity).toFixed(2) : 0,
       description: formData.description || '',
       date: formData.date || today,
       stock_item: parseInt(formData.stock_item) || null,
-      quantity: formData.stock_item ? parseInt(formData.quantity) : null,
+      quantity: type === 'income' ? quantity : (formData.stock_item ? quantity : null),
     };
 
     const action = type === 'income'
@@ -128,8 +131,9 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
         setErrors({});
       })
       .catch((err) => {
-        toast.error(err.message || 'فشل في حفظ العملية', { id: loadingToast });
-        setErrors({ general: err.message || 'فشل في حفظ العملية' });
+        const errorMessage = err.message || err || 'فشل في حفظ العملية';
+        toast.error(errorMessage, { id: loadingToast });
+        setErrors({ general: errorMessage });
       });
   };
 
@@ -142,7 +146,7 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
             {type === 'income' ? (currentItem ? 'تعديل مبيعات' : 'إضافة مبيعات') : (currentItem ? 'تعديل مصروف' : 'إضافة مصروف')}
           </DialogTitle>
           <DialogDescription className="text-right text-sm text-gray-600">
-            {type === 'income' ? 'اختر مصدر المبيعات وعنصر المخزون لتسجيل المبيعات.' : 'اختر فئة المصروف وعنصر المخزون لتسجيل المصروف.'}
+            {type === 'income' ? 'اختر مصدر المبيعات وعنصر المخزون (إن وجد) لتسجيل المبيعات.' : 'اختر فئة المصروف وعنصر المخزون لتسجيل المصروف.'}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -184,7 +188,10 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
           {selectedPrice !== null && type === 'income' && (
             <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-right">
               <p className="text-sm font-medium text-gray-700">
-                السعر: <span className="text-green-600 font-bold">{selectedPrice} جنيه</span>
+                السعر للوحدة: <span className="text-green-600 font-bold">{selectedPrice} جنيه</span>
+                {formData.quantity && parseInt(formData.quantity) > 0 && (
+                  <span> | الإجمالي: {parseFloat(selectedPrice * parseInt(formData.quantity)).toFixed(2)} جنيه</span>
+                )}
               </p>
             </div>
           )}
@@ -211,7 +218,7 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
             {errors.date && <p className="text-red-600 text-sm mt-1">{errors.date}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-right">عنصر المخزون</label>
+            <label className="block text-sm font-medium mb-1 text-right">عنصر المخزون (اختياري)</label>
             <Select
               onValueChange={(value) => handleSelectChange('stock_item', value)}
               value={formData.stock_item}
@@ -219,6 +226,7 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
               <SelectTrigger className={errors.stock_item ? 'border-red-500' : ''}>
                 <SelectValue placeholder="اختر عنصر المخزون" />
               </SelectTrigger>
+
               <SelectContent>
                 <SelectItem value="none">بدون عنصر مخزون</SelectItem>
                 {stockItems.map((item) => (
@@ -230,22 +238,20 @@ const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
             </Select>
             {errors.stock_item && <p className="text-red-600 text-sm mt-1">{errors.stock_item}</p>}
           </div>
-          {formData.stock_item && (
-            <div>
-              <label className="block text-sm font-medium mb-1 text-right">الكمية</label>
-              <Input
-                name="quantity"
-                type="number"
-                value={formData.quantity}
-                onChange={handleChange}
-                className={errors.quantity ? 'border-red-500 text-right' : 'text-right'}
-                min="1"
-                readOnly={type === 'income'}
-                dir="rtl"
-              />
-              {errors.quantity && <p className="text-red-600 text-sm mt-1">{errors.quantity}</p>}
-            </div>
-          )}
+          <div>
+            <label className="block text-sm font-medium mb-1 text-right">الكمية</label>
+            <Input
+              name="quantity"
+              type="number"
+              value={formData.quantity}
+              onChange={handleChange}
+              className={errors.quantity ? 'border-red-500 text-right' : 'text-right'}
+              min="1"
+              placeholder="أدخل الكمية"
+              required={type === 'income'} // إلزامي للمبيعات
+            />
+            {errors.quantity && <p className="text-red-600 text-sm mt-1">{errors.quantity}</p>}
+          </div>
           <div className="flex justify-end gap-3">
             <Button
               onClick={() => setShowModal(false)}
