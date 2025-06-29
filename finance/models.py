@@ -24,7 +24,8 @@ class Expense(models.Model):
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True)
     date = models.DateField()
-    paid_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
+    paid_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, related_name='expenses_paid')
+    related_employee = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='related_expenses')  # حقل جديد
     invoice_number = models.CharField(max_length=100, blank=True, null=True)
     attachment = models.FileField(upload_to='expenses/', null=True, blank=True)
     stock_item = models.ForeignKey('StockItem', on_delete=models.SET_NULL, null=True, blank=True)
@@ -59,9 +60,10 @@ class Expense(models.Model):
             models.Index(fields=['category']),
             models.Index(fields=['date']),
             models.Index(fields=['invoice_number']),
+            models.Index(fields=['related_employee']),  # فهرس جديد
         ]
         ordering = ['-date', 'id']
-
+        
 class IncomeSource(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)

@@ -47,6 +47,7 @@ const Expenses = () => {
     date: "",
     invoice_number: "",
     attachment: null,
+    related_employee: "", // حقل جديد
   });
   const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
@@ -97,7 +98,6 @@ const Expenses = () => {
       });
   }, []);
 
-
   const debouncedFetchExpenses = useCallback(
     debounce((filters, page) => {
       dispatch(
@@ -133,53 +133,56 @@ const Expenses = () => {
     if (!data.category || isNaN(parseInt(data.category))) newErrors.category = "الفئة مطلوبة.";
     if (!data.amount && data.amount !== 0) newErrors.amount = "المبلغ مطلوب.";
     if (!data.date) newErrors.date = "التاريخ مطلوب.";
+    if (data.related_employee && isNaN(parseInt(data.related_employee))) newErrors.related_employee = "الموظف المرتبط غير صالح.";
     return newErrors;
   };
-  
-const handleSave = async () => {
-  const data = currentExpense || newExpense;
-  const validationErrors = validateForm(data);
-  if (Object.keys(validationErrors).length > 0) {
-    setErrors(validationErrors);
-    return;
-  }
 
-  const expenseData = {
-    club: parseInt(data.club),
-    category: parseInt(data.category) || 1, // قيمة افتراضية إذا لزم
-    amount: parseFloat(data.amount),
-    date: data.date,
-    description: data.description || "",
-    invoice_number: data.invoice_number || "",
+  const handleSave = async () => {
+    const data = currentExpense || newExpense;
+    const validationErrors = validateForm(data);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    const expenseData = {
+      club: parseInt(data.club),
+      category: parseInt(data.category) || 1,
+      amount: parseFloat(data.amount),
+      date: data.date,
+      description: data.description || "",
+      invoice_number: data.invoice_number || "",
+      related_employee: data.related_employee ? parseInt(data.related_employee) : null, // إضافة حقل related_employee
+    };
+
+    console.log("Sending expenseData:", expenseData); // للتصحيح
+
+    const action = currentExpense
+      ? updateExpense({ id: currentExpense.id, updatedData: expenseData })
+      : addExpense(expenseData);
+
+    try {
+      await dispatch(action).unwrap();
+      setShowModal(false);
+      setCurrentExpense(null);
+      setNewExpense({
+        club: userClub?.id.toString() || "",
+        category: "",
+        amount: "",
+        description: "",
+        date: "",
+        invoice_number: "",
+        attachment: null,
+        related_employee: "", // إعادة تعيين
+      });
+      setErrors({});
+      setCurrentPage(1);
+      dispatch(fetchExpenses({ page: 1, filters }));
+    } catch (err) {
+      console.error("فشل في حفظ المصروف:", err);
+      setErrors({ general: err.message || "فشل في حفظ المصروف. تحقق من البيانات." });
+    }
   };
-
-  console.log("Sending expenseData:", expenseData); // للتصحيح
-
-  const action = currentExpense
-    ? updateExpense({ id: currentExpense.id, updatedData: expenseData })
-    : addExpense(expenseData);
-
-  try {
-    await dispatch(action).unwrap();
-    setShowModal(false);
-    setCurrentExpense(null);
-    setNewExpense({
-      club: userClub?.id.toString() || "",
-      category: "",
-      amount: "",
-      description: "",
-      date: "",
-      invoice_number: "",
-      attachment: null,
-    });
-    setErrors({});
-    setCurrentPage(1);
-    dispatch(fetchExpenses({ page: 1, filters }));
-  } catch (err) {
-    console.error("فشل في حفظ المصروف:", err);
-    setErrors({ general: err.message || "فشل في حفظ المصروف. تحقق من البيانات." });
-  }
-};
 
   const exportToExcel = async () => {
     try {
@@ -198,6 +201,9 @@ const handleSave = async () => {
         'الوصف': expense.description || "غير متاح",
         'التاريخ': expense.date || "غير متاح",
         'رقم الفاتورة': expense.invoice_number || "غير متاح",
+        'الموظف المرتبط': expense.related_employee_details?.first_name && expense.related_employee_details?.last_name
+          ? `${expense.related_employee_details.first_name} ${expense.related_employee_details.last_name}`
+          : expense.related_employee_details?.username || 'غير متاح',
       }));
 
       if (isSummaryClicked && totalExpensesCount > 0) {
@@ -208,6 +214,7 @@ const handleSave = async () => {
           'الوصف': `عدد المصروفات: ${totalExpensesCount}`,
           'التاريخ': "",
           'رقم الفاتورة': "",
+          'الموظف المرتبط': "",
         });
       }
 
@@ -219,6 +226,7 @@ const handleSave = async () => {
         { wch: 30 },
         { wch: 15 },
         { wch: 15 },
+        { wch: 20 }, // عمود جديد
       ];
 
       const wb = XLSX.utils.book_new();
@@ -267,6 +275,7 @@ const handleSave = async () => {
       date: expense.date || "",
       invoice_number: expense.invoice_number || "",
       attachment: null,
+      related_employee: expense.related_employee?.toString() || "", // إضافة حقل related_employee
     };
     setCurrentExpense(sanitizedExpense);
     setShowModal(true);
@@ -489,6 +498,7 @@ const handleSave = async () => {
                           date: "",
                           invoice_number: "",
                           attachment: null,
+                          related_employee: "",
                         });
                         setShowModal(true);
                       }}

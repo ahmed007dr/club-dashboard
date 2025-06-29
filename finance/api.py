@@ -58,12 +58,13 @@ def expense_category_api(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expense_api(request):
     """List or create expenses."""
     if request.method == 'GET':
-        expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)
+        expenses = Expense.objects.select_related('category', 'paid_by', 'related_employee').filter(club=request.user.club)
         if request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
@@ -84,12 +85,18 @@ def expense_api(request):
         data = request.data.copy()
         data['paid_by'] = request.user.id
         data['club'] = request.user.club.id
+        if 'related_employee' in data and data['related_employee']:
+            try:
+                related_employee = User.objects.get(id=data['related_employee'], club=request.user.club)
+            except User.DoesNotExist:
+                return Response({'error': 'الموظف المرتبط غير موجود'}, status=status.HTTP_400_BAD_REQUEST)
         serializer = ExpenseSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+    
+    
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def income_source_api(request):

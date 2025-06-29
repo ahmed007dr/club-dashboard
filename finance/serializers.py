@@ -15,6 +15,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     category_details = ExpenseCategorySerializer(source='category', read_only=True)
     paid_by_details = UserSerializer(source='paid_by', read_only=True)
+    related_employee_details = UserSerializer(source='related_employee', read_only=True)  # حقل جديد
     stock_item_details = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
 
@@ -23,13 +24,15 @@ class ExpenseSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'club', 'club_details', 'category', 'category_details',
             'amount', 'description', 'date', 'paid_by', 'paid_by_details',
+            'related_employee', 'related_employee_details',  # إضافة الحقول الجديدة
             'invoice_number', 'attachment', 'attachment_url', 'stock_item',
             'stock_item_details', 'stock_quantity'
         ]
         extra_kwargs = {
             'attachment': {'required': False},
             'stock_item': {'required': False},
-            'stock_quantity': {'required': False}
+            'stock_quantity': {'required': False},
+            'related_employee': {'required': False}  # اختياري
         }
 
     def get_attachment_url(self, obj):
@@ -45,7 +48,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
                 'unit': obj.stock_item.unit
             }
         return None
-
+    
 class IncomeSourceSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     stock_item_details = serializers.SerializerMethodField()
