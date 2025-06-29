@@ -17,6 +17,7 @@ const StaffSalaryReport = () => {
   const [staffList, setStaffList] = useState([]);
   const [selectedMonth, setSelectedMonth] = useState(moment().format('YYYY-MM'));
   const [selectedStaff, setSelectedStaff] = useState('all');
+  const [employeeExpenses, setEmployeeExpenses] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -44,6 +45,36 @@ const StaffSalaryReport = () => {
     fetchStaffList();
   }, []);
 
+  // Fetch expenses for employees
+  useEffect(() => {
+    const fetchExpenses = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const response = await axios.get(`${BASE_URL}finance/api/expenses/`, {
+          headers: { Authorization: `Bearer ${token}` },
+          params: {
+            start_date: `${selectedMonth}-01`,
+            end_date: moment(selectedMonth, 'YYYY-MM').endOf('month').format('YYYY-MM-DD'),
+          },
+        });
+        console.log('Expenses API response:', response.data); // للتصحيح
+        const expensesByEmployee = response.data.results.reduce((acc, expense) => {
+          if (expense.related_employee) {
+            if (!acc[expense.related_employee]) acc[expense.related_employee] = 0;
+            acc[expense.related_employee] += parseFloat(expense.amount);
+          }
+          return acc;
+        }, {});
+        setEmployeeExpenses(expensesByEmployee);
+      } catch (err) {
+        console.error('Failed to fetch expenses:', err);
+        setError('حدث خطأ أثناء جلب المصروفات المرتبطة.');
+      }
+    };
+    fetchExpenses();
+  }, [selectedMonth]);
+
   // Fetch report data
   const fetchReport = async () => {
     try {
@@ -62,6 +93,7 @@ const StaffSalaryReport = () => {
       const response = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      console.log('Salary report API response:', response.data); // للتصحيح
       setReportData(Array.isArray(response.data) ? response.data : [response.data]);
       setLoading(false);
     } catch (err) {
@@ -80,24 +112,37 @@ const StaffSalaryReport = () => {
     fetchReport();
   }, [selectedMonth, selectedStaff]);
 
-  // Export to Excel for selected staff or all staff
+  // Export to Excel
   const exportToExcel = (staffData, fileName) => {
     const data = [];
     staffData.forEach((staff) => {
       staff.monthly_data.forEach((entry) => {
+        const expenses = employeeExpenses[staff.id] || 0;
+        const netSalary = (entry.total_salary || 0) - expenses;
         data.push({
           الشهر: moment(entry.month, 'YYYY-MM').format('MMMM YYYY'),
           اسم_الموظف: staff.first_name && staff.last_name ? `${staff.first_name} ${staff.last_name}` : staff.username || 'اسم غير متوفر',
           معدل_الأجر_بالساعة: `${staff.hourly_rate || 0} جنيه`,
           الساعات_الفعلية: entry.total_hours || 'غير محسوب',
           الساعات_المتوقعة: entry.expected_hours || 'غير محسوب',
-          حالة_الساعات: entry.hours_status || 'غير محدد',
           إجمالي_الراتب: `${entry.total_salary || 0} جنيه`,
+          المصروفات_المستحقة: `${expenses} جنيه`,
+          صافي_الراتب: `${netSalary} جنيه`,
         });
       });
     });
 
     const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [
+      { wch: 20 }, // الشهر
+      { wch: 20 }, // اسم الموظف
+      { wch: 15 }, // معدل الأجر بالساعة
+      { wch: 15 }, // الساعات الفعلية
+      { wch: 15 }, // الساعات المتوقعة
+      { wch: 15 }, // إجمالي الراتب
+      { wch: 15 }, // المصروفات المستحقة
+      { wch: 15 }, // صافي الراتب
+    ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'تقرير الرواتب');
     XLSX.writeFile(wb, `${fileName}.xlsx`);
@@ -121,12 +166,15 @@ const StaffSalaryReport = () => {
       if (!acc[month]) {
         acc[month] = [];
       }
+      const expenses = employeeExpenses[staff.id] || 0;
       acc[month].push({ 
         ...entry, 
         first_name: staff.first_name || '', 
         last_name: staff.last_name || '', 
         username: staff.username || 'غير متوفر',
-        hourly_rate: staff.hourly_rate 
+        hourly_rate: staff.hourly_rate,
+        expenses,
+        net_salary: (entry.total_salary || 0) - expenses,
       });
     });
     return acc;
@@ -157,24 +205,21 @@ const StaffSalaryReport = () => {
       render: (value) => value || 'غير محسوب',
     },
     {
-      title: 'حالة الساعات',
-      dataIndex: 'hours_status',
-      key: 'hours_status',
-      render: (status) => (
-        <span
-          style={{
-            color:
-              status === 'مضبوط' ? '#52c41a' : status === 'زيادة' ? '#1890ff' : '#ff4d4f',
-          }}
-        >
-          {status || 'غير محدد'}
-        </span>
-      ),
-    },
-    {
       title: 'إجمالي الراتب',
       dataIndex: 'total_salary',
       key: 'total_salary',
+      render: (value) => `${value || 0} جنيه`,
+    },
+    {
+      title: 'سلف',
+      dataIndex: 'expenses',
+      key: 'expenses',
+      render: (value) => `${value || 0} جنيه`,
+    },
+    {
+      title: 'صافي الراتب',
+      dataIndex: 'net_salary',
+      key: 'net_salary',
       render: (value) => `${value || 0} جنيه`,
     },
   ];
