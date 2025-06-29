@@ -57,47 +57,90 @@ def ticket_detail_api(request, ticket_id):
     serializer = TicketSerializer(ticket)
     return Response(serializer.data)
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def add_ticket_api(request):
-    """Create a new ticket."""
-    data = request.data.copy()
-    data['issued_by'] = request.user.id
-    data['club'] = request.user.club.id
-    serializer = TicketSerializer(data=data)
+    """Create multiple tickets in a single request."""
+    data = request.data
+    num_tickets = data.get('num_tickets', 1)  
+    if not isinstance(num_tickets, int) or num_tickets < 1:
+        return Response({'error': 'عدد التذاكر يجب أن يكون عددًا صحيحًا موجبًا.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    ticket_data = {
+        'ticket_type_id': data.get('ticket_type'),
+        'notes': data.get('notes', ''),
+        'issued_by': request.user.id,
+        'club': request.user.club.id,
+    }
+    serializer = TicketSerializer(data=ticket_data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     try:
         with transaction.atomic():
             club = request.user.club
             ticket_type = serializer.validated_data['ticket_type']
             today = timezone.now().date()
             date_prefix = today.strftime('%Y%m%d')
-            ticket_count = Ticket.objects.filter(club=club, ticket_type=ticket_type, issue_datetime__date=today).count()
-            max_attempts = 999
-            attempt = 0
-            while attempt < max_attempts:
-                serial_number = f"{date_prefix}-{str(ticket_count + 1).zfill(3)}"
-                if not Ticket.objects.filter(serial_number=serial_number).exists():
-                    break
-                ticket_count += 1
-                attempt += 1
-            else:
-                return Response({'error': 'تم الوصول إلى الحد الأقصى للتذاكر اليومية.'}, status=status.HTTP_400_BAD_REQUEST)
-            ticket = serializer.save(serial_number=serial_number, price=ticket_type.price)
-            if ticket.price > 0:
+
+            # الحصول على عدد التذاكر الحالية مع قفل لتجنب التعارض
+            ticket_count = Ticket.objects.filter(
+                club=club, ticket_type=ticket_type, issue_datetime__date=today
+            ).select_for_update().count()
+
+            # تخصيص أرقام تسلسلية للتذاكر
+            tickets_to_create = []
+            serial_numbers = []
+            current_count = ticket_count
+            tickets_needed = num_tickets
+            serial_index = current_count + 1
+
+            while tickets_needed > 0:
+                serial_number = f"{date_prefix}-{str(serial_index).zfill(4)}"
+                # إذا كان الرقم التسلسلي موجودًا، جرب الرقم التالي
+                while Ticket.objects.filter(serial_number=serial_number).exists():
+                    serial_index += 1
+                    serial_number = f"{date_prefix}-{str(serial_index).zfill(4)}"
+                serial_numbers.append(serial_number)
+                tickets_to_create.append(
+                    Ticket(
+                        club=club,
+                        ticket_type=ticket_type,
+                        notes=ticket_data['notes'],
+                        price=ticket_type.price,
+                        issue_datetime=timezone.now(),
+                        issued_by=request.user,
+                        serial_number=serial_number
+                    )
+                )
+                tickets_needed -= 1
+                serial_index += 1
+
+            Ticket.objects.bulk_create(tickets_to_create)
+
+            if ticket_type.price > 0:
                 source, _ = IncomeSource.objects.get_or_create(
-                    club=ticket.club, name='تذاكر', defaults={'description': 'إيرادات بيع التذاكر', 'price': 0.00}
+                    club=club, name='تذاكر', defaults={'description': 'إيرادات بيع التذاكر', 'price': 0.00}
                 )
+                total_amount = ticket_type.price * num_tickets
                 Income.objects.create(
-                    club=ticket.club, source=source, amount=ticket.price,
-                    description=f"بيع تذكرة {ticket.ticket_type.name} ({ticket.serial_number})",
-                    date=today, received_by=request.user
+                    club=club,
+                    source=source,
+                    amount=total_amount,
+                    description=f"بيع {num_tickets} تذكرة من نوع {ticket_type.name} (أرقام: {serial_numbers[0]} إلى {serial_numbers[-1]})",
+                    date=today,
+                    received_by=request.user
                 )
-            return Response(TicketSerializer(ticket).data, status=status.HTTP_201_CREATED)
+
+            # استرجاع التذاكر التي تم إنشاؤها
+            created_tickets = Ticket.objects.filter(serial_number__in=serial_numbers)
+            response_serializer = TicketSerializer(created_tickets, many=True)
+            return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def delete_ticket_api(request, ticket_id):

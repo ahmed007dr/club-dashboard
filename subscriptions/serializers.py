@@ -252,7 +252,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'name': obj.type.name,
             'duration_days': obj.type.duration_days,
             'price': obj.type.price,
-            'is_active': obj.type.is_active
+            'is_active': obj.type.is_active,
+            'max_entries': obj.type.max_entries or 0  
         }
 
     def get_freeze_requests(self, obj):

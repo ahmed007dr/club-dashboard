@@ -12,6 +12,15 @@ import usePermission from "@/hooks/usePermission";
 import BASE_URL from "@/config/api";
 import EntryLogs from "./EntryLogs";
 
+// دالة debounce مخصصة
+const debounce = (func, delay) => {
+  let timeoutId;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => func(...args), delay);
+  };
+};
+
 // مكون الفلاتر
 const FilterComponent = ({ filters, setFilters, onReset }) => (
   <div className="flex flex-col sm:flex-row gap-4 mb-4">
@@ -122,7 +131,7 @@ const Attendance = () => {
   const [showTable, setShowTable] = useState(false);
   const [dailyAttendance, setDailyAttendance] = useState(0);
   const [weeklyAttendance, setWeeklyAttendance] = useState(0);
-  const [lastHourAttendance, setLastHourAttendance] = useState(0); // حالة جديدة
+  const [lastHourAttendance, setLastHourAttendance] = useState(0);
   const itemsPerPage = 20;
 
   // جلب بيانات الملف الشخصي للنادي
@@ -147,7 +156,7 @@ const Attendance = () => {
     fetchProfile();
   }, []);
 
-  // جلب إحصائيات الحضور اليومي، الأسبوعي، وآخر ساعة
+  // جلب إحصائيات الحضور
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -190,8 +199,8 @@ const Attendance = () => {
     };
 
     fetchStats();
-    const interval = setInterval(fetchStats, 60000); // تحديث كل دقيقة
-    return () => clearInterval(interval); // تنظيف عند إلغاء التأثير
+    const interval = setInterval(fetchStats, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   // جلب سجلات الحضور
@@ -205,50 +214,63 @@ const Attendance = () => {
     fetchAttendancesData();
   }, [fetchAttendancesData]);
 
+  // البحث عن الاشتراك مع تأخير
+  const searchSubscription = useCallback(
+    debounce(async (attendance) => {
+      if (!attendance.identifier || !attendance.club) {
+        setSearchLoading(false);
+        return;
+      }
+
+      setSearchLoading(true);
+      try {
+        const response = await fetch(
+          `${BASE_URL}subscriptions/api/subscriptions/?identifier=${attendance.identifier}&club=${attendance.club}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token")}`,
+              "Content-Type": "application/json",
+              "Cache-Control": "no-cache",
+            },
+          }
+        );
+        if (!response.ok) throw new Error("فشل في جلب الاشتراك");
+        const data = await response.json();
+        console.log("API Response:", data);
+
+        const subscription = data.results.find((sub) => {
+          const member = sub.member_details || {};
+          return (
+            member.rfid_code?.toUpperCase() === attendance.identifier ||
+            member.phone?.trim() === attendance.identifier
+          );
+        });
+
+        if (!subscription) {
+          toast.error("لم يتم العثور على اشتراك فعال لهذا المعرف");
+          setFoundSubscription(null);
+        } else {
+          setFoundSubscription(subscription);
+        }
+      } catch (err) {
+        toast.error("فشل في البحث عن الاشتراك: " + err.message);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 200),
+    []
+  );
+
   // التعامل مع تغيير إدخال نموذج الحضور
-  const handleAttendanceInputChange = async (e) => {
+  const handleAttendanceInputChange = (e) => {
     const { name, value } = e.target;
-    const updatedAttendance = { ...newAttendance, [name]: name === "identifier" ? value.trim().toUpperCase() : value };
+    const updatedAttendance = {
+      ...newAttendance,
+      [name]: name === "identifier" ? value.trim().toUpperCase() : value,
+    };
     setNewAttendance(updatedAttendance);
     setFoundSubscription(null);
-
-    if (!updatedAttendance.identifier || !updatedAttendance.club) {
-      setSearchLoading(false);
-      return;
-    }
-
-    setSearchLoading(true);
-    try {
-      const response = await fetch(`${BASE_URL}subscriptions/api/subscriptions/?identifier=${updatedAttendance.identifier}&club=${updatedAttendance.club}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json",
-          "Cache-Control": "no-cache",
-        },
-      });
-      if (!response.ok) throw new Error("فشل في جلب الاشتراك");
-      const data = await response.json();
-      console.log("API Response:", data);
-
-      const subscription = data.results.find((sub) => {
-        const member = sub.member_details || {};
-        return (
-          member.rfid_code?.toUpperCase() === updatedAttendance.identifier ||
-          member.phone?.trim() === updatedAttendance.identifier
-        );
-      });
-
-      if (!subscription) {
-        toast.error("لم يتم العثور على اشتراك فعال لهذا المعرف");
-        setFoundSubscription(null);
-      } else {
-        setFoundSubscription(subscription);
-      }
-    } catch (err) {
-      toast.error("فشل في البحث عن الاشتراك: " + err.message);
-    } finally {
-      setSearchLoading(false);
-    }
+    searchSubscription(updatedAttendance);
   };
 
   // تسجيل حضور جديد
@@ -275,8 +297,7 @@ const Attendance = () => {
         err?.response?.data?.detail ||
         err?.message ||
         "حدث خطأ غير متوقع أثناء تسجيل الحضور";
-    
-      toast.error(errorMsg);  
+      toast.error(errorMsg);
     } finally {
       setIsSubmitting(false);
     }
@@ -370,23 +391,35 @@ const Attendance = () => {
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                         <p className="flex items-center gap-2">
                           <FiUser className="text-blue-600" />
-                          {foundSubscription.member_details?.name}
+                          {foundSubscription.member_details?.name || "غير متاح"}
                         </p>
                         <p className="flex items-center gap-2">
                           <FiHash className="text-blue-600" />
-                          #{foundSubscription.member_details?.rfid_code}
+                          #{foundSubscription.member_details?.rfid_code || "غير متاح"}
                         </p>
                         <p className="flex items-center gap-2">
                           <FiDollarSign className="text-blue-600" />
-                          المبلغ المتبقي: {foundSubscription.remaining_amount}
+                          المبلغ المتبقي: {foundSubscription.remaining_amount ?? "غير متاح"}
                         </p>
                         <p className="flex items-center gap-2">
                           <FiList className="text-blue-600" />
                           الإدخالات المتبقية:{" "}
-                          <span className={foundSubscription.type_details.max_entries - foundSubscription.entry_count <= 0 ? "text-red-600" : "text-green-600"}>
-                            {foundSubscription.type_details.max_entries - foundSubscription.entry_count}
+                          <span
+                            className={
+                              Number.isFinite(
+                                Number(foundSubscription.type_details?.max_entries) - Number(foundSubscription.entry_count)
+                              ) && Number(foundSubscription.type_details?.max_entries) - Number(foundSubscription.entry_count) <= 0
+                                ? "text-red-600"
+                                : "text-green-600"
+                            }
+                          >
+                            {Number.isFinite(
+                              Number(foundSubscription.type_details?.max_entries) - Number(foundSubscription.entry_count)
+                            )
+                              ? Number(foundSubscription.type_details?.max_entries) - Number(foundSubscription.entry_count)
+                              : "غير متاح"}
                           </span>{" "}
-                          / {foundSubscription.type_details.max_entries}
+                          / {foundSubscription.type_details?.max_entries ?? "غير متاح"}
                         </p>
                         <p className="flex items-center gap-2">
                           <FiTag className="text-blue-600" />
@@ -398,12 +431,18 @@ const Attendance = () => {
                         </p>
                         <p className="flex items-center gap-2">
                           <FiCalendar className="text-blue-600" />
-                          بداية الاشتراك: {new Date(foundSubscription.start_date).toLocaleDateString("ar-EG")}
+                          بداية الاشتراك: {new Date(foundSubscription.start_date).toLocaleDateString("ar-EG") || "غير متاح"}
                         </p>
                         <p className="flex items-center gap-2">
                           <FiCalendar className="text-blue-600" />
-                          نهاية الاشتراك: {new Date(foundSubscription.end_date).toLocaleDateString("ar-EG")}
+                          نهاية الاشتراك: {new Date(foundSubscription.end_date).toLocaleDateString("ar-EG") || "غير متاح"}
                         </p>
+                        {foundSubscription.coach_simple && (
+                          <p className="flex items-center gap-2">
+                            <FiUser className="text-blue-600" />
+                            اسم الكابتن: {foundSubscription.coach_simple?.username || "غير متاح"}
+                          </p>
+                        )}
                       </div>
                     </div>
                   )}

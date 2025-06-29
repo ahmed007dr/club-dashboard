@@ -51,35 +51,54 @@ export const fetchTicketTypes = createAsyncThunk(
   }
 );
 
-
+// Add a new ticket
 export const addTicket = createAsyncThunk(
   'tickets/addTicket',
   async (ticketData, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      console.log('Token for addTicket:', token); 
+      console.log('Token for addTicket:', token);
       if (!token) {
         throw new Error('No authentication token found');
       }
+
+      // Validate ticketData
+      if (!ticketData.ticket_type || isNaN(ticketData.ticket_type)) {
+        console.error('Invalid ticket_type:', ticketData.ticket_type);
+        return rejectWithValue({ ticket_type: ['This field may not be null or invalid.'] });
+      }
+
+      // Prepare payload with correct field name (ticket_type instead of ticket_type_id)
+      const payload = {
+        ...ticketData,
+        ticket_type: ticketData.ticket_type, // Ensure ticket_type is used
+        notes: ticketData.notes || '', // Ensure notes is always included
+      };
+      delete payload.ticket_type_id; // Remove ticket_type_id if present
+
+      console.log('Sending ticketData:', JSON.stringify(payload, null, 2));
+
       const response = await fetch(`${BASE_URL}tickets/api/tickets/add/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(ticketData),
+        body: JSON.stringify(payload),
       });
+
       if (!response.ok) {
         const errorData = await response.json();
-        console.log('addTicket error response:', errorData); // تسجيل الرد
-        throw new Error(errorData.error || `Failed to add ticket: ${response.status}`);
+        console.log('addTicket error response:', JSON.stringify(errorData, null, 2));
+        return rejectWithValue(errorData);
       }
+
       const data = await response.json();
-      console.log('addTicket success response:', data); // تسجيل النجاح
+      console.log('addTicket success response:', JSON.stringify(data, null, 2));
       return data;
     } catch (error) {
-      console.error('addTicket error:', error.message); // تسجيل الخطأ
-      return rejectWithValue(error.message);
+      console.error('addTicket error:', error.message);
+      return rejectWithValue({ error: error.message });
     }
   }
 );
@@ -199,8 +218,9 @@ const ticketsSlice = createSlice({
       })
       .addCase(addTicket.fulfilled, (state, action) => {
         state.loading = false;
-        state.tickets.results.unshift(action.payload);
-        state.tickets.count += 1;
+        // Since addTicket returns an array of created tickets, add them to the start
+        state.tickets.results = [...action.payload, ...state.tickets.results];
+        state.tickets.count += action.payload.length;
       })
       .addCase(addTicket.rejected, (state, action) => {
         state.loading = false;

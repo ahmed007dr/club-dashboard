@@ -7,7 +7,8 @@ import { format, differenceInHours, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import toast from 'react-hot-toast';
 
@@ -18,7 +19,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token'); // أو من مصدر آخر
+  const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -50,8 +51,8 @@ const DailyReportButton = () => {
   const [loading, setLoading] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [employeeId, setEmployeeId] = useState('');
-  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'));
-  const [endDate, setEndDate] = useState(format(new Date(), 'yyyy-MM-dd\'T\'HH:mm'));
+  const [startDate, setStartDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
   const [employees, setEmployees] = useState([]);
   const [employeeLoading, setEmployeeLoading] = useState(false);
   const [reportData, setReportData] = useState(null);
@@ -75,6 +76,10 @@ const DailyReportButton = () => {
     }
   }, [userRole]);
 
+  const formatDateForApi = (date) => {
+    return format(date, "yyyy-MM-dd'T'HH:mm");
+  };
+
   const handlePreviewReport = async () => {
     setPreviewLoading(true);
     setError('');
@@ -84,8 +89,8 @@ const DailyReportButton = () => {
       let params = {};
       if (userRole === 'admin' || userRole === 'owner') {
         if (employeeId) params.employee_id = employeeId;
-        if (startDate) params.start_date = startDate;
-        if (endDate) params.end_date = endDate;
+        if (startDate) params.start_date = formatDateForApi(startDate);
+        if (endDate) params.end_date = formatDateForApi(endDate);
         if (!startDate || !endDate) {
           throw new Error('يجب تحديد تاريخ البداية والنهاية');
         }
@@ -110,8 +115,8 @@ const DailyReportButton = () => {
       let params = {};
       if (userRole === 'admin' || userRole === 'owner') {
         if (employeeId) params.employee_id = employeeId;
-        if (startDate) params.start_date = startDate;
-        if (endDate) params.end_date = endDate;
+        if (startDate) params.start_date = formatDateForApi(startDate);
+        if (endDate) params.end_date = formatDateForApi(endDate);
         if (!startDate || !endDate) {
           throw new Error('يجب تحديد تاريخ البداية والنهاية');
         }
@@ -189,8 +194,17 @@ const DailyReportButton = () => {
             .print-report table { width: 100%; border-collapse: collapse; }
             .print-report th, .print-report td { border: 1px solid #e5e7eb; padding: 8px; text-align: right; }
             .print-report th { background: #f3f4f6; }
-          `}
-        </style>
+          }
+          .react-datepicker__input-container input {
+            direction: rtl;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #d1d5db;
+          }
+          .react-datepicker__header {
+            background-color: #f3f4f6;
+          }
+        `}</style>
 
         {isErrorModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 no-print">
@@ -251,12 +265,15 @@ const DailyReportButton = () => {
                     تاريخ البداية
                   </label>
                   <div className="relative">
-                    <Input
-                      id="startDate"
-                      type="datetime-local"
-                      value personalization={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="w-full text-right bg-white dark:bg-gray-800 text-gray-700 dark:text-white border-gray-300 dark:border-gray-600"
+                    <DatePicker
+                      selected={startDate}
+                      onChange={(date) => setStartDate(date)}
+                      showTimeSelect
+                      timeFormat="HH:mm"
+                      timeIntervals={15}
+                      dateFormat="d MMMM yyyy, h:mm aa"
+                      locale={ar}
+                      className="w-full text-right bg-white dark:bg-gray-800 text-gray-700 dark:text-white border-gray-300 dark:border-gray-600 rounded-md p-2"
                       disabled={loading || previewLoading}
                     />
                     <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -267,12 +284,15 @@ const DailyReportButton = () => {
                     تاريخ النهاية
                   </label>
                   <div className="relative">
-                    <Input
-                      id="endDate"
-                      type="datetime-local"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      className="w-full text-right bg-white dark:bg-gray-800 text-gray-700 dark:text-white border-gray-300 dark:border-gray-600"
+                    <DatePicker
+                      selected={endDate}
+                      onChange={(date) => setEndDate(date)}
+                      showTimeSelect
+                      timeFormat="HH:mm"
+                      timeIntervals={15}
+                      dateFormat="d MMMM yyyy, h:mm aa"
+                      locale={ar}
+                      className="w-full text-right bg-white dark:bg-gray-800 text-gray-700 dark:text-white border-gray-300 dark:border-gray-600 rounded-md p-2"
                       disabled={loading || previewLoading}
                     />
                     <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
