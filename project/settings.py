@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'user_visit',
 
     #apps
+    'permissions',
     "core",
     "members",
     "subscriptions",

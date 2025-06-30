@@ -51,7 +51,7 @@ const Dashboard = () => {
       icon: <RiUserLine />,
       children: [
         { path: 'staff', name: 'شيفتات الموظفين', icon: <AiOutlineSchedule /> },
-        { path: 'attendance-form', name: 'بصمة الدخول والخروج', icon: <BiLogIn /> },
+        // { path: 'attendance-form', name: 'بصمة الدخول والخروج', icon: <BiLogIn /> },
         { path: 'AttendanceDashboard', name: 'حضور الموظفين', icon: <AiOutlineSchedule /> },
       ],
     },

@@ -8,16 +8,18 @@ from .serializers import UserProfileSerializer, LoginSerializer, RFIDLoginSerial
 from .models import User
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
-from utils.permissions import IsOwnerOrRelatedToClub  
+from permissions.permissions import IsOwnerOrRelatedToClub
+from permissions.models import GroupPermission
 from staff.models import StaffAttendance
 from django.utils import timezone
-from datetime import timedelta
 import logging
+
 logger = logging.getLogger(__name__)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_login(request):
+    """Login user and return JWT tokens."""
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         username = serializer.validated_data['username']
@@ -37,6 +39,7 @@ def api_login(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def api_logout(request):
+    """Logout user by blacklisting refresh token."""
     try:
         refresh_token = request.data.get('refresh')
         if not refresh_token:
@@ -48,24 +51,47 @@ def api_logout(request):
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def api_user_profile(request):
+    """Retrieve the authenticated user's profile without permission checks."""
     user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=request.user.id)
     serializer = UserProfileSerializer(user)
     return Response(serializer.data)
+
 @api_view(['GET'])
-@permission_classes([IsAuthenticated])
+@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_list(request):
-    """Retrieve a list of users from the same club without additional restrictions."""
-    logger.debug(f"User list request: User={request.user.username}, Query={request.query_params}")
+    """Retrieve a list of users from the same club."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='users').first()
+    
+    if not perm or not perm.can_view:
+        logger.warning(f"View permission denied for users: {request.user.username}")
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
 
     search_query = request.query_params.get('search', '').strip()
-    users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(
-        club=request.user.club
-    )
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+        users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(
+            club=request.user.club
+        )
+    else:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                logger.warning(f"No active shift for user: {request.user.username}")
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(
+                club=request.user.club, date_joined__gte=attendance.check_in
+            )
+        else:
+            users = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club').filter(
+                club=request.user.club
+            )
 
     if search_query:
         is_active_filter = None
@@ -98,13 +124,24 @@ def api_user_list(request):
     serializer = UserProfileSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_create(request):
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-
+    """Create a new user."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='users').first()
+    
+    if not perm or not perm.can_create:
+        logger.warning(f"Create permission denied for users: {request.user.username}")
+        return Response({'error': 'غير مسموح بإنشاء مستخدمين.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user, club=request.user.club, check_out__isnull=True
+        ).order_by('-check_in').first()
+        if not attendance:
+            logger.warning(f"No active shift for user: {request.user.username}")
+            return Response({'error': 'لا يمكن إنشاء مستخدمين إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+    
     data = request.data.copy()
     data['club'] = request.user.club.id
     serializer = UserSerializer(data=data)
@@ -116,12 +153,25 @@ def api_user_create(request):
 @api_view(['PUT'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def api_user_update(request, pk):
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-
+    """Update an existing user."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='users').first()
+    
+    if not perm or not perm.can_edit:
+        logger.warning(f"Edit permission denied for users: {request.user.username}")
+        return Response({'error': 'غير مسموح بالتعديل.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user, club=request.user.club, check_out__isnull=True
+        ).order_by('-check_in').first()
+        if not attendance:
+            logger.warning(f"No active shift for user: {request.user.username}")
+            return Response({'error': 'لا يمكن تعديل المستخدمين إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+    
     try:
         user = User.objects.get(pk=pk, club=request.user.club)
     except User.DoesNotExist:
+        logger.error(f"User {pk} not found in club for user: {request.user.username}")
         return Response({'error': 'المستخدم غير موجود في ناديك.'}, status=status.HTTP_404_NOT_FOUND)
 
     data = request.data.copy()
@@ -135,6 +185,7 @@ def api_user_update(request, pk):
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_rfid_login(request):
+    """Login user via RFID."""
     serializer = RFIDLoginSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.validated_data['user']
@@ -150,22 +201,60 @@ def api_rfid_login(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def active_users_api(request):
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-
-    users = User.objects.filter(is_active=True, club=request.user.club)
+    """List active users."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='users').first()
+    
+    if not perm or not perm.can_view:
+        logger.warning(f"View permission denied for users: {request.user.username}")
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+        users = User.objects.filter(is_active=True, club=request.user.club)
+    else:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                logger.warning(f"No active shift for user: {request.user.username}")
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            users = User.objects.filter(
+                is_active=True, club=request.user.club, date_joined__gte=attendance.check_in
+            )
+        else:
+            users = User.objects.filter(is_active=True, club=request.user.club)
+    
     serializer = UserSerializer(users, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def coach_list(request):
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-
-    coaches = User.objects.filter(
-        role='coach',
-        is_active=True,
-        club=request.user.club
-    ).values('id', 'username')
+    """List active coaches."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='coaches').first()
+    
+    if not perm or not perm.can_view:
+        logger.warning(f"View permission denied for coaches: {request.user.username}")
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+        coaches = User.objects.filter(
+            role='coach', is_active=True, club=request.user.club
+        ).values('id', 'username')
+    else:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                logger.warning(f"No active shift for user: {request.user.username}")
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            coaches = User.objects.filter(
+                role='coach', is_active=True, club=request.user.club, date_joined__gte=attendance.check_in
+            ).values('id', 'username')
+        else:
+            coaches = User.objects.filter(
+                role='coach', is_active=True, club=request.user.club
+            ).values('id', 'username')
+    
     return Response(coaches, status=status.HTTP_200_OK)

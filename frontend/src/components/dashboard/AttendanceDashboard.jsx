@@ -14,6 +14,8 @@ import usePermission from "@/hooks/usePermission";
 import { debounce } from "lodash";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const AttendanceDashboard = () => {
   const dispatch = useDispatch();
@@ -22,12 +24,16 @@ const AttendanceDashboard = () => {
   const canViewShifts = usePermission("view_shift");
 
   // Form states
-  const [rfidCode, setRfidCode] = useState("");
-  const [foundStaff, setFoundStaff] = useState(null);
-  const [formError, setFormError] = useState("");
-  const [loadingAction, setLoadingAction] = useState(false);
-  const rfidRef = useRef("");
-  const [actionType, setActionType] = useState("checkIn");
+  const [rfidCodeCheckIn, setRfidCodeCheckIn] = useState("");
+  const [rfidCodeCheckOut, setRfidCodeCheckOut] = useState("");
+  const [foundStaffCheckIn, setFoundStaffCheckIn] = useState(null);
+  const [foundStaffCheckOut, setFoundStaffCheckOut] = useState(null);
+  const [errorCheckIn, setErrorCheckIn] = useState("");
+  const [errorCheckOut, setErrorCheckOut] = useState("");
+  const [loadingCheckIn, setLoadingCheckIn] = useState(false);
+  const [loadingCheckOut, setLoadingCheckOut] = useState(false);
+  const rfidCheckInRef = useRef("");
+  const rfidCheckOutRef = useRef("");
 
   // Table states
   const [currentPage, setCurrentPage] = useState(1);
@@ -36,7 +42,7 @@ const AttendanceDashboard = () => {
     staffName: "",
     dateFrom: "",
     dateTo: "",
-    status: "checkedIn", // Default to "موجود حاليًا"
+    status: "checkedIn",
   });
 
   // Fetch staff by RFID
@@ -52,63 +58,121 @@ const AttendanceDashboard = () => {
     }
   };
 
-  // Debounced RFID search
-  const debouncedFetchStaff = debounce(async (value) => {
-    setLoadingAction(true);
+  // Debounced RFID search for Check-In
+  const debouncedFetchStaffCheckIn = debounce(async (value) => {
+    setLoadingCheckIn(true);
     const results = await fetchStaffByRfid(value);
-    setLoadingAction(false);
+    setLoadingCheckIn(false);
 
     const staff = results.find((staff) => staff.rfid_code === value);
     if (!staff) {
-      setFormError("لم يتم العثور على موظف بهذا الرمز");
+      setErrorCheckIn("لم يتم العثور على موظف بهذا الرمز");
     } else {
-      setFoundStaff(staff);
+      setFoundStaffCheckIn(staff);
     }
-  }, 700);
+  }, 500);
+
+  // Debounced RFID search for Check-Out
+  const debouncedFetchStaffCheckOut = debounce(async (value) => {
+    setLoadingCheckOut(true);
+    const results = await fetchStaffByRfid(value);
+    setLoadingCheckOut(false);
+
+    const staff = results.find((staff) => staff.rfid_code === value);
+    if (!staff) {
+      setErrorCheckOut("لم يتم العثور على موظف بهذا الرمز");
+    } else {
+      setFoundStaffCheckOut(staff);
+    }
+  }, 500);
 
   // Handle RFID input change
-  const handleRfidChange = (e) => {
+  const handleCheckInChange = (e) => {
     const value = e.target.value;
-    rfidRef.current = value;
-    setRfidCode(value);
-    setFormError("");
-    setFoundStaff(null);
+    rfidCheckInRef.current = value;
+    setRfidCodeCheckIn(value);
+    setErrorCheckIn("");
+    setFoundStaffCheckIn(null);
 
     if (value) {
-      debouncedFetchStaff(value);
+      debouncedFetchStaffCheckIn(value);
+    } else {
+      debouncedFetchStaffCheckIn.cancel();
+    }
+  };
+
+  const handleCheckOutChange = (e) => {
+    const value = e.target.value;
+    rfidCheckOutRef.current = value;
+    setRfidCodeCheckOut(value);
+    setErrorCheckOut("");
+    setFoundStaffCheckOut(null);
+
+    if (value) {
+      debouncedFetchStaffCheckOut(value);
+    } else {
+      debouncedFetchStaffCheckOut.cancel();
     }
   };
 
   // Handle form submission
-  const handleSubmit = async (e) => {
+  const handleCheckInSubmit = async (e) => {
     e.preventDefault();
-    if (!foundStaff) {
-      setFormError("الرجاء إدخال رمز RFID صحيح");
+    if (!foundStaffCheckIn) {
+      setErrorCheckIn("الرجاء إدخال رمز RFID صحيح");
       return;
     }
 
-    setLoadingAction(true);
-    const action = actionType === "checkIn" ? checkInStaff : checkOutStaff;
-    const result = await dispatch(action(rfidRef.current));
-    setLoadingAction(false);
+    setLoadingCheckIn(true);
+    const result = await dispatch(checkInStaff(rfidCheckInRef.current));
+    setLoadingCheckIn(false);
 
-    if (action.fulfilled.match(result)) {
-      toast.success(`تم تسجيل ${actionType === "checkIn" ? "الدخول" : "الخروج"} بنجاح`, { icon: "✅" });
-      setRfidCode("");
-      rfidRef.current = "";
-      setFoundStaff(null);
+    if (checkInStaff.fulfilled.match(result)) {
+      toast.success("تم تسجيل الدخول بنجاح", { icon: "✅" });
+      setRfidCodeCheckIn("");
+      rfidCheckInRef.current = "";
+      setFoundStaffCheckIn(null);
       dispatch(fetchShiftAttendances());
     } else {
-      toast.error(result.payload?.error || `فشل في تسجيل ${actionType === "checkIn" ? "الدخول" : "الخروج"}`, { icon: "❌" });
+      toast.error(result.payload?.error || "فشل في تسجيل الدخول", { icon: "❌" });
+    }
+  };
+
+  const handleCheckOutSubmit = async (e) => {
+    e.preventDefault();
+    if (!foundStaffCheckOut) {
+      setErrorCheckOut("الرجاء إدخال رمز RFID صحيح");
+      return;
+    }
+
+    setLoadingCheckOut(true);
+    const result = await dispatch(checkOutStaff(rfidCheckOutRef.current));
+    setLoadingCheckOut(false);
+
+    if (checkOutStaff.fulfilled.match(result)) {
+      toast.success("تم تسجيل الخروج بنجاح", { icon: "✅" });
+      setRfidCodeCheckOut("");
+      rfidCheckOutRef.current = "";
+      setFoundStaffCheckOut(null);
+      dispatch(fetchShiftAttendances());
+    } else {
+      toast.error(result.payload?.error || "فشل في تسجيل الخروج", { icon: "❌" });
     }
   };
 
   // Handle reset
-  const handleReset = () => {
-    setRfidCode("");
-    rfidRef.current = "";
-    setFoundStaff(null);
-    setFormError("");
+  const handleResetCheckIn = () => {
+    setRfidCodeCheckIn("");
+    rfidCheckInRef.current = "";
+    setFoundStaffCheckIn(null);
+    setErrorCheckIn("");
+  };
+
+  const handleResetCheckOut = () => {
+    setRfidCodeCheckOut("");
+    rfidCheckOutRef.current = "";
+    setFoundStaffCheckOut(null);
+    setErrorCheckOut("");
   };
 
   // Fetch attendances
@@ -180,242 +244,268 @@ const AttendanceDashboard = () => {
 
   if (!canAddAttendance && !canViewShifts) {
     return (
-      <div className="flex items-center justify-center min-h-screen" dir="rtl">
-        <div className="bg-white p-6 rounded-2xl shadow-lg max-w-md w-full border border-gray-100">
-          <div className="flex items-center gap-3">
-            <FiAlertTriangle className="text-red-600 w-8 h-8" />
-            <h2 className="text-xl font-semibold text-gray-800">عدم صلاحية الوصول</h2>
-          </div>
-          <p className="mt-2 text-gray-600">ليس لديك صلاحية للوصول لهذه الصفحة</p>
-        </div>
+      <div className="flex items-center justify-center h-screen" dir="rtl">
+        <Card className="shadow-sm border-gray-200 max-w-md w-full">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-right text-xl flex items-center gap-2">
+              <FiAlertTriangle className="text-red-600 w-6 h-6" />
+              عدم صلاحية الوصول
+            </CardTitle>
+            <p className="text-right text-base text-gray-600">ليس لديك صلاحية للوصول لهذه الصفحة</p>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-8" dir="rtl">
-      <h1 className="text-4xl font-bold text-gray-800 flex items-center gap-3">
-        <FiLogIn className="text-green-600 w-10 h-10" />
+    <div className="p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
+      <h1 className="text-3xl font-bold text-right flex items-center gap-3">
+        <FiLogIn className="text-green-600 w-8 h-8" />
         لوحة تسجيل الحضور
       </h1>
 
       {/* Attendance Form */}
       {canAddAttendance && (
-        <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100">
+        <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Check-In Section */}
-            <div className="bg-green-50 p-6 rounded-xl border border-green-200">
-              <h2 className="text-xl font-semibold text-green-800 flex items-center gap-2 mb-6">
-                <FiLogIn className="w-6 h-6" />
-                تسجيل الدخول
-              </h2>
-              <form onSubmit={actionType === "checkIn" ? handleSubmit : null} className="space-y-6">
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-600 mb-2">رمز RFID</label>
+            {/* Check-In Form */}
+            <Card className="shadow-sm border-gray-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-right text-xl flex items-center gap-2">
+                  <FiLogIn className="text-green-600 w-6 h-6" />
+                  تسجيل الدخول
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form onSubmit={handleCheckInSubmit} className="space-y-4">
                   <div className="relative">
-                    <FiTag className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      value={actionType === "checkIn" ? rfidCode : ""}
-                      onChange={actionType === "checkIn" ? handleRfidChange : null}
-                      placeholder="أدخل رمز RFID لتسجيل الدخول"
-                      className="w-full p-3 pr-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-700 transition-all duration-200 text-right"
-                      disabled={loadingAction || loading || actionType !== "checkIn"}
-                    />
+                    <label className="block text-sm font-medium mb-1 text-right">
+                      رمز RFID
+                    </label>
+                    <div className="relative">
+                      <FiTag className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={rfidCodeCheckIn}
+                        onChange={handleCheckInChange}
+                        placeholder="أدخل رمز RFID لتسجيل الدخول"
+                        className="w-full border border-gray-300 rounded-lg py-2.5 pr-10 pl-4 bg-white text-gray-700 focus:ring-2 focus:ring-green-500 focus:outline-none transition-all duration-200 text-right"
+                        disabled={loadingCheckIn || loading}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {loadingAction && actionType === "checkIn" && (
-                  <div className="flex justify-center items-center py-3">
-                    <Loader2 className="animate-spin w-6 h-6 text-green-600" />
-                    <span className="mr-2 text-gray-600">جاري البحث...</span>
-                  </div>
-                )}
+                  {loadingCheckIn && (
+                    <div className="flex justify-center items-center py-2">
+                      <Loader2 className="animate-spin w-6 h-6 text-green-600" />
+                      <span className="mr-2 text-gray-600">جاري البحث...</span>
+                    </div>
+                  )}
 
-                {formError && actionType === "checkIn" && (
-                  <div className="bg-red-50 p-4 rounded-lg flex items-center gap-3">
-                    <FiAlertTriangle className="text-red-600 w-5 h-5" />
-                    <p className="text-red-600 text-sm">{formError}</p>
-                  </div>
-                )}
+                  {errorCheckIn && (
+                    <div className="bg-red-50 p-3 rounded-lg flex items-center gap-2 text-right">
+                      <FiAlertTriangle className="text-red-600 w-5 h-5" />
+                      <p className="text-red-600 text-sm">{errorCheckIn}</p>
+                    </div>
+                  )}
 
-                {foundStaff && actionType === "checkIn" && (
-                  <div className="bg-gray-50 p-5 rounded-lg border border-gray-100">
-                    <h3 className="font-semibold mb-4 text-gray-800 text-right">بيانات الموظف</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200 hover:shadow-sm transition-all duration-200">
-                          {foundStaff.photo ? (
-                            <img src={foundStaff.photo} alt="Staff" className="w-full h-full object-cover" />
-                          ) : (
-                            <FiUser className="text-gray-500 w-8 h-8" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            {foundStaff.first_name} {foundStaff.last_name}
-                          </p>
-                          <p className="text-sm text-gray-600">{foundStaff.role}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
+                  {foundStaffCheckIn && (
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <h4 className="font-medium mb-3 text-right">بيانات الموظف</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="flex items-center gap-3">
-                          <FiShield className="text-gray-500 w-5 h-5" />
-                          <p className="text-sm">
-                            <span className="font-medium">الحالة: </span>
-                            <span
-                              className={`px-2 py-1 rounded text-xs ${
-                                foundStaff.is_active ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
-                              }`}
-                            >
-                              {foundStaff.is_active ? "نشط" : "غير نشط"}
-                            </span>
-                          </p>
+                          <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200 hover:shadow-sm transition-all duration-200">
+                            {foundStaffCheckIn.photo ? (
+                              <img
+                                src={foundStaffCheckIn.photo}
+                                alt="Staff"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <FiUser className="text-gray-500 w-6 h-6" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-800">
+                              {foundStaffCheckIn.first_name} {foundStaffCheckIn.last_name}
+                            </p>
+                            <p className="text-sm text-gray-600">{foundStaffCheckIn.role}</p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <FiHome className="text-gray-500 w-5 h-5" />
-                          <p className="text-sm">
-                            <span className="font-medium">النادي: </span>
-                            {foundStaff.club?.name || "—"}
-                          </p>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <FiShield className="text-gray-500 w-5 h-5" />
+                            <p className="text-sm">
+                              <span className="font-medium">الحالة: </span>
+                              <span
+                                className={`px-2 py-1 rounded text-xs ${
+                                  foundStaffCheckIn.is_active
+                                    ? "bg-green-100 text-green-600"
+                                    : "bg-red-100 text-red-600"
+                                }`}
+                              >
+                                {foundStaffCheckIn.is_active ? "نشط" : "غير نشط"}
+                              </span>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <FiHome className="text-gray-500 w-5 h-5" />
+                            <p className="text-sm">
+                              <span className="font-medium">النادي: </span>
+                              {foundStaffCheckIn.club?.name || "—"}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
+                  )}
+
+                  <div className="flex gap-4 justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleResetCheckIn}
+                      variant="outline"
+                      className="px-4 py-2"
+                      disabled={loadingCheckIn || loading}
+                    >
+                      إعادة تعيين
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white"
+                      disabled={loadingCheckIn || loading || !foundStaffCheckIn}
+                    >
+                      {loadingCheckIn ? (
+                        <Loader2 className="animate-spin w-5 h-5 mr-2" />
+                      ) : (
+                        <FiLogIn className="mr-2 h-5 w-5" />
+                      )}
+                      تسجيل الدخول
+                    </Button>
                   </div>
-                )}
+                </form>
+              </CardContent>
+            </Card>
 
-                <div className="flex gap-4 justify-end">
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="px-5 py-2.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
-                    disabled={loadingAction || loading}
-                  >
-                    إعادة تعيين
-                  </button>
-                  <button
-                    type="submit"
-                    onClick={() => setActionType("checkIn")}
-                    className="px-5 py-2.5 rounded-lg bg-green-600 text-white flex items-center gap-2 hover:bg-green-700 transition-colors"
-                    disabled={loadingAction || loading || (actionType === "checkIn" && !foundStaff)}
-                  >
-                    {loadingAction && actionType === "checkIn" ? (
-                      <Loader2 className="animate-spin w-5 h-5" />
-                    ) : (
-                      <FiLogIn className="w-5 h-5" />
-                    )}
-                    تسجيل الدخول
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Check-Out Section */}
-            <div className="bg-red-50 p-6 rounded-xl border border-red-200">
-              <h2 className="text-xl font-semibold text-red-800 flex items-center gap-2 mb-6">
-                <FiLogOut className="w-6 h-6" />
-                تسجيل الخروج
-              </h2>
-              <form onSubmit={actionType === "checkOut" ? handleSubmit : null} className="space-y-6">
-                <div className="relative">
-                  <label className="block text-sm font-medium text-gray-600 mb-2">رمز RFID</label>
+            {/* Check-Out Form */}
+            <Card className="shadow-sm border-gray-200">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-right text-xl flex items-center gap-2">
+                  <FiLogOut className="text-red-600 w-6 h-6" />
+                  تسجيل الخروج
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <form onSubmit={handleCheckOutSubmit} className="space-y-4">
                   <div className="relative">
-                    <FiTag className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="text"
-                      value={actionType === "checkOut" ? rfidCode : ""}
-                      onChange={actionType === "checkOut" ? handleRfidChange : null}
-                      placeholder="أدخل رمز RFID لتسجيل الخروج"
-                      className="w-full p-3 pr-12 border border-gray-200 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-white text-gray-700 transition-all duration-200 text-right"
-                      disabled={loadingAction || loading || actionType !== "checkOut"}
-                    />
+                    <label className="block text-sm font-medium mb-1 text-right">
+                      رمز RFID
+                    </label>
+                    <div className="relative">
+                      <FiTag className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                      <input
+                        type="text"
+                        value={rfidCodeCheckOut}
+                        onChange={handleCheckOutChange}
+                        placeholder="أدخل رمز RFID لتسجيل الخروج"
+                        className="w-full border border-gray-300 rounded-lg py-2.5 pr-10 pl-4 bg-white text-gray-700 focus:ring-2 focus:ring-red-500 focus:outline-none transition-all duration-200 text-right"
+                        disabled={loadingCheckOut || loading}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                {loadingAction && actionType === "checkOut" && (
-                  <div className="flex justify-center items-center py-3">
-                    <Loader2 className="animate-spin w-6 h-6 text-red-600" />
-                    <span className="mr-2 text-gray-600">جاري البحث...</span>
-                  </div>
-                )}
+                  {loadingCheckOut && (
+                    <div className="flex justify-center items-center py-2">
+                      <Loader2 className="animate-spin w-6 h-6 text-red-600" />
+                      <span className="mr-2 text-gray-600">جاري البحث...</span>
+                    </div>
+                  )}
 
-                {formError && actionType === "checkOut" && (
-                  <div className="bg-red-50 p-4 rounded-lg flex items-center gap-3">
-                    <FiAlertTriangle className="text-red-600 w-5 h-5" />
-                    <p className="text-red-600 text-sm">{formError}</p>
-                  </div>
-                )}
+                  {errorCheckOut && (
+                    <div className="bg-red-50 p-3 rounded-lg flex items-center gap-2 text-right">
+                      <FiAlertTriangle className="text-red-600 w-5 h-5" />
+                      <p className="text-red-600 text-sm">{errorCheckOut}</p>
+                    </div>
+                  )}
 
-                {foundStaff && actionType === "checkOut" && (
-                  <div className="bg-gray-50 p-5 rounded-lg border border-gray-100">
-                    <h3 className="font-semibold mb-4 text-gray-800 text-right">بيانات الموظف</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200 hover:shadow-sm transition-all duration-200">
-                          {foundStaff.photo ? (
-                            <img src={foundStaff.photo} alt="Staff" className="w-full h-full object-cover" />
-                          ) : (
-                            <FiUser className="text-gray-500 w-8 h-8" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            {foundStaff.first_name} {foundStaff.last_name}
-                          </p>
-                          <p className="text-sm text-gray-600">{foundStaff.role}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-3">
+                  {foundStaffCheckOut && (
+                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                      <h4 className="font-medium mb-3 text-right">بيانات الموظف</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="flex items-center gap-3">
-                          <FiShield className="text-gray-500 w-5 h-5" />
-                          <p className="text-sm">
-                            <span className="font-medium">الحالة: </span>
-                            <span
-                              className={`px-2 py-1 rounded text-xs ${
-                                foundStaff.is_active ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
-                              }`}
-                            >
-                              {foundStaff.is_active ? "نشط" : "غير نشط"}
-                            </span>
-                          </p>
+                          <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border border-gray-200 hover:shadow-sm transition-all duration-200">
+                            {foundStaffCheckOut.photo ? (
+                              <img
+                                src={foundStaffCheckOut.photo}
+                                alt="Staff"
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <FiUser className="text-gray-500 w-6 h-6" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-800">
+                              {foundStaffCheckOut.first_name} {foundStaffCheckOut.last_name}
+                            </p>
+                            <p className="text-sm text-gray-600">{foundStaffCheckOut.role}</p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <FiHome className="text-gray-500 w-5 h-5" />
-                          <p className="text-sm">
-                            <span className="font-medium">النادي: </span>
-                            {foundStaff.club?.name || "—"}
-                          </p>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <FiShield className="text-gray-500 w-5 h-5" />
+                            <p className="text-sm">
+                              <span className="font-medium">الحالة: </span>
+                              <span
+                                className={`px-2 py-1 rounded text-xs ${
+                                  foundStaffCheckOut.is_active
+                                    ? "bg-green-100 text-green-600"
+                                    : "bg-red-100 text-red-600"
+                                }`}
+                              >
+                                {foundStaffCheckOut.is_active ? "نشط" : "غير نشط"}
+                              </span>
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <FiHome className="text-gray-500 w-5 h-5" />
+                            <p className="text-sm">
+                              <span className="font-medium">النادي: </span>
+                              {foundStaffCheckOut.club?.name || "—"}
+                            </p>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <div className="flex gap-4 justify-end">
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="px-5 py-2.5 border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
-                    disabled={loadingAction || loading}
-                  >
-                    إعادة تعيين
-                  </button>
-                  <button
-                    type="submit"
-                    onClick={() => setActionType("checkOut")}
-                    className="px-5 py-2.5 rounded-lg bg-red-600 text-white flex items-center gap-2 hover:bg-red-700 transition-colors"
-                    disabled={loadingAction || loading || (actionType === "checkOut" && !foundStaff)}
-                  >
-                    {loadingAction && actionType === "checkOut" ? (
-                      <Loader2 className="animate-spin w-5 h-5" />
-                    ) : (
-                      <FiLogOut className="w-5 h-5" />
-                    )}
-                    تسجيل الخروج
-                  </button>
-                </div>
-              </form>
-            </div>
+                  <div className="flex gap-4 justify-end">
+                    <Button
+                      type="button"
+                      onClick={handleResetCheckOut}
+                      variant="outline"
+                      className="px-4 py-2"
+                      disabled={loadingCheckOut || loading}
+                    >
+                      إعادة تعيين
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white"
+                      disabled={loadingCheckOut || loading || !foundStaffCheckOut}
+                    >
+                      {loadingCheckOut ? (
+                        <Loader2 className="animate-spin w-5 h-5 mr-2" />
+                      ) : (
+                        <FiLogOut className="mr-2 h-5 w-5" />
+                      )}
+                      تسجيل الخروج
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
           </div>
         </div>
       )}
@@ -432,21 +522,22 @@ const AttendanceDashboard = () => {
               </h3>
               <div className="flex items-center gap-3">
                 {filteredData.length > 0 && (
-                  <button
+                  <Button
                     onClick={exportToExcel}
-                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 transition-colors"
+                    className="flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white"
                   >
                     <FiDownload className="mr-2" />
                     تصدير إلى Excel
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
                   onClick={resetFilters}
-                  className="flex items-center px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm text-gray-600 transition-colors"
+                  variant="outline"
+                  className="flex items-center px-4 py-2"
                 >
                   <FiX className="mr-2" />
                   إعادة ضبط
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -509,13 +600,14 @@ const AttendanceDashboard = () => {
           {error && (
             <div className="p-6 bg-red-50 text-red-700 rounded-2xl shadow-sm flex items-center justify-between">
               <span className="font-medium">خطأ: {error}</span>
-              <button
+              <Button
                 onClick={() => dispatch(fetchShiftAttendances())}
-                className="flex items-center px-4 py-2 bg-red-100 hover:bg-red-200 rounded-lg text-sm transition-colors"
+                variant="outline"
+                className="flex items-center px-4 py-2"
               >
                 <FiRefreshCw className="mr-2" />
                 إعادة المحاولة
-              </button>
+              </Button>
             </div>
           )}
 
@@ -630,15 +722,14 @@ const AttendanceDashboard = () => {
           {totalPages > 1 && (
             <div className="flex justify-center mt-8">
               <nav className="inline-flex rounded-lg shadow-sm -space-x-px">
-                <button
+                <Button
                   onClick={() => paginate(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className={`px-4 py-2 rounded-r-lg border border-gray-200 text-sm font-medium transition-colors ${
-                    currentPage === 1 ? "bg-gray-100 text-gray-400 cursor-not-allowed" : "bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
+                  variant="outline"
+                  className="px-4 py-2 rounded-r-lg"
                 >
                   السابق
-                </button>
+                </Button>
                 {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                   let pageNum;
                   if (totalPages <= 5) {
@@ -652,33 +743,40 @@ const AttendanceDashboard = () => {
                   }
 
                   return (
-                    <button
+                    <Button
                       key={pageNum}
                       onClick={() => paginate(pageNum)}
-                      className={`px-4 py-2 border-t border-b border-gray-200 text-sm font-medium transition-colors ${
-                        currentPage === pageNum ? "bg-blue-500 text-white" : "bg-white text-gray-700 hover:bg-gray-50"
-                      }`}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      className={`px-4 py-2 ${currentPage === pageNum ? "bg-blue-500 text-white" : ""}`}
                     >
                       {pageNum}
-                    </button>
+                    </Button>
                   );
                 })}
-                <button
+                <Button
                   onClick={() => paginate(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className={`px-4 py-2 rounded-l-lg border border-gray-200 text-sm font-medium transition-colors ${
-                    currentPage === totalPages
-                      ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                      : "bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
+                  variant="outline"
+                  className="px-4 py-2 rounded-l-lg"
                 >
                   التالي
-                </button>
+                </Button>
               </nav>
             </div>
           )}
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+      `}</style>
     </div>
   );
 };

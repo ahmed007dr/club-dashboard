@@ -1,8 +1,8 @@
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from django.db import transaction
-from django.db.models import Count, Sum, Avg, Q,BooleanField, Case, When, F, Max, IntegerField, FloatField, Value, ExpressionWrapper, DecimalField, OuterRef, Subquery
-from django.db.models.functions import TruncMonth, TruncWeek
+from django.db.models import Count, Sum, Avg, Q, BooleanField, Case, When, F, Max, IntegerField, FloatField, Value, ExpressionWrapper, DecimalField, OuterRef, Subquery
+from django.db.models.functions import TruncMonth
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
@@ -19,7 +19,8 @@ from members.models import Member
 from accounts.models import User
 from attendance.models import Attendance
 from staff.models import StaffAttendance
-from utils.permissions import IsOwnerOrRelatedToClub
+from permissions.permissions import IsOwnerOrRelatedToClub
+from permissions.models import GroupPermission
 
 logger = logging.getLogger(__name__)
 
@@ -27,24 +28,41 @@ logger = logging.getLogger(__name__)
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def feature_list(request):
     """List or create features."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='features').first()
+    
     if request.method == 'GET':
-        if request.user.role not in ['owner', 'admin']:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-            if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        features = Feature.objects.filter(club=request.user.club, is_active=True)
+        if not perm or not perm.can_view:
+            return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+            features = Feature.objects.filter(club=request.user.club, is_active=True)
+        else:
+            if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+                attendance = StaffAttendance.objects.filter(
+                    staff=request.user, club=request.user.club, check_out__isnull=True
+                ).order_by('-check_in').first()
+                if not attendance:
+                    return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+                features = Feature.objects.filter(
+                    club=request.user.club, is_active=True, created_at__gte=attendance.check_in
+                )
+            else:
+                features = Feature.objects.filter(club=request.user.club, is_active=True)
+        
         serializer = FeatureSerializer(features, many=True)
         return Response(serializer.data)
     
     elif request.method == 'POST':
-        if request.user.role not in ['owner', 'admin']:
+        if not perm or not perm.can_create:
+            return Response({'error': 'غير مسموح بإنشاء ميزات.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
-                return Response({'error': 'You can only create features during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'لا يمكن إنشاء ميزات إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = FeatureSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save(club=request.user.club)
@@ -54,98 +72,161 @@ def feature_list(request):
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def feature_detail(request, pk):
-    """Retrieve, update, or delete a feature (Owner/Admin only for PUT/DELETE)."""
+    """Retrieve, update, or delete a feature."""
     feature = get_object_or_404(Feature, pk=pk, club=request.user.club)
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='features').first()
     
     if request.method == 'GET':
-        if request.user.role not in ['owner', 'admin']:
+        if not perm or not perm.can_view:
+            return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = FeatureSerializer(feature)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        if not perm or not perm.can_edit:
+            return Response({'error': 'غير مسموح بالتعديل.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = FeatureSerializer(feature)
-        return Response(serializer.data)
+                return Response({'error': 'لا يمكن تعديل الميزات إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = FeatureSerializer(feature, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    elif request.method in ['PUT', 'DELETE']:
-        if request.user.role not in ['owner', 'admin']:
-            return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-        if request.method == 'PUT':
-            serializer = FeatureSerializer(feature, data=request.data, context={'request': request})
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        elif request.method == 'DELETE':
-            if SubscriptionType.objects.filter(features=feature).exists():
-                return Response({"error": "لا يمكن حذف ميزة مرتبطة بنوع اشتراك."}, status=status.HTTP_400_BAD_REQUEST)
-            feature.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+    elif request.method == 'DELETE':
+        if not perm or not perm.can_delete:
+            return Response({'error': 'غير مسموح بالحذف.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا يمكن حذف الميزات إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if SubscriptionType.objects.filter(features=feature).exists():
+            return Response({"error": "لا يمكن حذف ميزة مرتبطة بنوع اشتراك."}, status=status.HTTP_400_BAD_REQUEST)
+        feature.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def payment_method_list(request):
     """List or create payment methods."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='payment_methods').first()
+    
     if request.method == 'GET':
-        if request.user.role not in ['owner', 'admin']:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-            if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        methods = PaymentMethod.objects.filter(club=request.user.club, is_active=True)
+        if not perm or not perm.can_view:
+            logger.warning(f"View permission denied for payment_methods: {request.user.username}")
+            return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+            methods = PaymentMethod.objects.filter(club=request.user.club, is_active=True)
+        else:
+            if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+                attendance = StaffAttendance.objects.filter(
+                    staff=request.user, club=request.user.club, check_out__isnull=True
+                ).order_by('-check_in').first()
+                if not attendance:
+                    logger.warning(f"No active shift for user: {request.user.username}")
+                    return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+                methods = PaymentMethod.objects.filter(
+                    club=request.user.club, is_active=True, created_at__gte=attendance.check_in
+                )
+            else:
+                methods = PaymentMethod.objects.filter(club=request.user.club, is_active=True)
+        
         serializer = PaymentMethodSerializer(methods, many=True)
         return Response(serializer.data)
     
     elif request.method == 'POST':
-        if request.user.role not in ['owner', 'admin']:
+        if not perm or not perm.can_create:
+            logger.warning(f"Create permission denied for payment_methods: {request.user.username}")
+            return Response({'error': 'غير مسموح بإنشاء طرق دفع.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
-                return Response({'error': 'You can only create payment methods during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
+                logger.warning(f"No active shift for user: {request.user.username}")
+                return Response({'error': 'لا يمكن إنشاء طرق دفع إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = PaymentMethodSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save(club=request.user.club)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 
-@api_view(['GET', 'PUT', 'DELETE'])
+
+@api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def payment_method_detail(request, pk):
-    """Retrieve, update, or delete a payment method (Owner/Admin only for PUT/DELETE)."""
-    method = get_object_or_404(PaymentMethod, pk=pk, club=request.user.club)
+def payment_method_detail(request):
+    """List or create payment methods."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='payment_methods').first()
     
     if request.method == 'GET':
-        if request.user.role not in ['owner', 'admin']:
+        if not perm or not perm.can_view:
+            logger.warning(f"View permission denied for payment_methods: {request.user.username}")
+            return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+            methods = PaymentMethod.objects.filter(club=request.user.club, is_active=True)
+        else:
+            if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+                attendance = StaffAttendance.objects.filter(
+                    staff=request.user, club=request.user.club, check_out__isnull=True
+                ).order_by('-check_in').first()
+                if not attendance:
+                    logger.warning(f"No active shift for user: {request.user.username}")
+                    return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+                methods = PaymentMethod.objects.filter(
+                    club=request.user.club, is_active=True, created_at__gte=attendance.check_in
+                )
+            else:
+                methods = PaymentMethod.objects.filter(club=request.user.club, is_active=True)
+        
+        serializer = PaymentMethodSerializer(methods, many=True)
+        return Response(serializer.data)
+    
+    elif request.method == 'POST':
+        if not perm or not perm.can_create:
+            logger.warning(f"Create permission denied for payment_methods: {request.user.username}")
+            return Response({'error': 'غير مسموح بإنشاء طرق دفع.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = PaymentMethodSerializer(method)
-        return Response(serializer.data)
+                logger.warning(f"No active shift for user: {request.user.username}")
+                return Response({'error': 'لا يمكن إنشاء طرق دفع إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = PaymentMethodSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(club=request.user.club)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    elif request.method in ['PUT', 'DELETE']:
-        if request.user.role not in ['owner', 'admin']:
-            return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-        if request.method == 'PUT':
-            serializer = PaymentMethodSerializer(method, data=request.data, context={'request': request})
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        elif request.method == 'DELETE':
-            if Payment.objects.filter(payment_method=method).exists():
-                return Response({"error": "لا يمكن حذف طريقة دفع مستخدمة في مدفوعات."}, status=status.HTTP_400_BAD_REQUEST)
-            method.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_type_list(request):
     """List or create subscription types with active special offers."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscription_types').first()
+    
     if request.method == 'GET':
+        if not perm or not perm.can_view:
+            return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+        
         now = timezone.now()
         search_term = request.GET.get('q', '')
         status_filter = request.GET.get('status', 'all')
@@ -153,14 +234,22 @@ def subscription_type_list(request):
         feature_id = request.GET.get('feature_id', '')
         ordering = request.GET.get('ordering', '')
 
-        if request.user.role not in ['owner', 'admin']:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-            if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
+        if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+            types = SubscriptionType.objects.filter(club=request.user.club)
+        else:
+            if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+                attendance = StaffAttendance.objects.filter(
+                    staff=request.user, club=request.user.club, check_out__isnull=True
+                ).order_by('-check_in').first()
+                if not attendance:
+                    return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+                types = SubscriptionType.objects.filter(
+                    club=request.user.club, created_at__gte=attendance.check_in
+                )
+            else:
+                types = SubscriptionType.objects.filter(club=request.user.club)
 
-        types = SubscriptionType.objects.filter(club=request.user.club).annotate(
+        types = types.annotate(
             active_subscriptions_count=Count('subscriptions', filter=Q(subscriptions__end_date__gte=now.date())),
             current_discount=Subquery(
                 SpecialOffer.objects.filter(
@@ -179,9 +268,7 @@ def subscription_type_list(request):
                 default=F('price'),
                 output_field=DecimalField(max_digits=10, decimal_places=2)
             )
-        )
-
-        types = types.filter(
+        ).filter(
             Q(is_golden_only=False) |
             (Q(is_golden_only=True) &
              Q(specialoffer__start_datetime__lte=now,
@@ -216,12 +303,16 @@ def subscription_type_list(request):
         return paginator.get_paginated_response(serializer.data)
 
     elif request.method == 'POST':
-        if request.user.role not in ['owner', 'admin']:
+        if not perm or not perm.can_create:
+            return Response({'error': 'غير مسموح بإنشاء أنواع اشتراك.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
-                return Response({'error': 'You can only create subscription types during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'لا يمكن إنشاء أنواع اشتراك إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = SubscriptionTypeSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             subscription_type = serializer.save(club=request.user.club)
@@ -231,27 +322,45 @@ def subscription_type_list(request):
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_type_detail(request, pk):
-    """Retrieve, update, or delete a subscription type (Owner/Admin only for PUT/DELETE)."""
+    """Retrieve, update, or delete a subscription type."""
     subscription_type = get_object_or_404(SubscriptionType, pk=pk)
-    if request.method != 'GET' and request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscription_types').first()
+    
     if request.method == 'GET':
-        if request.user.role not in ['owner', 'admin']:
+        if not perm or not perm.can_view:
+            return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = SubscriptionTypeSerializer(subscription_type)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        if not perm or not perm.can_edit:
+            return Response({'error': 'غير مسموح بالتعديل.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = SubscriptionTypeSerializer(subscription_type)
-        return Response(serializer.data)
-    elif request.method == 'PUT':
+                return Response({'error': 'لا يمكن تعديل أنواع الاشتراك إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = SubscriptionTypeSerializer(subscription_type, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
     elif request.method == 'DELETE':
+        if not perm or not perm.can_delete:
+            return Response({'error': 'غير مسموح بالحذف.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا يمكن حذف أنواع الاشتراك إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
         if Subscription.objects.filter(type=subscription_type).exists():
             return Response({'error': 'لا يمكن حذف نوع اشتراك مرتبط باشتراكات نشطة'}, status=status.HTTP_400_BAD_REQUEST)
         subscription_type.delete()
@@ -261,13 +370,27 @@ def subscription_type_detail(request, pk):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def active_subscription_types(request):
     """List active subscription types."""
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-    types = SubscriptionType.objects.filter(is_active=True, club=request.user.club).order_by('id')
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscription_types').first()
+    
+    if not perm or not perm.can_view:
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+        types = SubscriptionType.objects.filter(is_active=True, club=request.user.club)
+    else:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            types = SubscriptionType.objects.filter(
+                is_active=True, club=request.user.club, created_at__gte=attendance.check_in
+            )
+        else:
+            types = SubscriptionType.objects.filter(is_active=True, club=request.user.club)
+    
+    types = types.order_by('id')
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(types, request)
     serializer = SubscriptionTypeSerializer(page, many=True)
@@ -277,25 +400,33 @@ def active_subscription_types(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_list(request):
     """List or create subscriptions with applied special offer discounts."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscriptions').first()
+    
     if request.method == 'GET':
+        if not perm or not perm.can_view:
+            return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+        
         search_term = request.GET.get('searchTerm', request.GET.get('search_term', '')).strip()
         identifier = request.GET.get('identifier', '')
         club_id = request.GET.get('club', request.user.club.id)
         today = timezone.now().date()
 
-        if request.user.role not in ['owner', 'admin']:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-            if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-            subscriptions = Subscription.objects.filter(
-                club=club_id,
-                attendance_attendances__attendance_date__gte=attendance.check_in,
-                attendance_attendances__attendance_date__lte=timezone.now()
-            ).select_related('member', 'type', 'club').distinct()
-        else:
+        if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
             subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=club_id)
+        else:
+            if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+                attendance = StaffAttendance.objects.filter(
+                    staff=request.user, club=request.user.club, check_out__isnull=True
+                ).order_by('-check_in').first()
+                if not attendance:
+                    return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+                subscriptions = Subscription.objects.filter(
+                    club=club_id,
+                    created_at__gte=attendance.check_in,
+                    created_at__lte=timezone.now()
+                ).select_related('member', 'type', 'club').distinct()
+            else:
+                subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=club_id)
 
         if identifier:
             subscriptions = subscriptions.annotate(
@@ -357,14 +488,18 @@ def subscription_list(request):
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
+    
+    elif request.method == 'POST':
+        if not perm or not perm.can_create:
+            return Response({'error': 'غير مسموح بإنشاء اشتراكات.'}, status=status.HTTP_403_FORBIDDEN)
         
-    if request.method == 'POST':
-        if request.user.role not in ['owner', 'admin']:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
-                return Response({'error': 'You can only create subscriptions during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'لا يمكن إنشاء اشتراكات إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
         mutable_data = request.data.copy()
         mutable_data['created_by'] = request.user.id
         mutable_data['club'] = request.user.club.id
@@ -433,29 +568,27 @@ def subscription_list(request):
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_detail(request, pk):
-    """Retrieve, update, or delete a subscription (Owner/Admin only for PUT/DELETE)."""
+    """Retrieve, update, or delete a subscription."""
     subscription = get_object_or_404(Subscription, pk=pk)
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscriptions').first()
     
     if request.method == 'GET':
-        if request.user.role not in ['owner', 'admin']:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-            if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-            has_interaction = Attendance.objects.filter(
-                subscription=subscription,
-                attendance_date__gte=attendance.check_in,
-                attendance_date__lte=timezone.now()
-            ).exists()
-            if not has_interaction:
-                return Response({'error': 'This subscription is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
+        if not perm or not perm.can_view:
+            return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = SubscriptionSerializer(subscription)
         return Response(serializer.data)
     
     elif request.method == 'PUT':
-        if request.user.role not in ['owner', 'admin']:
-            return Response({'error': 'غير مسموح بالتعديل. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+        if not perm or not perm.can_edit:
+            return Response({'error': 'غير مسموح بالتعديل.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا يمكن تعديل الاشتراكات إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
         
         mutable_data = request.data.copy()
         mutable_data['club'] = request.user.club.id
@@ -463,24 +596,20 @@ def subscription_detail(request, pk):
         with transaction.atomic():
             serializer = SubscriptionSerializer(subscription, data=mutable_data, partial=True, context={'request': request})
             if serializer.is_valid():
-                # حفظ القيم القديمة للمقارنة
                 old_type = subscription.type
                 old_paid_amount = subscription.paid_amount or Decimal('0')
                 old_coach_compensation_value = (
                     subscription.coach_compensation_value or Decimal('0')
                 ) if (subscription.coach and subscription.coach_compensation_type == 'external') else Decimal('0')
                 
-                # تحديث الاشتراك
                 updated_subscription = serializer.save()
                 
-                # الحصول على القيم الجديدة
                 new_type = updated_subscription.type
                 new_paid_amount = updated_subscription.paid_amount or Decimal('0')
                 new_coach_compensation_value = (
                     updated_subscription.coach_compensation_value or Decimal('0')
                 ) if (updated_subscription.coach and updated_subscription.coach_compensation_type == 'external') else Decimal('0')
                 
-                # حساب السعر الفعلي بناءً على نوع الاشتراك الجديد
                 now = timezone.now()
                 active_offer = SpecialOffer.objects.filter(
                     subscription_type=new_type,
@@ -493,15 +622,12 @@ def subscription_detail(request, pk):
                     if active_offer else new_type.price
                 )
                 
-                # تحديث remaining_amount إذا تغير نوع الاشتراك
                 if old_type != new_type:
                     updated_subscription.remaining_amount = (effective_price - new_paid_amount).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                     updated_subscription.save()
                 
-                # حساب الفرق الإضافي للإيرادات
                 additional_amount = (new_paid_amount - old_paid_amount) + (new_coach_compensation_value - old_coach_compensation_value)
                 
-                # إضافة فرق السعر إذا تغير نوع الاشتراك
                 if old_type != new_type:
                     old_effective_price = (
                         (old_type.price * (100 - active_offer.discount_percentage) / 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
@@ -512,7 +638,6 @@ def subscription_detail(request, pk):
                     if price_difference > 0:
                         additional_amount += price_difference
                 
-                # تسجيل الإيراد الإضافي إذا وجد
                 if additional_amount > 0:
                     source, _ = IncomeSource.objects.get_or_create(
                         club=updated_subscription.club, 
@@ -541,38 +666,59 @@ def subscription_detail(request, pk):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     elif request.method == 'DELETE':
-        if request.user.role not in ['owner', 'admin']:
-            return Response({'error': 'غير مسموح بالحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+        if not perm or not perm.can_delete:
+            return Response({'error': 'غير مسموح بالحذف.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا يمكن حذف الاشتراكات إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
         subscription.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def active_subscriptions(request):
     """List active subscriptions."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscriptions').first()
+    
+    if not perm or not perm.can_view:
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
     today = timezone.now().date()
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        subscriptions = Subscription.objects.filter(
-            start_date__lte=today,
-            end_date__gte=today,
-            entry_count__lt=F('type__max_entries') | Q(type__max_entries=0),
-            club=request.user.club,
-            attendance_attendances__attendance_date__gte=attendance.check_in,
-            attendance_attendances__attendance_date__lte=timezone.now()
-        ).distinct()
-    else:
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
         subscriptions = Subscription.objects.filter(
             start_date__lte=today,
             end_date__gte=today,
             entry_count__lt=F('type__max_entries') | Q(type__max_entries=0),
             club=request.user.club
         )
+    else:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            subscriptions = Subscription.objects.filter(
+                start_date__lte=today,
+                end_date__gte=today,
+                entry_count__lt=F('type__max_entries') | Q(type__max_entries=0),
+                club=request.user.club,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            ).distinct()
+        else:
+            subscriptions = Subscription.objects.filter(
+                start_date__lte=today,
+                end_date__gte=today,
+                entry_count__lt=F('type__max_entries') | Q(type__max_entries=0),
+                club=request.user.club
+            )
+    
     subscriptions = subscriptions.order_by('-start_date')
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
@@ -583,24 +729,36 @@ def active_subscriptions(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def expired_subscriptions(request):
     """List expired subscriptions."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscriptions').first()
+    
+    if not perm or not perm.can_view:
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
     today = timezone.now().date()
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        subscriptions = Subscription.objects.filter(
-            Q(end_date__lt=today) | Q(entry_count__gte=F('type__max_entries'), type__max_entries__gt=0),
-            club=request.user.club,
-            attendance_attendances__attendance_date__gte=attendance.check_in,
-            attendance_attendances__attendance_date__lte=timezone.now()
-        ).distinct()
-    else:
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
         subscriptions = Subscription.objects.filter(
             Q(end_date__lt=today) | Q(entry_count__gte=F('type__max_entries'), type__max_entries__gt=0),
             club=request.user.club
         )
+    else:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            subscriptions = Subscription.objects.filter(
+                Q(end_date__lt=today) | Q(entry_count__gte=F('type__max_entries'), type__max_entries__gt=0),
+                club=request.user.club,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            ).distinct()
+        else:
+            subscriptions = Subscription.objects.filter(
+                Q(end_date__lt=today) | Q(entry_count__gte=F('type__max_entries'), type__max_entries__gt=0),
+                club=request.user.club
+            )
+    
     subscriptions = subscriptions.order_by('-end_date')
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
@@ -611,21 +769,30 @@ def expired_subscriptions(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def upcoming_subscriptions(request):
     """List upcoming subscriptions."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscriptions').first()
+    
+    if not perm or not perm.can_view:
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
     today = timezone.now().date()
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        subscriptions = Subscription.objects.filter(
-            start_date__gt=today,
-            club=request.user.club,
-            attendance_attendances__attendance_date__gte=attendance.check_in,
-            attendance_attendances__attendance_date__lte=timezone.now()
-        ).distinct()
-    else:
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
         subscriptions = Subscription.objects.filter(start_date__gt=today, club=request.user.club)
+    else:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            subscriptions = Subscription.objects.filter(
+                start_date__gt=today,
+                club=request.user.club,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            ).distinct()
+        else:
+            subscriptions = Subscription.objects.filter(start_date__gt=today, club=request.user.club)
+    
     subscriptions = subscriptions.order_by('start_date')
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(subscriptions, request)
@@ -637,22 +804,21 @@ def upcoming_subscriptions(request):
 def renew_subscription(request, pk):
     """Renew a subscription."""
     subscription = get_object_or_404(Subscription, pk=pk)
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscriptions').first()
+    
+    if not perm or not perm.can_create:
+        return Response({'error': 'غير مسموح بتجديد الاشتراكات.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if subscription.is_cancelled:
         return Response({"error": "لا يمكن تجديد اشتراك ملغى"}, status=status.HTTP_400_BAD_REQUEST)
-    if request.user.role not in ['owner', 'admin']:
+    
+    if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
         attendance = StaffAttendance.objects.filter(
             staff=request.user, club=request.user.club, check_out__isnull=True
         ).order_by('-check_in').first()
         if not attendance:
-            return Response({'error': 'You can only renew subscriptions during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
-        has_interaction = Attendance.objects.filter(
-            subscription=subscription,
-            attendance_date__gte=attendance.check_in,
-            attendance_date__lte=timezone.now()
-        ).exists()
-        if not has_interaction:
-            return Response({'error': 'This subscription is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
-
+            return Response({'error': 'لا يمكن تجديد الاشتراكات إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+    
     payment_data = request.data.get('payments', [])
     
     with transaction.atomic():
@@ -701,24 +867,23 @@ def renew_subscription(request, pk):
 def make_payment(request, pk):
     """Add a payment to an existing subscription."""
     subscription = get_object_or_404(Subscription, pk=pk)
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='payments').first()
+    
+    if not perm or not perm.can_create:
+        return Response({'error': 'غير مسموح بإنشاء مدفوعات.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if subscription.is_cancelled:
         return Response({"error": "لا يمكن إضافة دفعات لاشتراك ملغى"}, status=status.HTTP_400_BAD_REQUEST)
     if subscription.remaining_amount <= 0:
         return Response({"error": "لا يوجد مبلغ متبقي للدفع"}, status=status.HTTP_400_BAD_REQUEST)
-    if request.user.role not in ['owner', 'admin']:
+    
+    if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
         attendance = StaffAttendance.objects.filter(
             staff=request.user, club=request.user.club, check_out__isnull=True
         ).order_by('-check_in').first()
         if not attendance:
-            return Response({'error': 'You can only make payments during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
-        has_interaction = Attendance.objects.filter(
-            subscription=subscription,
-            attendance_date__gte=attendance.check_in,
-            attendance_date__lte=timezone.now()
-        ).exists()
-        if not has_interaction:
-            return Response({'error': 'This subscription is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
-
+            return Response({'error': 'لا يمكن إنشاء مدفوعات إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+    
     payment_data = request.data.copy()
     payment_data['subscription'] = subscription.id
     payment_data['created_by'] = request.user.id
@@ -749,11 +914,21 @@ def make_payment(request, pk):
 def cancel_subscription(request, pk):
     """Cancel a subscription and process refund."""
     subscription = get_object_or_404(Subscription, pk=pk)
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscriptions').first()
+    
+    if not perm or not perm.can_delete:
+        return Response({'error': 'غير مسموح بالإلغاء.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if subscription.is_cancelled:
         return Response({"error": "الاشتراك ملغى بالفعل"}, status=status.HTTP_400_BAD_REQUEST)
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالإلغاء. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-
+    
+    if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user, club=request.user.club, check_out__isnull=True
+        ).order_by('-check_in').first()
+        if not attendance:
+            return Response({'error': 'لا يمكن إلغاء الاشتراكات إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+    
     with transaction.atomic():
         refund_amount = subscription.calculate_refunded_amount()
         subscription.is_cancelled = True
@@ -778,25 +953,37 @@ def cancel_subscription(request, pk):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def member_subscriptions(request):
     """List subscriptions for a specific member."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscriptions').first()
+    
+    if not perm or not perm.can_view:
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
     member_id = request.query_params.get('member_id')
     search_term = request.query_params.get('identifier', '')
     if not member_id:
         return Response({"error": "معرف العضو مطلوب"}, status=status.HTTP_400_BAD_REQUEST)
     
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        subscriptions = Subscription.objects.filter(
-            member_id=member_id,
-            club=request.user.club,
-            attendance_attendances__attendance_date__gte=attendance.check_in,
-            attendance_attendances__attendance_date__lte=timezone.now()
-        ).select_related('member', 'type', 'club').distinct()
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(
+            member_id=member_id, club=request.user.club
+        )
     else:
-        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(member_id=member_id, club=request.user.club)
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            subscriptions = Subscription.objects.filter(
+                member_id=member_id,
+                club=request.user.club,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            ).select_related('member', 'type', 'club').distinct()
+        else:
+            subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(
+                member_id=member_id, club=request.user.club
+            )
 
     if search_term:
         subscriptions = subscriptions.filter(
@@ -812,20 +999,28 @@ def member_subscriptions(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_stats(request):
     """Get subscription statistics."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscriptions').first()
+    
+    if not perm or not perm.can_view:
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
     today = timezone.now().date()
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        base_query = Subscription.objects.filter(
-            club=request.user.club,
-            attendance_attendances__attendance_date__gte=attendance.check_in,
-            attendance_attendances__attendance_date__lte=timezone.now()
-        ).distinct()
-    else:
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
         base_query = Subscription.objects.filter(club=request.user.club)
+    else:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            base_query = Subscription.objects.filter(
+                club=request.user.club,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            ).distinct()
+        else:
+            base_query = Subscription.objects.filter(club=request.user.club)
 
     stats = {
         'total': base_query.count(),
@@ -840,38 +1035,48 @@ def subscription_stats(request):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def subscription_analytics(request):
     """Get subscription analytics."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='subscriptions').first()
+    
+    if not perm or not perm.can_view:
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
     today = timezone.now().date()
     club = request.user.club
     start = request.query_params.get('start_date')
     end = request.query_params.get('end_date')
     s_type = request.query_params.get('subscription_type')
     coach = request.query_params.get('coach')
+    
     try:
         start_date = datetime.strptime(start, '%Y-%m-%d').date() if start else today - timedelta(days=90)
         end_date = datetime.strptime(end, '%Y-%m-%d').date() if end else today
     except ValueError:
         return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        base_filter = {
-            'club': club,
-            'start_date__lte': end_date,
-            'end_date__gte': start_date,
-            'attendance_attendances__attendance_date__gte': attendance.check_in,
-            'attendance_attendances__attendance_date__lte': timezone.now()
-        }
-    else:
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
         base_filter = {'club': club, 'start_date__lte': end_date, 'end_date__gte': start_date}
+    else:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            base_filter = {
+                'club': club,
+                'start_date__lte': end_date,
+                'end_date__gte': start_date,
+                'created_at__gte': attendance.check_in,
+                'created_at__lte': timezone.now()
+            }
+        else:
+            base_filter = {'club': club, 'start_date__lte': end_date, 'end_date__gte': start_date}
 
     if s_type:
         base_filter['type_id'] = s_type
     if coach:
         base_filter['coach_id'] = coach
+    
     base_qs = Subscription.objects.filter(**base_filter).select_related('type', 'member', 'coach').distinct()
     total_subs = base_qs.count()
     popular_qs = SubscriptionType.objects.filter(club=club).annotate(
@@ -888,6 +1093,7 @@ def subscription_analytics(request):
             for s in matching_subs
         )
         item['avg_attendance'] = round(total_att / len(matching_subs) if matching_subs else 0, 2)
+    
     att_by_day = Attendance.objects.filter(
         subscription__club=club, attendance_date__range=(start_date, end_date)
     ).filter(subscription__type_id=s_type if s_type else Q(), subscription__coach_id=coach if coach else Q()).annotate(
@@ -898,6 +1104,7 @@ def subscription_analytics(request):
             When(attendance_date__week_day=1, then=6), output_field=IntegerField()
         )
     ).values('day_of_week').annotate(total_entries=Count('id')).order_by('day_of_week')
+    
     freeze_filter = {'subscriptions__start_date__gte': start_date, 'subscriptions__start_date__lte': end_date}
     if s_type:
         freeze_filter['subscriptions__type_id'] = s_type
@@ -921,6 +1128,7 @@ def subscription_analytics(request):
             output_field=FloatField()
         )
     ).values('name', 'total', 'total_freezes', 'frozen_subscriptions', 'freeze_percentage').order_by('-total_freezes')
+    
     revenue_filter = {'subscriptions__club': club, 'subscriptions__start_date__lte': end_date, 'subscriptions__end_date__gte': start_date}
     if s_type:
         revenue_filter['subscriptions__type_id'] = s_type
@@ -933,6 +1141,7 @@ def subscription_analytics(request):
         )),
         remaining_amount=Sum('subscriptions__remaining_amount', filter=Q(**revenue_filter))
     ).values('name', 'total_revenue', 'coach_compensation_revenue', 'remaining_amount').order_by('-total_revenue')
+    
     member_behavior = base_qs.annotate(
         attendance_count=Count('attendance_attendances', filter=Q(attendance_attendances__attendance_date__range=(start_date, end_date))),
         subscription_count=Count('member__subscription')
@@ -940,9 +1149,11 @@ def subscription_analytics(request):
         is_regular=Case(When(attendance_count__gte=10, then=True), default=False, output_field=IntegerField()),
         is_repeated=Case(When(subscription_count__gte=2, then=True), default=False, output_field=IntegerField())
     ).order_by('-attendance_count')[:10]
+    
     inactive_members = base_qs.annotate(last_attendance=Max('attendance_attendances__attendance_date')).filter(
         Q(last_attendance__lte=today - timedelta(days=30)) | Q(last_attendance__isnull=True)
     ).values('member__name').annotate(subscription_count=Count('id'))[:10]
+    
     coach_stats = User.objects.filter(role='coach', is_active=True, club=club).annotate(
         total_clients=Count('private_subscriptions', filter=Q(
             private_subscriptions__start_date__lte=end_date, private_subscriptions__end_date__gte=start_date,
@@ -957,9 +1168,11 @@ def subscription_analytics(request):
             private_subscriptions__coach_compensation_type='external', **({'private_subscriptions__type_id': s_type} if s_type else {})
         ))
     ).values('username', 'total_clients', 'total_attendance', 'total_revenue').order_by('-total_clients')
+    
     temporal_stats = base_qs.annotate(month=TruncMonth('start_date')).values('month').annotate(
         total_subscriptions=Count('id'), total_revenue=Sum('paid_amount')
     ).order_by('month')
+    
     renewal_filter = {'subscriptions__end_date__lt': end_date, 'subscriptions__start_date__gte': start_date}
     if s_type:
         renewal_filter['subscriptions__type_id'] = s_type
@@ -980,9 +1193,11 @@ def subscription_analytics(request):
             output_field=FloatField()
         )
     ).values('name', 'expired_subscriptions', 'renewed_subscriptions', 'renewal_rate').order_by('-renewal_rate')
+    
     nearing_expiry = Subscription.objects.filter(
         club=club, end_date__range=(today, today + timedelta(days=7)), **({'type_id': s_type} if s_type else {}), **({'coach_id': coach} if coach else {})
     ).order_by('end_date')
+    
     response = {
         'popular_subscription_types': list(popular_qs),
         'attendance_analysis': {
@@ -1014,35 +1229,36 @@ def subscription_analytics(request):
 def request_freeze(request, pk):
     """Request a freeze for a subscription."""
     subscription = get_object_or_404(Subscription, pk=pk)
-    if request.user.role not in ['owner', 'admin']:
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='freeze_requests').first()
+    
+    if not perm or not perm.can_create:
+        return Response({'error': 'غير مسموح بطلب تجميد.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
         attendance = StaffAttendance.objects.filter(
             staff=request.user, club=request.user.club, check_out__isnull=True
         ).order_by('-check_in').first()
         if not attendance:
-            return Response({'error': 'You can only request freezes during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
-        has_interaction = Attendance.objects.filter(
-            subscription=subscription,
-            attendance_date__gte=attendance.check_in,
-            attendance_date__lte=timezone.now()
-        ).exists()
-        if not has_interaction:
-            return Response({'error': 'This subscription is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
-
+            return Response({'error': 'لا يمكن طلب تجميد إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+    
     requested_days = request.data.get('requested_days', 0)
     start_date_str = request.data.get('start_date', timezone.now().date())
     try:
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date() if isinstance(start_date_str, str) else start_date_str
     except ValueError:
         return Response({'error': 'صيغة تاريخ البدء غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+    
     if requested_days <= 0:
         return Response({'error': 'عدد أيام التجميد يجب أن يكون موجبًا'}, status=status.HTTP_400_BAD_REQUEST)
     if start_date < timezone.now().date():
         return Response({'error': 'لا يمكن أن يكون تاريخ البدء في الماضي'}, status=status.HTTP_400_BAD_REQUEST)
     if subscription.freeze_requests.filter(is_active=True).exists():
         return Response({'error': 'هذا الاشتراك لديه تجميد نشط بالفعل'}, status=status.HTTP_400_BAD_REQUEST)
+    
     total_freeze_days = sum(fr.requested_days for fr in subscription.freeze_requests.filter(is_active=False, cancelled_at__isnull=True))
     if total_freeze_days + requested_days > subscription.type.max_freeze_days:
         return Response({'error': f'إجمالي أيام التجميد ({total_freeze_days + requested_days}) يتجاوز الحد الأقصى ({subscription.type.max_freeze_days})'}, status=status.HTTP_400_BAD_REQUEST)
+    
     freeze_request = FreezeRequest(subscription=subscription, requested_days=requested_days, start_date=start_date, is_active=True, created_by=request.user)
     freeze_request.save()
     serializer = SubscriptionSerializer(subscription)
@@ -1053,10 +1269,21 @@ def request_freeze(request, pk):
 def cancel_freeze(request, freeze_id):
     """Cancel a freeze request."""
     freeze_request = get_object_or_404(FreezeRequest, pk=freeze_id)
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بإلغاء التجميد. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='freeze_requests').first()
+    
+    if not perm or not perm.can_delete:
+        return Response({'error': 'غير مسموح بإلغاء التجميد.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if not freeze_request.is_active:
         return Response({'error': 'طلب التجميد غير نشط'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user, club=request.user.club, check_out__isnull=True
+        ).order_by('-check_in').first()
+        if not attendance:
+            return Response({'error': 'لا يمكن إلغاء التجميد إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+    
     today = timezone.now().date()
     used_days = max(0, min((today - freeze_request.start_date).days, freeze_request.requested_days))
     subscription = freeze_request.subscription
@@ -1064,6 +1291,7 @@ def cancel_freeze(request, freeze_id):
     if remaining_days > 0:
         subscription.end_date -= timedelta(days=remaining_days)
         subscription.save()
+    
     freeze_request.is_active = False
     freeze_request.cancelled_at = timezone.now()
     freeze_request.save()
@@ -1075,31 +1303,47 @@ def cancel_freeze(request, freeze_id):
 def coach_report(request, coach_id):
     """Get report for a specific coach."""
     coach = get_object_or_404(User, pk=coach_id, role='coach', is_active=True)
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='coach_reports').first()
+    
+    if not perm or not perm.can_view:
+        return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if coach.club != request.user.club and request.user.role != 'owner':
         return Response({'error': 'غير مخول لعرض تقرير هذا الكابتن'}, status=status.HTTP_403_FORBIDDEN)
     
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-
     start_date = request.query_params.get('start_date')
     end_date = request.query_params.get('end_date')
     type_id = request.query_params.get('type_id')
+    
     try:
         start_date = datetime.strptime(start_date, '%Y-%m-%d').date() if start_date else timezone.now().date().replace(day=1)
         end_date = datetime.strptime(end_date, '%Y-%m-%d').date() if end_date else timezone.now().date()
     except ValueError:
         return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
     
-    subscriptions = Subscription.objects.filter(coach=coach, club=request.user.club, start_date__lte=end_date, end_date__gte=start_date).select_related('member', 'type').prefetch_related('attendance_attendances')
-    if request.user.role not in ['owner', 'admin']:
-        subscriptions = subscriptions.filter(
-            attendance_attendances__attendance_date__gte=attendance.check_in,
-            attendance_attendances__attendance_date__lte=timezone.now()
-        ).distinct()
+    if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+        subscriptions = Subscription.objects.filter(
+            coach=coach, club=request.user.club, start_date__lte=end_date, end_date__gte=start_date
+        ).select_related('member', 'type').prefetch_related('attendance_attendances')
+    else:
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+            subscriptions = Subscription.objects.filter(
+                coach=coach,
+                club=request.user.club,
+                start_date__lte=end_date,
+                end_date__gte=start_date,
+                created_at__gte=attendance.check_in,
+                created_at__lte=timezone.now()
+            ).select_related('member', 'type').prefetch_related('attendance_attendances').distinct()
+        else:
+            subscriptions = Subscription.objects.filter(
+                coach=coach, club=request.user.club, start_date__lte=end_date, end_date__gte=start_date
+            ).select_related('member', 'type').prefetch_related('attendance_attendances')
     
     if type_id:
         try:
@@ -1112,18 +1356,28 @@ def coach_report(request, coach_id):
     prev_month_clients = Subscription.objects.filter(
         coach=coach, club=request.user.club, start_date__lte=prev_month_end, end_date__gte=prev_month_start
     ).filter(type_id=type_id if type_id else Q()).aggregate(prev_clients=Count('id'))['prev_clients'] or 0
+    
     aggregated_data = subscriptions.aggregate(
         active_clients=Count('id', filter=Q(start_date__lte=timezone.now().date(), end_date__gte=timezone.now().date())),
         total_coach_compensation=Sum('coach_compensation_value', filter=Q(coach_compensation_type='external')),
         total_paid_amount=Sum('paid_amount'),
         total_remaining_amount=Sum('remaining_amount')
     )
+    
     report = {
-        'coach_id': coach.id, 'coach_username': coach.username, 'active_clients': aggregated_data['active_clients'] or 0,
-        'total_coach_compensation': aggregated_data['total_coach_compensation'] or 0, 'total_paid_amount': aggregated_data['total_paid_amount'] or 0,
-        'total_remaining_amount': aggregated_data['total_remaining_amount'] or 0, 'previous_month_clients': prev_month_clients,
-        'subscriptions': subscriptions, 'club': request.user.club, 'start_date': start_date, 'end_date': end_date
+        'coach_id': coach.id,
+        'coach_username': coach.username,
+        'active_clients': aggregated_data['active_clients'] or 0,
+        'total_coach_compensation': aggregated_data['total_coach_compensation'] or 0,
+        'total_paid_amount': aggregated_data['total_paid_amount'] or 0,
+        'total_remaining_amount': aggregated_data['total_remaining_amount'] or 0,
+        'previous_month_clients': prev_month_clients,
+        'subscriptions': subscriptions,
+        'club': request.user.club,
+        'start_date': start_date,
+        'end_date': end_date
     }
+    
     serializer = CoachReportSerializer(report)
     return Response(serializer.data)
 
@@ -1131,24 +1385,41 @@ def coach_report(request, coach_id):
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def special_offer_list(request):
     """List or create special offers."""
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='special_offers').first()
+    
     if request.method == 'GET':
-        if request.user.role not in ['owner', 'admin']:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-            if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        offers = SpecialOffer.objects.filter(club=request.user.club, is_active=True)
+        if not perm or not perm.can_view:
+            return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if hasattr(request, 'is_search_old_data') and request.is_search_old_data:
+            offers = SpecialOffer.objects.filter(club=request.user.club, is_active=True)
+        else:
+            if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+                attendance = StaffAttendance.objects.filter(
+                    staff=request.user, club=request.user.club, check_out__isnull=True
+                ).order_by('-check_in').first()
+                if not attendance:
+                    return Response({'error': 'لا توجد وردية مفتوحة. يرجى تسجيل الدخول أولاً.'}, status=status.HTTP_404_NOT_FOUND)
+                offers = SpecialOffer.objects.filter(
+                    club=request.user.club, is_active=True, created_at__gte=attendance.check_in
+                )
+            else:
+                offers = SpecialOffer.objects.filter(club=request.user.club, is_active=True)
+        
         serializer = SpecialOfferSerializer(offers, many=True)
         return Response(serializer.data)
 
     elif request.method == 'POST':
-        if request.user.role not in ['owner', 'admin']:
+        if not perm or not perm.can_create:
+            return Response({'error': 'غير مسموح بإنشاء عروض خاصة.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
-                return Response({'error': 'You can only create special offers during an active shift.'}, status=status.HTTP_403_FORBIDDEN)
+                return Response({'error': 'لا يمكن إنشاء عروض خاصة إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
         serializer = SpecialOfferSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save(club=request.user.club)
@@ -1158,28 +1429,44 @@ def special_offer_list(request):
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
 def special_offer_detail(request, pk):
-    """Retrieve, update, or delete a special offer (Owner/Admin only for PUT/DELETE)."""
+    """Retrieve, update, or delete a special offer."""
     offer = get_object_or_404(SpecialOffer, pk=pk, club=request.user.club)
+    perm = GroupPermission.objects.filter(group__in=request.user.groups.all(), resource='special_offers').first()
     
     if request.method == 'GET':
-        if request.user.role not in ['owner', 'admin']:
+        if not perm or not perm.can_view:
+            return Response({'error': 'غير مسموح بالعرض.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = SpecialOfferSerializer(offer)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        if not perm or not perm.can_edit:
+            return Response({'error': 'غير مسموح بالتعديل.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
             if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = SpecialOfferSerializer(offer)
-        return Response(serializer.data)
+                return Response({'error': 'لا يمكن تعديل العروض الخاصة إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = SpecialOfferSerializer(offer, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
-    elif request.method in ['PUT', 'DELETE']:
-        if request.user.role not in ['owner', 'admin']:
-            return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
-        if request.method == 'PUT':
-            serializer = SpecialOfferSerializer(offer, data=request.data, context={'request': request})
-            if serializer.is_valid():
-                serializer.save()
-                return Response(serializer.data)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        elif request.method == 'DELETE':
-            offer.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+    elif request.method == 'DELETE':
+        if not perm or not perm.can_delete:
+            return Response({'error': 'غير مسموح بالحذف.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        if perm and perm.shift_restricted and request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                return Response({'error': 'لا يمكن حذف العروض الخاصة إلا خلال وردية نشطة.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        offer.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
