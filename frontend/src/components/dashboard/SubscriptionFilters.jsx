@@ -22,7 +22,7 @@ const SubscriptionFilters = ({
   const handleFilterChange = useCallback(
     (e) => {
       const { name, value } = e.target;
-      console.log("Filter change:", name, value);
+//       console.log("Filter change:", name, value);
       setFilters((prev) => ({ ...prev, [name]: value }));
       setError(null);
       setSearchTriggered(false);
@@ -57,7 +57,7 @@ const SubscriptionFilters = ({
     queryParams.append("page", "1");
     queryParams.append("pageSize", itemsPerPage.toString());
 
-    console.log("Final query params:", queryParams.toString());
+//     console.log("Final query params:", queryParams.toString());
 
     dispatch(fetchSubscriptions(Object.fromEntries(queryParams)))
       .unwrap()

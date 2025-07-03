@@ -41,7 +41,7 @@ const ClubUserSelector = () => {
         });
 
         const clubArray = Object.values(clubsMap);
-        console.log('Grouped Club Data:', clubArray);
+//         console.log('Grouped Club Data:', clubArray);
         setClubs(clubArray);
       } catch (error) {
         console.error('Failed to fetch users:', error);

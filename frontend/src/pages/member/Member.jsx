@@ -77,7 +77,7 @@ const Member = () => {
   // Get auth headers
   const getAuthHeaders = useCallback(async () => {
     const token = localStorage.getItem('token');
-    console.log('Token:', token);
+//     console.log('Token:', token);
     
     if (!token) {
       toast.error('يرجى تسجيل الدخول أولاً');

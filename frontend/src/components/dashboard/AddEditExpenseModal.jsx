@@ -193,7 +193,7 @@ const AddEditExpenseModal = ({
           </Button>
           <Button
             onClick={() => {
-              console.log('handleSave triggered', { canAddExpense, canEditExpense });
+//               console.log('handleSave triggered', { canAddExpense, canEditExpense });
               handleSave();
             }}
             className={`px-4 py-1 text-xs text-white rounded ${

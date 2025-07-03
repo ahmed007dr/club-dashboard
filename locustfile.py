@@ -24,25 +24,25 @@ class DeviceManagementUser(HttpUser):
                 'Authorization': f'Bearer {self.access_token}'
             })
         else:
-            print(f"Login failed: {response.text}")
+#             print(f"Login failed: {response.text}")
 
     @task(2)
     def access_protected_endpoint(self):
         if hasattr(self, 'access_token'):
             response = self.client.get("/api/user/profile/")
             if response.status_code == 403:
-                print(f"Device not authorized: {response.text}")
+#                 print(f"Device not authorized: {response.text}")
             elif response.status_code == 200:
-                print(f"Profile accessed successfully: {response.json()}")
+#                 print(f"Profile accessed successfully: {response.json()}")
 
     @task(1)
     def logout(self):
         if hasattr(self, 'access_token'):
             response = self.client.post("/logout/", json={"refresh": "dummy_refresh_token"})
             if response.status_code == 205:
-                print("Logout successful")
+#                 print("Logout successful")
             else:
-                print(f"Logout failed: {response.text}")
+#                 print(f"Logout failed: {response.text}")
 
     @task(3)
     def simulate_multiple_devices(self):
@@ -57,6 +57,6 @@ class DeviceManagementUser(HttpUser):
 
         response = self.client.post("/login/", json=login_data)
         if response.status_code == 403:
-            print(f"Max device limit reached: {response.text}")
+#             print(f"Max device limit reached: {response.text}")
         elif response.status_code == 200:
-            print(f"New device login successful: {response.json()}")
+#             print(f"New device login successful: {response.json()}")

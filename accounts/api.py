@@ -8,6 +8,8 @@ from .serializers import UserProfileSerializer, LoginSerializer, RFIDLoginSerial
 from .models import User
 from rest_framework.pagination import PageNumberPagination
 from django.db.models import Q
+from staff.models import StaffAttendance
+from django.utils import timezone
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +19,7 @@ FULL_ACCESS_ROLES = ['owner', 'admin']
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_login(request):
-    """Login user and return JWT tokens."""
+    """Login user, record attendance, and return JWT tokens."""
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         username = serializer.validated_data['username']
@@ -25,6 +27,25 @@ def api_login(request):
         user = authenticate(username=username, password=password)
         if user:
             user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
+            # تسجيل حضور الموظف إذا كان نشطًا ومرتبطًا بنادي
+            if user.is_active and user.club:
+                # إغلاق أي حضور مفتوح
+                open_attendances = StaffAttendance.objects.filter(staff=user, check_out__isnull=True)
+                for attendance in open_attendances:
+                    logger.debug(f"Closing open attendance: {attendance.id}")
+                    attendance.check_out = timezone.now()
+                    attendance.save()
+                # تسجيل حضور جديد
+                attendance = StaffAttendance.objects.create(
+                    staff=user,
+                    club=user.club,
+                    check_in=timezone.now(),
+                    created_by=user
+                )
+                logger.info(f"Check-in created: {attendance.id} for user: {user.username}")
+            else:
+                logger.warning(f"User {user.username} is not active or has no club, skipping attendance.")
+            
             refresh = RefreshToken.for_user(user)
             return Response({
                 'user': UserProfileSerializer(user).data,
@@ -32,6 +53,41 @@ def api_login(request):
                 'access': str(refresh.access_token),
             }, status=status.HTTP_200_OK)
         return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_rfid_login(request):
+    """Login user via RFID and record attendance."""
+    serializer = RFIDLoginSerializer(data=request.data)
+    if serializer.is_valid():
+        user = serializer.validated_data['user']
+        user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
+        # تسجيل حضور الموظف إذا كان نشطًا ومرتبطًا بنادي
+        if user.is_active and user.club:
+            # إغلاق أي حضور مفتوح
+            open_attendances = StaffAttendance.objects.filter(staff=user, check_out__isnull=True)
+            for attendance in open_attendances:
+                logger.debug(f"Closing open attendance: {attendance.id}")
+                attendance.check_out = timezone.now()
+                attendance.save()
+            # تسجيل حضور جديد
+            attendance = StaffAttendance.objects.create(
+                staff=user,
+                club=user.club,
+                check_in=timezone.now(),
+                created_by=user
+            )
+            logger.info(f"Check-in created: {attendance.id} for user: {user.username}")
+        else:
+            logger.warning(f"User {user.username} is not active or has no club, skipping attendance.")
+        
+        refresh = RefreshToken.for_user(user)
+        return Response({
+            'user': UserProfileSerializer(user).data,
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+        }, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
@@ -140,22 +196,6 @@ def api_user_update(request, pk):
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_200_OK)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['POST'])
-@permission_classes([AllowAny])
-def api_rfid_login(request):
-    """Login user via RFID."""
-    serializer = RFIDLoginSerializer(data=request.data)
-    if serializer.is_valid():
-        user = serializer.validated_data['user']
-        user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
-        refresh = RefreshToken.for_user(user)
-        return Response({
-            'user': UserProfileSerializer(user).data,
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        }, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])

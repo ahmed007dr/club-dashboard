@@ -47,10 +47,10 @@ const SubscriptionReportTable = ({ title, dataKey, initialData, columns, params 
   const handleExportExcel = async () => {
     setLoading(true);
     try {
-      console.log('جاري جلب كل البيانات للتصدير:', title);
+//       console.log('جاري جلب كل البيانات للتصدير:', title);
       const response = await fetchExportSubscriptionReport(params);
       const allData = response[dataKey].results;
-      console.log('عدد السجلات المصدرة:', allData.length);
+//       console.log('عدد السجلات المصدرة:', allData.length);
 
       const headers = columns.map(col => col.header);
       const rows = allData.map(item =>

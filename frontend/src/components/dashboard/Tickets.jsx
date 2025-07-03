@@ -61,7 +61,7 @@ const Tickets = () => {
         return response.json();
       })
       .then((data) => {
-        console.log('Profile data:', data);
+//         console.log('Profile data:', data);
         setUserClub({ id: data.club.id, name: data.club.name });
         setUserId(data.id); // تعيين userId من الرد
         localStorage.setItem('userId', data.id); // تخزين userId

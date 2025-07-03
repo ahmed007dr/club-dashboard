@@ -49,7 +49,7 @@ export const addReceipt = createAsyncThunk(
   async (receiptData, { rejectWithValue }) => {
     try {
       if (process.env.NODE_ENV !== 'production') {
-        console.log('Attempting to add receipt:', receiptData);
+//         console.log('Attempting to add receipt:', receiptData);
       }
       const response = await axios.post(
         `${API_BASE_URL}/receipts/add/`,
@@ -57,7 +57,7 @@ export const addReceipt = createAsyncThunk(
         { headers: getAuthHeaders() }
       );
       if (process.env.NODE_ENV !== 'production') {
-        console.log('Receipt added successfully:', response.data);
+//         console.log('Receipt added successfully:', response.data);
       }
       return response.data;
     } catch (error) {

@@ -19,7 +19,7 @@ const MemberAttendanceChart = ({ memberId }) => {
           throw new Error('لم يتم العثور على رمز المصادقة');
         }
 
-        console.log(`Fetching attendance for member ID: ${memberId}`);
+//         console.log(`Fetching attendance for member ID: ${memberId}`);
         const response = await fetch(
           `${BASE_URL}attendance/api/attendances/heatmap/member/?member_id=${memberId}`,
           {
@@ -35,7 +35,7 @@ const MemberAttendanceChart = ({ memberId }) => {
         }
 
         const result = await response.json();
-        console.log('Received attendance data:', result);
+//         console.log('Received attendance data:', result);
         setData(result);
         setLoading(false);
       } catch (err) {

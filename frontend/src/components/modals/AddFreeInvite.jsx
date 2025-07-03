@@ -21,7 +21,7 @@ const AddFreeInvite = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log('Free Invite submitted:', formData);
+//     console.log('Free Invite submitted:', formData);
     // Submit formData to your backend
   };
 

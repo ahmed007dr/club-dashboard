@@ -22,10 +22,10 @@ def distribute_attendance_records():
     # Get all records for 24 May 2025
     records = Attendance.objects.filter(attendance_date=target_date)
     total_records = records.count()
-    print(f"Found {total_records} records for {target_date}")
+#     print(f"Found {total_records} records for {target_date}")
 
     if total_records == 0:
-        print("No records to distribute.")
+#         print("No records to distribute.")
         return
 
     # Get current entry counts for each day in the period (1 Jan to 24 May 2025)
@@ -52,7 +52,7 @@ def distribute_attendance_records():
     # Filter out days with no available slots
     valid_dates = [date for date, slots in available_slots.items() if slots > 0]
     if not valid_dates:
-        print("No available slots in the period to distribute records.")
+#         print("No available slots in the period to distribute records.")
         return
 
     # Distribute records
@@ -62,7 +62,7 @@ def distribute_attendance_records():
 
     for record in records_to_update:
         if not valid_dates:
-            print(f"Stopped: No more available slots. {total_records - records_updated} records not distributed.")
+#             print(f"Stopped: No more available slots. {total_records - records_updated} records not distributed.")
             break
 
         # Choose a random date with available slots
@@ -85,7 +85,7 @@ def distribute_attendance_records():
         if available_slots[chosen_date] == 0:
             valid_dates.remove(chosen_date)
 
-    print(f"Successfully distributed {records_updated} records from 1 Jan to 24 May 2025.")
+#     print(f"Successfully distributed {records_updated} records from 1 Jan to 24 May 2025.")
 
 if __name__ == "__main__":
     distribute_attendance_records()

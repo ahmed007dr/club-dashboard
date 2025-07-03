@@ -70,7 +70,7 @@ const Main = () => {
         }))
           .unwrap()
           .then((res) => {
-            console.log("Attendances fetched:", res);
+//             console.log("Attendances fetched:", res);
             setTotalAttendances(res?.count || (Array.isArray(res.data) ? res.data.length : res?.data?.length) || 0);
           })
           .catch((err) => {

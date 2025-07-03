@@ -236,7 +236,7 @@ const Attendance = () => {
         );
         if (!response.ok) throw new Error("فشل في جلب الاشتراك");
         const data = await response.json();
-        console.log("API Response:", data);
+//         console.log("API Response:", data);
 
         const subscription = data.results.find((sub) => {
           const member = sub.member_details || {};

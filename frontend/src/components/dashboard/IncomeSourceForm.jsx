@@ -69,7 +69,7 @@ const IncomeSourceForm = ({ onSuccess }) => {
       return;
     }
 
-    console.log("Form Data being sent:", formData);
+//     console.log("Form Data being sent:", formData);
 
     const loadingToast = toast.loading("جارٍ الإرسال...");
 

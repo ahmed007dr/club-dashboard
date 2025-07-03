@@ -317,7 +317,7 @@ const CreateSubscription = ({ onClose }) => {
       setIsModalOpen(false);
       onClose();
     } catch (error) {
-      console.log("Full error object:", JSON.stringify(error, null, 2));
+//       console.log("Full error object:", JSON.stringify(error, null, 2));
       let errorData = error.payload || error.data || error.response?.data || error;
       if (errorData?.non_field_errors && Array.isArray(errorData.non_field_errors)) {
         setErrorMessage(errorData.non_field_errors[0]);

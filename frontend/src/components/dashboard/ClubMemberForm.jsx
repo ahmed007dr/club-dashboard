@@ -69,7 +69,7 @@ function ClubMemberForm() {
         member_id: formData.member_id
       };
       
-      console.log('Submitting:', payload);
+//       console.log('Submitting:', payload);
       
       // Here you would typically dispatch an action
       // await dispatch(someAction(payload)).unwrap();

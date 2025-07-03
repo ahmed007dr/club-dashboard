@@ -37,14 +37,14 @@ def distribute_attendance_records(threshold=150):    # Define the year and distr
     ).filter(count__gt=threshold).order_by('attendance_date')
 
     if not high_attendance_days:
-        print("No days found with more than 300 attendance records in 2025.")
+#         print("No days found with more than 300 attendance records in 2025.")
         return
 
     # Process each day with high attendance
     for day_entry in high_attendance_days:
         target_date = day_entry['attendance_date']
         total_records = day_entry['count']
-        print(f"Found {total_records} records for {target_date}")
+#         print(f"Found {total_records} records for {target_date}")
 
         # Get records for the target date
         records = Attendance.objects.filter(attendance_date=target_date)
@@ -77,7 +77,7 @@ def distribute_attendance_records(threshold=150):    # Define the year and distr
         # Filter out days that can't take at least min_entries_per_day
         valid_dates = [date for date, slots in available_slots.items() if slots > 0]
         if not valid_dates:
-            print(f"No available slots in January 2025 to distribute records from {target_date}.")
+#             print(f"No available slots in January 2025 to distribute records from {target_date}.")
             continue
 
         # Select excess records to redistribute
@@ -127,8 +127,8 @@ def distribute_attendance_records(threshold=150):    # Define the year and distr
                 valid_dates.remove(date)
 
         if records_to_update:
-            print(f"Warning: {len(records_to_update)} records from {target_date} could not be distributed due to slot limits.")
-        print(f"Successfully distributed {records_updated} records from {target_date} to January 2025.")
+#             print(f"Warning: {len(records_to_update)} records from {target_date} could not be distributed due to slot limits.")
+#         print(f"Successfully distributed {records_updated} records from {target_date} to January 2025.")
 
 if __name__ == "__main__":
     distribute_attendance_records()

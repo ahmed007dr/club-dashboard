@@ -33,9 +33,9 @@ const MemberSubscriptionReport = () => {
         rfid_code: rfidCode || undefined,
         subscription_status: subscriptionStatus || undefined,
       };
-      console.log('Fetching report with params:', params);
+//       console.log('Fetching report with params:', params);
       const data = await fetchSubscriptionReport(params);
-      console.log('Received report data:', data);
+//       console.log('Received report data:', data);
       setReportData(data);
     } catch (err) {
       console.error('Error fetching report:', err);

@@ -38,7 +38,7 @@ const TicketForm = ({ userClub, userId, canAddTickets, itemsPerPage, filterTicke
 
   const handleCreateTicketSubmit = async (e) => {
     e.preventDefault();
-    console.log('Submitting ticket with data:', JSON.stringify(ticketFormData, null, 2));
+//     console.log('Submitting ticket with data:', JSON.stringify(ticketFormData, null, 2));
 
     // Validate ticket types availability
     if (!ticketTypes.length) {
@@ -95,11 +95,11 @@ const TicketForm = ({ userClub, userId, canAddTickets, itemsPerPage, filterTicke
       notes: ticketFormData.notes || '', // Ensure notes is always sent, even if empty
     };
 
-    console.log('Ticket data to send:', JSON.stringify(ticketData, null, 2));
+//     console.log('Ticket data to send:', JSON.stringify(ticketData, null, 2));
 
     try {
       const response = await dispatch(addTicket(ticketData)).unwrap();
-      console.log('addTicket response:', JSON.stringify(response, null, 2));
+//       console.log('addTicket response:', JSON.stringify(response, null, 2));
 
       const numTickets = ticketFormData.num_tickets;
       const currentTime = new Date().toLocaleTimeString('ar-EG');

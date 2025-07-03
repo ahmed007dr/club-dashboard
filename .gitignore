@@ -11,6 +11,6 @@ media/
 .idea/
 venv/
 *.env
-
+*.bak
 */migrations/
 setting.md

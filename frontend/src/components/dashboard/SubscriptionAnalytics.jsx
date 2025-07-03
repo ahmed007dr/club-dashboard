@@ -23,7 +23,7 @@ const SubscriptionAnalytics = () => {
   // Fetch subscription types and coaches
   const fetchFilters = async () => {
     try {
-      console.log('Fetching filters from:', `${BASE_URL}subscriptions/api/subscription-types/active/`, `${BASE_URL}accounts/api/coaches/`);
+//       console.log('Fetching filters from:', `${BASE_URL}subscriptions/api/subscription-types/active/`, `${BASE_URL}accounts/api/coaches/`);
       const [typesResponse, coachesResponse] = await Promise.all([
         axios.get(`${BASE_URL}subscriptions/api/subscription-types/active/`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
@@ -54,7 +54,7 @@ const SubscriptionAnalytics = () => {
         },
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
       });
-      console.log('Analytics response:', response.data);
+//       console.log('Analytics response:', response.data);
       setAnalytics(response.data || {});
     } catch (error) {
       console.error('Error fetching analytics:', error.message, error.response?.status);
@@ -187,7 +187,7 @@ const SubscriptionAnalytics = () => {
     const activeMembers = Array.isArray(analytics.member_behavior?.active_members)
       ? analytics.member_behavior.active_members
       : [];
-    console.log('Active members:', activeMembers);
+//     console.log('Active members:', activeMembers);
     const sortedMembers = sortConfig.key?.includes('member')
       ? sortData(activeMembers, sortConfig.key.split('.')[1], sortConfig.direction)
       : activeMembers;

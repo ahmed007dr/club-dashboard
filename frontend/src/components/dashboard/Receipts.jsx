@@ -72,7 +72,7 @@ function Receipts() {
         ? response
         : response.results || response.data || response.subscriptions || [];
       setAllSubscriptions(results);
-      console.log("Fetched subscriptions for dropdowns:", results.length);
+//       console.log("Fetched subscriptions for dropdowns:", results.length);
     } catch (error) {
       console.error("Failed to fetch subscriptions:", error.message);
       toast.error("فشل في تحميل بيانات الاشتراكات");

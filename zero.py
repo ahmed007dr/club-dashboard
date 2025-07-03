@@ -23,6 +23,6 @@ def update_negative_remaining_amount():
 if __name__ == "__main__":
     try:
         count = update_negative_remaining_amount()
-        print(f"done {count}  remaining_amount to zero")
+#         print(f"done {count}  remaining_amount to zero")
     except Exception as e:
-        print(f"zerror : {str(e)}")
+#         print(f"zerror : {str(e)}")

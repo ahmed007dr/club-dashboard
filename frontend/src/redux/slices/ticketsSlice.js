@@ -57,7 +57,7 @@ export const addTicket = createAsyncThunk(
   async (ticketData, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      console.log('Token for addTicket:', token);
+//       console.log('Token for addTicket:', token);
       if (!token) {
         throw new Error('No authentication token found');
       }
@@ -76,7 +76,7 @@ export const addTicket = createAsyncThunk(
       };
       delete payload.ticket_type_id; // Remove ticket_type_id if present
 
-      console.log('Sending ticketData:', JSON.stringify(payload, null, 2));
+//       console.log('Sending ticketData:', JSON.stringify(payload, null, 2));
 
       const response = await fetch(`${BASE_URL}tickets/api/tickets/add/`, {
         method: 'POST',
@@ -89,12 +89,12 @@ export const addTicket = createAsyncThunk(
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.log('addTicket error response:', JSON.stringify(errorData, null, 2));
+//         console.log('addTicket error response:', JSON.stringify(errorData, null, 2));
         return rejectWithValue(errorData);
       }
 
       const data = await response.json();
-      console.log('addTicket success response:', JSON.stringify(data, null, 2));
+//       console.log('addTicket success response:', JSON.stringify(data, null, 2));
       return data;
     } catch (error) {
       console.error('addTicket error:', error.message);

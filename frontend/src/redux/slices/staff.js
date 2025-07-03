@@ -38,7 +38,7 @@ export const fetchStaff = createAsyncThunk(
 export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff, { rejectWithValue }) => {
     try {
         const token = localStorage.getItem('token');
-        console.log('Attempting to add staff shift with data:', newStaff);
+//         console.log('Attempting to add staff shift with data:', newStaff);
         
         const res = await fetch(`${BASE_URL}staff/api/shifts/add/`, {
             method: 'POST',
@@ -56,7 +56,7 @@ export const addStaff = createAsyncThunk('staff/addStaff', async (newStaff, { re
             return rejectWithValue(data);
         }
 
-        console.log('Successfully added staff shift:', data);
+//         console.log('Successfully added staff shift:', data);
         return data;
     } catch (error) {
         console.error('Error while adding staff shift:', error);
@@ -110,10 +110,10 @@ export const getStaffById = createAsyncThunk('staff/getStaffById', async (id) =>
         // Check if response is OK
         if (!res.ok) {
             if (res.status === 404) {
-                console.log("Staff not found (404).");
+//                 console.log("Staff not found (404).");
                 throw new Error("Staff not found.");
             }
-            console.log("Failed to fetch staff by ID, status:", res.status);
+//             console.log("Failed to fetch staff by ID, status:", res.status);
             throw new Error("Failed to fetch staff by ID.");
         }
 
@@ -122,7 +122,7 @@ export const getStaffById = createAsyncThunk('staff/getStaffById', async (id) =>
 
         return data; // Returning the staff data
     } catch (error) {
-        console.log("Error occurred during staff data fetch:", error.message);
+//         console.log("Error occurred during staff data fetch:", error.message);
         throw error; // Rethrow the error for Redux to handle
     }
 });

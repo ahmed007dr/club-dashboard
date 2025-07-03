@@ -70,6 +70,7 @@ def member_attendance_heatmap_api(request):
         for entry in daily_counts
     ]
     return Response(heatmap_data)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def attendance_list_api(request):

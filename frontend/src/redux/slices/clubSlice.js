@@ -76,7 +76,7 @@ export const switchClub = createAsyncThunk(
       }
 
       const data = await response.json();
-      console.log('✅ Club switched successfully:', data);
+//       console.log('✅ Club switched successfully:', data);
       return Array.isArray(data) ? data : [data]; // Normalize to array like fetchClubs
     } catch (error) {
       console.error('🔴 Error switching club:', error);
@@ -110,7 +110,7 @@ export const fetchClubList = createAsyncThunk(
       }
 
       const data = await response.json();
-      console.log('Fetched club list:', data);
+//       console.log('Fetched club list:', data);
       return Array.isArray(data) ? data : [data];
     } catch (error) {
       console.error('Error fetching club list:', error);

@@ -47,7 +47,7 @@ const AttendanceDashboard = () => {
 
       // Log specifically for hourly data
       if (key === 'hourly') {
-        console.log('Hourly Data:', result);
+//         console.log('Hourly Data:', result);
       }
     } catch (err) {
       setError(prev => ({ ...prev, [key]: err.message }));

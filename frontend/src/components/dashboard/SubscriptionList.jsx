@@ -76,11 +76,11 @@ const SubscriptionList = () => {
       entryCount: filters.entryCount,
       status: filters.status.toLowerCase(), // تمرير الحالة للـ backend
     };
-    console.log("Fetch query:", query);
+//     console.log("Fetch query:", query);
     dispatch(fetchSubscriptions(query))
       .unwrap()
       .then((data) => {
-        console.log("Fetched subscriptions:", data.subscriptions);
+//         console.log("Fetched subscriptions:", data.subscriptions);
         if (data.subscriptions.length === 0 && filters.memberName.trim()) {
           setError("لا توجد اشتراكات مطابقة للبحث.");
         } else {

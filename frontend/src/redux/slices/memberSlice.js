@@ -71,7 +71,7 @@ export const addMember = createAsyncThunk(
       }
 
       const data = await res.json();
-      console.log('Add member response data:', data);
+//       console.log('Add member response data:', data);
       return data;
     } catch (error) {
       console.error('Error in addMember:', error);

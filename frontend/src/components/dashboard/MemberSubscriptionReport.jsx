@@ -25,9 +25,9 @@ const MemberSubscriptionReport = () => {
     setError('');
     setIsErrorModalOpen(false);
     try {
-      console.log('Fetching report with params:', { days, inactive_days: inactiveDays });
+//       console.log('Fetching report with params:', { days, inactive_days: inactiveDays });
       const data = await fetchSubscriptionReport({ days, inactive_days: inactiveDays });
-      console.log('Received report data:', data);
+//       console.log('Received report data:', data);
       setReportData(data);
     } catch (err) {
       console.error('Error fetching report:', err);

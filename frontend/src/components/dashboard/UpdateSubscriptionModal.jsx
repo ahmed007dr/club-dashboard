@@ -126,7 +126,7 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('handleSubmit triggered', { formData, foundMember });
+//     console.log('handleSubmit triggered', { formData, foundMember });
 
     if (!formData.club || !formData.type || !formData.start_date || !formData.paid_amount) {
       setErrorMessage('يرجى ملء جميع الحقول المطلوبة');
