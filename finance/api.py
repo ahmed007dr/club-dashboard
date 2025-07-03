@@ -24,6 +24,7 @@ from .serializers import (
     ExpenseSerializer, IncomeSerializer, ExpenseCategorySerializer, IncomeSourceSerializer,
     ExpenseDetailSerializer, IncomeDetailSerializer, IncomeSummarySerializer, StockItemSerializer
 )
+from staff.models import StaffAttendance
 from utils.convert_to_name import get_object_from_id_or_name
 from utils.reports import get_employee_report_data
 
@@ -36,31 +37,50 @@ class StandardPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 20
 
+    
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def expense_category_api(request):
-    """List or create expense categories."""
+    """List or create expense categories, restricted to active shift for non-owner/admin users."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     if request.method == 'GET':
         categories = ExpenseCategory.objects.filter(club=request.user.club)
+        
+        # Restrict categories to those linked to expenses in active shift for non-owner/admin users
+        if request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                logger.warning(f"No active shift for user: {request.user.username}")
+                return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
+            categories = categories.filter(
+                expense__paid_by=request.user,
+                expense__date__gte=attendance.check_in,
+                expense__date__lte=attendance.check_out or timezone.now()
+            ).distinct()
+        
         if request.query_params.get('name'):
             categories = categories.filter(name__icontains=request.query_params.get('name'))
         if request.query_params.get('description'):
             categories = categories.filter(description__icontains=request.query_params.get('description'))
+        
         categories = categories.order_by('-id')
         paginator = StandardPagination()
         page = paginator.paginate_queryset(categories, request)
         serializer = ExpenseCategorySerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
+    
     elif request.method == 'POST':
         serializer = ExpenseCategorySerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(club=request.user.club)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
@@ -121,16 +141,32 @@ def income_source_api(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def income_api(request):
-    """List or create incomes."""
+    """List or create incomes, restricted to active shift for non-owner/admin users."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     if request.method == 'GET':
         incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
+        
+        # Restrict incomes to active shift for non-owner/admin users
+        if request.user.role not in ['owner', 'admin']:
+            attendance = StaffAttendance.objects.filter(
+                staff=request.user, club=request.user.club, check_out__isnull=True
+            ).order_by('-check_in').first()
+            if not attendance:
+                logger.warning(f"No active shift for user: {request.user.username}")
+                return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
+            incomes = incomes.filter(
+                received_by=request.user,
+                date__gte=attendance.check_in,
+                date__lte=attendance.check_out or timezone.now()
+            )
+
         if request.query_params.get('source'):
             try:
                 source_id = int(request.query_params.get('source'))
@@ -146,6 +182,7 @@ def income_api(request):
                 return Response({"error": "صيغة المبلغ غير صحيحة"}, status=status.HTTP_400_BAD_REQUEST)
         if request.query_params.get('description'):
             incomes = incomes.filter(description__icontains=request.query_params.get('description'))
+        
         incomes = incomes.order_by('-id')
         paginator = StandardPagination()
         page = paginator.paginate_queryset(incomes, request)
@@ -193,6 +230,7 @@ def income_api(request):
                     )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
 
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
