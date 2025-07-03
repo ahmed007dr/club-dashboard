@@ -9,8 +9,12 @@ from rest_framework.pagination import PageNumberPagination
 from .models import Ticket, TicketType
 from .serializers import TicketSerializer, TicketTypeSerializer
 from finance.models import Income, IncomeSource
-from utils.permissions import IsOwnerOrRelatedToClub
 from datetime import datetime
+import logging
+
+logger = logging.getLogger(__name__)
+
+FULL_ACCESS_ROLES = ['owner', 'admin']
 
 class StandardPagination(PageNumberPagination):
     page_size = 20
@@ -18,9 +22,13 @@ class StandardPagination(PageNumberPagination):
     max_page_size = 20
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def ticket_type_list_api(request):
     """List ticket types with optional name filter."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     ticket_types = TicketType.objects.filter(club=request.user.club, price__gt=0)
     if request.query_params.get('name'):
         ticket_types = ticket_types.filter(name__icontains=request.query_params.get('name'))
@@ -31,9 +39,13 @@ def ticket_type_list_api(request):
     return paginator.get_paginated_response(serializer.data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def ticket_list_api(request):
     """List tickets with optional filters."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     tickets = Ticket.objects.select_related('club', 'ticket_type', 'issued_by').filter(club=request.user.club)
     if request.query_params.get('ticket_type'):
         tickets = tickets.filter(ticket_type__id=request.query_params.get('ticket_type'))
@@ -50,20 +62,27 @@ def ticket_list_api(request):
     return paginator.get_paginated_response(serializer.data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def ticket_detail_api(request, ticket_id):
     """Retrieve details of a specific ticket."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     ticket = get_object_or_404(Ticket, id=ticket_id, club=request.user.club)
     serializer = TicketSerializer(ticket)
     return Response(serializer.data)
 
-
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def add_ticket_api(request):
     """Create multiple tickets in a single request."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     data = request.data
-    num_tickets = data.get('num_tickets', 1)  
+    num_tickets = data.get('num_tickets', 1)
     if not isinstance(num_tickets, int) or num_tickets < 1:
         return Response({'error': 'عدد التذاكر يجب أن يكون عددًا صحيحًا موجبًا.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -139,14 +158,20 @@ def add_ticket_api(request):
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
 
     except Exception as e:
+        logger.error(f"Error creating tickets: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
+
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def delete_ticket_api(request, ticket_id):
     """Delete a ticket (Owner or Admin only)."""
-    if request.user.role not in ['owner', 'admin']:
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.user.role not in FULL_ACCESS_ROLES:
         return Response({'error': 'غير مسموح بالحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+    
     ticket = get_object_or_404(Ticket, id=ticket_id, club=request.user.club)
     with transaction.atomic():
         ticket.delete()
@@ -154,9 +179,13 @@ def delete_ticket_api(request, ticket_id):
     return Response({'message': 'تم حذف التذكرة بنجاح.'}, status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def add_ticket_type_api(request):
     """Create a new ticket type."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     data = request.data.copy()
     data['club'] = request.user.club.id
     serializer = TicketTypeSerializer(data=data, context={'request': request})
@@ -167,4 +196,5 @@ def add_ticket_type_api(request):
             ticket_type = serializer.save()
             return Response(TicketTypeSerializer(ticket_type).data, status=status.HTTP_201_CREATED)
     except Exception as e:
+        logger.error(f"Error creating ticket type: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

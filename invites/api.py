@@ -5,14 +5,22 @@ from django.shortcuts import get_object_or_404
 from .models import FreeInvite
 from .serializers import FreeInviteSerializer
 from rest_framework.permissions import IsAuthenticated
-from utils.permissions import IsOwnerOrRelatedToClub
 from rest_framework.pagination import PageNumberPagination
 from django.db import transaction
+import logging
+
+logger = logging.getLogger(__name__)
+
+FULL_ACCESS_ROLES = ['owner', 'admin']
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def free_invite_list_api(request):
     """List free invites with optional filters."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     invites = FreeInvite.objects.select_related('club').filter(club=request.user.club).order_by('-created_at')
     if request.query_params.get('guest_name'):
         invites = invites.filter(guest_name__icontains=request.query_params.get('guest_name'))
@@ -26,10 +34,14 @@ def free_invite_list_api(request):
     return paginator.get_paginated_response(serializer.data)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 @transaction.atomic
 def add_free_invite_api(request):
     """Create a new free invite."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     data = request.data.copy()
     data['created_by'] = request.user.id
     data['club'] = request.user.club.id
@@ -40,19 +52,28 @@ def add_free_invite_api(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def free_invite_detail_api(request, invite_id):
     """Retrieve details of a specific free invite."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     invite = get_object_or_404(FreeInvite, id=invite_id, club=request.user.club)
     serializer = FreeInviteSerializer(invite)
     return Response(serializer.data)
 
 @api_view(['PUT'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def edit_free_invite_api(request, invite_id):
     """Update a free invite (Owner or Admin only)."""
-    if request.user.role not in ['owner', 'admin']:
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.user.role not in FULL_ACCESS_ROLES:
         return Response({'error': 'غير مسموح بالتعديل. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+    
     invite = get_object_or_404(FreeInvite, id=invite_id, club=request.user.club)
     serializer = FreeInviteSerializer(invite, data=request.data, partial=True)
     if serializer.is_valid():
@@ -61,21 +82,31 @@ def edit_free_invite_api(request, invite_id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def delete_free_invite_api(request, invite_id):
     """Delete a free invite (Owner or Admin only)."""
-    if request.user.role not in ['owner', 'admin']:
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.user.role not in FULL_ACCESS_ROLES:
         return Response({'error': 'غير مسموح بالحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+    
     invite = get_object_or_404(FreeInvite, id=invite_id, club=request.user.club)
     invite.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def mark_invite_used_api(request, invite_id):
     """Mark a free invite as used (Owner or Admin only)."""
-    if request.user.role not in ['owner', 'admin']:
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.user.role not in FULL_ACCESS_ROLES:
         return Response({'error': 'غير مسموح بتغيير حالة الدعوة. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+    
     invite = get_object_or_404(FreeInvite, id=invite_id, club=request.user.club)
     invite.status = 'used'
     invite.save()

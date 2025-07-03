@@ -1,57 +1,34 @@
 from datetime import timedelta
-
 from django.db import IntegrityError
 from django.db.models import Exists, OuterRef, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-
 from .models import Member
 from subscriptions.models import Subscription
 from .serializers import MemberSerializer
 from attendance.models import Attendance
-from staff.models import StaffAttendance
 from utils.generate_membership_number import generate_membership_number
-from utils.permissions import IsOwnerOrRelatedToClub
+import logging
+
+logger = logging.getLogger(__name__)
+
+FULL_ACCESS_ROLES = ['owner', 'admin']
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def member_list_api(request):
+    """List members with optional search."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     search_term = request.GET.get('q', '')
-    is_search_mode = bool(search_term)  
-
-    if request.user.role in ['owner', 'admin']:
-        members = Member.objects.filter(club=request.user.club).order_by('-id')
-    else:
-        if is_search_mode:
-            # Allow access to all members for search queries
-            members = Member.objects.filter(club=request.user.club).order_by('-id')
-        else:
-            # Restrict to members with attendance in current shift
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user,
-                club=request.user.club,
-                check_out__isnull=True  
-            ).order_by('-check_in').first()
-
-            if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-
-            member_ids = Attendance.objects.filter(
-                subscription__club=request.user.club,
-                attendance_date__gte=attendance.check_in,
-                attendance_date__lte=timezone.now()
-            ).values_list('subscription__member_id', flat=True).distinct()
-
-            members = Member.objects.filter(
-                id__in=member_ids,
-                club=request.user.club
-            ).order_by('-id')
+    members = Member.objects.filter(club=request.user.club).order_by('-id')
 
     if search_term:
         members = members.filter(
@@ -66,42 +43,26 @@ def member_list_api(request):
     return paginator.get_paginated_response(serializer.data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def member_detail_api(request, member_id):
-    member = get_object_or_404(Member, id=member_id)
-    search_term = request.GET.get('q', '')
-    is_search_mode = bool(search_term)  # Consider it a search if q is provided
-
-    if request.user.role not in ['owner', 'admin'] and not is_search_mode:
-        # Restrict to members with attendance in current shift
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club,
-            check_out__isnull=True
-        ).order_by('-check_in').first()
-
-        if not attendance:
-            return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-
-        has_interaction = Attendance.objects.filter(
-            subscription__club=request.user.club,
-            subscription__member_id=member_id,
-            attendance_date__gte=attendance.check_in,
-            attendance_date__lte=timezone.now()
-        ).exists()
-
-        if not has_interaction:
-            return Response({'error': 'This member is not associated with your current shift.'}, status=status.HTTP_403_FORBIDDEN)
-
+    """Retrieve a member's details."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    member = get_object_or_404(Member, id=member_id, club=request.user.club)
     serializer = MemberSerializer(member)
     return Response(serializer.data)
 
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def member_search_api(request):
+    """Search members by various criteria."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     search_term = request.GET.get('q', '')
-
     search_filter = (
         Q(name__icontains=search_term) |
         Q(membership_number__icontains=search_term) |
@@ -122,6 +83,11 @@ def member_search_api(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def api_user_profile(request):
+    """Retrieve the authenticated user's profile."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     user = request.user
     profile_data = {
         'username': user.username,
@@ -129,31 +95,14 @@ def api_user_profile(request):
     }
     return Response(profile_data)
 
-import logging
-
-logger = logging.getLogger(__name__)
-
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def create_member_api(request):
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user,
-            club=request.user.club,
-            check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response(
-                {'error': 'You can only create members during an active shift.'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
+    """Create a new member."""
     if not request.user.club:
-        return Response(
-            {'error': 'User is not associated with any club.'},
-            status=status.HTTP_403_FORBIDDEN
-        )
-
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     data = request.data
     mutable_data = {}
     for key in data:
@@ -187,13 +136,19 @@ def create_member_api(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['PUT'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def update_member_api(request, member_id):
-    if request.user.role not in ['owner', 'admin']:
+    """Update a member's details (Owner/Admin only)."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.user.role not in FULL_ACCESS_ROLES:
         return Response(
-            {'error': 'Only owners or admins can update members.'},
+            {'error': 'غير مسموح بالتعديل. يجب أن تكون Owner أو Admin.'},
             status=status.HTTP_403_FORBIDDEN
         )
+    
     member = get_object_or_404(Member, pk=member_id, club=request.user.club)
     data = request.data.copy()
     serializer = MemberSerializer(member, data=data, partial=True, context={'request': request})
@@ -211,23 +166,30 @@ def update_member_api(request, member_id):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def delete_member_api(request, member_id):
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'Only owners or admins can delete members.'}, status=status.HTTP_403_FORBIDDEN)
-
-    member = get_object_or_404(Member, id=member_id)
+    """Delete a member (Owner/Admin only)."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.user.role not in FULL_ACCESS_ROLES:
+        return Response({'error': 'غير مسموح بالحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    member = get_object_or_404(Member, id=member_id, club=request.user.club)
     member.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def member_subscription_report_api(request):
+    """Get member subscription report."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     try:
-        club_id = request.user.club.id if hasattr(request.user, 'club') else None
-        if not club_id:
-            return Response({'error': 'لا يوجد نادي مرتبط بالمستخدم'}, status=status.HTTP_403_FORBIDDEN)
-
+        club_id = request.user.club.id
         try:
             expiry_days = int(request.GET.get('days', 7))
             inactive_days = int(request.GET.get('inactive_days', 7))
@@ -331,18 +293,19 @@ def member_subscription_report_api(request):
 
         return Response(response_data, status=status.HTTP_200_OK)
     except Exception as e:
-        print(f"Error in member_subscription_report_api: {str(e)}")
+        logger.error(f"Error in member_subscription_report_api: {str(e)}")
         return Response({'error': f'خطأ داخلي: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def export_subscription_report_api(request):
+    """Export member subscription report."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     try:
-        club_id = request.user.club.id if hasattr(request.user, 'club') else None
-        if not club_id:
-            return Response({'error': 'لا يوجد نادي مرتبط بالمستخدم'}, status=status.HTTP_403_FORBIDDEN)
-
+        club_id = request.user.club.id
         expiry_days = int(request.GET.get('days', 7))
         inactive_days = int(request.GET.get('inactive_days', 7))
         if expiry_days < 1 or inactive_days < 1:
@@ -402,5 +365,5 @@ def export_subscription_report_api(request):
 
         return Response(response_data, status=status.HTTP_200_OK)
     except Exception as e:
-        print(f"Error in export_subscription_report_api: {str(e)}")
+        logger.error(f"Error in export_subscription_report_api: {str(e)}")
         return Response({'error': f'خطأ داخلي: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

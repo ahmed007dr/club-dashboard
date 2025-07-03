@@ -19,17 +19,16 @@ from jinja2 import Template
 from decimal import Decimal
 from django.db import transaction
 from accounts.models import User
-from staff.models import StaffAttendance
-from .models import Expense, Income, ExpenseCategory, IncomeSource, StockTransaction, StockItem,Schedule
+from .models import Expense, Income, ExpenseCategory, IncomeSource, StockTransaction, StockItem, Schedule
 from .serializers import (
     ExpenseSerializer, IncomeSerializer, ExpenseCategorySerializer, IncomeSourceSerializer,
     ExpenseDetailSerializer, IncomeDetailSerializer, IncomeSummarySerializer, StockItemSerializer
 )
-from utils.permissions import IsOwnerOrRelatedToClub
-from utils.reports import get_employee_report_data
 from utils.convert_to_name import get_object_from_id_or_name
 
 logger = logging.getLogger(__name__)
+
+FULL_ACCESS_ROLES = ['owner', 'admin']
 
 class StandardPagination(PageNumberPagination):
     page_size = 20
@@ -37,9 +36,13 @@ class StandardPagination(PageNumberPagination):
     max_page_size = 20
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def expense_category_api(request):
     """List or create expense categories."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if request.method == 'GET':
         categories = ExpenseCategory.objects.filter(club=request.user.club)
         if request.query_params.get('name'):
@@ -58,24 +61,16 @@ def expense_category_api(request):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def expense_api(request):
     """List or create expenses."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if request.method == 'GET':
         expenses = Expense.objects.select_related('category', 'paid_by', 'related_employee').filter(club=request.user.club)
-        if request.user.role not in ['owner', 'admin']:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-            if not attendance:
-                return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
-            expenses = expenses.filter(
-                paid_by=request.user,
-                date__gte=attendance.check_in,
-                date__lte=attendance.check_out or timezone.now()
-            )
         expenses = expenses.order_by('-id')
         paginator = StandardPagination()
         page = paginator.paginate_queryset(expenses, request)
@@ -95,11 +90,15 @@ def expense_api(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    
+
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def income_source_api(request):
+    """List or create income sources."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if request.method == 'GET':
         sources = IncomeSource.objects.filter(club=request.user.club)
         if request.query_params.get('name'):
@@ -112,11 +111,9 @@ def income_source_api(request):
         serializer = IncomeSourceSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
     elif request.method == 'POST':
-        if request.user.role not in ['owner', 'admin']:
-            return Response({'error': 'غير مسموح بإنشاء مصادر إيرادات.'}, status=status.HTTP_403_FORBIDDEN)
         data = request.data.copy()
         data['club'] = request.user.club.id
-        data['created_by'] = request.user.id  # تعيين created_by
+        data['created_by'] = request.user.id
         serializer = IncomeSourceSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
@@ -124,22 +121,15 @@ def income_source_api(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def income_api(request):
     """List or create incomes."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if request.method == 'GET':
         incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
-        if request.user.role not in ['owner', 'admin']:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-            if not attendance:
-                return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
-            incomes = incomes.filter(
-                received_by=request.user,
-                date__gte=attendance.check_in,
-                date__lte=attendance.check_out or timezone.now()
-            )
         if request.query_params.get('source'):
             try:
                 source_id = int(request.query_params.get('source'))
@@ -175,15 +165,15 @@ def income_api(request):
             quantity = int(quantity)
             if quantity <= 0:
                 return Response({'error': 'الكمية يجب أن تكون أكبر من صفر'}, status=status.HTTP_400_BAD_REQUEST)
-            data['amount'] = float(source.price * quantity)  # حساب المبلغ بناءً على الكمية دائمًا
-            data['quantity'] = quantity  # حفظ الكمية في Income
+            data['amount'] = float(source.price * quantity)
+            data['quantity'] = quantity
             if source.stock_item:
                 if not source.stock_item.is_sellable:
                     return Response({'error': 'عنصر المخزون غير قابل للبيع'}, status=status.HTTP_400_BAD_REQUEST)
                 if quantity > source.stock_item.current_quantity:
                     return Response({'error': 'الكمية المطلوبة غير متوفرة في المخزون'}, status=status.HTTP_400_BAD_REQUEST)
             else:
-                data['stock_item'] = None  # عدم وجود stock_item للمبيعات غير المرتبطة بالمخزون
+                data['stock_item'] = None
         except IncomeSource.DoesNotExist:
             return Response({'error': 'معرف مصدر غير صالح'}, status=status.HTTP_400_BAD_REQUEST)
         except ValueError:
@@ -202,13 +192,17 @@ def income_api(request):
                     )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def expense_detail_api(request, pk):
     """Retrieve, update, or delete an expense (Owner/Admin only for PUT/DELETE)."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     expense = get_object_or_404(Expense, pk=pk, club=request.user.club)
-    if request.method != 'GET' and request.user.role not in ['owner', 'admin']:
+    if request.method != 'GET' and request.user.role not in FULL_ACCESS_ROLES:
         return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
     if request.method == 'GET':
         serializer = ExpenseSerializer(expense, context={'request': request})
@@ -224,11 +218,15 @@ def expense_detail_api(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def income_detail_api(request, pk):
     """Retrieve, update, or delete an income (Owner/Admin only for PUT/DELETE)."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     income = get_object_or_404(Income, pk=pk, club=request.user.club)
-    if request.method != 'GET' and request.user.role not in ['owner', 'admin']:
+    if request.method != 'GET' and request.user.role not in FULL_ACCESS_ROLES:
         return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
     if request.method == 'GET':
         serializer = IncomeSerializer(income)
@@ -244,11 +242,13 @@ def income_detail_api(request, pk):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def daily_summary_api(request):
     """Generate daily summary for incomes and expenses."""
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح برؤية الملخص اليومي.'}, status=status.HTTP_403_FORBIDDEN)
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     date_str = request.query_params.get('date')
     month_str = request.query_params.get('month')
     username = request.query_params.get('username')
@@ -303,23 +303,15 @@ def daily_summary_api(request):
     page = paginator.paginate_queryset(summary, request)
     return paginator.get_paginated_response(page)
 
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def income_summary(request):
     """Generate income summary with optional filters."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_400_BAD_REQUEST)
-        incomes = incomes.filter(
-            received_by=request.user,
-            date__gte=attendance.check_in,
-            date__lte=attendance.check_out or timezone.now()
-        )
     if request.query_params.get('date'):
         try:
             date_obj = datetime.strptime(request.query_params.get('date'), '%Y-%m-%d').date()
@@ -337,7 +329,7 @@ def income_summary(request):
         return Response({'error': 'تاريخي البداية والنهاية مطلوبان معًا.'}, status=status.HTTP_400_BAD_REQUEST)
     if request.query_params.get('user'):
         user_obj = get_object_from_id_or_name(User, request.query_params.get('user'), ['id', 'username'])
-        if user_obj and user_obj.club == request.user.club and (request.user.role in ['owner', 'admin'] or user_obj == request.user):
+        if user_obj and user_obj.club == request.user.club:
             incomes = incomes.filter(received_by=user_obj)
         else:
             return Response({'error': 'المستخدم غير موجود أو غير مسموح.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -354,21 +346,14 @@ def income_summary(request):
     return Response(response_data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def expense_summary(request):
     """Generate expense summary with optional filters."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
-        expenses = expenses.filter(
-            paid_by=request.user,
-            date__gte=attendance.check_in,
-            date__lte=attendance.check_out or timezone.now()
-        )
     if request.query_params.get('date'):
         try:
             date_obj = datetime.strptime(request.query_params.get('date'), '%Y-%m-%d').date()
@@ -386,7 +371,7 @@ def expense_summary(request):
         return Response({'error': 'تاريخي البداية والنهاية مطلوبان معًا.'}, status=status.HTTP_400_BAD_REQUEST)
     if request.query_params.get('user'):
         user_obj = get_object_from_id_or_name(User, request.query_params.get('user'), ['id', 'username'])
-        if user_obj and user_obj.club == request.user.club and (request.user.role in ['owner', 'admin'] or user_obj == request.user):
+        if user_obj and user_obj.club == request.user.club:
             expenses = expenses.filter(paid_by=user_obj)
         else:
             return Response({'error': 'المستخدم غير موجود أو غير مسموح.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -402,13 +387,14 @@ def expense_summary(request):
         response_data['details'] = ExpenseDetailSerializer(expenses, many=True).data
     return Response(response_data, status=status.HTTP_200_OK)
 
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def finance_overview(request):
     """Generate financial overview."""
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح برؤية النظرة المالية.'}, status=status.HTTP_403_FORBIDDEN)
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     income_qs = Income.objects.filter(club=request.user.club)
     expense_qs = Expense.objects.filter(club=request.user.club)
     if request.query_params.get('start') and request.query_params.get('end'):
@@ -432,21 +418,19 @@ def finance_overview(request):
 @permission_classes([IsAuthenticated])
 def employee_daily_report_api(request):
     """Generate daily report for an employee based on their shift."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     logger.debug(f"Daily report request: User={request.user.username}, Role={request.user.role}, Params={request.query_params}")
     employee_id = request.query_params.get('employee_id')
     start_date = request.query_params.get('start_date')
     end_date = request.query_params.get('end_date')
 
-    if request.user.role not in ['owner', 'admin']:
-        # Non-owner/admin can only view their own report
-        employee_id = request.user.id  # Force current user ID
+    if request.user.role not in FULL_ACCESS_ROLES:
+        employee_id = request.user.id  # Force current user ID for non-owner/admin
     else:
-        # Owner/admin can view any employee's report
         employee_id = employee_id if employee_id else request.user.id
-
-    if not request.user.club:
-        logger.error(f"User {request.user.username} has no associated club")
-        return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
 
     employee = get_object_or_404(User, id=employee_id, club=request.user.club)
 
@@ -455,23 +439,15 @@ def employee_daily_report_api(request):
     )
     return Response(data, status=status_code)
 
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def expense_all_api(request):
     """List all expenses with optional filters."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club)
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
-        expenses = expenses.filter(
-            paid_by=request.user,
-            date__gte=attendance.check_in,
-            date__lte=attendance.check_out or timezone.now()
-        )
     if request.query_params.get('start') and request.query_params.get('end'):
         try:
             start_date = datetime.strptime(request.query_params.get('start'), '%Y-%m-%d').date()
@@ -491,23 +467,15 @@ def expense_all_api(request):
     serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def income_all_api(request):
     """List all incomes with optional filters."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
-    if request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
-        incomes = incomes.filter(
-            received_by=request.user,
-            date__gte=attendance.check_in,
-            date__lte=attendance.check_out or timezone.now()
-        )
     if request.query_params.get('source'):
         try:
             source_id = int(request.query_params.get('source'))
@@ -536,13 +504,14 @@ def income_all_api(request):
     serializer = IncomeSerializer(incomes, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def generate_daily_report_pdf(request):
     """Generate a daily report PDF."""
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بإنشاء تقرير يومي.'}, status=status.HTTP_403_FORBIDDEN)
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     employee_id = request.query_params.get('employee_id')
     start_date = request.query_params.get('start_date')
     end_date = request.query_params.get('end_date')
@@ -603,11 +572,13 @@ def generate_daily_report_pdf(request):
             return response
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def financial_analysis_api(request):
     """Generate financial analysis."""
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح برؤية التحليل المالي.'}, status=status.HTTP_403_FORBIDDEN)
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     period_type = request.query_params.get('period_type', 'monthly')
     start = request.query_params.get('start')
     end = request.query_params.get('end')
@@ -752,9 +723,13 @@ def financial_analysis_api(request):
     return Response(response_data, status=status.HTTP_200_OK)
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def stock_item_api(request):
     """List or create stock items."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if request.method == 'GET':
         stock_items = StockItem.objects.filter(club=request.user.club)
         if request.query_params.get('name'):
@@ -765,8 +740,6 @@ def stock_item_api(request):
         serializer = StockItemSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
     elif request.method == 'POST':
-        if request.user.role not in ['owner', 'admin']:
-            return Response({'error': 'غير مسموح بإنشاء عناصر المخزون.'}, status=status.HTTP_403_FORBIDDEN)
         data = request.data.copy()
         data['club'] = request.user.club.id
         serializer = StockItemSerializer(data=data)
@@ -776,9 +749,13 @@ def stock_item_api(request):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def stock_inventory_api(request):
     """List or perform stock inventory checks."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if request.method == 'GET':
         stock_items = StockItem.objects.filter(club=request.user.club).annotate(
             total_added=Sum('transactions__quantity', filter=Q(transactions__transaction_type='ADD')),
@@ -826,11 +803,13 @@ def stock_inventory_api(request):
             return Response({'error': 'حدث خطأ أثناء تسجيل الجرد'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def stock_profit_api(request):
     """Calculate stock profit."""
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح برؤية ربح المخزون.'}, status=status.HTTP_403_FORBIDDEN)
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     stock_item_id = request.query_params.get('stock_item_id')
     start_date = request.query_params.get('start_date')
     end_date = request.query_params.get('end_date')
@@ -868,11 +847,13 @@ def stock_profit_api(request):
     return Response(report_data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def stock_sales_analysis_api(request):
     """Generate stock sales analysis."""
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح برؤية تحليل مبيعات المخزون.'}, status=status.HTTP_403_FORBIDDEN)
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     stock_item_id = request.query_params.get('stock_item_id')
     start_date = request.query_params.get('start_date')
     end_date = request.query_params.get('end_date')
@@ -924,7 +905,7 @@ def stock_sales_analysis_api(request):
         elif avg_daily_sales < 1:
             sales_status = 'ضعيف (مبيعات نادرة)'
         elif avg_daily_sales < 5:
-            sales_status = 'متوسط (مبيعات متقطعة)'
+            sales_status = 'متوسط (مبيعات متقلبة)'
         else:
             sales_status = 'قوي (مبيعات مستمرة)'
         sale_gaps = []
@@ -955,8 +936,13 @@ def stock_sales_analysis_api(request):
     return Response(analysis_data, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def generate_inventory_pdf(request):
+    """Generate inventory report PDF."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     stock_items = StockItem.objects.filter(club=request.user.club)
     if request.query_params.get('stock_item_id'):
         stock_items = stock_items.filter(id=request.query_params.get('stock_item_id'))
@@ -985,24 +971,26 @@ def generate_inventory_pdf(request):
             response = FileResponse(pdf_file, content_type='application/pdf')
             response['Content-Disposition'] = f'attachment; filename="inventory_report_{timezone.now().strftime("%Y%m%d")}.pdf"'
             return response
-        
+
 @api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def schedule_api(request):
+    """List or create schedules."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     if request.method == 'GET':
         schedules = Schedule.objects.filter(club=request.user.club)
-        if request.user.role not in ['owner', 'admin']:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-            if not attendance:
-                return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
-            schedules = schedules.filter(
-                created_by=request.user,
-                start__gte=attendance.check_in,
-                start__lte=attendance.check_out or timezone.now()
-            )
         return Response([{
             'id': s.id, 'title': s.title, 'start': s.start.isoformat(), 'end': s.end.isoformat(), 'type': s.type
         } for s in schedules], status=status.HTTP_200_OK)
-    
+    elif request.method == 'POST':
+        data = request.data.copy()
+        data['club'] = request.user.club.id
+        data['created_by'] = request.user.id
+        serializer = ScheduleSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

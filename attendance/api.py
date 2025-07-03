@@ -8,18 +8,23 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
-from utils.permissions import IsOwnerOrRelatedToClub
 from .models import Attendance, EntryLog
 from members.models import Member
 from .serializers import AttendanceSerializer, EntryLogSerializer
-from django.db.models import Case, When, F, BooleanField,Q,Count
+from django.db.models import Case, When, F, BooleanField, Q, Count
 
 logger = logging.getLogger(__name__)
 
+FULL_ACCESS_ROLES = ['owner', 'admin']
+
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def attendance_heatmap_api(request):
     """Get heatmap data for club attendance."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     attendances = Attendance.objects.select_related('subscription').filter(
         subscription__club=request.user.club
     )
@@ -36,9 +41,13 @@ def attendance_heatmap_api(request):
     return Response(heatmap_data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def member_attendance_heatmap_api(request):
     """Get heatmap data for a specific member's attendance."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     member_id = request.query_params.get('member_id')
     if not member_id:
         logger.error('Member ID is required for member attendance heatmap')
@@ -61,9 +70,13 @@ def member_attendance_heatmap_api(request):
     return Response(heatmap_data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def attendance_list_api(request):
     """Get paginated list of attendances with optional filters."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     rfid = request.GET.get('rfid', '')
     attendance_date = request.GET.get('attendance_date', '')
     member_name = request.GET.get('member_name', '')
@@ -89,7 +102,6 @@ def attendance_list_api(request):
     if member_name:
         attendances = attendances.filter(subscription__member__name__icontains=member_name)
 
-
     attendances = attendances.order_by('-attendance_date', '-entry_time')
 
     paginator = PageNumberPagination()
@@ -99,11 +111,15 @@ def attendance_list_api(request):
     return paginator.get_paginated_response(serializer.data)
 
 @api_view(['DELETE'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def delete_attendance_api(request, attendance_id):
     """Delete an attendance record (Owner/Admin only)."""
-    if request.user.role not in ['owner', 'admin']:
-        return Response({'error': 'غير مسموح بالوصول. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.user.role not in FULL_ACCESS_ROLES:
+        return Response({'error': 'غير مسموح بالحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
 
     attendance = get_object_or_404(Attendance, id=attendance_id)
     subscription = attendance.subscription
@@ -112,11 +128,14 @@ def delete_attendance_api(request, attendance_id):
     attendance.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
-
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def add_attendance_api(request):
     """Create a new attendance record with rate limiting per member."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     serializer = AttendanceSerializer(data=request.data)
     if serializer.is_valid():
         # Get identifier from request data
@@ -167,11 +186,14 @@ def add_attendance_api(request):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def attendance_last_hour_api(request):
     """Get the count of attendances for the last 60 minutes."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     now = timezone.now()
     one_hour_ago = now - timedelta(hours=1)
     
@@ -189,9 +211,13 @@ def attendance_last_hour_api(request):
     return Response({"count": count}, status=status.HTTP_200_OK)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def attendance_hourly_api(request):
     """Get hourly attendance data for a specific day."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     date_str = request.GET.get('date', timezone.now().date().isoformat())
     try:
         target_date = datetime.strptime(date_str, '%Y-%m-%d').date()
@@ -218,9 +244,13 @@ def attendance_hourly_api(request):
     return Response(hourly_data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def attendance_weekly_api(request):
     """Get daily attendance data for the last 7 days."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     today = timezone.now().date()
     end_date = today
     while end_date.weekday() != 4:
@@ -249,9 +279,13 @@ def attendance_weekly_api(request):
     return Response(daily_data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def attendance_monthly_api(request):
     """Get daily attendance data for the last 30 days."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     today = timezone.now().date()
     start_date = today - timedelta(days=29)
     days = [start_date + timedelta(days=i) for i in range(30)]
@@ -277,9 +311,13 @@ def attendance_monthly_api(request):
     return Response(daily_data)
 
 @api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def entry_log_list_api(request):
     """Get paginated list of entry logs with optional filters."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     club = request.GET.get('club', '')
     rfid = request.GET.get('rfid', '')
     member = request.GET.get('member', '')
@@ -311,9 +349,13 @@ def entry_log_list_api(request):
     return paginator.get_paginated_response(serializer.data)
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
+@permission_classes([IsAuthenticated])
 def create_entry_log_api(request):
     """Create a new entry log record."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
     data = request.data.copy()
     data['approved_by'] = request.user.id
     serializer = EntryLogSerializer(data=data)
@@ -327,99 +369,4 @@ def create_entry_log_api(request):
                 status=status.HTTP_400_BAD_REQUEST
             )
         return Response(serializer.data, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def entry_log_list_api(request):    
-    """Get paginated list of entry logs with optional filters."""
-    club = request.GET.get('club', '')
-    rfid = request.GET.get('rfid', '')
-    member = request.GET.get('member', '')
-    timestamp = request.GET.get('timestamp', '')
-    page = request.GET.get('page', 1)
-    page_size = request.GET.get('page_size', 20)
-
-    is_search_mode = club or rfid or member or timestamp
-
-    if request.user.role in ['owner', 'admin']:
-        logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
-            club=request.user.club
-        )
-    else:
-        if is_search_mode:
-            logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
-                club=request.user.club
-            )
-        else:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user,
-                club=request.user.club,
-                check_out__isnull=True
-            ).order_by('-check_in').first()
-
-            if not attendance:
-                return Response({'error': 'No open shift found. Please check in first.'}, status=status.HTTP_404_NOT_FOUND)
-
-            logs = EntryLog.objects.select_related('club', 'member', 'approved_by', 'related_subscription').filter(
-                club=request.user.club,
-                approved_by=request.user,
-                timestamp__gte=attendance.check_in,
-                timestamp__lte=timezone.now()
-            )
-
-    if club:
-        logs = logs.filter(club__name__icontains=club)
-    if rfid:
-        logs = logs.filter(member__rfid_code__iexact=rfid)
-    if member:
-        logs = logs.filter(member__name__icontains=member)
-    if timestamp:
-        try:
-            date_obj = datetime.strptime(timestamp, '%Y-%m-%d').date()
-            logs = logs.filter(timestamp__date=date_obj)
-        except ValueError:
-            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
-
-    logs = logs.order_by('-timestamp')
-    paginator = PageNumberPagination()
-    paginator.page_size = page_size
-    result_page = paginator.paginate_queryset(logs, request)
-    serializer = EntryLogSerializer(result_page, many=True)
-
-    return paginator.get_paginated_response(serializer.data)
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated, IsOwnerOrRelatedToClub])
-def create_entry_log_api(request):
-    """Create a new entry log record."""
-    data = request.data.copy()
-    data['approved_by'] = request.user.id
-
-    serializer = EntryLogSerializer(data=data)
-
-    if serializer.is_valid():
-        entry_log = serializer.save()
-
-        if not IsOwnerOrRelatedToClub().has_object_permission(request, None, entry_log):
-            entry_log.delete()
-            return Response(
-                {'error': 'ليس لديك الصلاحية لتسجيل دخول لهذا النادي'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-        subscription = entry_log.related_subscription
-        if subscription:
-            if not subscription.can_enter():
-                entry_log.delete()
-                return Response(
-                    {'error': 'لا يمكن تسجيل الدخول: تم الوصول للحد الأقصى لعدد الدخول'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        else:
-            logger.info('No subscription linked to entry log')
-
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
-
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

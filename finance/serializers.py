@@ -1,8 +1,10 @@
 from rest_framework import serializers
-from .models import Expense, Income, ExpenseCategory, IncomeSource, StockItem, StockTransaction
+from .models import Expense, Income, ExpenseCategory, IncomeSource, StockItem, StockTransaction, Schedule
 from core.serializers import ClubSerializer
 from accounts.serializers import UserSerializer
 from receipts.serializers import ReceiptSerializer
+from core.models import Club
+from accounts.models import User
 
 class ExpenseCategorySerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
@@ -15,7 +17,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     category_details = ExpenseCategorySerializer(source='category', read_only=True)
     paid_by_details = UserSerializer(source='paid_by', read_only=True)
-    related_employee_details = UserSerializer(source='related_employee', read_only=True)  # حقل جديد
+    related_employee_details = UserSerializer(source='related_employee', read_only=True)
     stock_item_details = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
 
@@ -24,7 +26,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'club', 'club_details', 'category', 'category_details',
             'amount', 'description', 'date', 'paid_by', 'paid_by_details',
-            'related_employee', 'related_employee_details',  # إضافة الحقول الجديدة
+            'related_employee', 'related_employee_details',
             'invoice_number', 'attachment', 'attachment_url', 'stock_item',
             'stock_item_details', 'stock_quantity'
         ]
@@ -32,7 +34,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
             'attachment': {'required': False},
             'stock_item': {'required': False},
             'stock_quantity': {'required': False},
-            'related_employee': {'required': False}  # اختياري
+            'related_employee': {'required': False}
         }
 
     def get_attachment_url(self, obj):
@@ -66,9 +68,6 @@ class IncomeSourceSerializer(serializers.ModelSerializer):
                 'is_sellable': obj.stock_item.is_sellable
             }
         return None
-    
-
-
 
 class IncomeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
@@ -83,7 +82,7 @@ class IncomeSerializer(serializers.ModelSerializer):
             'id', 'club', 'club_details', 'source', 'source_details',
             'amount', 'description', 'date', 'received_by', 'received_by_details',
             'related_receipt', 'receipt_details', 'stock_transaction', 'stock_transaction_details',
-            'quantity'  # إضافة حقل quantity
+            'quantity'
         ]
 
     def get_stock_transaction_details(self, obj):
@@ -100,9 +99,7 @@ class IncomeSerializer(serializers.ModelSerializer):
                 }
             }
         return None
-    
 
-    
 class StockItemSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
 
@@ -145,3 +142,43 @@ class IncomeDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Income
         fields = ['id', 'amount', 'date', 'source_name']
+
+class ScheduleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Schedule
+        fields = ['id', 'club', 'title', 'start', 'end', 'type', 'created_by']
+        read_only_fields = ['id', 'created_by']
+
+    def validate(self, data):
+        """
+        Validate the schedule data to ensure start time is before end time
+        and that the club and created_by fields are valid.
+        """
+        # Validate that start time is before end time
+        if data['start'] >= data['end']:
+            raise serializers.ValidationError({
+                'start': 'وقت البدء يجب أن يكون قبل وقت الانتهاء.'
+            })
+
+        # Ensure the club belongs to the authenticated user
+        user = self.context['request'].user
+        if data['club'].id != user.club.id:
+            raise serializers.ValidationError({
+                'club': 'لا يمكن إنشاء جدول لنادي غير مرتبط بالمستخدم.'
+            })
+
+        # Ensure created_by is set to the authenticated user
+        data['created_by'] = user
+
+        return data
+
+    def to_representation(self, instance):
+        """
+        Customize the output format to match the GET response in schedule_api.
+        """
+        representation = super().to_representation(instance)
+        representation['start'] = instance.start.isoformat()
+        representation['end'] = instance.end.isoformat()
+        representation['club'] = instance.club.id
+        representation['created_by'] = instance.created_by.id if instance.created_by else None
+        return representation

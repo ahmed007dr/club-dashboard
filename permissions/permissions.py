@@ -6,6 +6,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# متغير للتحكم في تعليق الصلاحيات (يمكن استبداله بمنطق أكثر تعقيدًا مثل قاعدة بيانات)
+RESTRICTIONS_SUSPENDED = True  # تعليق الصلاحيات مؤقتًا إذا كان True
+
 RESOURCE_MAPPING = {
     # attendance
     'attendance_list_api': 'attendance',
@@ -85,7 +88,6 @@ RESOURCE_MAPPING = {
     'payment_method_list': 'payment_methods',
 }
 
-
 class IsOwnerOrRelatedToClub(permissions.BasePermission):
     FULL_ACCESS_ROLES = ['owner', 'admin']
 
@@ -109,7 +111,23 @@ class IsOwnerOrRelatedToClub(permissions.BasePermission):
             logger.error(f"User {request.user.username} has no associated club")
             return False
 
+        # إذا كان المستخدم أدمن أو مالك، السماح بجميع العمليات
+        if request.user.role in self.FULL_ACCESS_ROLES:
+            return True
+
         resource = getattr(view, 'basename', RESOURCE_MAPPING.get(view_name, view_name))
+
+        # عند تعليق الصلاحيات
+        if RESTRICTIONS_SUSPENDED:
+            # منع PUT/DELETE لغير الأدمن والمالك
+            if request.method in ['PUT', 'PATCH', 'DELETE']:
+                logger.warning(f"{request.method} permission denied for {resource} for user: {request.user.username}")
+                return False
+            # السماح بـ GET/POST بدون قيود
+            logger.debug(f"Restrictions suspended, allowing {request.method} for {resource} for user: {request.user.username}")
+            return True
+
+        # المنطق الطبيعي (بدون تعليق الصلاحيات)
         perm = None
         for group in request.user.groups.all():
             perm = GroupPermission.objects.filter(group=group, resource=resource).first()
@@ -118,7 +136,7 @@ class IsOwnerOrRelatedToClub(permissions.BasePermission):
 
         if not perm:
             logger.warning(f"No group permissions for {resource} for user: {request.user.username}")
-            return request.user.role in self.FULL_ACCESS_ROLES
+            return False
 
         if request.method in permissions.SAFE_METHODS:
             if not perm.can_view:
@@ -172,6 +190,21 @@ class IsOwnerOrRelatedToClub(permissions.BasePermission):
             logger.error(f"Permission or club mismatch: {resource}, user: {request.user.username}")
             return False
 
+        # إذا كان المستخدم أدمن أو مالك، السماح بجميع العمليات
+        if request.user.role in self.FULL_ACCESS_ROLES:
+            return True
+
+        # عند تعليق الصلاحيات
+        if RESTRICTIONS_SUSPENDED:
+            # منع PUT/DELETE لغير الأدمن والمالك
+            if request.method in ['PUT', 'PATCH', 'DELETE']:
+                logger.warning(f"{request.method} permission denied for {resource} for user: {request.user.username}")
+                return False
+            # السماح بـ GET بدون قيود
+            logger.debug(f"Restrictions suspended, allowing {request.method} for {resource} for user: {request.user.username}")
+            return True
+
+        # المنطق الطبيعي (بدون تعليق الصلاحيات)
         if request.method in permissions.SAFE_METHODS:
             if not perm.can_view:
                 return False
