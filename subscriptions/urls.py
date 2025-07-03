@@ -4,11 +4,11 @@ from django.contrib.auth.decorators import login_required
 
 urlpatterns = [
     # Template Views
-    path('subscriptions/', login_required(views.subscription_list), name='subscription_list'),
-    path('subscriptions/add/', login_required(views.add_subscription), name='add_subscription'),
-    path('subscriptions/<int:subscription_id>/edit/', login_required(views.edit_subscription), name='edit_subscription'),
-    path('subscriptions/<int:subscription_id>/delete/', login_required(views.delete_subscription), name='delete_subscription'),
-    path('subscriptions/<int:subscription_id>/', login_required(views.subscription_detail), name='subscription_detail'),
+    # path('subscriptions/', login_required(views.subscription_list), name='subscription_list'),
+    # path('subscriptions/add/', login_required(views.add_subscription), name='add_subscription'),
+    # path('subscriptions/<int:subscription_id>/edit/', login_required(views.edit_subscription), name='edit_subscription'),
+    # path('subscriptions/<int:subscription_id>/delete/', login_required(views.delete_subscription), name='delete_subscription'),
+    # path('subscriptions/<int:subscription_id>/', login_required(views.subscription_detail), name='subscription_detail'),
   # Subscription Types
     path('api/subscription-types/', api.subscription_type_list, name='api-subscription-type-list'),
     path('api/subscription-types/<int:pk>/', api.subscription_type_detail, name='api-subscription-type-detail'),

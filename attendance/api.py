@@ -12,6 +12,8 @@ from .models import Attendance, EntryLog
 from members.models import Member
 from .serializers import AttendanceSerializer, EntryLogSerializer
 from django.db.models import Case, When, F, BooleanField, Q, Count
+from django.utils.dateparse import parse_datetime
+from staff.models import StaffAttendance
 
 logger = logging.getLogger(__name__)
 
@@ -68,11 +70,10 @@ def member_attendance_heatmap_api(request):
         for entry in daily_counts
     ]
     return Response(heatmap_data)
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def attendance_list_api(request):
-    """Get paginated list of attendances with optional filters."""
+    """Get paginated list of attendances with optional filters, restricted to active shift for non-owner/admin users by default."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
@@ -86,8 +87,22 @@ def attendance_list_api(request):
         subscription__club=request.user.club
     )
 
-    is_search_mode = rfid or member_name
-    if not is_search_mode and not attendance_date:
+    # Restrict attendances to those linked to subscriptions created during active shift for non-owner/admin users, unless filtering
+    is_search_mode = rfid or member_name or attendance_date
+    if not is_search_mode and request.user.role not in ['owner', 'admin']:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user, club=request.user.club, check_out__isnull=True
+        ).order_by('-check_in').first()
+        if not attendance:
+            logger.warning(f"No active shift for user: {request.user.username}")
+            return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
+        attendances = attendances.filter(
+            subscription__created_by=request.user,
+            subscription__start_date__gte=attendance.check_in,
+            subscription__start_date__lte=attendance.check_out or timezone.now()
+        )
+
+    if not is_search_mode:
         start_date = timezone.now().date() - timedelta(days=2)
         attendances = attendances.filter(attendance_date__gte=start_date)
 
@@ -95,8 +110,11 @@ def attendance_list_api(request):
         attendances = attendances.filter(subscription__member__rfid_code__iexact=rfid)
     if attendance_date:
         try:
-            date_obj = datetime.strptime(attendance_date, '%Y-%m-%d').date()
-            attendances = attendances.filter(attendance_date=date_obj)
+            date_obj = parse_datetime(attendance_date)
+            if not date_obj:
+                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+            date_obj = timezone.make_aware(date_obj) if timezone.is_naive(date_obj) else date_obj
+            attendances = attendances.filter(attendance_date=date_obj.date())
         except ValueError:
             return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
     if member_name:
@@ -197,14 +215,13 @@ def attendance_last_hour_api(request):
     now = timezone.now()
     one_hour_ago = now - timedelta(hours=1)
     
-    # تحديد تاريخ اليوم لضمان عدم عد السجلات من أيام سابقة
     today = now.date()
     
     attendances = Attendance.objects.filter(
         subscription__club=request.user.club,
-        attendance_date=today,  # التحقق من تاريخ الحضور
-        entry_time__gte=one_hour_ago.time(),  # وقت الدخول في آخر ساعة
-        entry_time__lte=now.time()  # وقت الدخول حتى الآن
+        attendance_date=today, 
+        entry_time__gte=one_hour_ago.time(),
+        entry_time__lte=now.time()  
     )
     
     count = attendances.count()

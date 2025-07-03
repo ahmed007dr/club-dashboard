@@ -14,21 +14,37 @@ from .serializers import MemberSerializer
 from attendance.models import Attendance
 from utils.generate_membership_number import generate_membership_number
 import logging
+from staff.models import StaffAttendance
 
 logger = logging.getLogger(__name__)
 
 FULL_ACCESS_ROLES = ['owner', 'admin']
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def member_list_api(request):
-    """List members with optional search."""
+    """List members with optional search, showing only members added during active shift for non-owner/admin users by default."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
-    search_term = request.GET.get('q', '')
-    members = Member.objects.filter(club=request.user.club).order_by('-id')
+    search_term = request.GET.get('q', '').strip()
+    members = Member.objects.filter(club=request.user.club)
+
+    # Restrict members to those linked to subscriptions created during active shift for non-owner/admin users, unless searching
+    if request.user.role not in ['owner', 'admin'] and not search_term:
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user, club=request.user.club, check_out__isnull=True
+        ).order_by('-check_in').first()
+        if not attendance:
+            logger.warning(f"No active shift for user: {request.user.username}")
+            return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
+        members = members.filter(
+            subscriptions__created_by=request.user,
+            subscriptions__start_date__gte=attendance.check_in,
+            subscriptions__start_date__lte=attendance.check_out or timezone.now()
+        ).distinct()
 
     if search_term:
         members = members.filter(
@@ -37,6 +53,7 @@ def member_list_api(request):
             Q(rfid_code__icontains=search_term)
         )
 
+    members = members.order_by('-id')
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(members, request)
     serializer = MemberSerializer(result_page, many=True)

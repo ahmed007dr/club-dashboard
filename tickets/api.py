@@ -11,6 +11,8 @@ from .serializers import TicketSerializer, TicketTypeSerializer
 from finance.models import Income, IncomeSource
 from datetime import datetime
 import logging
+from django.utils.dateparse import parse_datetime
+from staff.models import StaffAttendance
 
 logger = logging.getLogger(__name__)
 
@@ -38,28 +40,49 @@ def ticket_type_list_api(request):
     serializer = TicketTypeSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def ticket_list_api(request):
-    """List tickets with optional filters."""
+    """List tickets with optional filters, restricted to active shift for non-owner/admin users by default."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     tickets = Ticket.objects.select_related('club', 'ticket_type', 'issued_by').filter(club=request.user.club)
+    
+    # Restrict tickets to those issued during active shift for non-owner/admin users, unless filtering
+    if request.user.role not in ['owner', 'admin'] and not (request.query_params.get('ticket_type') or request.query_params.get('issue_date')):
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user, club=request.user.club, check_out__isnull=True
+        ).order_by('-check_in').first()
+        if not attendance:
+            logger.warning(f"No active shift for user: {request.user.username}")
+            return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
+        tickets = tickets.filter(
+            issued_by=request.user,
+            issue_datetime__gte=attendance.check_in,
+            issue_datetime__lte=attendance.check_out or timezone.now()
+        )
+
     if request.query_params.get('ticket_type'):
         tickets = tickets.filter(ticket_type__id=request.query_params.get('ticket_type'))
     if request.query_params.get('issue_date'):
         try:
-            date_obj = datetime.strptime(request.query_params.get('issue_date'), '%Y-%m-%d').date()
-            tickets = tickets.filter(issue_datetime__date=date_obj)
+            date_obj = parse_datetime(request.query_params.get('issue_date'))
+            if not date_obj:
+                return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+            date_obj = timezone.make_aware(date_obj) if timezone.is_naive(date_obj) else date_obj
+            tickets = tickets.filter(issue_datetime__date=date_obj.date())
         except ValueError:
             return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+
     tickets = tickets.order_by('-id')
     paginator = StandardPagination()
     result_page = paginator.paginate_queryset(tickets, request)
     serializer = TicketSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
