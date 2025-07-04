@@ -177,7 +177,11 @@ function StaffAttendanceReport() {
                 reportData.map((staff) =>
                   staff.monthly_data.map((entry) => (
                     <tr key={`${staff.staff_id}-${entry.month}`} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 text-sm">{staff.staff_name}</td>
+                      <td className="px-6 py-4 text-sm">
+                        {staff.first_name || staff.last_name 
+                          ? `${staff.first_name} ${staff.last_name}`.trim() 
+                          : staff.username || 'غير متوفر'}
+                      </td>
                       <td className="px-6 py-4 text-sm">{staff.rfid_code || '—'}</td>
                       <td className="px-6 py-4 text-sm">{entry.total_hours}</td>
                       <td className="px-6 py-4 text-sm">{entry.attendance_days}</td>
@@ -189,7 +193,7 @@ function StaffAttendanceReport() {
                 )
               ) : (
                 <tr>
-                  <td colSpan="5" className="px-6 py-6 text-center text-gray-500">
+                  <td colSpan="5" className="px-6 py-4 text-center text-gray-500">
                     لا توجد بيانات حضور متاحة لهذا الشهر
                   </td>
                 </tr>

@@ -62,6 +62,10 @@ const FinancialDashboard = () => {
   const [users, setUsers] = useState([]);
   const [categories, setCategories] = useState([]);
   const [sources, setSources] = useState([]);
+  // حالات لتتبع الصفحات الحالية
+  const [incomePage, setIncomePage] = useState(1);
+  const [expensePage, setExpensePage] = useState(1);
+  const itemsPerPage = 10; // عدد العناصر لكل صفحة
 
   const periodOptions = [
     { value: 'daily', label: 'يومي' },
@@ -125,6 +129,9 @@ const FinancialDashboard = () => {
 
       setData(response.data);
       setError(null);
+      // إعادة تعيين الصفحات إلى 1 عند جلب بيانات جديدة
+      setIncomePage(1);
+      setExpensePage(1);
     } catch (err) {
       let errorMessage = 'حدث خطأ أثناء جلب البيانات';
       if (err.response) {
@@ -159,6 +166,21 @@ const FinancialDashboard = () => {
   const handleFilterChange = (name, value) => {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
+
+  // دالة لتقسيم البيانات إلى صفحات
+  const paginate = (items, page) => {
+    const startIndex = (page - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return items.slice(startIndex, endIndex);
+  };
+
+  // حساب عدد الصفحات للإيرادات والمصروفات
+  const incomeTotalPages = data?.income_details
+    ? Math.ceil(data.income_details.length / itemsPerPage)
+    : 0;
+  const expenseTotalPages = data?.expense_details
+    ? Math.ceil(data.expense_details.length / itemsPerPage)
+    : 0;
 
   // تحضير بيانات الرسوم البيانية
   const prepareLineChartData = () => {
@@ -665,7 +687,7 @@ const FinancialDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {data.income_details.map((item, index) => (
+                        {paginate(data.income_details, incomePage).map((item, index) => (
                           <tr key={item.id || index}>
                             <td className="px-6 py-4 text-right">
                               {new Date(item.date).toLocaleDateString('ar-EG')}
@@ -680,6 +702,28 @@ const FinancialDashboard = () => {
                       </tbody>
                     </table>
                   </div>
+                  {/* أزرار التنقل للإيرادات */}
+                  {incomeTotalPages > 1 && (
+                    <div className="flex justify-between mt-4">
+                      <button
+                        onClick={() => setIncomePage(prev => Math.max(prev - 1, 1))}
+                        disabled={incomePage === 1}
+                        className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg disabled:opacity-50"
+                      >
+                        السابق
+                      </button>
+                      <span className="text-gray-800 dark:text-gray-200">
+                        الصفحة {incomePage} من {incomeTotalPages}
+                      </span>
+                      <button
+                        onClick={() => setIncomePage(prev => Math.min(prev + 1, incomeTotalPages))}
+                        disabled={incomePage === incomeTotalPages}
+                        className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg disabled:opacity-50"
+                      >
+                        التالي
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               {data.expense_details && (
@@ -706,7 +750,7 @@ const FinancialDashboard = () => {
                         </tr>
                       </thead>
                       <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                        {data.expense_details.map((item, index) => (
+                        {paginate(data.expense_details, expensePage).map((item, index) => (
                           <tr key={item.id || index}>
                             <td className="px-6 py-4 text-right">
                               {new Date(item.date).toLocaleDateString('ar-EG')}
@@ -721,6 +765,28 @@ const FinancialDashboard = () => {
                       </tbody>
                     </table>
                   </div>
+                  {/* أزرار التنقل للمصروفات */}
+                  {expenseTotalPages > 1 && (
+                    <div className="flex justify-between mt-4">
+                      <button
+                        onClick={() => setExpensePage(prev => Math.max(prev - 1, 1))}
+                        disabled={expensePage === 1}
+                        className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg disabled:opacity-50"
+                      >
+                        السابق
+                      </button>
+                      <span className="text-gray-800 dark:text-gray-200">
+                        الصفحة {expensePage} من {expenseTotalPages}
+                      </span>
+                      <button
+                        onClick={() => setExpensePage(prev => Math.min(prev + 1, expenseTotalPages))}
+                        disabled={expensePage === expenseTotalPages}
+                        className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg disabled:opacity-50"
+                      >
+                        التالي
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
