@@ -45,44 +45,64 @@ const AttendanceDashboard = () => {
     status: "checkedIn",
   });
 
-  // Fetch staff by RFID
-  const fetchStaffByRfid = async (rfid) => {
+  // Fetch staff by RFID using check-in/check-out endpoints
+  const fetchStaffByRfid = async (rfid, isCheckIn = true) => {
     try {
       const token = localStorage.getItem("token");
-      const headers = { Authorization: `Bearer ${token}` };
-      const response = await axios.get(`${BASE_URL}accounts/api/users/?q=${rfid}`, { headers });
-      return response.data.results || null;
+      if (!token) throw new Error("Authentication token missing");
+      const endpoint = isCheckIn ? 'check-in' : 'check-out';
+      const response = await axios.post(
+        `${BASE_URL}staff/api/${endpoint}/`,
+        { rfid_code: rfid },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      return response.data.staff_details || null;
     } catch (error) {
-      console.error("Error fetching staff:", error);
-      return null;
+      console.error(`Error fetching staff for ${isCheckIn ? 'check-in' : 'check-out'}:`, error.response?.data || error.message);
+      throw new Error(error.response?.data?.error || "فشل البحث عن الموظف");
     }
   };
 
   // Debounced RFID search for Check-In
   const debouncedFetchStaffCheckIn = debounce(async (value) => {
     setLoadingCheckIn(true);
-    const results = await fetchStaffByRfid(value);
-    setLoadingCheckIn(false);
-
-    const staff = results.find((staff) => staff.rfid_code === value);
-    if (!staff) {
-      setErrorCheckIn("لم يتم العثور على موظف بهذا الرمز");
-    } else {
-      setFoundStaffCheckIn(staff);
+    try {
+      const staff = await fetchStaffByRfid(value, true);
+      setLoadingCheckIn(false);
+      if (!staff) {
+        setErrorCheckIn("لم يتم العثور على موظف بهذا الرمز");
+      } else {
+        setFoundStaffCheckIn(staff);
+        toast.success("تم تسجيل الحضور بنجاح", { icon: "✅" });
+        dispatch(fetchShiftAttendances()); // Update attendance table
+      }
+    } catch (error) {
+      setLoadingCheckIn(false);
+      setErrorCheckIn(error.message);
     }
   }, 500);
 
   // Debounced RFID search for Check-Out
   const debouncedFetchStaffCheckOut = debounce(async (value) => {
     setLoadingCheckOut(true);
-    const results = await fetchStaffByRfid(value);
-    setLoadingCheckOut(false);
-
-    const staff = results.find((staff) => staff.rfid_code === value);
-    if (!staff) {
-      setErrorCheckOut("لم يتم العثور على موظف بهذا الرمز");
-    } else {
-      setFoundStaffCheckOut(staff);
+    try {
+      const staff = await fetchStaffByRfid(value, false);
+      setLoadingCheckOut(false);
+      if (!staff) {
+        setErrorCheckOut("لم يتم العثور على موظف بهذا الرمز");
+      } else {
+        setFoundStaffCheckOut(staff);
+        toast.success("تم تسجيل الانصراف بنجاح", { icon: "✅" });
+        dispatch(fetchShiftAttendances()); // Update attendance table
+      }
+    } catch (error) {
+      setLoadingCheckOut(false);
+      setErrorCheckOut(error.message);
     }
   }, 500);
 
@@ -122,20 +142,11 @@ const AttendanceDashboard = () => {
       setErrorCheckIn("الرجاء إدخال رمز RFID صحيح");
       return;
     }
-
-    setLoadingCheckIn(true);
-    const result = await dispatch(checkInStaff(rfidCheckInRef.current));
-    setLoadingCheckIn(false);
-
-    if (checkInStaff.fulfilled.match(result)) {
-      toast.success("تم تسجيل الدخول بنجاح", { icon: "✅" });
-      setRfidCodeCheckIn("");
-      rfidCheckInRef.current = "";
-      setFoundStaffCheckIn(null);
-      dispatch(fetchShiftAttendances());
-    } else {
-      toast.error(result.payload?.error || "فشل في تسجيل الدخول", { icon: "❌" });
-    }
+    // Check-in is already handled in debouncedFetchStaffCheckIn
+    setRfidCodeCheckIn("");
+    rfidCheckInRef.current = "";
+    setFoundStaffCheckIn(null);
+    setErrorCheckIn("");
   };
 
   const handleCheckOutSubmit = async (e) => {
@@ -144,20 +155,11 @@ const AttendanceDashboard = () => {
       setErrorCheckOut("الرجاء إدخال رمز RFID صحيح");
       return;
     }
-
-    setLoadingCheckOut(true);
-    const result = await dispatch(checkOutStaff(rfidCheckOutRef.current));
-    setLoadingCheckOut(false);
-
-    if (checkOutStaff.fulfilled.match(result)) {
-      toast.success("تم تسجيل الخروج بنجاح", { icon: "✅" });
-      setRfidCodeCheckOut("");
-      rfidCheckOutRef.current = "";
-      setFoundStaffCheckOut(null);
-      dispatch(fetchShiftAttendances());
-    } else {
-      toast.error(result.payload?.error || "فشل في تسجيل الخروج", { icon: "❌" });
-    }
+    // Check-out is already handled in debouncedFetchStaffCheckOut
+    setRfidCodeCheckOut("");
+    rfidCheckOutRef.current = "";
+    setFoundStaffCheckOut(null);
+    setErrorCheckOut("");
   };
 
   // Handle reset
