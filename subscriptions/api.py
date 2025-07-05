@@ -243,7 +243,6 @@ def active_subscription_types(request):
     serializer = SubscriptionTypeSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def subscription_list(request):
@@ -255,7 +254,7 @@ def subscription_list(request):
     
     if request.method == 'GET':
         search_term = request.query_params.get('searchTerm', request.query_params.get('search_term', '')).strip()
-        identifier = request.query_params.get('identifier', '')
+        identifier = request.query_params.get('identifier', '').strip()
         club_id = request.query_params.get('club', request.user.club.id)
         today = timezone.now().date()
         ordering = request.query_params.get('ordering', '')
@@ -298,6 +297,7 @@ def subscription_list(request):
                 Q(member__rfid_code=identifier) | Q(member__phone=identifier),
                 can_enter=True
             ).order_by('-start_date')[:1]
+
         else:
             if search_term:
                 subscriptions = subscriptions.filter(
@@ -329,14 +329,18 @@ def subscription_list(request):
                 elif status_param == 'upcoming':
                     subscriptions = subscriptions.filter(start_date__gt=today)
 
+            if not (search_term or identifier or request.query_params.get('status')):
+                subscriptions = subscriptions.filter(remaining_amount__gt=0)
+
             if ordering:
                 if ordering in ['remaining_amount', '-remaining_amount', 'start_date', '-start_date']:
-                    subscriptions = subscriptions.order_by(f'{ordering}', '-id')
+                    subscriptions = subscriptions.order_by(ordering, '-id')
                 else:
                     subscriptions = subscriptions.order_by(ordering)
             else:
                 subscriptions = subscriptions.order_by('-remaining_amount', '-start_date')
 
+        # Pagination and serialization
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page or subscriptions, many=True, context={'request': request})

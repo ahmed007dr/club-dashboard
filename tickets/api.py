@@ -10,6 +10,7 @@ from .models import Ticket, TicketType
 from .serializers import TicketSerializer, TicketTypeSerializer
 from finance.models import Income, IncomeSource
 from datetime import datetime
+from datetime import timedelta
 import logging
 from django.utils.dateparse import parse_datetime
 from staff.models import StaffAttendance
@@ -44,15 +45,18 @@ def ticket_type_list_api(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def ticket_list_api(request):
-    """List tickets with optional filters, restricted to active shift for non-owner/admin users by default."""
+    """List tickets with optional filters, defaulting to last 24 hours if no filters provided."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     tickets = Ticket.objects.select_related('club', 'ticket_type', 'issued_by').filter(club=request.user.club)
-    
-    # Restrict tickets to those issued during active shift for non-owner/admin users, unless filtering
-    if request.user.role not in ['owner', 'admin'] and not (request.query_params.get('ticket_type') or request.query_params.get('issue_date')):
+
+    ticket_type_param = request.query_params.get('ticket_type')
+    issue_date_param = request.query_params.get('issue_date')
+
+    # Restrict tickets based on role and filters
+    if request.user.role not in ['owner', 'admin'] and not (ticket_type_param or issue_date_param):
         attendance = StaffAttendance.objects.filter(
             staff=request.user, club=request.user.club, check_out__isnull=True
         ).order_by('-check_in').first()
@@ -65,11 +69,14 @@ def ticket_list_api(request):
             issue_datetime__lte=attendance.check_out or timezone.now()
         )
 
-    if request.query_params.get('ticket_type'):
-        tickets = tickets.filter(ticket_type__id=request.query_params.get('ticket_type'))
-    if request.query_params.get('issue_date'):
+    elif not (ticket_type_param or issue_date_param):
+        last_24_hours = timezone.now() - timedelta(hours=24)
+        tickets = tickets.filter(issue_datetime__gte=last_24_hours)
+    if ticket_type_param:
+        tickets = tickets.filter(ticket_type__id=ticket_type_param)
+    if issue_date_param:
         try:
-            date_obj = parse_datetime(request.query_params.get('issue_date'))
+            date_obj = parse_datetime(issue_date_param)
             if not date_obj:
                 return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
             date_obj = timezone.make_aware(date_obj) if timezone.is_naive(date_obj) else date_obj

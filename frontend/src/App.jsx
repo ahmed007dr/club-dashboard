@@ -40,7 +40,6 @@ import useTokenRefresh from './hooks/useTokenRefresh';
 import StaffAttendanceReport from './components/dashboard/StaffAttendanceReport.jsx';
 import StockAnalytics from './components/dashboard/StockAnalytics.jsx';
 import StaffSalaryReport from './components/dashboard/StaffSalaryReport.jsx';
-
 import AttendanceDashboard from './components/dashboard/AttendanceDashboard.jsx';
 import { Toaster } from 'react-hot-toast';
 

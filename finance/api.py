@@ -85,18 +85,43 @@ def expense_category_api(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def expense_api(request):
-    """List or create expenses."""
+    """List or create expenses. Defaults to last 24 hours if no filters applied."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+
     if request.method == 'GET':
         expenses = Expense.objects.select_related('category', 'paid_by', 'related_employee').filter(club=request.user.club)
+
+        category_param = request.query_params.get('category')
+        amount_param = request.query_params.get('amount')
+        desc_param = request.query_params.get('description')
+
+        if not (category_param or amount_param or desc_param):
+            last_24_hours = timezone.now() - timedelta(hours=24)
+            expenses = expenses.filter(date__gte=last_24_hours)
+
+        if category_param:
+            try:
+                expenses = expenses.filter(category_id=int(category_param))
+            except ValueError:
+                return Response({'error': 'معرف التصنيف غير صالح'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if amount_param:
+            try:
+                expenses = expenses.filter(amount=float(amount_param))
+            except ValueError:
+                return Response({'error': 'صيغة المبلغ غير صحيحة'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if desc_param:
+            expenses = expenses.filter(description__icontains=desc_param)
+
         expenses = expenses.order_by('-id')
         paginator = StandardPagination()
         page = paginator.paginate_queryset(expenses, request)
         serializer = ExpenseSerializer(page, many=True, context={'request': request})
         return paginator.get_paginated_response(serializer.data)
+    
     elif request.method == 'POST':
         data = request.data.copy()
         data['paid_by'] = request.user.id
@@ -145,16 +170,21 @@ def income_source_api(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def income_api(request):
-    """List or create incomes, restricted to active shift for non-owner/admin users."""
+    """List or create incomes, restricted to active shift for non-owner/admin users or last 24 hours if no filter."""
+    
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+
     if request.method == 'GET':
         incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club)
-        
-        # Restrict incomes to active shift for non-owner/admin users
-        if request.user.role not in ['owner', 'admin']:
+
+        source_param = request.query_params.get('source')
+        amount_param = request.query_params.get('amount')
+        desc_param = request.query_params.get('description')
+
+        # فلترة وردية الموظف غير الأدمن
+        if request.user.role not in ['owner', 'admin'] and not (source_param or amount_param or desc_param):
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
@@ -167,28 +197,35 @@ def income_api(request):
                 date__lte=attendance.check_out or timezone.now()
             )
 
-        if request.query_params.get('source'):
+ 
+        elif not (source_param or amount_param or desc_param):
+            last_24_hours = timezone.now() - timedelta(hours=24)
+            incomes = incomes.filter(date__gte=last_24_hours)
+
+        if source_param:
             try:
-                source_id = int(request.query_params.get('source'))
+                source_id = int(source_param)
                 if not IncomeSource.objects.filter(id=source_id, club=request.user.club).exists():
                     return Response({"error": "مصدر الإيراد غير موجود في ناديك"}, status=status.HTTP_400_BAD_REQUEST)
                 incomes = incomes.filter(source_id=source_id)
             except ValueError:
                 return Response({"error": "معرف مصدر غير صالح"}, status=status.HTTP_400_BAD_REQUEST)
-        if request.query_params.get('amount'):
+
+        if amount_param:
             try:
-                incomes = incomes.filter(amount=float(request.query_params.get('amount')))
+                incomes = incomes.filter(amount=float(amount_param))
             except ValueError:
                 return Response({"error": "صيغة المبلغ غير صحيحة"}, status=status.HTTP_400_BAD_REQUEST)
-        if request.query_params.get('description'):
-            incomes = incomes.filter(description__icontains=request.query_params.get('description'))
-        
+
+        if desc_param:
+            incomes = incomes.filter(description__icontains=desc_param)
+
         incomes = incomes.order_by('-id')
         paginator = StandardPagination()
         page = paginator.paginate_queryset(incomes, request)
         serializer = IncomeSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
-    
+
     elif request.method == 'POST':
         data = request.data.copy()
         data['received_by'] = request.user.id
