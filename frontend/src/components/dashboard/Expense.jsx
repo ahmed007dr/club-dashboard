@@ -47,19 +47,25 @@ const Expenses = () => {
     date: "",
     invoice_number: "",
     attachment: null,
-    related_employee: "", // حقل جديد
+    related_employee: "",
   });
   const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
   const [filters, setFilters] = useState({
     category: "",
-    startDate: "",
-    endDate: "",
+    user: "",
+    amount: "",
+    description: "",
+    start_date: new Date().toISOString().slice(0, 10), // آخر 24 ساعة
+    end_date: new Date().toISOString().slice(0, 10),
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [userClub, setUserClub] = useState(null);
   const [errors, setErrors] = useState({});
   const [isSummaryClicked, setIsSummaryClicked] = useState(false);
+  const [localExpenses, setLocalExpenses] = useState([]); // لتخزين البيانات المفلترة من الإجمالي
+  const [localTotalExpenses, setLocalTotalExpenses] = useState(0); // لتخزين الإجمالي المحلي
+  const [localTotalExpensesCount, setLocalTotalExpensesCount] = useState(0); // لتخزين عدد المصروفات المحلي
   const itemsPerPage = 20;
   const maxButtons = 5;
 
@@ -93,7 +99,7 @@ const Expenses = () => {
         setNewExpense((prev) => ({ ...prev, club: data.club.id.toString() }));
       })
       .catch((err) => {
-        console.error("Failed to fetch user profile:", err);
+        console.error("فشل في تحميل بيانات المستخدم:", err);
         setErrors({ general: "فشل في تحميل بيانات المستخدم" });
       });
   }, []);
@@ -103,9 +109,12 @@ const Expenses = () => {
       dispatch(
         fetchExpenses({
           page,
-          start_date: filters.startDate,
-          end_date: filters.endDate,
           category: filters.category,
+          user: filters.user,
+          amount: filters.amount,
+          description: filters.description,
+          start_date: filters.start_date,
+          end_date: filters.end_date,
         })
       );
     }, 300),
@@ -147,15 +156,13 @@ const Expenses = () => {
 
     const expenseData = {
       club: parseInt(data.club),
-      category: parseInt(data.category) || 1,
+      category: parseInt(data.category),
       amount: parseFloat(data.amount),
       date: data.date,
       description: data.description || "",
       invoice_number: data.invoice_number || "",
-      related_employee: data.related_employee ? parseInt(data.related_employee) : null, // إضافة حقل related_employee
+      related_employee: data.related_employee ? parseInt(data.related_employee) : null,
     };
-
-    console.log("Sending expenseData:", expenseData); // للتصحيح
 
     const action = currentExpense
       ? updateExpense({ id: currentExpense.id, updatedData: expenseData })
@@ -173,11 +180,11 @@ const Expenses = () => {
         date: "",
         invoice_number: "",
         attachment: null,
-        related_employee: "", // إعادة تعيين
+        related_employee: "",
       });
       setErrors({});
       setCurrentPage(1);
-      dispatch(fetchExpenses({ page: 1, filters }));
+      dispatch(fetchExpenses({ page: 1, ...filters }));
     } catch (err) {
       console.error("فشل في حفظ المصروف:", err);
       setErrors({ general: err.message || "فشل في حفظ المصروف. تحقق من البيانات." });
@@ -188,9 +195,12 @@ const Expenses = () => {
     try {
       await dispatch(
         fetchAllExpenses({
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-          categoryId: filters.category,
+          category: filters.category,
+          user: filters.user,
+          amount: filters.amount,
+          description: filters.description,
+          start_date: filters.start_date,
+          end_date: filters.end_date,
         })
       ).unwrap();
 
@@ -204,6 +214,9 @@ const Expenses = () => {
         'الموظف المرتبط': expense.related_employee_details?.first_name && expense.related_employee_details?.last_name
           ? `${expense.related_employee_details.first_name} ${expense.related_employee_details.last_name}`
           : expense.related_employee_details?.username || 'غير متاح',
+        'الموظف المدفوع بواسطة': expense.paid_by_details?.first_name && expense.paid_by_details?.last_name
+          ? `${expense.paid_by_details.first_name} ${expense.paid_by_details.last_name}`
+          : expense.paid_by_details?.username || 'غير متاح',
       }));
 
       if (isSummaryClicked && totalExpensesCount > 0) {
@@ -215,18 +228,13 @@ const Expenses = () => {
           'التاريخ': "",
           'رقم الفاتورة': "",
           'الموظف المرتبط': "",
+          'الموظف المدفوع بواسطة': "",
         });
       }
 
       const ws = XLSX.utils.json_to_sheet(data);
       ws["!cols"] = [
-        { wch: 20 },
-        { wch: 20 },
-        { wch: 15 },
-        { wch: 30 },
-        { wch: 15 },
-        { wch: 15 },
-        { wch: 20 }, // عمود جديد
+        { wch: 20 }, { wch: 20 }, { wch: 15 }, { wch: 30 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 20 },
       ];
 
       const wb = XLSX.utils.book_new();
@@ -263,7 +271,7 @@ const Expenses = () => {
     }
 
     return buttons;
-  }, []);
+  }, [maxButtons]);
 
   const handleEditClick = (expense) => {
     const sanitizedExpense = {
@@ -275,7 +283,7 @@ const Expenses = () => {
       date: expense.date || "",
       invoice_number: expense.invoice_number || "",
       attachment: null,
-      related_employee: expense.related_employee?.toString() || "", // إضافة حقل related_employee
+      related_employee: expense.related_employee?.toString() || "",
     };
     setCurrentExpense(sanitizedExpense);
     setShowModal(true);
@@ -293,7 +301,7 @@ const Expenses = () => {
         .then(() => {
           setConfirmDeleteModal(false);
           setExpenseToDelete(null);
-          dispatch(fetchExpenses({ page: currentPage, filters }));
+          dispatch(fetchExpenses({ page: currentPage, ...filters }));
         })
         .catch((err) => {
           console.error("فشل في حذف المصروف:", err);
@@ -304,38 +312,66 @@ const Expenses = () => {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters((prev) => ({ ...prev, [name]: value }));
+    if ((name === "start_date" || name === "end_date") && value && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      setErrors((prev) => ({ ...prev, [name]: "صيغة التاريخ غير صحيحة (YYYY-MM-DD)" }));
+      return;
+    }
+    setFilters((prev) => ({ ...prev, [name]: value || "" }));
+    setCurrentPage(1);
+    setErrors((prev) => ({ ...prev, [name]: "" }));
+  };
+
+  const handleSelectChange = (name, value) => {
+    setFilters((prev) => ({ ...prev, [name]: value === "all" ? "" : value }));
     setCurrentPage(1);
   };
 
   const handleResetFilters = () => {
+    const today = new Date().toISOString().slice(0, 10);
     setFilters({
       category: "",
-      startDate: "",
-      endDate: "",
+      user: "",
+      amount: "",
+      description: "",
+      start_date: today,
+      end_date: today,
     });
     setCurrentPage(1);
     setIsSummaryClicked(false);
+    setLocalExpenses([]);
+    setLocalTotalExpenses(0);
+    setLocalTotalExpensesCount(0);
   };
 
   const handleCalculateTotal = async () => {
     try {
+      const startDate = filters.start_date || new Date().toISOString().slice(0, 10);
+      const endDate = filters.end_date || new Date().toISOString().slice(0, 10);
       const response = await dispatch(
         fetchExpenseSummary({
-          start: filters.startDate || null,
-          end: filters.endDate || null,
-          details: true,
-          userId: user.id,
           category: filters.category || null,
+          user: filters.user || null,
+          amount: filters.amount || null,
+          description: filters.description || null,
+          start_date: startDate,
+          end_date: endDate,
+          details: true,
         })
       ).unwrap();
-      setIsSummaryClicked(true);
-      if (!response.details || response.details.length === 0) {
+      if (response && response.details) {
+        setLocalExpenses(response.details);
+        setLocalTotalExpenses(response.total_expense || 0);
+        setLocalTotalExpensesCount(response.details.length || 0);
+        setIsSummaryClicked(true);
+      } else {
+        setLocalExpenses([]);
+        setLocalTotalExpenses(0);
+        setLocalTotalExpensesCount(0);
         setErrors({ general: "لا توجد مصروفات في هذا النطاق" });
       }
     } catch (err) {
       console.error("فشل في حساب الإجمالي:", err);
-      setErrors({ general: "فشل في حساب الإجمالي" });
+      setErrors({ general: "فشل في حساب الإجمالي: " + (err.message || "خطأ غير معروف") });
     }
   };
 
@@ -343,60 +379,63 @@ const Expenses = () => {
     ? Math.ceil(expensesPagination.count / itemsPerPage)
     : 1;
 
-  const PaginationControls = useCallback(({ currentPage, setPage, pageCount }) => (
-    <div className="flex justify-center items-center mt-6 gap-4">
-      <Button
-        onClick={() => setPage(currentPage - 1)}
-        disabled={currentPage === 1}
-        variant="outline"
-        className="px-3 py-1 text-sm"
-      >
-        السابق
-      </Button>
-      <div className="flex gap-1">
-        {getPageButtons(currentPage, pageCount).map((page, index) => (
-          <Button
-            key={index}
-            onClick={() => typeof page === "number" && setPage(page)}
-            variant={currentPage === page ? "default" : "outline"}
-            disabled={typeof page !== "number"}
-            className={`px-3 py-1 text-sm ${typeof page !== "number" ? "cursor-default" : ""}`}
-          >
-            {page}
-          </Button>
-        ))}
+  const PaginationControls = useCallback(
+    ({ currentPage, setPage, pageCount }) => (
+      <div className="flex justify-center items-center mt-6 gap-4">
+        <Button
+          onClick={() => setPage(currentPage - 1)}
+          disabled={currentPage === 1}
+          variant="outline"
+          className="px-3 py-1 text-sm"
+        >
+          السابق
+        </Button>
+        <div className="flex gap-1">
+          {getPageButtons(currentPage, pageCount).map((page, index) => (
+            <Button
+              key={index}
+              onClick={() => typeof page === "number" && setPage(page)}
+              variant={currentPage === page ? "default" : "outline"}
+              disabled={typeof page !== "number"}
+              className={`px-3 py-1 text-sm ${typeof page !== "number" ? "cursor-default" : ""}`}
+            >
+              {page}
+            </Button>
+          ))}
+        </div>
+        <Button
+          onClick={() => setPage(currentPage + 1)}
+          disabled={currentPage === pageCount || !expensesPagination?.next}
+          variant="outline"
+          className="px-3 py-1 text-sm"
+        >
+          التالي
+        </Button>
+        <span className="text-sm text-gray-600">
+          صفحة {currentPage} من {pageCount || 1}
+        </span>
       </div>
-      <Button
-        onClick={() => setPage(currentPage + 1)}
-        disabled={currentPage === pageCount || !expensesPagination?.next}
-        variant="outline"
-        className="px-3 py-1 text-sm"
-      >
-        التالي
-      </Button>
-      <span className="text-sm text-gray-600">
-        صفحة {currentPage} من {pageCount || 1}
-      </span>
-    </div>
-  ), [getPageButtons, expensesPagination]);
+    ),
+    [getPageButtons, expensesPagination]
+  );
 
   const summaryCard = useMemo(() => {
     if (!isSummaryClicked) return null;
-    if (totalExpenses > 0) {
+    if (localTotalExpenses > 0) {
       return (
         <div className="bg-teal-50 border border-teal-200 rounded-lg p-4 text-right mb-4">
           <div className="flex items-center gap-2">
             <FiDollarSign className="text-teal-600 w-6 h-6" />
             <p className="text-lg font-semibold text-gray-800">
-              عدد المصروفات: {totalExpensesCount}
+              عدد المصروفات: {localTotalExpensesCount}
             </p>
           </div>
           <p className="text-lg font-semibold text-gray-800">
-            إجمالي المصروفات: {totalExpenses} جنيه
+            إجمالي المصروفات: {localTotalExpenses} جنيه
           </p>
-          {(filters.startDate || filters.endDate) && (
+          {(filters.start_date || filters.end_date) && (
             <p className="text-sm text-gray-600">
-              للفترة من {filters.startDate || "غير محدد"} إلى {filters.endDate || "غير محدد"}
+              للفترة من {filters.start_date || "غير محدد"} إلى {filters.end_date || "غير محدد"}
             </p>
           )}
         </div>
@@ -412,7 +451,22 @@ const Expenses = () => {
         </div>
       </div>
     );
-  }, [isSummaryClicked, totalExpenses, totalExpensesCount, filters.startDate, filters.endDate]);
+  }, [isSummaryClicked, localTotalExpenses, localTotalExpensesCount, filters.start_date, filters.end_date]);
+
+  const summaryCardDetails = useMemo(() => {
+    if (!isSummaryClicked || localTotalExpenses <= 0) return null;
+    const selectedCategory = expenseCategories.find((cat) => cat.id.toString() === filters.category) || { name: "جميع الفئات" };
+    return (
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-right mt-4">
+        <p className="text-sm text-gray-700">عدد المصروفات: {localTotalExpensesCount}</p>
+        <p className="text-sm text-gray-700">الإجمالي: {localTotalExpenses} جنيه</p>
+        <p className="text-sm text-gray-700">
+          التاريخ: من {filters.start_date || "غير محدد"} إلى {filters.end_date || "غير محدد"}
+        </p>
+        <p className="text-sm text-gray-700">الفئة: {selectedCategory.name}</p>
+      </div>
+    );
+  }, [isSummaryClicked, localTotalExpenses, localTotalExpensesCount, filters.start_date, filters.end_date, filters.category, expenseCategories]);
 
   if (!canViewExpense) {
     return (
@@ -477,15 +531,20 @@ const Expenses = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <ExpenseFilters
-                  filters={filters}
-                  expenseCategories={expenseCategories}
-                  handleFilterChange={handleFilterChange}
-                  handleReset={handleResetFilters}
-                  handleCalculateTotal={handleCalculateTotal}
-                />
-                <div className="flex gap-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                <div className="w-full">
+                  <ExpenseFilters
+                    filters={filters}
+                    expenseCategories={expenseCategories}
+                    users={[]} // سيتم استبداله ببيانات المستخدمين إذا توفرت
+                    handleFilterChange={handleFilterChange}
+                    handleSelectChange={handleSelectChange}
+                    handleReset={handleResetFilters}
+                    handleCalculateTotal={handleCalculateTotal}
+                  />
+                  {summaryCardDetails && <div className="mt-4">{summaryCardDetails}</div>}
+                </div>
+                <div className="flex flex-col gap-2">
                   {canAddExpense && (
                     <Button
                       onClick={() => {
@@ -502,7 +561,7 @@ const Expenses = () => {
                         });
                         setShowModal(true);
                       }}
-                      className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 text-sm"
+                      className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 text-sm w-full sm:w-auto"
                     >
                       <FiPlus className="ml-2 w-5 h-5" />
                       إضافة مصروف
@@ -510,7 +569,7 @@ const Expenses = () => {
                   )}
                   <Button
                     onClick={exportToExcel}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 text-sm w-full sm:w-auto"
                   >
                     تصدير إلى إكسيل
                   </Button>
@@ -534,14 +593,14 @@ const Expenses = () => {
               )}
 
               <ExpenseTable
-                expenses={expenses}
+                expenses={isSummaryClicked ? localExpenses : expenses} // استخدام localExpenses عند الإجمالي
                 handleEditClick={handleEditClick}
                 handleDeleteClick={handleDeleteClick}
                 canEditExpense={canEditExpense}
                 canDeleteExpense={canDeleteExpense}
               />
               <ExpenseCards
-                expenses={expenses}
+                expenses={isSummaryClicked ? localExpenses : expenses} // استخدام localExpenses عند الإجمالي
                 handleEditClick={handleEditClick}
                 handleDeleteClick={handleDeleteClick}
                 canEditExpense={canEditExpense}
