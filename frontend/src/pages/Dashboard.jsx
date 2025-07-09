@@ -33,6 +33,7 @@ const Dashboard = () => {
       children: [
         { path: '', name: 'الرئيسية', icon: <IoMdAnalytics /> },
         { path: 'profile', name: 'الملف الشخصي', icon: <BsPersonBoundingBox /> },
+        { path: 'club', name: 'بيانات النادي', icon: <FaRegBuilding /> },
       ],
     },
     {
@@ -61,17 +62,17 @@ const Dashboard = () => {
       children: [
         { path: 'income-sources', name: 'الإيرادات', icon: <GiReceiveMoney /> },
         { path: 'expense', name: 'المصروفات', icon: <GiPayMoney /> },
-        { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
+        // { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
         { path: 'reports', name: 'تقرير الإيرادات', icon: <GiReceiveMoney /> },
       ],
     },
-    {
-      name: 'إدارة النادي',
-      icon: <FaRegBuilding />,
-      children: [
-        { path: 'club', name: 'بيانات النادي', icon: <FaRegBuilding /> },
-      ],
-    },
+    // {
+    //   name: 'إدارة النادي',
+    //   icon: <FaRegBuilding />,
+    //   children: [
+    //     { path: 'club', name: 'بيانات النادي', icon: <FaRegBuilding /> },
+    //   ],
+    // },
     {
       name: 'التقارير والتحليلات',
       icon: <TbReportAnalytics />,
