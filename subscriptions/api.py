@@ -283,7 +283,6 @@ def subscription_list(request):
 
             subscriptions = subscriptions.filter(filters)
 
-        # فلترة بالـ identifier (RFID أو رقم الهاتف)
         if identifier:
             subscriptions = subscriptions.annotate(
                 can_enter=Case(

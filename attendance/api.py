@@ -168,7 +168,9 @@ def add_attendance_api(request):
         
         # Find member using identifier
         try:
-            member = Member.objects.get(Q(rfid_code=identifier) | Q(phone=identifier))
+            member = Member.objects.get(Q(rfid_code=identifier))
+            # member = Member.objects.get(Q(rfid_code=identifier) | Q(phone=identifier))
+
         except Member.DoesNotExist:
             logger.error(f"No member found for identifier {identifier}")
             return Response(
