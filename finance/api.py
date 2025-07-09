@@ -570,7 +570,7 @@ def expense_all_api(request):
         # Apply filters
         expenses = apply_common_filters(expenses, request, user_field='paid_by', source_category_field='category')
         
-        expenses = expenses.order_by('-id')
+        expenses = expenses.order_by('-date', '-id')
         serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
     
@@ -593,7 +593,7 @@ def income_all_api(request):
         # Apply filters
         incomes = apply_common_filters(incomes, request, user_field='received_by', source_category_field='source')
         
-        incomes = incomes.order_by('-id')
+        incomes = incomes.order_by('-date', '-id')
         serializer = IncomeSerializer(incomes, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
     
