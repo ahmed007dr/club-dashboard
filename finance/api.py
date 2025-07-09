@@ -37,18 +37,6 @@ class StandardPagination(PageNumberPagination):
     max_page_size = 20
 
 def apply_common_filters(queryset, request, user_field=None, source_category_field=None):
-    """
-    Apply common filters to a queryset for income or expense models.
-    Args:
-        queryset: The base queryset to filter.
-        request: The HTTP request object containing query parameters.
-        user_field: The field name for user filtering (e.g., 'received_by' or 'paid_by').
-        source_category_field: The field name for source or category (e.g., 'source' or 'category').
-    Returns:
-        Filtered queryset.
-    Raises:
-        ValueError: If filters are invalid.
-    """
     query_params = request.query_params
     applied_filters = []
 
@@ -56,30 +44,51 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
     if query_params.get('date') and (query_params.get('start_date') or query_params.get('end_date')):
         raise ValueError('لا يمكن استخدام "date" مع "start_date" أو "end_date" في نفس الطلب.')
 
-    # Filter by specific date
+    # Filter by specific date or datetime
     if query_params.get('date'):
         try:
-            date_obj = datetime.strptime(query_params.get('date'), '%Y-%m-%d').date()
-            queryset = queryset.filter(date=date_obj)
-            applied_filters.append(f"date={date_obj}")
+            date_input = query_params.get('date')
+            # Try parsing as full datetime (YYYY-MM-DD HH:MM:SS)
+            try:
+                date_obj = datetime.strptime(date_input, '%Y-%m-%d %H:%M:%S')
+                date_obj = timezone.make_aware(date_obj)  # Ensure timezone-aware
+                queryset = queryset.filter(date=date_obj)
+                applied_filters.append(f"date={date_obj}")
+            except ValueError:
+                # Fallback to date only (YYYY-MM-DD), filter for the whole day
+                date_obj = datetime.strptime(date_input, '%Y-%m-%d')
+                start_of_day = timezone.make_aware(date_obj.replace(hour=0, minute=0, second=0))
+                end_of_day = timezone.make_aware(date_obj.replace(hour=23, minute=59, second=59))
+                queryset = queryset.filter(date__range=[start_of_day, end_of_day])
+                applied_filters.append(f"date={date_input} (full day)")
         except ValueError:
-            raise ValueError('صيغة التاريخ غير صحيحة (YYYY-MM-DD).')
+            raise ValueError('صيغة التاريخ غير صحيحة (YYYY-MM-DD أو YYYY-MM-DD HH:MM:SS).')
 
-    # Filter by date range
+    # Filter by datetime range
     if query_params.get('start_date') and query_params.get('end_date'):
         try:
-            start_date = datetime.strptime(query_params.get('start_date'), '%Y-%m-%d').date()
-            end_date = datetime.strptime(query_params.get('end_date'), '%Y-%m-%d').date()
+            start_input = query_params.get('start_date')
+            end_input = query_params.get('end_date')
+            # Try parsing as full datetime
+            try:
+                start_date = datetime.strptime(start_input, '%Y-%m-%d %H:%M:%S')
+                end_date = datetime.strptime(end_input, '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                # Fallback to date only, assume full day
+                start_date = datetime.strptime(start_input, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+                end_date = datetime.strptime(end_input, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+            start_date = timezone.make_aware(start_date)  # Ensure timezone-aware
+            end_date = timezone.make_aware(end_date)  # Ensure timezone-aware
             if start_date > end_date:
                 raise ValueError('تاريخ البداية يجب أن يكون قبل تاريخ النهاية.')
             queryset = queryset.filter(date__range=[start_date, end_date])
             applied_filters.append(f"start_date={start_date}, end_date={end_date}")
         except ValueError:
-            raise ValueError('صيغة التاريخ غير صحيحة (YYYY-MM-DD).')
+            raise ValueError('صيغة التاريخ غير صحيحة (YYYY-MM-DD أو YYYY-MM-DD HH:MM:SS).')
     elif query_params.get('start_date') or query_params.get('end_date'):
         raise ValueError('تاريخي البداية والنهاية مطلوبان معًا.')
 
-    # Filter by user
+    # Filter by user, amount, description, source/category
     if query_params.get('user'):
         user_obj = get_object_from_id_or_name(User, query_params.get('user'), ['id', 'username'])
         if user_obj and user_obj.club == request.user.club:
@@ -88,7 +97,6 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
         else:
             raise ValueError('المستخدم غير موجود أو غير مسموح.')
 
-    # Filter by source or category
     if query_params.get('source') and source_category_field == 'source':
         source_obj = get_object_from_id_or_name(IncomeSource, query_params.get('source'), ['id', 'name'])
         if source_obj and source_obj.club == request.user.club:
@@ -104,7 +112,6 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
         else:
             raise ValueError('فئة المصروف غير موجودة.')
 
-    # Filter by amount
     if query_params.get('amount'):
         try:
             queryset = queryset.filter(amount=float(query_params.get('amount')))
@@ -112,16 +119,13 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
         except ValueError:
             raise ValueError('صيغة المبلغ غير صحيحة.')
 
-    # Filter by description
     if query_params.get('description'):
         queryset = queryset.filter(description__icontains=query_params.get('description'))
         applied_filters.append(f"description={query_params.get('description')}")
 
-    # Log applied filters and record count
     logger.debug(f"Applied filters: {', '.join(applied_filters) if applied_filters else 'none'}")
     logger.debug(f"Number of records after filtering: {queryset.count()}")
     
-    # Log sample records for debugging
     if queryset.exists():
         sample_fields = ['id', 'amount', 'date']
         if source_category_field == 'source':
@@ -165,29 +169,17 @@ def handle_response(data, details_queryset=None, details_serializer=None, detail
         response_data[details_key] = details_serializer(details_queryset, many=True).data
     return Response(response_data, status=status_code)
 
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def expense_category_api(request):
-    """List or create expense categories, restricted to active shift for non-owner/admin users."""
+    """List or create expense categories, accessible to all authenticated users."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     if request.method == 'GET':
         categories = ExpenseCategory.objects.filter(club=request.user.club)
-        
-        if request.user.role not in FULL_ACCESS_ROLES:
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-            if not attendance:
-                logger.warning(f"No active shift for user: {request.user.username}")
-                return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
-            categories = categories.filter(
-                expense__paid_by=request.user,
-                expense__date__gte=attendance.check_in,
-                expense__date__lte=attendance.check_out or timezone.now()
-            ).distinct()
         
         if request.query_params.get('name'):
             categories = categories.filter(name__icontains=request.query_params.get('name'))
@@ -257,13 +249,30 @@ def expense_api(request):
         data = request.data.copy()
         data['paid_by'] = request.user.id
         data['club'] = request.user.club.id
+        
+        # التحقق من وجود وردية مفتوحة
+        attendance = StaffAttendance.objects.filter(
+            staff=request.user, club=request.user.club, check_out__isnull=True
+        ).order_by('-check_in').first()
+        
+        if not attendance:
+            return Response({'error': 'لا توجد وردية مفتوحة. يجب تسجيل حضور أولاً.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # اجعل تاريخ المصروف داخل فترة الوردية المفتوحة
+        data['date'] = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+
         if 'related_employee' in data and data['related_employee']:
             try:
                 related_employee = User.objects.get(id=data['related_employee'], club=request.user.club)
             except User.DoesNotExist:
                 return Response({'error': 'الموظف المرتبط غير موجود'}, status=status.HTTP_400_BAD_REQUEST)
+
         serializer = ExpenseSerializer(data=data, context={'request': request})
         if serializer.is_valid():
+            expense_date = serializer.validated_data.get('date')
+            if expense_date < attendance.check_in or expense_date > (attendance.check_out or timezone.now()):
+                return Response({'error': 'تاريخ المصروف خارج فترة الوردية المفتوحة'}, status=status.HTTP_400_BAD_REQUEST)
+
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -271,13 +280,13 @@ def expense_api(request):
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def income_source_api(request):
-    """List or create income sources."""
+    """قائمة أو إنشاء مصادر الإيرادات."""
     if not request.user.club:
-        logger.error(f"User {request.user.username} has no associated club")
+        logger.error(f"المستخدم {request.user.username} غير مرتبط بنادي")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     if request.method == 'GET':
-        sources = IncomeSource.objects.filter(club=request.user.club)
+        sources = IncomeSource.objects.filter(club=request.user.club, price__gt=0)  # تصفية السعر > 0
         if request.query_params.get('name'):
             sources = sources.filter(name__icontains=request.query_params.get('name'))
         if request.query_params.get('description'):
@@ -297,7 +306,7 @@ def income_source_api(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+        
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def income_api(request):
@@ -349,7 +358,8 @@ def income_api(request):
         data = request.data.copy()
         data['received_by'] = request.user.id
         data['club'] = request.user.club.id
-        data['date'] = timezone.now().date().isoformat()
+        #data['date'] = timezone.now().isoformat() 
+        #data['date'] = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
         source_id = data.get('source')
         quantity = data.get('quantity', 1)
         if not source_id:
@@ -593,7 +603,6 @@ def income_all_api(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def daily_summary_api(request):
-    """Generate daily summary for incomes and expenses."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
@@ -604,10 +613,16 @@ def daily_summary_api(request):
         username = request.query_params.get('username')
         if date_str:
             try:
-                filter_date = datetime.strptime(date_str, '%Y-%m-%d').date()
-                date_filter = {'check_in__date': filter_date}
+                # Try parsing as full datetime
+                try:
+                    filter_datetime = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+                    date_filter = {'check_in__date': filter_datetime.date()}
+                except ValueError:
+                    # Fallback to date only, filter for the whole day
+                    filter_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    date_filter = {'check_in__date': filter_date}
             except ValueError:
-                return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD أو YYYY-MM-DD HH:MM:SS)'}, status=status.HTTP_400_BAD_REQUEST)
         elif month_str:
             try:
                 year, month = map(int, month_str.split('-'))
@@ -632,16 +647,30 @@ def daily_summary_api(request):
                 'total_expenses': 0, 'total_incomes': 0, 'net': 0
             }
             for attendance in attendances:
-                expenses = Expense.objects.filter(**club_filter, paid_by=employee, date__gte=attendance.check_in, date__lte=attendance.check_out or timezone.now())
-                incomes = Income.objects.filter(**club_filter, received_by=employee, date__gte=attendance.check_in, date__lte=attendance.check_out or timezone.now())
+                expenses = Expense.objects.filter(
+                    **club_filter, paid_by=employee, 
+                    date__gte=attendance.check_in, 
+                    date__lte=attendance.check_out or timezone.now()
+                )
+                incomes = Income.objects.filter(
+                    **club_filter, received_by=employee, 
+                    date__gte=attendance.check_in, 
+                    date__lte=attendance.check_out or timezone.now()
+                )
                 total_expenses = calculate_totals(expenses)
                 total_incomes = calculate_totals(incomes)
                 expense_details = ExpenseDetailSerializer(expenses, many=True).data
                 income_details = IncomeDetailSerializer(incomes, many=True).data
                 attendance_summary = {
-                    'attendance_id': attendance.id, 'check_in': attendance.check_in, 'check_out': attendance.check_out,
-                    'duration_hours': attendance.duration_hours(), 'expenses': expense_details, 'incomes': income_details,
-                    'total_expenses': total_expenses, 'total_incomes': total_incomes, 'net': total_incomes - total_expenses
+                    'attendance_id': attendance.id, 
+                    'check_in': attendance.check_in, 
+                    'check_out': attendance.check_out,
+                    'duration_hours': attendance.duration_hours(), 
+                    'expenses': expense_details, 
+                    'incomes': income_details,
+                    'total_expenses': total_expenses, 
+                    'total_incomes': total_incomes, 
+                    'net': total_incomes - total_expenses
                 }
                 employee_summary['attendance_periods'].append(attendance_summary)
                 employee_summary['total_expenses'] += total_expenses
@@ -655,6 +684,8 @@ def daily_summary_api(request):
     
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

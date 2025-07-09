@@ -27,25 +27,6 @@ def api_login(request):
         user = authenticate(username=username, password=password)
         if user:
             user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
-            # تسجيل حضور الموظف إذا كان نشطًا ومرتبطًا بنادي
-            if user.is_active and user.club:
-                # إغلاق أي حضور مفتوح
-                open_attendances = StaffAttendance.objects.filter(staff=user, check_out__isnull=True)
-                for attendance in open_attendances:
-                    logger.debug(f"Closing open attendance: {attendance.id}")
-                    attendance.check_out = timezone.now()
-                    attendance.save()
-                # تسجيل حضور جديد
-                attendance = StaffAttendance.objects.create(
-                    staff=user,
-                    club=user.club,
-                    check_in=timezone.now(),
-                    created_by=user
-                )
-                logger.info(f"Check-in created: {attendance.id} for user: {user.username}")
-            else:
-                logger.warning(f"User {user.username} is not active or has no club, skipping attendance.")
-            
             refresh = RefreshToken.for_user(user)
             return Response({
                 'user': UserProfileSerializer(user).data,
@@ -63,25 +44,6 @@ def api_rfid_login(request):
     if serializer.is_valid():
         user = serializer.validated_data['user']
         user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
-        # تسجيل حضور الموظف إذا كان نشطًا ومرتبطًا بنادي
-        if user.is_active and user.club:
-            # إغلاق أي حضور مفتوح
-            open_attendances = StaffAttendance.objects.filter(staff=user, check_out__isnull=True)
-            for attendance in open_attendances:
-                logger.debug(f"Closing open attendance: {attendance.id}")
-                attendance.check_out = timezone.now()
-                attendance.save()
-            # تسجيل حضور جديد
-            attendance = StaffAttendance.objects.create(
-                staff=user,
-                club=user.club,
-                check_in=timezone.now(),
-                created_by=user
-            )
-            logger.info(f"Check-in created: {attendance.id} for user: {user.username}")
-        else:
-            logger.warning(f"User {user.username} is not active or has no club, skipping attendance.")
-        
         refresh = RefreshToken.for_user(user)
         return Response({
             'user': UserProfileSerializer(user).data,

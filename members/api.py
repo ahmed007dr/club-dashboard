@@ -23,27 +23,48 @@ FULL_ACCESS_ROLES = ['owner', 'admin']
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def member_list_api(request):
-    """List members with optional search, showing only members added in last 3 days by default."""
+    """List members with optional search, showing only members added in last 24 hours by default."""
     if not request.user.club:
-        logger.error(f"User {request.user.username} has no associated club")
-        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=403)
 
     search_term = request.GET.get('q', '').strip()
     members = Member.objects.filter(club=request.user.club)
 
     if request.user.role not in ['owner', 'admin'] and not search_term:
         attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
+            staff=request.user,
+            club=request.user.club,
+            check_out__isnull=True
         ).order_by('-check_in').first()
+
         if not attendance:
-            logger.warning(f"No active shift for user: {request.user.username}")
-            return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
-        
-        members = members.filter(
-            subscriptions__created_by=request.user,
-            subscriptions__start_date__gte=attendance.check_in,
-            subscriptions__start_date__lte=attendance.check_out or timezone.now()
-        ).distinct()
+            return Response({'error': 'لا توجد وردية مفتوحة.'}, status=403)
+
+        now = timezone.now()
+        one_hour_ago = now - timedelta(hours=1)
+        today = now.date()
+
+        checked_in_subscription_ids = Attendance.objects.filter(
+            subscription__club=request.user.club,
+            attendance_date=today,
+            entry_time__gte=one_hour_ago.time()
+        ).values_list('subscription_id', flat=True)
+
+        checked_in_member_ids = Subscription.objects.filter(
+            id__in=checked_in_subscription_ids
+        ).values_list('member_id', flat=True)
+
+        created_member_ids = members.filter(
+            created_at__gte=attendance.check_in,
+            created_at__lte=attendance.check_out or now
+        ).values_list('id', flat=True)
+
+        allowed_member_ids = set(checked_in_member_ids) | set(created_member_ids)
+        members = members.filter(id__in=allowed_member_ids)
+
+    elif not search_term:
+        last_24_hours = timezone.now() - timedelta(hours=24)
+        members = members.filter(created_at__gte=last_24_hours)
 
     if search_term:
         members = members.filter(
@@ -51,15 +72,13 @@ def member_list_api(request):
             Q(phone__icontains=search_term) |
             Q(rfid_code__icontains=search_term)
         )
-    else:
-        three_days_ago = timezone.now() - timedelta(days=3)
-        members = members.filter(created_at__gte=three_days_ago)
 
     members = members.order_by('-id')
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(members, request)
     serializer = MemberSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

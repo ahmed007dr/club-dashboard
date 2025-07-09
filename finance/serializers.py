@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.utils import timezone
 from .models import Expense, Income, ExpenseCategory, IncomeSource, StockItem, StockTransaction, Schedule
 from core.serializers import ClubSerializer
 from accounts.serializers import UserSerializer
@@ -20,6 +21,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
     related_employee_details = UserSerializer(source='related_employee', read_only=True)
     stock_item_details = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
+    date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', input_formats=['%Y-%m-%d %H:%M:%S', '%Y-%m-%d'])
 
     class Meta:
         model = Expense
@@ -50,6 +52,15 @@ class ExpenseSerializer(serializers.ModelSerializer):
                 'unit': obj.stock_item.unit
             }
         return None
+
+    def validate_date(self, value):
+        if self.instance is None:  # مصروف جديد
+            return timezone.now()
+        if timezone.is_naive(value):
+            value = timezone.make_aware(value, timezone.get_current_timezone())
+        if value > timezone.now():
+            raise serializers.ValidationError('لا يمكن تسجيل مصروف في المستقبل.')
+        return value
     
 class IncomeSourceSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
@@ -68,13 +79,15 @@ class IncomeSourceSerializer(serializers.ModelSerializer):
                 'is_sellable': obj.stock_item.is_sellable
             }
         return None
-
+    
 class IncomeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     source_details = IncomeSourceSerializer(source='source', read_only=True)
     received_by_details = UserSerializer(source='received_by', read_only=True)
     receipt_details = ReceiptSerializer(source='related_receipt', read_only=True)
     stock_transaction_details = serializers.SerializerMethodField()
+    #date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', input_formats=['%Y-%m-%d %H:%M:%S', '%Y-%m-%d'])
+    date = serializers.DateTimeField(read_only=True)
 
     class Meta:
         model = Income
@@ -100,15 +113,21 @@ class IncomeSerializer(serializers.ModelSerializer):
             }
         return None
 
+    def validate_date(self, value):
+        if value > timezone.now():
+            raise serializers.ValidationError('لا يمكن تسجيل إيراد في المستقبل.')
+        return value
+
 class StockItemSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
 
     class Meta:
         model = StockItem
         fields = ['id', 'club', 'club_details', 'name', 'description', 'unit', 'initial_quantity', 'current_quantity', 'is_sellable']
-        
+
 class StockTransactionSerializer(serializers.ModelSerializer):
     stock_item_details = serializers.SerializerMethodField()
+    date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
 
     class Meta:
         model = StockTransaction
@@ -125,11 +144,16 @@ class StockTransactionSerializer(serializers.ModelSerializer):
         }
 
 class IncomeSummarySerializer(serializers.ModelSerializer):
+    date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    source_name = serializers.CharField(source='source.name', read_only=True)
+    received_by_name = serializers.CharField(source='received_by.username', read_only=True)
+
     class Meta:
         model = Income
-        fields = ['id', 'amount', 'date', 'source', 'received_by']
+        fields = ['id', 'amount', 'date', 'source', 'source_name', 'received_by', 'received_by_name']
 
 class ExpenseDetailSerializer(serializers.ModelSerializer):
+    date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
     category_name = serializers.CharField(source='category.name', read_only=True)
 
     class Meta:
@@ -137,6 +161,7 @@ class ExpenseDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'amount', 'date', 'category_name']
 
 class IncomeDetailSerializer(serializers.ModelSerializer):
+    date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
     source_name = serializers.CharField(source='source.name', read_only=True)
 
     class Meta:
@@ -144,41 +169,30 @@ class IncomeDetailSerializer(serializers.ModelSerializer):
         fields = ['id', 'amount', 'date', 'source_name']
 
 class ScheduleSerializer(serializers.ModelSerializer):
+    start = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', input_formats=['%Y-%m-%d %H:%M:%S', 'iso8601'])
+    end = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', input_formats=['%Y-%m-%d %H:%M:%S', 'iso8601'])
+
     class Meta:
         model = Schedule
         fields = ['id', 'club', 'title', 'start', 'end', 'type', 'created_by']
         read_only_fields = ['id', 'created_by']
 
     def validate(self, data):
-        """
-        Validate the schedule data to ensure start time is before end time
-        and that the club and created_by fields are valid.
-        """
-        # Validate that start time is before end time
         if data['start'] >= data['end']:
             raise serializers.ValidationError({
                 'start': 'وقت البدء يجب أن يكون قبل وقت الانتهاء.'
             })
 
-        # Ensure the club belongs to the authenticated user
         user = self.context['request'].user
         if data['club'].id != user.club.id:
             raise serializers.ValidationError({
                 'club': 'لا يمكن إنشاء جدول لنادي غير مرتبط بالمستخدم.'
             })
 
-        # Ensure created_by is set to the authenticated user
         data['created_by'] = user
-
         return data
 
     def to_representation(self, instance):
-        """
-        Customize the output format to match the GET response in schedule_api.
-        """
         representation = super().to_representation(instance)
-        representation['start'] = instance.start.isoformat()
-        representation['end'] = instance.end.isoformat()
-        representation['club'] = instance.club.id
-        representation['created_by'] = instance.created_by.id if instance.created_by else None
         return representation
+    

@@ -1,6 +1,7 @@
 from django.db import models
 from utils.generate_invoice import generate_invoice_number
 from core.models import Club
+from django.utils import timezone
 
 class ExpenseCategory(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
@@ -23,7 +24,7 @@ class Expense(models.Model):
     category = models.ForeignKey('ExpenseCategory', on_delete=models.SET_NULL, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True)
-    date = models.DateField()
+    date = models.DateTimeField(default=timezone.now)
     paid_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, related_name='expenses_paid')
     related_employee = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='related_expenses')  # حقل جديد
     invoice_number = models.CharField(max_length=100, blank=True, null=True)
@@ -86,7 +87,7 @@ class Income(models.Model):
     source = models.ForeignKey('IncomeSource', on_delete=models.SET_NULL, null=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField(blank=True)
-    date = models.DateField()
+    date = models.DateTimeField(default=timezone.now)
     received_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
     related_receipt = models.ForeignKey('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True)
     stock_transaction = models.ForeignKey('StockTransaction', on_delete=models.SET_NULL, null=True, blank=True)

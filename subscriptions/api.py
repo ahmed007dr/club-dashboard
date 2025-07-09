@@ -125,7 +125,7 @@ def subscription_type_list(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+
     if request.method == 'GET':
         now = timezone.now()
         search_term = request.GET.get('q', '')
@@ -189,6 +189,10 @@ def subscription_type_list(request):
         return paginator.get_paginated_response(serializer.data)
 
     elif request.method == 'POST':
+        # 🔒 السماح فقط للـ owner و admin
+        if request.user.role not in ['owner', 'admin']:
+            return Response({'error': 'غير مسموح: صلاحيات غير كافية لإضافة نوع اشتراك.'}, status=status.HTTP_403_FORBIDDEN)
+
         serializer = SubscriptionTypeSerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             subscription_type = serializer.save(club=request.user.club)
@@ -243,15 +247,16 @@ def active_subscription_types(request):
     serializer = SubscriptionTypeSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def subscription_list(request):
     logger.info(f"Processing subscription_list for user: {request.user.username}, params: {request.query_params}")
-    
+
     if not request.user.club:
         logger.warning(f"User {request.user.username} not associated with a club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+
     if request.method == 'GET':
         search_term = request.query_params.get('searchTerm', request.query_params.get('search_term', '')).strip()
         identifier = request.query_params.get('identifier', '').strip()
@@ -261,19 +266,24 @@ def subscription_list(request):
 
         subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=club_id)
 
-        if request.user.role not in ['owner', 'admin'] and not (search_term or identifier):
+        # تحديد الوصول بناءً على الدور
+        if request.user.role not in ['owner', 'admin']:
+            filters = Q(remaining_amount__gt=0)
+
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
-            if not attendance:
-                logger.warning(f"No active shift for user: {request.user.username}")
-                return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
-            subscriptions = subscriptions.filter(
-                created_by=request.user,
-                start_date__gte=attendance.check_in,
-                start_date__lte=attendance.check_out or timezone.now()
-            )
 
+            if attendance:
+                filters |= Q(
+                    created_by=request.user,
+                    start_date__gte=attendance.check_in,
+                    start_date__lte=attendance.check_out or timezone.now()
+                )
+
+            subscriptions = subscriptions.filter(filters)
+
+        # فلترة بالـ identifier (RFID أو رقم الهاتف)
         if identifier:
             subscriptions = subscriptions.annotate(
                 can_enter=Case(
@@ -299,12 +309,15 @@ def subscription_list(request):
             ).order_by('-start_date')[:1]
 
         else:
+            # فلترة بالبحث
             if search_term:
                 subscriptions = subscriptions.filter(
                     Q(member__rfid_code__icontains=search_term) |
                     Q(member__phone__icontains=search_term) |
                     Q(member__name__icontains=search_term)
                 )
+
+            # فلترة بالحقول المباشرة
             for param, field in [
                 ('member_id', 'member_id'),
                 ('type_id', 'type_id'),
@@ -315,12 +328,14 @@ def subscription_list(request):
                 if request.query_params.get(param):
                     subscriptions = subscriptions.filter(**{field: request.query_params.get(param)})
 
+            # فلترة بالحالة
             if status_param := request.query_params.get('status'):
                 if status_param == 'active':
                     subscriptions = subscriptions.filter(
                         start_date__lte=today,
-                        end_date__gte=today,
-                        entry_count__lt=F('type__max_entries') | Q(type__max_entries=0)
+                        end_date__gte=today
+                    ).filter(
+                        Q(type__max_entries=0) | Q(entry_count__lt=F('type__max_entries'))
                     )
                 elif status_param == 'expired':
                     subscriptions = subscriptions.filter(
@@ -329,9 +344,11 @@ def subscription_list(request):
                 elif status_param == 'upcoming':
                     subscriptions = subscriptions.filter(start_date__gt=today)
 
-            if not (search_term or identifier or request.query_params.get('status')):
+            # إذا لم يوجد أي فلتر: أظهر فقط الاشتراكات ذات المبلغ المتبقي (لـ owner/admin فقط)
+            elif request.user.role in ['owner', 'admin']:
                 subscriptions = subscriptions.filter(remaining_amount__gt=0)
 
+            # ترتيب النتائج
             if ordering:
                 if ordering in ['remaining_amount', '-remaining_amount', 'start_date', '-start_date']:
                     subscriptions = subscriptions.order_by(ordering, '-id')

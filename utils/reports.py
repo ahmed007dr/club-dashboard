@@ -25,10 +25,20 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
             return {'error': 'الموظف غير موجود أو لا ينتمي إلى النادي'}, status.HTTP_404_NOT_FOUND
     else:
         employee = user
-        if user.role not in ['owner', 'admin'] and employee_id:
-            logger.warning("Non-admin user attempted to access another employee's report: user=%s, employee_id=%s", 
-                          user.username, employee_id)
-            return {'error': 'غير مسموح لك بمشاهدة تقارير موظف آخر'}, status.HTTP_403_FORBIDDEN
+        if user.role not in ['owner', 'admin']:
+            if employee_id and int(employee_id) != user.id:
+                logger.warning("Non-admin user attempted to access another employee's report: user=%s, employee_id=%s", 
+                            user.username, employee_id)
+                return {'error': 'غير مسموح لك بمشاهدة تقارير موظف آخر'}, status.HTTP_403_FORBIDDEN
+            employee = user
+        else:
+            # admin/owner: مسموح له يجيب تقارير أي حد
+            query = User.objects.filter(id=employee_id)
+            if user.role == 'admin':
+                query = query.filter(club=user.club)
+            employee = query.first()
+            if not employee:
+                return {'error': 'الموظف غير موجود أو لا ينتمي إلى النادي'}, status.HTTP_404_NOT_FOUND
 
     # تحديد الفترة الزمنية
     if user.role in ['owner', 'admin']:
