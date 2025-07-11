@@ -41,6 +41,7 @@ const Dashboard = () => {
       icon: <FiUsers />,
       children: [
         { path: 'members', name: 'الأعضاء', icon: <RiGroupLine /> },
+        { path: 'member-profile', name: '2الأعضاء', icon: <RiGroupLine /> },
         { path: 'subscriptions', name: 'الاشتراكات', icon: <MdOutlineSubscriptions /> },
         { path: 'attendance', name: 'حضور الأعضاء', icon: <AiOutlineSchedule /> },
         { path: 'free-invites', name: 'الدعوات المجانية', icon: <RiVipCrown2Line /> },

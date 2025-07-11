@@ -5,55 +5,33 @@ import BASE_URL from '@/config/api';
 // جلب أنواع الاشتراكات مع دعم التصفية والترقيم
 export const fetchSubscriptionTypes = createAsyncThunk(
   'subscriptions/fetchSubscriptionTypes',
-  async (
-    {
-      page = 1,
-      searchQuery = '',
-      statusFilter = 'all',
-      durationFilter = '',
-      featureId = '',
-    } = {},
-    { rejectWithValue }
-  ) => {
+  async ({ page = 1, searchQuery = '', statusFilter = 'all', durationFilter = '', featureId = '' } = {}, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token is missing.');
+      if (!token) throw new Error('Authentication token is missing.');
+      let allResults = [];
+      let hasMore = true;
+      let currentPage = page;
+      while (hasMore) {
+        const params = new URLSearchParams({
+          page: currentPage,
+          ...(searchQuery && { q: searchQuery }),
+          ...(statusFilter !== 'all' && { status: statusFilter }),
+          ...(durationFilter && { duration: durationFilter }),
+          ...(featureId && { feature_id: featureId }),
+        });
+        const response = await axios.get(
+          `${BASE_URL}subscriptions/api/subscription-types/?${params.toString()}`,
+          { headers: { Authorization: `Bearer ${token}`, "Cache-Control": "no-cache" } }
+        );
+        allResults = [...allResults, ...(Array.isArray(response.data.results) ? response.data.results : [])];
+        hasMore = !!response.data.next;
+        currentPage += 1;
       }
-
-      const cleanSearchQuery = searchQuery.trim();
-      const params = new URLSearchParams({
-        page,
-        ...(cleanSearchQuery && { q: cleanSearchQuery }),
-        ...(statusFilter !== 'all' && { status: statusFilter }),
-        ...(durationFilter && { duration: durationFilter }),
-        ...(featureId && { feature_id: featureId }),
-      });
-
-      const response = await axios.get(
-        `${BASE_URL}subscriptions/api/subscription-types/?${params.toString()}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      const data = response.data;
-      return {
-        count: data.count || 0,
-        results: Array.isArray(data.results) ? data.results : [],
-        next: data.next || null,
-        previous: data.previous || null,
-      };
+      return { count: allResults.length, results: allResults, next: null, previous: null };
     } catch (error) {
       console.error('Error fetching subscription types:', error);
-      return rejectWithValue(
-        error.response?.data?.detail ||
-          error.response?.data?.message ||
-          error.message ||
-          'Failed to fetch subscription types'
-      );
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -66,11 +44,7 @@ export const fetchActiveSubscriptionTypes = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscription-types/active/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return Array.isArray(response.data.results) ? response.data.results : [];
     } catch (error) {
@@ -88,11 +62,7 @@ export const fetchSubscriptionTypeById = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscription-types/${id}/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return response.data;
     } catch (error) {
@@ -108,11 +78,7 @@ export const updateSubscription = createAsyncThunk(
   async ({ id, subscriptionData }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authorization token is missing.');
-      }
-
-      // تنظيف البيانات لضمان إرسال القيم الصحيحة
+      if (!token) throw new Error('Authorization token is missing.');
       const cleanedData = {
         ...subscriptionData,
         coach: subscriptionData.coach ? parseInt(subscriptionData.coach) : null,
@@ -120,26 +86,16 @@ export const updateSubscription = createAsyncThunk(
         coach_compensation_value: subscriptionData.coach ? parseFloat(subscriptionData.coach_compensation_value).toFixed(2) : '0.00',
         private_training_price: subscriptionData.private_training_price ? parseFloat(subscriptionData.private_training_price).toFixed(2) : null,
       };
-
-      // إزالة end_date من البيانات المرسلة لأنه يتم حسابه في الخلفية
       delete cleanedData.end_date;
-
       const response = await axios.put(
         `${BASE_URL}subscriptions/api/subscriptions/${id}/`,
         cleanedData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       return response.data;
     } catch (error) {
       console.error('Error updating subscription:', error);
-      return rejectWithValue(
-        error.response?.data || error.message
-      );
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
@@ -152,11 +108,7 @@ export const deleteSubscriptionById = createAsyncThunk(
       const token = localStorage.getItem('token');
       await axios.delete(
         `${BASE_URL}subscriptions/api/subscriptions/${id}/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return id;
     } catch (error) {
@@ -166,6 +118,7 @@ export const deleteSubscriptionById = createAsyncThunk(
   }
 );
 
+// جلب العروض الخاصة
 export const fetchSpecialOffers = createAsyncThunk(
   'subscriptions/fetchSpecialOffers',
   async (_, { rejectWithValue }) => {
@@ -180,25 +133,18 @@ export const fetchSpecialOffers = createAsyncThunk(
     }
   }
 );
+
 // إضافة اشتراك جديد
 export const postSubscription = createAsyncThunk(
   'subscriptions/postSubscription',
   async (subscriptionData, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token is missing.');
-      }
-
+      if (!token) throw new Error('Authentication token is missing.');
       const response = await axios.post(
         `${BASE_URL}subscriptions/api/subscriptions/`,
         subscriptionData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       return response.data;
     } catch (error) {
@@ -219,12 +165,7 @@ export const putSubscriptionType = createAsyncThunk(
       const response = await axios.put(
         `${BASE_URL}subscriptions/api/subscription-types/${id}/`,
         subscriptionData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       return response.data;
     } catch (error) {
@@ -242,11 +183,7 @@ export const deleteSubscriptionType = createAsyncThunk(
       const token = localStorage.getItem('token');
       await axios.delete(
         `${BASE_URL}subscriptions/api/subscription-types/${id}/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return id;
     } catch (error) {
@@ -265,12 +202,7 @@ export const addSubscriptionType = createAsyncThunk(
       const response = await axios.post(
         `${BASE_URL}subscriptions/api/subscription-types/`,
         subscriptionData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       return response.data;
     } catch (error) {
@@ -288,11 +220,7 @@ export const fetchSubscriptionById = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscriptions/${id}/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return response.data;
     } catch (error) {
@@ -310,11 +238,7 @@ export const fetchActiveSubscriptions = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscriptions/active/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return Array.isArray(response.data.results) ? response.data.results : [];
     } catch (error) {
@@ -332,11 +256,7 @@ export const fetchExpiredSubscriptions = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscriptions/expired/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return Array.isArray(response.data.results) ? response.data.results : [];
     } catch (error) {
@@ -356,9 +276,7 @@ export const fetchMemberSubscriptions = createAsyncThunk(
         `${BASE_URL}subscriptions/api/subscriptions/member/`,
         {
           params: { member_id: memberId, page },
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
         }
       );
       return {
@@ -382,11 +300,7 @@ export const fetchSubscriptionStats = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscriptions/stats/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return response.data;
     } catch (error) {
@@ -404,11 +318,7 @@ export const fetchUpcomingSubscriptions = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscriptions/upcoming/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return Array.isArray(response.data.results) ? response.data.results : [];
     } catch (error) {
@@ -418,26 +328,17 @@ export const fetchUpcomingSubscriptions = createAsyncThunk(
   }
 );
 
+// إجراء دفعة
 export const makePayment = createAsyncThunk(
   'subscriptions/makePayment',
   async ({ subscriptionId, amount, paymentMethodId }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token is missing.');
-      }
+      if (!token) throw new Error('Authentication token is missing.');
       const response = await axios.post(
         `${BASE_URL}subscriptions/api/subscriptions/${subscriptionId}/make-payment/`,
-        {
-          amount,
-          payment_method_id: paymentMethodId,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { amount, payment_method_id: paymentMethodId },
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       return { subscriptionId, ...response.data };
     } catch (error) {
@@ -447,6 +348,7 @@ export const makePayment = createAsyncThunk(
   }
 );
 
+// جلب طرق الدفع
 export const fetchPaymentMethods = createAsyncThunk(
   'subscriptions/fetchPaymentMethods',
   async (_, { rejectWithValue }) => {
@@ -454,9 +356,7 @@ export const fetchPaymentMethods = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/payment-methods/`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
       return response.data;
     } catch (error) {
@@ -469,36 +369,29 @@ export const fetchPaymentMethods = createAsyncThunk(
 // تجديد اشتراك
 export const renewSubscription = createAsyncThunk(
   'subscriptions/renewSubscription',
-  async ({ subscriptionId }, { rejectWithValue }) => {
+  async ({ subscriptionId, renewData }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await axios.post(
         `${BASE_URL}subscriptions/api/subscriptions/${subscriptionId}/renew/`,
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        renewData,
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       return response.data;
     } catch (error) {
       console.error('Error renewing subscription:', error);
-      return rejectWithValue(error.response?.data?.message || error.message);
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
 
+// جلب الاشتراكات
 export const fetchSubscriptions = createAsyncThunk(
   'subscriptions/fetchSubscriptions',
   async (params = {}, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Authentication token missing');
-      }
-
+      if (!token) throw new Error('Authentication token missing');
       const queryParams = {
         page: params.page || 1,
         page_size: params.pageSize || 20,
@@ -521,17 +414,11 @@ export const fetchSubscriptions = createAsyncThunk(
         ...(params.paidAmountGte && { paid_amount_gte: params.paidAmountGte }),
         ...(params.paidAmountLte && { paid_amount_lte: params.paidAmountLte }),
       };
-
       const queryString = new URLSearchParams(queryParams).toString();
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/subscriptions/?${queryString}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
-
       return {
         subscriptions: Array.isArray(response.data.results) ? response.data.results : [],
         count: response.data.count || 0,
@@ -554,12 +441,7 @@ export const addAttendance = createAsyncThunk(
       const response = await axios.post(
         `${BASE_URL}attendance/api/attendances/add/`,
         newAttendance,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       return response.data;
     } catch (error) {
@@ -577,16 +459,8 @@ export const requestSubscriptionFreeze = createAsyncThunk(
       const token = localStorage.getItem('token');
       const response = await axios.post(
         `${BASE_URL}subscriptions/api/subscriptions/${subscriptionId}/request-freeze/`,
-        {
-          requested_days: requestedDays,
-          start_date: startDate,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { requested_days: requestedDays, start_date: startDate },
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       return { subscriptionId, ...response.data };
     } catch (error) {
@@ -605,12 +479,7 @@ export const cancelSubscriptionFreeze = createAsyncThunk(
       const response = await axios.post(
         `${BASE_URL}subscriptions/api/freeze-requests/${freezeRequestId}/cancel/`,
         {},
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
       return { freezeRequestId, ...response.data };
     } catch (error) {
@@ -632,12 +501,7 @@ export const fetchCoachProfile = createAsyncThunk(
       };
       const response = await axios.get(
         `${BASE_URL}subscriptions/api/coach-report/${coachId}/`,
-        {
-          params,
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+        { params, headers: { Authorization: `Bearer ${token}` } }
       );
       return response.data;
     } catch (error) {
@@ -667,7 +531,7 @@ const subscriptionsSlice = createSlice({
     paymentMethods: [],
     paymentMethodsLoading: false,
     paymentMethodsError: null,
-    specialOffers: [], // أضف هذا
+    specialOffers: [],
     loading: false,
     error: null,
     status: 'idle',
@@ -705,7 +569,6 @@ const subscriptionsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
-      // جلب طرق الدفع
       .addCase(fetchPaymentMethods.pending, (state) => {
         state.paymentMethodsLoading = true;
         state.paymentMethodsError = null;
@@ -718,7 +581,6 @@ const subscriptionsSlice = createSlice({
         state.paymentMethodsLoading = false;
         state.paymentMethodsError = action.payload;
       })
-      // جلب أنواع الاشتراكات
       .addCase(fetchSubscriptionTypes.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -731,7 +593,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // إضافة نوع اشتراك
       .addCase(addSubscriptionType.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -745,7 +606,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // جلب نوع اشتراك معين
       .addCase(fetchSubscriptionTypeById.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -758,7 +618,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // تحديث اشتراك
       .addCase(updateSubscription.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -777,7 +636,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // حذف اشتراك
       .addCase(deleteSubscriptionById.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -793,7 +651,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // جلب الاشتراكات
       .addCase(fetchSubscriptions.pending, (state) => {
         state.status = 'loading';
         state.error = null;
@@ -811,7 +668,6 @@ const subscriptionsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
-      // إضافة اشتراك
       .addCase(postSubscription.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -825,7 +681,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // تحديث نوع اشتراك
       .addCase(putSubscriptionType.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -841,7 +696,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // حذف نوع اشتراك
       .addCase(deleteSubscriptionType.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -857,7 +711,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // جلب اشتراك معين
       .addCase(fetchSubscriptionById.pending, (state) => {
         state.status = 'loading';
         state.error = null;
@@ -870,7 +723,6 @@ const subscriptionsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
-      // جلب الاشتراكات النشطة
       .addCase(fetchActiveSubscriptions.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -883,7 +735,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // جلب الاشتراكات المنتهية
       .addCase(fetchExpiredSubscriptions.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -896,7 +747,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // جلب إحصائيات الاشتراكات
       .addCase(fetchSubscriptionStats.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -909,7 +759,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // جلب الاشتراكات القادمة
       .addCase(fetchUpcomingSubscriptions.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -922,7 +771,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // إجراء دفعة
       .addCase(makePayment.pending, (state) => {
         state.loading = true;
         state.paymentStatus = null;
@@ -943,7 +791,6 @@ const subscriptionsSlice = createSlice({
         state.paymentStatus = 'failed';
         state.error = action.payload;
       })
-      // تجديد اشتراك
       .addCase(renewSubscription.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -951,20 +798,14 @@ const subscriptionsSlice = createSlice({
       .addCase(renewSubscription.fulfilled, (state, action) => {
         state.loading = false;
         state.status = 'succeeded';
-        const updatedSubscription = action.payload;
-        state.subscriptions = state.subscriptions.map((sub) =>
-          sub.id === updatedSubscription.id ? updatedSubscription : sub
-        );
-        state.memberSubscriptions.results = state.memberSubscriptions.results.map((sub) =>
-          sub.id === updatedSubscription.id ? updatedSubscription : sub
-        );
+        state.subscriptions.push(action.payload);
+        state.memberSubscriptions.results.push(action.payload);
       })
       .addCase(renewSubscription.rejected, (state, action) => {
         state.loading = false;
         state.status = 'failed';
         state.error = action.payload;
       })
-      // جلب اشتراكات عضو
       .addCase(fetchMemberSubscriptions.pending, (state) => {
         state.status = 'loading';
         state.error = null;
@@ -977,7 +818,6 @@ const subscriptionsSlice = createSlice({
         state.status = 'failed';
         state.error = action.payload;
       })
-      // إضافة حضور
       .addCase(addAttendance.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -990,7 +830,6 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      // طلب تجميد اشتراك
       .addCase(requestSubscriptionFreeze.pending, (state, action) => {
         const { subscriptionId } = action.meta.arg;
         state.freezeStatus[subscriptionId] = 'loading';
@@ -1015,7 +854,6 @@ const subscriptionsSlice = createSlice({
         state.freezeStatus[subscriptionId] = 'failed';
         state.freezeError[subscriptionId] = error;
       })
-      // إلغاء تجميد اشتراك
       .addCase(cancelSubscriptionFreeze.pending, (state, action) => {
         const { freezeRequestId } = action.meta.arg;
         state.cancelStatus[freezeRequestId] = 'loading';
@@ -1040,7 +878,6 @@ const subscriptionsSlice = createSlice({
         state.cancelStatus[freezeRequestId] = 'failed';
         state.cancelError[freezeRequestId] = error;
       })
-      // جلب ملف المدرب
       .addCase(fetchCoachProfile.pending, (state) => {
         state.coachProfile.loading = true;
         state.coachProfile.error = null;

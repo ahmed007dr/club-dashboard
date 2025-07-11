@@ -9,13 +9,15 @@ const getToken = () => {
 
 export const fetchAttendances = createAsyncThunk(
   "attendance/fetchAttendances",
-  async ({ page, pageSize, member_name, rfid_code, subscription_id }, { rejectWithValue }) => {
+  async ({ page, pageSize, member_name, rfid_code, subscription, attendance_date, subscription_type }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem("token");
       const params = { page, page_size: pageSize };
       if (member_name) params.member_name = member_name;
       if (rfid_code) params.rfid_code = rfid_code;
-      if (subscription_id) params.subscription = subscription_id; 
+      if (subscription) params.subscription = subscription;
+      if (attendance_date) params.attendance_date = attendance_date;
+      if (subscription_type) params.subscription_type = subscription_type;
       const response = await axios.get(`${BASE_URL}attendance/api/attendances/`, {
         headers: { Authorization: `Bearer ${token}` },
         params,

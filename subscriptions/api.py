@@ -584,7 +584,6 @@ def upcoming_subscriptions(request):
     serializer = SubscriptionSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
-
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def renew_subscription(request, pk):
@@ -599,22 +598,57 @@ def renew_subscription(request, pk):
         return Response({"error": "لا يمكن تجديد اشتراك ملغى"}, status=status.HTTP_400_BAD_REQUEST)
     
     payment_data = request.data.get('payments', [])
+    new_type_id = request.data.get('type', old_subscription.type.id)  # دعم تغيير نوع الاشتراك
+    start_date = request.data.get('start_date', old_subscription.end_date)  # دعم تحديد تاريخ البدء
     
     with transaction.atomic():
-        # Create a new subscription
+        subscription_type = get_object_or_404(SubscriptionType, id=new_type_id, club=request.user.club)
+        now = timezone.now()
+        
+        # حساب السعر الفعلي بناءً على العروض الخاصة
+        active_offer = SpecialOffer.objects.filter(
+            subscription_type=subscription_type,
+            start_datetime__lte=now,
+            end_datetime__gte=now,
+            is_active=True
+        ).first()
+        effective_price = (
+            (subscription_type.price * (100 - active_offer.discount_percentage) / 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            if active_offer else subscription_type.price
+        )
+        
+        # التحقق من عدم وجود اشتراكات نشطة متداخلة
+        today = timezone.now().date()
+        active_subscriptions = Subscription.objects.filter(
+            member=old_subscription.member,
+            club=request.user.club,
+            start_date__lte=today,
+            end_date__gte=today,
+            entry_count__lt=F('type__max_entries'),
+            type__max_entries__gt=0
+        ).exclude(is_cancelled=True)
+        if active_subscriptions.exists():
+            latest_active_subscription = active_subscriptions.order_by('-end_date').first()
+            max_end_date = latest_active_subscription.end_date
+            if start_date <= max_end_date:
+                return Response(
+                    {"non_field_errors": [f"لا يمكن إنشاء اشتراك جديد يبدأ قبل {max_end_date} بسبب وجود اشتراك نشط."]},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
         new_subscription_data = {
             'member': old_subscription.member.id,
-            'type': old_subscription.type.id,
+            'type': subscription_type.id,
             'club': old_subscription.club.id,
-            'start_date': old_subscription.end_date,
-            'end_date': old_subscription.end_date + timedelta(days=old_subscription.type.duration_days),
+            'start_date': start_date,
+            'end_date': start_date + timedelta(days=subscription_type.duration_days),
             'entry_count': 0,
             'paid_amount': Decimal('0'),
-            'remaining_amount': old_subscription.type.price,
+            'remaining_amount': effective_price,
             'created_by': request.user.id
         }
         
-        # Handle coach-related fields
+        # التعامل مع بيانات المدرب
         if old_subscription.coach:
             new_subscription_data['coach'] = old_subscription.coach.id
             new_subscription_data['coach_compensation_type'] = old_subscription.coach_compensation_type
@@ -640,13 +674,13 @@ def renew_subscription(request, pk):
                     return Response(payment_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
             
             new_subscription.paid_amount = total_paid
-            new_subscription.remaining_amount = new_subscription.type.price - total_paid
+            new_subscription.remaining_amount = effective_price - total_paid
             new_subscription.save()
             
             source, _ = IncomeSource.objects.get_or_create(
                 club=new_subscription.club, name='Renewal', defaults={'description': 'إيراد عن تجديد اشتراك'}
             )
-            amount = new_subscription.type.price
+            amount = total_paid
             if new_subscription.coach and new_subscription.coach_compensation_type == 'external':
                 amount += new_subscription.coach_compensation_value or Decimal('0.00')
             Income.objects.create(
@@ -660,9 +694,6 @@ def renew_subscription(request, pk):
             
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])

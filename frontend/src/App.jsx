@@ -19,7 +19,7 @@ import Profile from './components/dashboard/Profile';
 import Staff from './components/dashboard/Staff';
 import Finance from './components/dashboard/Finance';
 import MemberSubscriptions from './components/dashboard/MemberSubscriptions';
-import MemberProfile from './components/dashboard/MemberProfile'; // الكود الجديد
+import MemberProfile from './components/members/MemberProfile'; // الكود الجديد
 import AddMember from './components/modals/AddMember';
 import StaffProfile from './components/dashboard/StaffProfile';
 import AttendanceForm from './components/dashboard/AttendanceForm';
