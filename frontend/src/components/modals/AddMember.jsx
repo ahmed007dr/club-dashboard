@@ -15,7 +15,6 @@ const AddMember = ({ closeAddModal, onAddSuccess }) => {
   // استرجاع بيانات المستخدم الحالي من Redux
   const currentUser = useSelector((state) => state.auth.user);
 
-  // تهيئة formData
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -28,8 +27,10 @@ const AddMember = ({ closeAddModal, onAddSuccess }) => {
     address: '',
     note: '',
     photo: null,
+    gender: '', // إضافة حقل gender
   });
 
+  
   // معالجة التغييرات في الحقول
   const handleChange = useCallback((e) => {
     const { name, value, type, files } = e.target;
@@ -80,6 +81,7 @@ const AddMember = ({ closeAddModal, onAddSuccess }) => {
     if (formData.job) form.append('job', formData.job);
     if (formData.address) form.append('address', formData.address);
     if (formData.note) form.append('note', formData.note);
+    if (formData.gender) form.append('gender', formData.gender); 
     if (formData.photo) form.append('photo', formData.photo);
 
     try {
@@ -152,27 +154,39 @@ const AddMember = ({ closeAddModal, onAddSuccess }) => {
           </div>
         )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            { id: 'name', label: 'الاسم الكامل', type: 'text', placeholder: 'أدخل الاسم الكامل', required: true },
-            { id: 'phone', label: 'رقم الهاتف', type: 'text', placeholder: 'أدخل رقم الهاتف', required: true },
-            { id: 'national_id', label: 'رقم الهوية', type: 'text', placeholder: 'أدخل رقم الهوية' },
-            { id: 'birth_date', label: 'تاريخ الميلاد', type: 'date' },
-            {
-              id: 'club',
-              label: 'النادي',
-              type: 'select',
-              required: true,
-              disabled: !!currentUser?.club?.id || !!currentUser?.club_id,
-              options: [
-                { value: '', label: 'اختر النادي' },
-                ...clubs.map((club) => ({ value: club.id, label: club.name })),
-              ],
-            },
-            { id: 'referred_by', label: 'أُحيل بواسطة (رقم العضو)', type: 'text', placeholder: 'أدخل رقم العضو المحيل' },
-            { id: 'rfid_code', label: 'رمز RFID', type: 'text', placeholder: 'أدخل رمز RFID' },
-            { id: 'job', label: 'الوظيفة', type: 'text', placeholder: 'أدخل الوظيفة' },
-            { id: 'address', label: 'العنوان', type: 'text', placeholder: 'أدخل العنوان' },
-            { id: 'note', label: 'ملاحظة', type: 'textarea', placeholder: 'أدخل ملاحظة' },
+         
+        {[
+          { id: 'name', label: 'الاسم الكامل', type: 'text', placeholder: 'أدخل الاسم الكامل', required: true },
+          { id: 'phone', label: 'رقم الهاتف', type: 'text', placeholder: 'أدخل رقم الهاتف', required: true },
+          { id: 'national_id', label: 'رقم الهوية', type: 'text', placeholder: 'أدخل رقم الهوية' },
+          { id: 'birth_date', label: 'تاريخ الميلاد', type: 'date' },
+          {
+            id: 'club',
+            label: 'النادي',
+            type: 'select',
+            required: true,
+            disabled: !!currentUser?.club?.id || !!currentUser?.club_id,
+            options: [
+              { value: '', label: 'اختر النادي' },
+              ...clubs.map((club) => ({ value: club.id, label: club.name })),
+            ],
+          },
+          { id: 'referred_by', label: 'أُحيل بواسطة (رقم العضو)', type: 'text', placeholder: 'أدخل رقم العضو المحيل' },
+          { id: 'rfid_code', label: 'رمز RFID', type: 'text', placeholder: 'أدخل رمز RFID' },
+          { id: 'job', label: 'الوظيفة', type: 'text', placeholder: 'أدخل الوظيفة' },
+          { id: 'address', label: 'العنوان', type: 'text', placeholder: 'أدخل العنوان' },
+          { id: 'note', label: 'ملاحظة', type: 'textarea', placeholder: 'أدخل ملاحظة' },
+          {
+            id: 'gender',
+            label: 'الجنس',
+            type: 'select',
+            options: [
+              { value: '', label: 'اختر الجنس' },
+              { value: 'M', label: 'ذكر' },
+              { value: 'F', label: 'أنثى' },
+            ],
+          },
+
           ].map((field) => (
             <div key={field.id} className="flex flex-col">
               <label htmlFor={field.id} className="text-sm font-medium text-gray-700 mb-2 text-right">

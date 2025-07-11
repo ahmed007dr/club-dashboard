@@ -95,12 +95,12 @@ def member_detail_api(request, member_id):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def member_search_api(request):
-    """Search members by various criteria."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     search_term = request.GET.get('q', '')
+    gender = request.GET.get('gender', '')  # إضافة فلتر gender
     search_filter = (
         Q(name__icontains=search_term) |
         Q(membership_number__icontains=search_term) |
@@ -109,14 +109,16 @@ def member_search_api(request):
         Q(phone__icontains=search_term)
     )
 
-    members = Member.objects.filter(
-        Q(club=request.user.club) & search_filter
-    ).order_by('-name')
+    members = Member.objects.filter(Q(club=request.user.club) & search_filter)
+    if gender:
+        members = members.filter(gender=gender)  # تطبيق فلتر gender
 
+    members = members.order_by('-name')
     paginator = PageNumberPagination()
     result_page = paginator.paginate_queryset(members, request)
     serializer = MemberSerializer(result_page, many=True)
     return paginator.get_paginated_response(serializer.data)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -218,52 +220,49 @@ def delete_member_api(request, member_id):
     member.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def member_subscription_report_api(request):
-    """Get member subscription report."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     try:
         club_id = request.user.club.id
-        try:
-            expiry_days = int(request.GET.get('days', 7))
-            inactive_days = int(request.GET.get('inactive_days', 7))
-            name = request.GET.get('name')
-            rfid_code = request.GET.get('rfid_code')
-            subscription_status = request.GET.get('subscription_status')
-            if expiry_days < 1 or inactive_days < 1:
-                raise ValueError
-        except ValueError:
-            return Response({'error': 'يجب أن تكون أيام الانتهاء وعدم الحضور قيمًا صحيحة وموجبة'}, status=status.HTTP_400_BAD_REQUEST)
+        expiry_days = int(request.GET.get('days', 7))
+        inactive_days = int(request.GET.get('inactive_days', 7))
+        name = request.GET.get('name')
+        rfid_code = request.GET.get('rfid_code')
+        gender = request.GET.get('gender')  # إضافة فلتر gender
+        subscription_status = request.GET.get('subscription_status')
+        if expiry_days < 1 or inactive_days < 1:
+            raise ValueError
 
         today = timezone.now().date()
         expiry_threshold = today + timedelta(days=expiry_days)
         inactive_threshold = today - timedelta(days=inactive_days)
 
         base_query = Member.objects.filter(club_id=club_id)
-        
         if name:
             base_query = base_query.filter(name__icontains=name)
         if rfid_code:
             base_query = base_query.filter(rfid_code__icontains=rfid_code)
+        if gender:
+            base_query = base_query.filter(gender=gender)  # تطبيق فلتر gender
 
+        # باقي الكود بدون تغيير
         members_without_subscriptions = base_query.annotate(
             has_subscription=Exists(Subscription.objects.filter(member=OuterRef('pk')))
         ).filter(has_subscription=False)
-        
         members_with_expired_subscriptions = base_query.filter(
             subscription__isnull=False,
             subscription__end_date__lt=today
         ).distinct()
-        
         members_with_near_expiry = base_query.filter(
             subscription__end_date__gte=today,
             subscription__end_date__lte=expiry_threshold
         ).distinct()
-        
         members_inactive = base_query.filter(
             subscription__end_date__gte=today
         ).exclude(
@@ -333,6 +332,7 @@ def member_subscription_report_api(request):
     except Exception as e:
         logger.error(f"Error in member_subscription_report_api: {str(e)}")
         return Response({'error': f'خطأ داخلي: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

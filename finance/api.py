@@ -249,16 +249,7 @@ def expense_api(request):
         data = request.data.copy()
         data['paid_by'] = request.user.id
         data['club'] = request.user.club.id
-        
-        # التحقق من وجود وردية مفتوحة
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        
-        if not attendance:
-            return Response({'error': 'لا توجد وردية مفتوحة. يجب تسجيل حضور أولاً.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        # اجعل تاريخ المصروف داخل فترة الوردية المفتوحة
         data['date'] = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
 
         if 'related_employee' in data and data['related_employee']:
@@ -269,12 +260,9 @@ def expense_api(request):
 
         serializer = ExpenseSerializer(data=data, context={'request': request})
         if serializer.is_valid():
-            expense_date = serializer.validated_data.get('date')
-            if expense_date < attendance.check_in or expense_date > (attendance.check_out or timezone.now()):
-                return Response({'error': 'تاريخ المصروف خارج فترة الوردية المفتوحة'}, status=status.HTTP_400_BAD_REQUEST)
-
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'POST'])
@@ -286,7 +274,8 @@ def income_source_api(request):
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     if request.method == 'GET':
-        sources = IncomeSource.objects.filter(club=request.user.club, price__gt=0)  # تصفية السعر > 0
+        # sources = IncomeSource.objects.filter(club=request.user.club, price__gt=0)  # تصفية السعر > 0
+        sources = IncomeSource.objects.filter(club=request.user.club)  # تصفية السعر > 0
         if request.query_params.get('name'):
             sources = sources.filter(name__icontains=request.query_params.get('name'))
         if request.query_params.get('description'):

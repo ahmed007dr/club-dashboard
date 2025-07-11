@@ -166,6 +166,20 @@ export const deleteSubscriptionById = createAsyncThunk(
   }
 );
 
+export const fetchSpecialOffers = createAsyncThunk(
+  'subscriptions/fetchSpecialOffers',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`${BASE_URL}subscriptions/api/special-offers/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch special offers.');
+    }
+  }
+);
 // إضافة اشتراك جديد
 export const postSubscription = createAsyncThunk(
   'subscriptions/postSubscription',
@@ -653,6 +667,7 @@ const subscriptionsSlice = createSlice({
     paymentMethods: [],
     paymentMethodsLoading: false,
     paymentMethodsError: null,
+    specialOffers: [], // أضف هذا
     loading: false,
     error: null,
     status: 'idle',
@@ -679,6 +694,17 @@ const subscriptionsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(fetchSpecialOffers.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(fetchSpecialOffers.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.specialOffers = action.payload;
+      })
+      .addCase(fetchSpecialOffers.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+      })
       // جلب طرق الدفع
       .addCase(fetchPaymentMethods.pending, (state) => {
         state.paymentMethodsLoading = true;

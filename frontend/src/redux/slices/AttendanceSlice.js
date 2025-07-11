@@ -7,28 +7,19 @@ const getToken = () => {
   return token ? `Bearer ${token}` : '';
 };
 
-
-
 export const fetchAttendances = createAsyncThunk(
   "attendance/fetchAttendances",
-  async ({ page, pageSize, ...filters }, { rejectWithValue }) => {
+  async ({ page, pageSize, member_name, rfid_code, subscription_id }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem("token");
-      const response = await axios.get(
-        `${BASE_URL}attendance/api/attendances/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          params: {
-            page,
-            page_size: pageSize,
-            ...filters,
-          },
-        }
-      );
-
+      const params = { page, page_size: pageSize };
+      if (member_name) params.member_name = member_name;
+      if (rfid_code) params.rfid_code = rfid_code;
+      if (subscription_id) params.subscription = subscription_id; 
+      const response = await axios.get(`${BASE_URL}attendance/api/attendances/`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params,
+      });
       return {
         data: response.data.results,
         count: response.data.count,
@@ -36,14 +27,10 @@ export const fetchAttendances = createAsyncThunk(
         pageSize,
       };
     } catch (error) {
-      return rejectWithValue(
-        error.response?.data?.message || "Failed to fetch attendances."
-      );
+      return rejectWithValue(error.response?.data?.message || "Failed to fetch attendances.");
     }
   }
 );
-
-
 // Async thunk for adding attendance
 export const addAttendance = createAsyncThunk(
   'attendance/addAttendance',

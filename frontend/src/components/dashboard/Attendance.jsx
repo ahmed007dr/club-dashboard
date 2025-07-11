@@ -214,14 +214,14 @@ const Attendance = () => {
     fetchAttendancesData();
   }, [fetchAttendancesData]);
 
-  // البحث عن الاشتراك مع تأخير
+  
   const searchSubscription = useCallback(
     debounce(async (attendance) => {
       if (!attendance.identifier || !attendance.club) {
         setSearchLoading(false);
         return;
       }
-
+  
       setSearchLoading(true);
       try {
         const response = await fetch(
@@ -236,8 +236,7 @@ const Attendance = () => {
         );
         if (!response.ok) throw new Error("فشل في جلب الاشتراك");
         const data = await response.json();
-//         console.log("API Response:", data);
-
+  
         const subscription = data.results.find((sub) => {
           const member = sub.member_details || {};
           return (
@@ -245,7 +244,7 @@ const Attendance = () => {
             member.phone?.trim() === attendance.identifier
           );
         });
-
+  
         if (!subscription) {
           toast.error("لم يتم العثور على اشتراك فعال لهذا المعرف");
           setFoundSubscription(null);
@@ -257,9 +256,10 @@ const Attendance = () => {
       } finally {
         setSearchLoading(false);
       }
-    }, 200),
+    }, 1000), // تأخير لمدة ثانية واحدة
     []
   );
+
 
   // التعامل مع تغيير إدخال نموذج الحضور
   const handleAttendanceInputChange = (e) => {

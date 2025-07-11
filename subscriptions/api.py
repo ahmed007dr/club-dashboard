@@ -247,7 +247,6 @@ def active_subscription_types(request):
     serializer = SubscriptionTypeSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def subscription_list(request):
@@ -261,15 +260,20 @@ def subscription_list(request):
         search_term = request.query_params.get('searchTerm', request.query_params.get('search_term', '')).strip()
         identifier = request.query_params.get('identifier', '').strip()
         club_id = request.query_params.get('club', request.user.club.id)
+        status_param = request.query_params.get('status', '').strip()
         today = timezone.now().date()
         ordering = request.query_params.get('ordering', '')
+
+        # التحقق من وجود معايير بحث
+        if not (search_term or identifier or status_param):
+            logger.info(f"No search criteria provided by user: {request.user.username}")
+            return Response({'message': 'يرجى إدخال معايير البحث (اسم، رقم هاتف، RFID، أو حالة الاشتراك).'}, status=status.HTTP_400_BAD_REQUEST)
 
         subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=club_id)
 
         # تحديد الوصول بناءً على الدور
         if request.user.role not in ['owner', 'admin']:
-            filters = Q(remaining_amount__gt=0)
-
+            filters = Q()
             attendance = StaffAttendance.objects.filter(
                 staff=request.user, club=request.user.club, check_out__isnull=True
             ).order_by('-check_in').first()
@@ -280,7 +284,6 @@ def subscription_list(request):
                     start_date__gte=attendance.check_in,
                     start_date__lte=attendance.check_out or timezone.now()
                 )
-
             subscriptions = subscriptions.filter(filters)
 
         if identifier:
@@ -303,11 +306,10 @@ def subscription_list(request):
                     output_field=BooleanField()
                 )
             ).filter(
-                Q(member__rfid_code=identifier) | Q(member__phone=identifier),
-                can_enter=True
-            ).order_by('-start_date')[:1]
+                Q(member__rfid_code=identifier) | Q(member__phone=identifier)
+            )
 
-        else:
+        elif search_term or status_param:
             # فلترة بالبحث
             if search_term:
                 subscriptions = subscriptions.filter(
@@ -328,7 +330,7 @@ def subscription_list(request):
                     subscriptions = subscriptions.filter(**{field: request.query_params.get(param)})
 
             # فلترة بالحالة
-            if status_param := request.query_params.get('status'):
+            if status_param:
                 if status_param == 'active':
                     subscriptions = subscriptions.filter(
                         start_date__lte=today,
@@ -343,25 +345,20 @@ def subscription_list(request):
                 elif status_param == 'upcoming':
                     subscriptions = subscriptions.filter(start_date__gt=today)
 
-            # إذا لم يوجد أي فلتر: أظهر فقط الاشتراكات ذات المبلغ المتبقي (لـ owner/admin فقط)
-            elif request.user.role in ['owner', 'admin']:
-                subscriptions = subscriptions.filter(remaining_amount__gt=0)
-
-            # ترتيب النتائج
-            if ordering:
-                if ordering in ['remaining_amount', '-remaining_amount', 'start_date', '-start_date']:
-                    subscriptions = subscriptions.order_by(ordering, '-id')
-                else:
-                    subscriptions = subscriptions.order_by(ordering)
+        if ordering:
+            if ordering in ['remaining_amount', '-remaining_amount', 'start_date', '-start_date']:
+                subscriptions = subscriptions.order_by(ordering, '-id')
             else:
-                subscriptions = subscriptions.order_by('-remaining_amount', '-start_date')
+                subscriptions = subscriptions.order_by(ordering)
+        else:
+            subscriptions = subscriptions.order_by('-remaining_amount', '-start_date')
 
         # Pagination and serialization
         paginator = PageNumberPagination()
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page or subscriptions, many=True, context={'request': request})
         return paginator.get_paginated_response(serializer.data) if page else Response(serializer.data)
-
+    
     elif request.method == 'POST':
         mutable_data = request.data.copy()
         mutable_data['created_by'] = request.user.id

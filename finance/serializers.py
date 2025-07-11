@@ -86,9 +86,7 @@ class IncomeSerializer(serializers.ModelSerializer):
     received_by_details = UserSerializer(source='received_by', read_only=True)
     receipt_details = ReceiptSerializer(source='related_receipt', read_only=True)
     stock_transaction_details = serializers.SerializerMethodField()
-    #date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', input_formats=['%Y-%m-%d %H:%M:%S', '%Y-%m-%d'])
-    date = serializers.DateTimeField(read_only=True)
-
+    date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)  
     class Meta:
         model = Income
         fields = [

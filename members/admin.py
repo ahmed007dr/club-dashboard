@@ -7,7 +7,7 @@ from core.models import Club
 from subscriptions.models import Subscription
 from .resources import MemberResource
 
-# Resource for import/export
+
 class MemberResource(resources.ModelResource):
     club__name = fields.Field(
         column_name='club__name',
@@ -20,10 +20,10 @@ class MemberResource(resources.ModelResource):
         fields = (
             'id', 'name', 'membership_number', 'rfid_code', 'national_id', 
             'phone', 'phone2', 'birth_date', 'job', 'address', 'note', 
-            'club__name', 'created_at'
+            'gender', 'club__name', 'created_at' 
         )
         export_order = fields
-# Inline subscription display
+
 class SubscriptionInline(admin.TabularInline):
     model = Subscription
     extra = 0
@@ -31,18 +31,17 @@ class SubscriptionInline(admin.TabularInline):
     readonly_fields = ('start_date', 'end_date')
     raw_id_fields = ('type',)
 
-# Main Member admin
 @admin.register(Member)
 class MemberAdmin(ImportExportModelAdmin):
     resource_class = MemberResource
     list_display = (
         'name', 'membership_number', 'rfid_code', 'club', 'phone', 
-        'job', 'created_at'
+        'job', 'gender', 'created_at' 
     )
-    list_filter = ('club', 'created_at', 'job')
+    list_filter = ('club', 'created_at', 'job', 'gender')
     search_fields = (
         'name', 'membership_number', 'rfid_code', 
-        'national_id', 'phone', 'phone2'
+        'national_id', 'phone', 'phone2', 'gender'
     )
     date_hierarchy = 'created_at'
     raw_id_fields = ('referred_by',)

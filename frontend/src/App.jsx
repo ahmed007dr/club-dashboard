@@ -19,7 +19,7 @@ import Profile from './components/dashboard/Profile';
 import Staff from './components/dashboard/Staff';
 import Finance from './components/dashboard/Finance';
 import MemberSubscriptions from './components/dashboard/MemberSubscriptions';
-import Member from './pages/member/Member';
+import MemberProfile from './components/dashboard/MemberProfile'; // الكود الجديد
 import AddMember from './components/modals/AddMember';
 import StaffProfile from './components/dashboard/StaffProfile';
 import AttendanceForm from './components/dashboard/AttendanceForm';
@@ -35,18 +35,50 @@ import ManageUsers from './components/dashboard/ManageUsers';
 import ReportsPage from './components/dashboard/Reports';
 import FinancialDashboard from './components/dashboard/FinancialDashboard';
 import MemberSubscriptionReport from './components/dashboard/MemberSubscriptionReport';
-import SubscriptionAnalytics from './components/dashboard/SubscriptionAnalytics'; 
+import SubscriptionAnalytics from './components/dashboard/SubscriptionAnalytics';
+import StaffAttendanceReport from './components/dashboard/StaffAttendanceReport';
+import StockAnalytics from './components/dashboard/StockAnalytics';
+import StaffSalaryReport from './components/dashboard/StaffSalaryReport';
+import AttendanceDashboard from './components/dashboard/AttendanceDashboard';
 import useTokenRefresh from './hooks/useTokenRefresh';
-import StaffAttendanceReport from './components/dashboard/StaffAttendanceReport.jsx';
-import StockAnalytics from './components/dashboard/StockAnalytics.jsx';
-import StaffSalaryReport from './components/dashboard/StaffSalaryReport.jsx';
-import AttendanceDashboard from './components/dashboard/AttendanceDashboard.jsx';
 import { Toaster } from 'react-hot-toast';
 
-// Route protection component
 const ProtectedRoute = ({ element }) => {
   const accessToken = localStorage.getItem('token');
-  return accessToken ? element : <Navigate to="/login" replace />;
+  const [isValidating, setIsValidating] = React.useState(true);
+  const [isValidToken, setIsValidToken] = React.useState(false);
+
+  React.useEffect(() => {
+    const validateToken = async () => {
+      try {
+        // افترض API endpoint للتحقق من التوكن
+        const response = await fetch('/api/validate-token', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (response.ok) {
+          setIsValidToken(true);
+        } else {
+          setIsValidToken(false);
+        }
+      } catch {
+        setIsValidToken(false);
+      } finally {
+        setIsValidating(false);
+      }
+    };
+
+    if (accessToken) {
+      validateToken();
+    } else {
+      setIsValidating(false);
+    }
+  }, [accessToken]);
+
+  if (isValidating) {
+    return <div className="flex justify-center items-center min-h-screen">جاري التحقق...</div>;
+  }
+
+  return accessToken && isValidToken ? element : <Navigate to="/login" replace />;
 };
 
 function App() {
@@ -56,6 +88,7 @@ function App() {
   React.useEffect(() => {
     if (error) {
       toast.error(`جلسة منتهية، يرجى تسجيل الدخول مجدداً: ${error}`);
+      localStorage.removeItem('token');
       navigate('/login');
     }
   }, [error, navigate]);
@@ -74,7 +107,7 @@ function App() {
           <Route path="subscriptions" element={<Subscriptions />} />
           <Route path="receipts" element={<Receipts />} />
           <Route path="members" element={<Members />} />
-          <Route path="member/:id" element={<Member />} />
+          <Route path="member-profile" element={<MemberProfile />} /> {/* المسار الجديد */}
           <Route path="member-subscriptions/:memberId" element={<MemberSubscriptions />} />
           <Route path="tickets" element={<Tickets />} />
           <Route path="attendance" element={<Attendance />} />
@@ -100,12 +133,10 @@ function App() {
           <Route path="dashboard/subscription-report" element={<MemberSubscriptionReport />} />
           <Route path="dashboard/StockAnalytics" element={<StockAnalytics />} />
           <Route path="dashboard/financial-analysis" element={<FinancialDashboard />} />
-          <Route path="dashboard/subscription-analytics" element={<SubscriptionAnalytics />} /> 
+          <Route path="dashboard/subscription-analytics" element={<SubscriptionAnalytics />} />
           <Route path="attendance-report/:staffId?" element={<StaffAttendanceReport />} />
           <Route path="attendance-StaffSalaryReport" element={<StaffSalaryReport />} />
           <Route path="AttendanceDashboard" element={<AttendanceDashboard />} />
-
-
         </Route>
       </Routes>
     </div>

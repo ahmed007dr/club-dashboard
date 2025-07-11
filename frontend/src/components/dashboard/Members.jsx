@@ -185,33 +185,34 @@ const Members = () => {
           {/* Desktop Table View */}
           <div className="hidden lg:block overflow-x-auto rounded-lg shadow">
             <table className="w-full text-sm bg-white">
-              <thead className="bg-gray-100 text-gray-700">
-                <tr>
-                  {["#", "الصورة", "الاسم", "كود RFID", "رقم العضوية", "الرقم القومي", "الهاتف", "اسم النادي", "الإجراءات"].map((header) => (
-                    <th key={header} className="p-4 text-right font-semibold border-b">{header}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {Array.isArray(members) && members.map((member, index) => (
-                  <tr key={member.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-4">{(currentPage - 1) * itemsPerPage + index + 1}</td>
-                    <td className="p-4">
-                      <Link to={`/member/${member.id}`}>
-                        <img
-                          src={member.photo || "https://via.placeholder.com/40"}
-                          alt="member"
-                          className="w-10 h-10 rounded-full object-cover hover:scale-105 transition-transform"
-                        />
-                      </Link>
-                    </td>
-                    <td className="p-4 font-medium">{member.name}</td>
-                    <td className="p-4">{member.rfid_code || "—"}</td>
-                    <td className="p-4">{member.membership_number}</td>
-                    <td className="p-4">{member.national_id}</td>
-                    <td className="p-4">{member.phone}</td>
-                    <td className="p-4">{member.club_name}</td>
-                    <td className="p-4 flex gap-2 justify-center">
+            <thead className="bg-gray-100 text-gray-700">
+                  <tr>
+                    {["#", "الصورة", "الاسم", "الجنس", "كود RFID", "رقم العضوية", "الرقم القومي", "الهاتف", "اسم النادي", "الإجراءات"].map((header) => (
+                      <th key={header} className="p-4 text-right font-semibold border-b">{header}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {Array.isArray(members) && members.map((member, index) => (
+                    <tr key={member.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4">{(currentPage - 1) * itemsPerPage + index + 1}</td>
+                      <td className="p-4">
+                        <Link to={`/member/${member.id}`}>
+                          <img
+                            src={member.photo || "https://via.placeholder.com/40"}
+                            alt="member"
+                            className="w-10 h-10 rounded-full object-cover hover:scale-105 transition-transform"
+                          />
+                        </Link>
+                      </td>
+                      <td className="p-4 font-medium">{member.name}</td>
+                      <td className="p-4">{member.gender === 'M' ? 'ذكر' : member.gender === 'F' ? 'أنثى' : '—'}</td>
+                      <td className="p-4">{member.rfid_code || "—"}</td>
+                      <td className="p-4">{member.membership_number}</td>
+                      <td className="p-4">{member.national_id}</td>
+                      <td className="p-4">{member.phone}</td>
+                      <td className="p-4">{member.club_name}</td>
+                      <td className="p-4 flex gap-2 justify-center">
                       <DropdownMenu dir="rtl">
                         <DropdownMenuTrigger asChild>
                           <button className="p-2 rounded-full hover:bg-gray-200 transition-colors">
@@ -307,6 +308,10 @@ const Members = () => {
                   <div>
                     <p className="text-xs text-gray-500">الهاتف</p>
                     <p>{member.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">الجنس</p>
+                    <p>{member.gender === 'M' ? 'ذكر' : member.gender === 'F' ? 'أنثى' : '—'}</p>
                   </div>
                 </div>
                 <div className="mt-4 pt-4 border-t">
@@ -505,15 +510,42 @@ const Members = () => {
                   </div>
                 ))}
               </div>
+
+
               <div className="space-y-4">
-                {[
-                  { label: "كود البطاقة (RFID)", name: "rfid_code", value: selectedMember.rfid_code || "" },
-                  { label: "الوظيفة", name: "job", value: selectedMember.job || "" },
-                  { label: "اسم النادي", name: "club_name", value: selectedMember.club_name, disabled: true },
-                  { label: "العنوان", name: "address", value: selectedMember.address || "" },
-                ].map((field) => (
-                  <div key={field.name} className="flex flex-col">
-                    <label className="text-right mb-1 text-sm font-medium">{field.label}</label>
+              {[
+                { label: "كود البطاقة (RFID)", name: "rfid_code", value: selectedMember.rfid_code || "" },
+                { label: "الوظيفة", name: "job", value: selectedMember.job || "" },
+                { label: "اسم النادي", name: "club_name", value: selectedMember.club_name, disabled: true },
+                { label: "العنوان", name: "address", value: selectedMember.address || "" },
+                {
+                  label: "الجنس",
+                  name: "gender",
+                  type: "select",
+                  value: selectedMember.gender || "",
+                  options: [
+                    { value: "", label: "اختر الجنس" },
+                    { value: "M", label: "ذكر" },
+                    { value: "F", label: "أنثى" },
+                  ],
+                },
+              ].map((field) => (
+                <div key={field.name} className="flex flex-col">
+                  <label className="text-right mb-1 text-sm font-medium">{field.label}</label>
+                  {field.type === "select" ? (
+                    <select
+                      name={field.name}
+                      value={field.value}
+                      onChange={handleEditChange}
+                      className="border border-gray-300 px-3 py-2 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    >
+                      {field.options.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
                     <input
                       type="text"
                       name={field.name}
@@ -524,19 +556,22 @@ const Members = () => {
                         field.disabled ? "bg-gray-100 cursor-not-allowed" : ""
                       }`}
                     />
-                  </div>
-                ))}
-                <div className="flex flex-col">
-                  <label className="text-right mb-1 text-sm font-medium">ملاحظات</label>
-                  <textarea
-                    name="note"
-                    value={selectedMember.note || ""}
-                    onChange={handleEditChange}
-                    className="border border-gray-300 px-3 py-2 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    rows={3}
-                  />
+                  )}
                 </div>
+              ))}
+              <div className="flex flex-col">
+                <label className="text-right mb-1 text-sm font-medium">ملاحظات</label>
+                <textarea
+                  name="note"
+                  value={selectedMember.note || ""}
+                  onChange={handleEditChange}
+                  className="border border-gray-300 px-3 py-2 rounded-lg text-right focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  rows={3}
+                />
               </div>
+            </div>
+
+
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button

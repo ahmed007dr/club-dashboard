@@ -2,6 +2,11 @@ from django.db import models
 from utils.generate_membership_number import generate_membership_number
 
 class Member(models.Model):
+    GENDER_CHOICES = (
+        ('M', 'ذكر'),
+        ('F', 'أنثى'),
+    )
+    
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     membership_number = models.CharField(max_length=50, unique=True)
@@ -14,6 +19,7 @@ class Member(models.Model):
     job = models.CharField(max_length=100, blank=True, null=True)
     address = models.CharField(max_length=100, blank=True, null=True)
     note = models.CharField(max_length=100, blank=True, null=True)
+    gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True, null=True)  
     created_at = models.DateTimeField(auto_now_add=True)
     referred_by = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='referrals')
 
@@ -27,8 +33,9 @@ class Member(models.Model):
 
     class Meta:
         indexes = [
-            models.Index(fields=['club']),             
+            models.Index(fields=['club']),
             models.Index(fields=['membership_number']),
-            models.Index(fields=['rfid_code']),        
-            models.Index(fields=['created_at']),       
+            models.Index(fields=['rfid_code']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['gender']),  
         ]

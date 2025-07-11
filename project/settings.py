@@ -144,7 +144,9 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'project.wsgi.application'
 
-
+# REST_FRAMEWORK = {
+#     'DATETIME_FORMAT': '%Y-%m-%d %H:%M',
+# }
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 

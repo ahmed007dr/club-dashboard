@@ -54,7 +54,7 @@ const AddEditExpenseModal = ({
             {currentExpense ? 'تعديل المصروف' : 'إضافة مصروف'}
           </DialogTitle>
           <DialogDescription className="text-right text-xs text-gray-500 mt-1">
-            أدخل تفاصيل المصروف بسهولة وسرعة.
+            أدخل تفاصيل المصروف .
           </DialogDescription>
         </DialogHeader>
         <div className="mt-2">

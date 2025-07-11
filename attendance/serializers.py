@@ -16,6 +16,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
     member_name = serializers.SerializerMethodField()
     rfid_code = serializers.SerializerMethodField()  
     subscription_details = SubscriptionSerializer(source='subscription', read_only=True)
+    # coach_name = serializers.CharField(source='subscription.coach.username', read_only=True)
 
     class Meta:
         model = Attendance
