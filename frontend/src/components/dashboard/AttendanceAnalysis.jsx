@@ -207,14 +207,14 @@ const AttendanceAnalysis = () => {
               إعادة المحاولة
             </button>
           </div>
-        ) : analysisData ? (
+        ) : analysisData && analysisData.status ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              { label: 'الحالة', value: analysisData.status.replace(/_/g, ' '), icon: FiUser },
-              { label: 'التأخير بالدقائق', value: analysisData.late_by_minutes, icon: FiClock },
-              { label: 'المغادرة المبكرة بالدقائق', value: analysisData.left_early_by_minutes, icon: FiClock },
-              { label: 'الساعات الفعلية', value: `${analysisData.actual_hours} ساعة`, icon: FiClock },
-              { label: 'الساعات المتوقعة', value: `${analysisData.expected_hours} ساعة`, icon: FiClock },
+              { label: 'الحالة', value: analysisData.status ? analysisData.status.replace(/_/g, ' ') : 'غير متوفر', icon: FiUser },
+              { label: 'التأخير بالدقائق', value: analysisData.late_by_minutes ?? 'غير متوفر', icon: FiClock },
+              { label: 'المغادرة المبكرة بالدقائق', value: analysisData.left_early_by_minutes ?? 'غير متوفر', icon: FiClock },
+              { label: 'الساعات الفعلية', value: analysisData.actual_hours ? `${analysisData.actual_hours} ساعة` : 'غير متوفر', icon: FiClock },
+              { label: 'الساعات المتوقعة', value: analysisData.expected_hours ? `${analysisData.expected_hours} ساعة` : 'غير متوفر', icon: FiClock },
             ].map((item, index) => (
               <div key={index} className="bg-gray-50 p-4 rounded-lg flex items-center gap-3">
                 <item.icon className="text-blue-600 w-6 h-6" />

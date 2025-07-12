@@ -121,7 +121,7 @@ export const analyzeAttendance = createAsyncThunk(
   'attendance/analyze',
   async (staffId, { rejectWithValue }) => {
     try {
-      const response = await axios.get(`${BASE_URL}staff/api/attendance/${staffId}/analysis/`, {
+      const response = await axios.get(`${BASE_URL}staff/api/attendance/${staffId}/`, {
         headers: {
            Authorization: getToken(),  // Added Bearer prefix
           'Content-Type': 'application/json',
