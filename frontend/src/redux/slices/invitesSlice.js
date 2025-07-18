@@ -1,33 +1,28 @@
-// src/redux/slices/invitesSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 
-
+// Fetch all free invites with pagination and filters
 export const fetchFreeInvites = createAsyncThunk(
   'invites/fetchFreeInvites',
   async (params = {}, { rejectWithValue }) => {
     const token = localStorage.getItem('token');
     try {
-      const response = await axios.get(
-        `${BASE_URL}invites/api/free-invites/`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          params: {
-            page: params.page || 1,
-            page_size: params.page_size || 20,
-            club: params.club,
-            guest_name: params.guest_name || undefined,
-            status: params.status || undefined,
-            date: params.date || undefined,
-          },
-        }
-      );
-      return response.data; // { results, count, next, previous }
+      const response = await axios.get(`${BASE_URL}invites/api/free-invites/`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        params: {
+          page: params.page || 1,
+          page_size: params.page_size || 20,
+          club: params.club,
+          guest_name: params.guest_name,
+          status: params.status,
+          date: params.date,
+        },
+      });
+      return response.data;
     } catch (error) {
-      console.error('Failed to fetch invites:', error);
       return rejectWithValue(error.response?.data || 'Failed to fetch invites');
     }
   }
@@ -49,7 +44,6 @@ export const addInvite = createAsyncThunk(
           },
         }
       );
-      console.warn(response.data)
       return response.data;
     } catch (error) {
       return rejectWithValue(error.response?.data || error.message);
@@ -68,7 +62,6 @@ export const fetchInviteById = createAsyncThunk(
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
           },
         }
       );
@@ -90,7 +83,6 @@ export const deleteInviteById = createAsyncThunk(
         {
           headers: {
             Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
           },
         }
       );
@@ -127,12 +119,12 @@ export const editInviteById = createAsyncThunk(
 // Mark invite as used
 export const markInviteAsUsed = createAsyncThunk(
   'invites/markInviteAsUsed',
-  async ({ inviteId, used_by }, { rejectWithValue }) => {
+  async (inviteId, { rejectWithValue }) => {
     const token = localStorage.getItem('token');
     try {
       const response = await axios.post(
         `${BASE_URL}invites/api/free-invites/${inviteId}/mark-used/`,
-        { used_by },
+        {},
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -147,6 +139,72 @@ export const markInviteAsUsed = createAsyncThunk(
   }
 );
 
+// Fetch remaining invites for a member
+export const fetchRemainingInvites = createAsyncThunk(
+  'invites/fetchRemainingInvites',
+  async (memberId, { rejectWithValue }) => {
+    const token = localStorage.getItem('token');
+    try {
+      const response = await axios.get(
+        `${BASE_URL}invites/api/free-invites/remaining/${memberId}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
+// Search member by RFID code
+export const searchMemberByRfid = createAsyncThunk(
+  'invites/searchMemberByRfid',
+  async (rfidCode, { rejectWithValue }) => {
+    const token = localStorage.getItem('token');
+    try {
+      // Step 1: Search for member by RFID
+      const memberResponse = await axios.get(
+        `${BASE_URL}api/members/search/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          params: { q: rfidCode },
+        }
+      );
+
+      if (!memberResponse.data.results || memberResponse.data.results.length === 0) {
+        return rejectWithValue({ error: 'لم يتم العثور على عضو بهذا الـ RFID' });
+      }
+
+      const member = memberResponse.data.results[0];
+      // Step 2: Fetch remaining invites for the member
+      const invitesResponse = await axios.get(
+        `${BASE_URL}invites/api/free-invites/remaining/${member.id}/`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      return {
+        member: member,
+        subscriptions: invitesResponse.data.remaining_invites,
+        member_id: member.id,
+        member_name: member.name,
+        membership_number: member.membership_number,
+      };
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
 const invitesSlice = createSlice({
   name: 'invites',
   initialState: {
@@ -154,13 +212,22 @@ const invitesSlice = createSlice({
       results: [],
       count: 0,
       next: null,
-      previous: null
+      previous: null,
     },
     currentInvite: null,
+    remainingInvites: null,
+    memberData: null,
     loading: false,
     error: null,
   },
-  reducers: {},
+  reducers: {
+    clearError: (state) => {
+      state.error = null;
+    },
+    clearMemberData: (state) => {
+      state.memberData = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       // Fetch Invites
@@ -168,62 +235,28 @@ const invitesSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-    .addCase(fetchFreeInvites.fulfilled, (state, action) => {
-  state.loading = false;
-  // Ensure we have a valid payload with results array
-  if (action.payload && Array.isArray(action.payload.results)) {
-    state.invites = {
-      results: action.payload.results,
-      count: action.payload.count || 0,
-      next: action.payload.next || null,
-      previous: action.payload.previous || null,
-    };
-  } else {
-    // Fallback to empty state if payload is invalid
-    state.invites = {
-      results: [],
-      count: 0,
-      next: null,
-      previous: null,
-    };
-  }
-})
+      .addCase(fetchFreeInvites.fulfilled, (state, action) => {
+        state.loading = false;
+        state.invites = action.payload;
+      })
       .addCase(fetchFreeInvites.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      
       // Add Invite
       .addCase(addInvite.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-.addCase(addInvite.fulfilled, (state, action) => {
-  state.loading = false;
-  
-  // Ensure state.invites exists
-  if (!state.invites) {
-    state.invites = {
-      results: [],
-      count: 0,
-      next: null,
-      previous: null,
-    };
-  }
-
-  // Ensure results is an array
-  if (!Array.isArray(state.invites.results)) {
-    state.invites.results = [];
-  }
-
-  // Add the new invite
-  state.invites.results.unshift(action.payload);
-})
+      .addCase(addInvite.fulfilled, (state, action) => {
+        state.loading = false;
+        state.invites.results.unshift(action.payload);
+        state.invites.count += 1;
+      })
       .addCase(addInvite.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      
       // Fetch Invite By ID
       .addCase(fetchInviteById.pending, (state) => {
         state.loading = true;
@@ -237,7 +270,6 @@ const invitesSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      
       // Delete Invite
       .addCase(deleteInviteById.pending, (state) => {
         state.loading = true;
@@ -245,18 +277,15 @@ const invitesSlice = createSlice({
       })
       .addCase(deleteInviteById.fulfilled, (state, action) => {
         state.loading = false;
-        // Remove deleted invite from results
         state.invites.results = state.invites.results.filter(
           (invite) => invite.id !== action.payload
         );
-        // Decrement total count
         state.invites.count -= 1;
       })
       .addCase(deleteInviteById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      
       // Edit Invite
       .addCase(editInviteById.pending, (state) => {
         state.loading = true;
@@ -264,19 +293,18 @@ const invitesSlice = createSlice({
       })
       .addCase(editInviteById.fulfilled, (state, action) => {
         state.loading = false;
-        // Update the invite in results array
         const index = state.invites.results.findIndex(
           (invite) => invite.id === action.payload.id
         );
         if (index !== -1) {
           state.invites.results[index] = action.payload;
         }
+        state.currentInvite = action.payload;
       })
       .addCase(editInviteById.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       })
-      
       // Mark Invite as Used
       .addCase(markInviteAsUsed.pending, (state) => {
         state.loading = true;
@@ -284,25 +312,45 @@ const invitesSlice = createSlice({
       })
       .addCase(markInviteAsUsed.fulfilled, (state, action) => {
         state.loading = false;
-        // Find and update the invite in results array
         const index = state.invites.results.findIndex(
           (invite) => invite.id === action.payload.id
         );
-        
         if (index !== -1) {
-          state.invites.results[index] = {
-            ...state.invites.results[index],
-            used: action.payload.used,
-            used_by: action.payload.used_by,
-            ...action.payload
-          };
+          state.invites.results[index] = action.payload;
         }
       })
       .addCase(markInviteAsUsed.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Fetch Remaining Invites
+      .addCase(fetchRemainingInvites.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchRemainingInvites.fulfilled, (state, action) => {
+        state.loading = false;
+        state.remainingInvites = action.payload;
+      })
+      .addCase(fetchRemainingInvites.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Search Member by RFID
+      .addCase(searchMemberByRfid.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(searchMemberByRfid.fulfilled, (state, action) => {
+        state.loading = false;
+        state.memberData = action.payload;
+      })
+      .addCase(searchMemberByRfid.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });
   },
 });
 
+export const { clearError, clearMemberData } = invitesSlice.actions;
 export default invitesSlice.reducer;

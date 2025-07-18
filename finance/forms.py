@@ -43,7 +43,7 @@ class IncomeSourceForm(forms.ModelForm):
 class IncomeForm(forms.ModelForm):
     class Meta:
         model = Income
-        fields = ['club', 'source', 'amount', 'description', 'date', 'received_by', 'related_receipt']
+        fields = ['club', 'source', 'amount', 'description', 'date', 'received_by', ]
         widgets = {
             'club': forms.Select(attrs={'class': 'form-control'}),
             'source': forms.Select(attrs={'class': 'form-control'}),
@@ -51,5 +51,4 @@ class IncomeForm(forms.ModelForm):
             'description': forms.Textarea(attrs={'class': 'form-control'}),
             'date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'received_by': forms.Select(attrs={'class': 'form-control'}),
-            'related_receipt': forms.Select(attrs={'class': 'form-control'}),
         }

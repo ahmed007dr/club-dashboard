@@ -22,17 +22,20 @@ class Feature(models.Model):
         ]
         unique_together = ['club', 'name']
 
+
 class SubscriptionType(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE, related_name='subscription_types')
     name = models.CharField(max_length=100)
     duration_days = models.PositiveIntegerField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    features = models.ManyToManyField(Feature, related_name='subscription_types', blank=True, help_text="الميزات المرتبطة بالاشتراك")
-    is_private_training = models.BooleanField(default=False, help_text="اشتراك تدريب خاص")
+    features = models.ManyToManyField(Feature, related_name='subscription_types', blank=True)
+    is_private_training = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-    max_entries = models.PositiveIntegerField(default=0, help_text="Maximum allowed entries during subscription period (0 means unlimited)")
-    max_freeze_days = models.PositiveIntegerField(default=0, help_text="Maximum allowed freeze days for this subscription type")
-    is_golden_only = models.BooleanField(default=False, help_text="يظهر فقط أثناء عروض ذهبية")
+    max_entries = models.PositiveIntegerField(default=0)
+    max_freeze_days = models.PositiveIntegerField(default=0)
+    free_invites_allowed = models.PositiveIntegerField(default=0, help_text="عدد الدعوات المجانية المسموح بها") 
+    is_golden_only = models.BooleanField(default=False)
+
     def __str__(self):
         return f"{self.name} ({self.club.name})"
 
@@ -48,6 +51,7 @@ class SubscriptionType(models.Model):
             models.Index(fields=['is_active']),
             models.Index(fields=['id']),
         ]
+
 
 class PaymentMethod(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE, related_name='payment_methods')

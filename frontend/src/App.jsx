@@ -8,18 +8,18 @@ import Register from './pages/auth/Register';
 import Navbar from './components/common/Navbar';
 import Main from './components/dashboard/Main';
 import Subscriptions from './components/dashboard/Subscriptions';
-import Receipts from './components/dashboard/Receipts';
 import Members from './components/dashboard/Members';
 import Tickets from './components/dashboard/Tickets';
 import Attendance from './components/dashboard/Attendance';
-import FreeInvites from './components/dashboard/FreeInvites';
+// import FreeInvites from './components/dashboard/FreeInvites';
+import InviteList from './components/freeinvites/InviteList';
 import Leads from './components/dashboard/Leads';
 import Club from './components/dashboard/Club';
 import Profile from './components/dashboard/Profile';
 import Staff from './components/dashboard/Staff';
 import Finance from './components/dashboard/Finance';
 import MemberSubscriptions from './components/dashboard/MemberSubscriptions';
-import MemberProfile from './components/members/MemberProfile'; // الكود الجديد
+import MemberProfile from './components/members/MemberProfile';
 import AddMember from './components/modals/AddMember';
 import StaffProfile from './components/dashboard/StaffProfile';
 import AttendanceForm from './components/dashboard/AttendanceForm';
@@ -105,13 +105,13 @@ function App() {
         <Route path="/" element={<ProtectedRoute element={<Dashboard />} />}>
           <Route index element={<Main />} />
           <Route path="subscriptions" element={<Subscriptions />} />
-          <Route path="receipts" element={<Receipts />} />
           <Route path="members" element={<Members />} />
-          <Route path="member-profile" element={<MemberProfile />} /> {/* المسار الجديد */}
+          <Route path="member-profile" element={<MemberProfile />} /> 
           <Route path="member-subscriptions/:memberId" element={<MemberSubscriptions />} />
           <Route path="tickets" element={<Tickets />} />
           <Route path="attendance" element={<Attendance />} />
-          <Route path="free-invites" element={<FreeInvites />} />
+          {/* <Route path="free-invites" element={<FreeInvites />} /> */}
+          <Route path="free-invites" element={<InviteList />} />
           <Route path="leads" element={<Leads />} />
           <Route path="club" element={<Club />} />
           <Route path="profile" element={<Profile />} />

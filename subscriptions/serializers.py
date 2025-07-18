@@ -15,7 +15,7 @@ from django.utils import timezone
 from .models import Feature
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import timedelta
-
+from invites.models import FreeInvite
 
 
 
@@ -183,7 +183,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     special_offer = serializers.PrimaryKeyRelatedField(
         queryset=SpecialOffer.objects.all(), write_only=True, required=False, allow_null=True
     )
-
+    remaining_free_invites = serializers.SerializerMethodField(read_only=True)  # تأكد إنه read_only
     class Meta:
         model = Subscription
         fields = [
@@ -192,7 +192,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'paid_amount', 'remaining_amount', 'entry_count', 'is_cancelled', 'cancellation_date',
             'refund_amount', 'created_by', 'created_by_details', 'freeze_requests', 'payments',
             'subscriptions_count', 'coach_simple', 'coach_identifier', 'identifier', 'status',
-            'coach_compensation_type', 'coach_compensation_value', 'special_offer'
+            'coach_compensation_type', 'coach_compensation_value', 'special_offer','remaining_free_invites'
         ]
         extra_kwargs = {
             'end_date': {'read_only': True},
@@ -278,6 +278,13 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             }
             for p in obj.payments.all()
         ]
+    
+    def get_remaining_free_invites(self, obj):
+        used_invites = FreeInvite.objects.filter(
+            subscription=obj,
+            status__in=['pending', 'used']
+        ).count()
+        return max(0, obj.type.free_invites_allowed - used_invites)
 
     def validate(self, data):
         club = data.get('club')

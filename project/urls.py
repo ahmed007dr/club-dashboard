@@ -41,7 +41,7 @@ urlpatterns = [
     path('members/', include('members.urls')),
     path('subscriptions/', include('subscriptions.urls')),
     path('tickets/', include('tickets.urls')),
-    path('receipts/', include('receipts.urls')),
+    # path('receipts/', include('receipts.urls')),
     path('staff/', include('staff.urls')),
     path('invites/', include('invites.urls')),
     path('finance/', include('finance.urls')),

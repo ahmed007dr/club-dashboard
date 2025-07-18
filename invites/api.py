@@ -8,6 +8,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.pagination import PageNumberPagination
 from django.db import transaction
 import logging
+from subscriptions.models import Subscription
+from members.models import Member
+from django.utils import timezone
+
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +49,8 @@ def add_free_invite_api(request):
     data = request.data.copy()
     data['created_by'] = request.user.id
     data['club'] = request.user.club.id
-    serializer = FreeInviteSerializer(data=data)
+
+    serializer = FreeInviteSerializer(data=data, context={'request': request})
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -112,3 +117,88 @@ def mark_invite_used_api(request, invite_id):
     invite.save()
     serializer = FreeInviteSerializer(invite)
     return Response(serializer.data)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_by_rfid_api(request):
+    rfid_code = request.query_params.get('rfid_code')
+    if not rfid_code:
+        return Response({'error': 'RFID Code مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        member = Member.objects.get(rfid_code=rfid_code, club=request.user.club)
+    except Member.DoesNotExist:
+        return Response({'error': 'لم يتم العثور على عضو بهذا الـ RFID'}, status=status.HTTP_404_NOT_FOUND)
+
+    today = timezone.now().date()
+    subscriptions = Subscription.objects.filter(
+        member=member,
+        club=request.user.club,
+        start_date__lte=today,
+        end_date__gte=today,
+        is_cancelled=False
+    )
+
+    remaining_invites = []
+    for subscription in subscriptions:
+        used_invites = FreeInvite.objects.filter(
+            subscription=subscription,
+            status__in=['pending', 'used']
+        ).count()
+        remaining = max(0, subscription.type.free_invites_allowed - used_invites)
+        remaining_invites.append({
+            'subscription_id': subscription.id,
+            'subscription_type': subscription.type.name,
+            'total_allowed': subscription.type.free_invites_allowed,
+            'used': used_invites,
+            'remaining': remaining
+        })
+
+    return Response({
+        'member_id': member.id,
+        'member_name': member.name,
+        'membership_number': member.membership_number,
+        'club': member.club.id,
+        'subscriptions': remaining_invites
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_remaining_invites_api(request, member_id):
+    """Get remaining free invites for a member."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    member = get_object_or_404(Member, id=member_id, club=request.user.club)
+    today = timezone.now().date()
+    
+    subscriptions = Subscription.objects.filter(
+        member=member,
+        club=request.user.club,
+        start_date__lte=today,
+        end_date__gte=today,
+        is_cancelled=False
+    )
+    
+    remaining_invites = []
+    for subscription in subscriptions:
+        used_invites = FreeInvite.objects.filter(
+            subscription=subscription,
+            status__in=['pending', 'used']
+        ).count()
+        remaining = max(0, subscription.type.free_invites_allowed - used_invites)
+        remaining_invites.append({
+            'subscription_id': subscription.id,
+            'subscription_type': subscription.type.name,
+            'total_allowed': subscription.type.free_invites_allowed,
+            'used': used_invites,
+            'remaining': remaining
+        })
+    
+    return Response({
+        'member_id': member.id,
+        'member_name': member.name,
+        'remaining_invites': remaining_invites
+    })

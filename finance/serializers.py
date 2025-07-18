@@ -3,9 +3,6 @@ from django.utils import timezone
 from .models import Expense, Income, ExpenseCategory, IncomeSource, StockItem, StockTransaction, Schedule
 from core.serializers import ClubSerializer
 from accounts.serializers import UserSerializer
-from receipts.serializers import ReceiptSerializer
-from core.models import Club
-from accounts.models import User
 
 class ExpenseCategorySerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
@@ -61,7 +58,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
         if value > timezone.now():
             raise serializers.ValidationError('لا يمكن تسجيل مصروف في المستقبل.')
         return value
-    
+
 class IncomeSourceSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     stock_item_details = serializers.SerializerMethodField()
@@ -79,21 +76,20 @@ class IncomeSourceSerializer(serializers.ModelSerializer):
                 'is_sellable': obj.stock_item.is_sellable
             }
         return None
-    
+
 class IncomeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     source_details = IncomeSourceSerializer(source='source', read_only=True)
     received_by_details = UserSerializer(source='received_by', read_only=True)
-    receipt_details = ReceiptSerializer(source='related_receipt', read_only=True)
     stock_transaction_details = serializers.SerializerMethodField()
-    date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)  
+    date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
+
     class Meta:
         model = Income
         fields = [
             'id', 'club', 'club_details', 'source', 'source_details',
             'amount', 'description', 'date', 'received_by', 'received_by_details',
-            'related_receipt', 'receipt_details', 'stock_transaction', 'stock_transaction_details',
-            'quantity'
+            'stock_transaction', 'stock_transaction_details', 'quantity'
         ]
 
     def get_stock_transaction_details(self, obj):
@@ -193,4 +189,3 @@ class ScheduleSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         return representation
-    

@@ -2,7 +2,7 @@ from django.contrib import admin
 from import_export.admin import ImportExportModelAdmin
 from import_export import resources
 from django.utils.html import format_html
-from .models import Expense, ExpenseCategory, Income, IncomeSource, StockItem, StockTransaction,Schedule
+from .models import Expense, ExpenseCategory, Income, IncomeSource, StockItem, StockTransaction, Schedule
 
 
 # Resources for Import/Export
@@ -32,7 +32,7 @@ class IncomeResource(resources.ModelResource):
         model = Income
         fields = (
             'id', 'club__name', 'source__name', 'amount', 'description',
-            'date', 'received_by__username', 'related_receipt__id', 'stock_transaction__id'
+            'date', 'received_by__username', 'stock_transaction__id'
         )
 
 
@@ -101,25 +101,19 @@ class IncomeAdmin(ImportExportModelAdmin):
     resource_class = IncomeResource
     list_display = (
         'club', 'source', 'amount', 'date', 'received_by',
-        'stock_transaction_link', 'related_receipt_link'
+        'stock_transaction_link'
     )
     search_fields = ('source__name', 'description', 'stock_transaction__id')
     list_filter = ('club', 'source', 'date', 'source__stock_item__is_sellable')
     date_hierarchy = 'date'
-    raw_id_fields = ('club', 'source', 'received_by', 'related_receipt', 'stock_transaction')
-    list_select_related = ('club', 'source', 'received_by', 'related_receipt', 'stock_transaction')
+    raw_id_fields = ('club', 'source', 'received_by', 'stock_transaction')
+    list_select_related = ('club', 'source', 'received_by', 'stock_transaction')
 
     def stock_transaction_link(self, obj):
         if obj.stock_transaction:
             return format_html(f'<a href="/admin/finance/stocktransaction/{obj.stock_transaction.id}/change/">#{obj.stock_transaction.id}</a>')
         return "-"
     stock_transaction_link.short_description = "حركة المخزون"
-
-    def related_receipt_link(self, obj):
-        if obj.related_receipt:
-            return format_html(f'<a href="/admin/receipts/receipt/{obj.related_receipt.id}/change/">#{obj.related_receipt.id}</a>')
-        return "-"
-    related_receipt_link.short_description = "إيصال"
 
 
 @admin.register(StockItem)
@@ -164,6 +158,7 @@ class StockTransactionAdmin(ImportExportModelAdmin):
         return "-"
     related_income_link.short_description = "إيراد مرتبط"
 
+
 @admin.register(Schedule)
 class ScheduleAdmin(admin.ModelAdmin):
     list_display = ('title', 'club', 'type', 'start', 'end', 'created_by')
@@ -172,4 +167,3 @@ class ScheduleAdmin(admin.ModelAdmin):
     date_hierarchy = 'start'
     raw_id_fields = ('club', 'created_by')
     list_select_related = ('club', 'created_by')
-    

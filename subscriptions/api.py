@@ -605,7 +605,6 @@ def renew_subscription(request, pk):
         subscription_type = get_object_or_404(SubscriptionType, id=new_type_id, club=request.user.club)
         now = timezone.now()
         
-        # حساب السعر الفعلي بناءً على العروض الخاصة
         active_offer = SpecialOffer.objects.filter(
             subscription_type=subscription_type,
             start_datetime__lte=now,
@@ -617,7 +616,6 @@ def renew_subscription(request, pk):
             if active_offer else subscription_type.price
         )
         
-        # التحقق من عدم وجود اشتراكات نشطة متداخلة
         today = timezone.now().date()
         active_subscriptions = Subscription.objects.filter(
             member=old_subscription.member,

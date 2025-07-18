@@ -7,7 +7,7 @@ from core.models import Club
 class Attendance(models.Model):
     subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name='attendance_attendances')
     attendance_date = models.DateField()  
-    entry_time = models.TimeField(null=True, blank=True) 
+    entry_time = models.TimeField(default=timezone.now) 
     approved_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_attendances')
 
     def __str__(self):
@@ -24,7 +24,7 @@ class Attendance(models.Model):
 class EntryLog(models.Model):
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='attendance_entry_logs') 
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='attendance_entry_logs')  
-    timestamp = models.DateTimeField(auto_now_add=True)
+    timestamp = models.DateTimeField(default=timezone.now)  
     approved_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='attendance_approved_entries')  
     related_subscription = models.ForeignKey(Subscription, on_delete=models.SET_NULL, null=True, blank=True, related_name='attendance_entry_logs') 
 

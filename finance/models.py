@@ -26,7 +26,7 @@ class Expense(models.Model):
     description = models.TextField(blank=True)
     date = models.DateTimeField(default=timezone.now)
     paid_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, related_name='expenses_paid')
-    related_employee = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='related_expenses')  # حقل جديد
+    related_employee = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='related_expenses')
     invoice_number = models.CharField(max_length=100, blank=True, null=True)
     attachment = models.FileField(upload_to='expenses/', null=True, blank=True)
     stock_item = models.ForeignKey('StockItem', on_delete=models.SET_NULL, null=True, blank=True)
@@ -61,10 +61,10 @@ class Expense(models.Model):
             models.Index(fields=['category']),
             models.Index(fields=['date']),
             models.Index(fields=['invoice_number']),
-            models.Index(fields=['related_employee']),  # فهرس جديد
+            models.Index(fields=['related_employee']),
         ]
         ordering = ['-date', 'id']
-        
+
 class IncomeSource(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     name = models.CharField(max_length=100)
@@ -89,7 +89,6 @@ class Income(models.Model):
     description = models.TextField(blank=True)
     date = models.DateTimeField(default=timezone.now)
     received_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True)
-    related_receipt = models.ForeignKey('receipts.Receipt', on_delete=models.SET_NULL, null=True, blank=True)
     stock_transaction = models.ForeignKey('StockTransaction', on_delete=models.SET_NULL, null=True, blank=True)
     quantity = models.PositiveIntegerField(default=1)
 
@@ -101,7 +100,6 @@ class Income(models.Model):
             models.Index(fields=['club']),
             models.Index(fields=['source']),
             models.Index(fields=['date']),
-            models.Index(fields=['related_receipt']),
         ]
         ordering = ['-date', 'id']
 

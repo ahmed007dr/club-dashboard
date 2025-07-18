@@ -36,11 +36,13 @@ def get_table_data(db_path, table_name):
             cursor.execute(f"SELECT * FROM \"{table_name}\"")
             columns = [desc[0] for desc in cursor.description]
             rows = cursor.fetchall()
-        logger.info(f"Fetched {len(rows)} rows from {table_name} with columns: {columns}")
-        return columns, rows
+            cursor.execute(f"SELECT COUNT(*) FROM \"{table_name}\"")
+            total_records = cursor.fetchone()[0]
+        logger.info(f"Fetched {len(rows)} rows from {table_name} with columns: {columns}. Total records: {total_records}")
+        return columns, rows, total_records
     except sqlite3.OperationalError as e:
         logger.error(f"Error accessing table {table_name}: {e}")
-        return [], []
+        return [], [], 0
 
 def check_foreign_key(table, column, value, new_db_path):
     """Check if a foreign key value exists in the new database."""
@@ -64,14 +66,14 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
         default_values = {}
 
     model_name = f"{model._meta.app_label}.{model._meta.model_name}"
-    old_columns, rows = get_table_data(old_db_path, table_name)
+    old_columns, rows, total_records = get_table_data(old_db_path, table_name)
     if not rows:
         logger.info(f"Table {table_name} is empty")
         migration_summary[table_name] = {'total': 0, 'success': 0, 'failed': 0}
         return
 
-    logger.info(f"Migrating table {table_name} ({len(rows)} records)...")
-    migration_summary[table_name] = {'total': len(rows), 'success': 0, 'failed': 0}
+    logger.info(f"Migrating table {table_name} ({total_records} records)...")
+    migration_summary[table_name] = {'total': total_records, 'success': 0, 'failed': 0}
 
     new_fields = {field.name: field for field in model._meta.fields}
     new_field_names = set(new_fields.keys())
@@ -84,7 +86,6 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
     feature_mappings = {}
     invalid_type_ids = set()
 
-    # Validate type_ids in subscriptions_subscription before migration
     if table_name == 'subscriptions_subscription':
         valid_type_ids = set()
         try:
@@ -179,6 +180,13 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                 migration_summary[table_name]['failed'] += 1
                 continue
 
+        if table_name == 'subscriptions_specialoffer':
+            subscription_type_id = row_data.get('subscription_type_id')
+            if subscription_type_id and not check_foreign_key('subscriptions_subscriptiontype', 'id', subscription_type_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid subscription_type_id: {subscription_type_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
         if table_name == 'attendance_attendance':
             subscription_id = row_data.get('subscription_id')
             if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
@@ -262,6 +270,12 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                 migration_summary[table_name]['failed'] += 1
                 continue
 
+            related_employee_id = row_data.get('related_employee_id')
+            if related_employee_id and not check_foreign_key('accounts_user', 'id', related_employee_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid related_employee_id: {related_employee_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
         if table_name == 'finance_income':
             source_id = row_data.get('source_id')
             if source_id and not check_foreign_key('finance_incomesource', 'id', source_id, new_db_path):
@@ -274,10 +288,6 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                 errors.append(f"Skipping record in {table_name}: invalid received_by_id: {received_by_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
-
-            related_receipt_id = row_data.get('related_receipt_id')
-            if related_receipt_id and not check_foreign_key('receipts_receipt', 'id', related_receipt_id, new_db_path):
-                row_data['related_receipt_id'] = None
 
         if table_name == 'finance_stocktransaction':
             stock_item_id = row_data.get('stock_item_id')
@@ -317,41 +327,9 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                 migration_summary[table_name]['failed'] += 1
                 continue
 
-        if table_name == 'receipts_receipt':
-            member_id = row_data.get('member_id')
-            if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
-                errors.append(f"Skipping record in {table_name}: invalid member_id: {member_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
             subscription_id = row_data.get('subscription_id')
             if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
                 errors.append(f"Skipping record in {table_name}: invalid subscription_id: {subscription_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            issued_by_id = row_data.get('issued_by_id')
-            if issued_by_id and not check_foreign_key('accounts_user', 'id', issued_by_id, new_db_path):
-                errors.append(f"Skipping record in {table_name}: invalid issued_by_id: {issued_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-        if table_name == 'receipts_autocorrectionlog':
-            member_id = row_data.get('member_id')
-            if member_id and not check_foreign_key('members_member', 'id', member_id, new_db_path):
-                errors.append(f"Skipping record in {table_name}: invalid member_id: {member_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            old_subscription_id = row_data.get('old_subscription_id')
-            if old_subscription_id and not check_foreign_key('subscriptions_subscription', 'id', old_subscription_id, new_db_path):
-                errors.append(f"Skipping record in {table_name}: invalid old_subscription_id: {old_subscription_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            new_subscription_id = row_data.get('new_subscription_id')
-            if new_subscription_id and not check_foreign_key('subscriptions_subscription', 'id', new_subscription_id, new_db_path):
-                errors.append(f"Skipping record in {table_name}: invalid new_subscription_id: {new_subscription_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
@@ -368,6 +346,40 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                 migration_summary[table_name]['failed'] += 1
                 continue
 
+        if table_name == 'subscriptions_specialoffer':
+            subscription_type_id = row_data.get('subscription_type_id')
+            if subscription_type_id and not check_foreign_key('subscriptions_subscriptiontype', 'id', subscription_type_id, new_db_path):
+                errors.append(f"Skipping record in {table_name}: invalid subscription_type_id: {subscription_type_id}, data: {row_data}")
+                migration_summary[table_name]['failed'] += 1
+                continue
+
+        # if table_name == 'core_alloweddevice':
+        #     user_id = row_data.get('user_id')
+        #     if user_id and not check_foreign_key('accounts_user', 'id', user_id, new_db_path):
+        #         errors.append(f"Skipping record in {table_name}: invalid user_id: {user_id}, data: {row_data}")
+        #         migration_summary[table_name]['failed'] += 1
+        #         continue
+
+        # if table_name == 'core_extendeduservisit':
+        #     user_visit_id = row_data.get('user_visit_id')
+        #     if user_visit_id and not check_foreign_key('user_visit_uservisit', 'id', user_visit_id, new_db_path):
+        #         errors.append(f"Skipping record in {table_name}: invalid user_visit_id: {user_visit_id}, data: {row_data}")
+        #         migration_summary[table_name]['failed'] += 1
+        #         continue
+
+        # if table_name == 'core_schedule':
+        #     club_id = row_data.get('club_id')
+        #     if club_id and not check_foreign_key('core_club', 'id', club_id, new_db_path):
+        #         errors.append(f"Skipping record in {table_name}: invalid club_id: {club_id}, data: {row_data}")
+        #         migration_summary[table_name]['failed'] += 1
+        #         continue
+
+        #     created_by_id = row_data.get('created_by_id')
+        #     if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
+        #         errors.append(f"Skipping record in {table_name}: invalid created_by_id: {created_by_id}, data: {row_data}")
+        #         migration_summary[table_name]['failed'] += 1
+        #         continue
+
         if table_name in [
             'core_club',
             'accounts_user',
@@ -379,6 +391,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             'subscriptions_payment',
             'subscriptions_freezerequest',
             'subscriptions_coachprofile',
+            'subscriptions_specialoffer',
             'attendance_attendance',
             'attendance_entrylog',
             'staff_shift',
@@ -390,10 +403,14 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             'finance_stockitem',
             'finance_stocktransaction',
             'invites_freeinvite',
-            'receipts_receipt',
             'tickets_tickettype',
             'tickets_ticket',
-            'receipts_autocorrectionlog'
+            # 'core_allowedip',
+            # 'core_alloweddevice',
+            # 'core_alloweddevice_history',
+            # 'core_devicesettings',
+            # 'core_extendeduservisit',
+            # 'core_schedule'
         ]:
             club_id = row_data.get('club_id')
             if club_id and not check_foreign_key('core_club', 'id', club_id, new_db_path):
@@ -437,6 +454,12 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                     row_data[field] = timezone.make_aware(value)
 
         row_data.pop('row_index', None)
+        if table_name == 'finance_income':
+            row_data.pop('related_receipt_id', None)
+        if table_name == 'invites_freeinvite' and row_data.get('subscription_id') is None:
+            errors.append(f"Skipping record in {table_name}: missing subscription_id: {row_data}")
+            migration_summary[table_name]['failed'] += 1
+            continue
 
         try:
             obj = model(**row_data)
@@ -446,7 +469,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             migration_summary[table_name]['failed'] += 1
             continue
 
-        if len(batch) >= 1000:
+        if len(batch) >= 500:
             try:
                 model.objects.bulk_create(batch)
                 migration_summary[table_name]['success'] += len(batch)
@@ -556,21 +579,27 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
 def migrate_all_required_tables(old_db_path, new_db_path):
     """Migrate data for all required tables."""
     settings.DATABASES['default']['NAME'] = new_db_path
+    migration_summary = {}
+    errors = []
     logger.info("Flushing database...")
-    call_command('flush', interactive=False)
+    try:
+        call_command('flush', interactive=False)
+    except Exception as e:
+        logger.error(f"Error flushing database: {e}")
+        return migration_summary, errors
+
     logger.info("Applying migrations...")
     try:
         call_command('migrate')
     except Exception as e:
         logger.error(f"Error applying migrations: {e}")
-        return
+        return migration_summary, errors
 
     with connection.cursor() as cursor:
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
         tables = [row[0] for row in cursor.fetchall()]
         logger.info(f"Tables in new database: {tables}")
 
-    migration_summary = {}
     global models
     models = {}
     for m in apps.get_models():
@@ -585,6 +614,7 @@ def migrate_all_required_tables(old_db_path, new_db_path):
             'subscriptions_payment',
             'subscriptions_freezerequest',
             'subscriptions_coachprofile',
+            'subscriptions_specialoffer',
             'attendance_attendance',
             'attendance_entrylog',
             'staff_shift',
@@ -596,10 +626,14 @@ def migrate_all_required_tables(old_db_path, new_db_path):
             'finance_stockitem',
             'finance_stocktransaction',
             'invites_freeinvite',
-            'receipts_autocorrectionlog',
-            'receipts_receipt',
             'tickets_tickettype',
-            'tickets_ticket'
+            'tickets_ticket',
+            # 'core_allowedip',
+            # 'core_alloweddevice',
+            # 'core_alloweddevice_history',
+            # 'core_devicesettings',
+            # 'core_extendeduservisit',
+            # 'core_schedule'
         ]:
             models[m._meta.db_table] = m
 
@@ -614,6 +648,7 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'subscriptions_payment',
         'subscriptions_freezerequest',
         'subscriptions_coachprofile',
+        'subscriptions_specialoffer',
         'attendance_attendance',
         'attendance_entrylog',
         'staff_shift',
@@ -625,10 +660,14 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'finance_income',
         'finance_stocktransaction',
         'invites_freeinvite',
-        'receipts_autocorrectionlog',
-        'receipts_receipt',
         'tickets_tickettype',
-        'tickets_ticket'
+        'tickets_ticket',
+        # 'core_allowedip',
+        # 'core_alloweddevice',
+        # 'core_alloweddevice_history',
+        # 'core_devicesettings',
+        # 'core_extendeduservisit',
+        # 'core_schedule'
     ]
 
     for table in tables:
@@ -645,7 +684,7 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'accounts.User.notes': "",
         'accounts.User.club': None,
         'accounts.User.hourly_rate': 0.00,
-        'accounts.User.expected_hours': 160.0,
+        'accounts.User.expected_hours': 176.0,
     }
     members_member_defaults = {
         'members.Member.club': None,
@@ -659,6 +698,8 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'subscriptions.SubscriptionType.max_freeze_days': 0,
         'subscriptions.SubscriptionType.max_entries': 0,
         'subscriptions.SubscriptionType.is_active': True,
+        'subscriptions.SubscriptionType.free_invites_allowed': 1,
+        'subscriptions.SubscriptionType.is_golden_only': False,
     }
     paymentmethod_defaults = {
         'subscriptions.PaymentMethod.is_active': True,
@@ -685,6 +726,10 @@ def migrate_all_required_tables(old_db_path, new_db_path):
     coachprofile_defaults = {
         'subscriptions.CoachProfile.max_trainees': 0,
     }
+    specialoffer_defaults = {
+        'subscriptions.SpecialOffer.is_active': True,
+        'subscriptions.SpecialOffer.is_golden': False,
+    }
     attendance_defaults = {
         'attendance.Attendance.approved_by': None,
     }
@@ -706,6 +751,7 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'finance.Expense.attachment': None,
         'finance.Expense.stock_item': None,
         'finance.Expense.stock_quantity': None,
+        'finance.Expense.related_employee': None,
     }
     incomesource_defaults = {
         'finance.IncomeSource.price': 0.00,
@@ -715,7 +761,6 @@ def migrate_all_required_tables(old_db_path, new_db_path):
     income_defaults = {
         'finance.Income.received_by': None,
         'finance.Income.description': "",
-        'finance.Income.related_receipt': None,
         'finance.Income.stock_transaction': None,
     }
     stockitem_defaults = {
@@ -733,12 +778,8 @@ def migrate_all_required_tables(old_db_path, new_db_path):
     freeinvite_defaults = {
         'invites.FreeInvite.invited_by': None,
         'invites.FreeInvite.created_by': None,
-    }
-    autocorrectionlog_defaults = {
-        'receipts.AutoCorrectionLog.note': "",
-    }
-    receipt_defaults = {
-        'receipts.Receipt.note': "",
+        'invites.FreeInvite.subscription': None,
+        'invites.FreeInvite.subscription': 1 
     }
     tickettype_defaults = {
         'tickets.TicketType.description': "",
@@ -746,6 +787,24 @@ def migrate_all_required_tables(old_db_path, new_db_path):
     ticket_defaults = {
         'tickets.Ticket.serial_number': None,
     }
+    # allowedip_defaults = {}
+    # alloweddevice_defaults = {
+    #     'core.AllowedDevice.device_name': None,
+    #     'core.AllowedDevice.is_active': True,
+    #     'core.AllowedDevice.last_seen': None,
+    # }
+    # alloweddevice_history_defaults = {
+    #     'core.AllowedDevice.history_change_reason': None,
+    # }
+    # devicesettings_defaults = {
+    #     'core.DeviceSettings.max_allowed_devices': 6,
+    # }
+    # extendeduservisit_defaults = {
+    #     'core.ExtendedUserVisit.session_duration': None,
+    # }
+    # schedule_defaults = {
+    #     'core.Schedule.created_by': None,
+    # }
 
     logger.info("Validating type_ids in old subscriptions_subscription...")
     type_ids_old = set()
@@ -774,6 +833,7 @@ def migrate_all_required_tables(old_db_path, new_db_path):
     migrate_table(models['subscriptions_payment'], 'subscriptions_payment', old_db_path, new_db_path, migration_summary, payment_defaults)
     migrate_table(models['subscriptions_freezerequest'], 'subscriptions_freezerequest', old_db_path, new_db_path, migration_summary, freezerequest_defaults)
     migrate_table(models['subscriptions_coachprofile'], 'subscriptions_coachprofile', old_db_path, new_db_path, migration_summary, coachprofile_defaults)
+    migrate_table(models['subscriptions_specialoffer'], 'subscriptions_specialoffer', old_db_path, new_db_path, migration_summary, specialoffer_defaults)
     migrate_table(models['attendance_attendance'], 'attendance_attendance', old_db_path, new_db_path, migration_summary, attendance_defaults)
     migrate_table(models['attendance_entrylog'], 'attendance_entrylog', old_db_path, new_db_path, migration_summary, entrylog_defaults)
     migrate_table(models['staff_shift'], 'staff_shift', old_db_path, new_db_path, migration_summary, shift_defaults)
@@ -785,10 +845,14 @@ def migrate_all_required_tables(old_db_path, new_db_path):
     migrate_table(models['finance_income'], 'finance_income', old_db_path, new_db_path, migration_summary, income_defaults)
     migrate_table(models['finance_stocktransaction'], 'finance_stocktransaction', old_db_path, new_db_path, migration_summary, stocktransaction_defaults)
     migrate_table(models['invites_freeinvite'], 'invites_freeinvite', old_db_path, new_db_path, migration_summary, freeinvite_defaults)
-    migrate_table(models['receipts_autocorrectionlog'], 'receipts_autocorrectionlog', old_db_path, new_db_path, migration_summary, autocorrectionlog_defaults)
-    migrate_table(models['receipts_receipt'], 'receipts_receipt', old_db_path, new_db_path, migration_summary, receipt_defaults)
     migrate_table(models['tickets_tickettype'], 'tickets_tickettype', old_db_path, new_db_path, migration_summary, tickettype_defaults)
     migrate_table(models['tickets_ticket'], 'tickets_ticket', old_db_path, new_db_path, migration_summary, ticket_defaults)
+    # migrate_table(models['core_allowedip'], 'core_allowedip', old_db_path, new_db_path, migration_summary, allowedip_defaults)
+    # migrate_table(models['core_alloweddevice'], 'core_alloweddevice', old_db_path, new_db_path, migration_summary, alloweddevice_defaults)
+    # migrate_table(models['core_alloweddevice_history'], 'core_alloweddevice_history', old_db_path, new_db_path, migration_summary, alloweddevice_history_defaults)
+    # migrate_table(models['core_devicesettings'], 'core_devicesettings', old_db_path, new_db_path, migration_summary, devicesettings_defaults)
+    # migrate_table(models['core_extendeduservisit'], 'core_extendeduservisit', old_db_path, new_db_path, migration_summary, extendeduservisit_defaults)
+    # migrate_table(models['core_schedule'], 'core_schedule', old_db_path, new_db_path, migration_summary, schedule_defaults)
 
     logger.info("Listing migrated subscription types in new database...")
     try:
@@ -800,7 +864,7 @@ def migrate_all_required_tables(old_db_path, new_db_path):
     except sqlite3.OperationalError as e:
         logger.error(f"Error listing subscription types: {e}")
 
-    return migration_summary
+    return migration_summary, errors
 
 def print_summary(migration_summary):
     """Print migration summary."""
@@ -811,11 +875,23 @@ def print_summary(migration_summary):
         logger.info(f"{table:<30} {stats['total']:>10} {stats['success']:>10} {stats['failed']:>10}")
     logger.info("========================")
 
+def print_detailed_errors(migration_summary, errors):
+    """Print detailed error report for failed migrations."""
+    logger.info("\n=== Detailed Error Report ===")
+    for table, stats in migration_summary.items():
+        if stats['failed'] > 0:
+            logger.info(f"\nTable: {table}")
+            table_errors = [e for e in errors if table in e]
+            for error in table_errors[:5]:
+                logger.error(error)
+    logger.info("============================")
+
 if __name__ == "__main__":
     OLD_DB_PATH = r"F:\club\gym\src\db_old.sqlite3"
     NEW_DB_PATH = r"F:\club\gym\src\db.sqlite3"
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings")
     import django
     django.setup()
-    migration_summary = migrate_all_required_tables(OLD_DB_PATH, NEW_DB_PATH)
+    migration_summary, errors = migrate_all_required_tables(OLD_DB_PATH, NEW_DB_PATH)
     print_summary(migration_summary)
+    print_detailed_errors(migration_summary, errors)

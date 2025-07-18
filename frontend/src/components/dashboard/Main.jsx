@@ -1,6 +1,5 @@
 import { fetchStaff } from "@/redux/slices/staff";
 import { fetchFreeInvites } from "@/redux/slices/invitesSlice";
-import { fetchReceipts } from "@/redux/slices/receiptsSlice";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { fetchUsers } from "@/redux/slices/memberSlice";
@@ -28,7 +27,6 @@ const Main = () => {
   const [totalAttendances, setTotalAttendances] = useState(0);
   const [totalStaff, setTotalStaff] = useState(0);
   const [totalInvites, setTotalInvites] = useState(0);
-  const [totalReceipts, setTotalReceipts] = useState(0);
 
   // جلب بيانات الحضور من Redux
   const attendances = useSelector((state) => state.attendance.data) || [];
@@ -94,13 +92,7 @@ const Main = () => {
             setTotalInvites(0);
           }),
 
-        dispatch(fetchReceipts())
-          .unwrap()
-          .then((res) => setTotalReceipts(res?.data?.length || 0))
-          .catch((err) => {
-            console.error("Error fetching receipts:", err);
-            setTotalReceipts(0);
-          }),
+
       ]);
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -248,35 +240,8 @@ const Main = () => {
             gradient="from-yellow-500 to-amber-600"
             bgGradient="from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20"
           />
-          <DataCard
-            label="الإيصالات"
-            value={totalReceipts}
-            icon={<FaReceipt />}
-            link="/receipts"
-            gradient="from-slate-500 to-gray-600"
-            bgGradient="from-slate-50 to-gray-50 dark:from-slate-900/20 dark:to-gray-900/20"
-          />
       </div>
 
-      {/* فلتر زمني */}
-      {/* <div className="flex gap-4 mt-6 mb-4">
-        <select 
-          className="bg-white dark:bg-gray-700 rounded-lg px-4 py-2 shadow"
-          value={timeFilter}
-          onChange={(e) => setTimeFilter(e.target.value)}
-        >
-          <option value="day">يومي</option>
-          <option value="week">أسبوعي</option>
-          <option value="month">شهري</option>
-          <option value="year">سنوي</option>
-        </select>
-        
-        <div className="bg-blue-100 dark:bg-blue-900 px-4 py-2 rounded-lg">
-          <span className="font-bold">متوسط الحضور: </span>
-          <span>{getAverageAttendance()}</span>
-          <span className="text-sm text-gray-500 mr-2"> (شخص/ساعة)</span>
-        </div>
-      </div>*/}
 
       {/* المخططات */}
       <div className="grid grid-cols-1 gap-6 mt-4">
