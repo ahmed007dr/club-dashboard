@@ -47,7 +47,7 @@ urlpatterns = [
     path('finance/', include('finance.urls')),
     path('attendance/', include('attendance.urls')),
     path('core/', include('core.urls')),
-
+    path('employees/', include('employees.urls')),
 ]
 
 # Static and media URL handling (development only)

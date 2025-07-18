@@ -29,40 +29,36 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'first_name', 'last_name', 'email', 'role', 'club',
-            'rfid_code', 'phone_number', 'notes', 'card_number', 'address', 'is_active', 'password'
+            'rfid_code', 'phone_number', 'notes', 'is_active', 'password'
         ]
         extra_kwargs = {
             'rfid_code': {'required': False, 'allow_null': True},
             'club': {'required': False, 'allow_null': True},
             'phone_number': {'required': False, 'allow_null': True, 'allow_blank': True},
             'notes': {'required': False, 'allow_null': True, 'allow_blank': True},
-            'card_number': {'required': False, 'allow_null': True, 'allow_blank': True},
-            'address': {'required': False, 'allow_null': True, 'allow_blank': True},
         }
 
     def validate_role(self, value):
-        """Prevent creating or updating users with 'owner' or 'admin' roles."""
         if value in ['owner', 'admin']:
             raise serializers.ValidationError("غير مسموح بإنشاء أو تعديل مستخدمين بدور 'مالك' أو 'أدمن'.")
-        if value not in ['reception', 'coach', 'accountant']:
-            raise serializers.ValidationError("الدور يجب أن يكون 'ريسبشن'، 'مدرب'، أو 'محاسب'.")
+        if value != 'reception':
+            raise serializers.ValidationError("الدور المسموح به هو 'ريسبشن' فقط.")
         return value
 
     def validate(self, data):
-        """Ensure password is provided for 'reception' role during creation."""
         role = data.get('role', self.instance.role if self.instance else None)
         password = data.get('password')
-        if role == 'reception' and not password and not self.instance:  # Creation mode
+        if role == 'reception' and not password and not self.instance:
             raise serializers.ValidationError({"password": "كلمة المرور مطلوبة لدور الريسبشن."})
         return data
 
     def create(self, validated_data):
         password = validated_data.pop('password', None)
         user = User(**validated_data)
-        if user.role == 'reception' and password:
+        if password:
             user.set_password(password)
         else:
-            user.set_unusable_password()  # For coach, accountant
+            user.set_unusable_password()
         user.save()
         return user
 
@@ -84,7 +80,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         model = User
         fields = [
             'id', 'username', 'email', 'first_name', 'last_name', 'role', 'club',
-            'rfid_code', 'phone_number', 'notes', 'card_number', 'address', 'is_active',
+            'rfid_code', 'phone_number', 'notes', 'is_active',
             'permissions', 'groups'
         ]
         extra_kwargs = {
@@ -92,8 +88,6 @@ class UserProfileSerializer(serializers.ModelSerializer):
             'email': {'required': False, 'allow_blank': True},
             'phone_number': {'required': False, 'allow_null': True, 'allow_blank': True},
             'notes': {'required': False, 'allow_null': True, 'allow_blank': True},
-            'card_number': {'required': False, 'allow_null': True, 'allow_blank': True},
-            'address': {'required': False, 'allow_null': True, 'allow_blank': True},
         }
 
     def get_permissions(self, user):

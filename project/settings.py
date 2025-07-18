@@ -37,14 +37,13 @@ INSTALLED_APPS = [
     "core",
     "members",
     "subscriptions",
-    # "receipts",
     "finance",
     "attendance",
     "tickets",
     "staff",
     "invites",
     'devices',
-
+    'employees',
 ]
 
 MIDDLEWARE = [

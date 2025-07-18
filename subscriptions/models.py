@@ -4,6 +4,7 @@ from django.dispatch import receiver
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
+from employees.models import Employee
 
 class Feature(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE, related_name='features')
@@ -78,7 +79,7 @@ class Subscription(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     member = models.ForeignKey('members.Member', on_delete=models.CASCADE)
     type = models.ForeignKey(SubscriptionType, on_delete=models.CASCADE, related_name='subscriptions')
-    coach = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, 
+    coach = models.ForeignKey(Employee, on_delete=models.SET_NULL, null=True, blank=True, 
                             related_name='private_subscriptions', 
                             limit_choices_to={'role': 'coach', 'is_active': True})
     start_date = models.DateField()
@@ -205,7 +206,7 @@ class FreezeRequest(models.Model):
         ]
 
 class CoachProfile(models.Model):
-    user = models.OneToOneField('accounts.User', on_delete=models.CASCADE, 
+    user = models.OneToOneField(Employee, on_delete=models.CASCADE, 
                                related_name='coach_profile', 
                                limit_choices_to={'role': 'coach', 'is_active': True})
     max_trainees = models.PositiveIntegerField(default=0)
@@ -218,12 +219,12 @@ class CoachProfile(models.Model):
             models.Index(fields=['user']),
         ]
 
-@receiver(post_save, sender='accounts.User')
+@receiver(post_save, sender=Employee)
 def create_coach_profile(sender, instance, created, **kwargs):
     if created and instance.role == 'coach' and instance.is_active:
         CoachProfile.objects.get_or_create(user=instance, defaults={'max_trainees': 0})
 
-@receiver(post_save, sender='accounts.User')
+@receiver(post_save, sender=Employee)
 def update_coach_profile(sender, instance, **kwargs):
     if instance.role == 'coach' and instance.is_active and not hasattr(instance, 'coach_profile'):
         CoachProfile.objects.get_or_create(user=instance, defaults={'max_trainees': 0})

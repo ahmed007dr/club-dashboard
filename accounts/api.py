@@ -14,18 +14,18 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 FULL_ACCESS_ROLES = ['owner', 'admin']
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_login(request):
-    """Login user, record attendance, and return JWT tokens."""
     serializer = LoginSerializer(data=request.data)
     if serializer.is_valid():
         username = serializer.validated_data['username']
         password = serializer.validated_data['password']
         user = authenticate(username=username, password=password)
-        if user:
+        if user and user.can_login:
             user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
             refresh = RefreshToken.for_user(user)
             return Response({
@@ -33,23 +33,32 @@ def api_login(request):
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }, status=status.HTTP_200_OK)
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error': 'غير مسموح لك بالدخول.'}, status=status.HTTP_403_FORBIDDEN)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_rfid_login(request):
-    """Login user via RFID and record attendance."""
     serializer = RFIDLoginSerializer(data=request.data)
     if serializer.is_valid():
-        user = serializer.validated_data['user']
-        user = User.objects.prefetch_related('groups', 'user_permissions', 'groups__permissions').get(id=user.id)
+        rfid = serializer.validated_data['rfid_code']
+        try:
+            user = User.objects.prefetch_related(
+                'groups', 'user_permissions', 'groups__permissions'
+            ).get(rfid_code=rfid)
+        except User.DoesNotExist:
+            return Response({'error': 'لا يوجد مستخدم مرتبط بهذا الكارت.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if not user.can_login:
+            return Response({'error': 'غير مسموح لك بالدخول.'}, status=status.HTTP_403_FORBIDDEN)
+
         refresh = RefreshToken.for_user(user)
         return Response({
             'user': UserProfileSerializer(user).data,
             'refresh': str(refresh),
             'access': str(refresh.access_token),
         }, status=status.HTTP_200_OK)
+
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['POST'])

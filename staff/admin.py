@@ -10,6 +10,7 @@ from dateutil.relativedelta import relativedelta
 from .models import Shift, StaffAttendance
 from accounts.models import User
 from core.models import Club
+from employees.models import Employee  # استيراد Employee
 
 # =======================
 # Shift Resource
@@ -17,14 +18,14 @@ from core.models import Club
 
 class ShiftResource(resources.ModelResource):
     club_name = fields.Field(column_name='Club')
-    staff_username = fields.Field(column_name='Staff')
+    staff_full_name = fields.Field(column_name='Staff')
     approved_by_username = fields.Field(column_name='Approved By')
 
     def dehydrate_club_name(self, obj):
         return obj.club.name if obj.club else ''
 
-    def dehydrate_staff_username(self, obj):
-        return obj.staff.username if obj.staff else ''
+    def dehydrate_staff_full_name(self, obj):
+        return obj.staff.full_name if obj.staff else ''
 
     def dehydrate_approved_by_username(self, obj):
         return obj.approved_by.username if obj.approved_by else ''
@@ -37,7 +38,7 @@ class ShiftResource(resources.ModelResource):
             'shift_start',
             'shift_end',
             'club_name',
-            'staff_username',
+            'staff_full_name',
             'approved_by_username',
         )
         export_order = fields
@@ -48,13 +49,13 @@ class ShiftResource(resources.ModelResource):
 
 class BulkShiftForm(forms.Form):
     staff = forms.ModelMultipleChoiceField(
-        queryset=User.objects.filter(is_active=True),
+        queryset=Employee.objects.all(),  # تغيير لـ Employee
         label="الموظفون",
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
     apply_to_all_staff = forms.BooleanField(
-        label="تطبيق على جميع الموظفين النشطين في النادي",
+        label="تطبيق على جميع الموظفين في النادي",
         required=False
     )
     start_date = forms.DateField(
@@ -117,7 +118,7 @@ class ShiftAdmin(ImportExportModelAdmin):
     resource_class = ShiftResource
     list_display = ('staff', 'club', 'date', 'shift_start', 'shift_end', 'approved_by')
     list_filter = ('club', 'date')
-    search_fields = ('staff__username', 'club__name')
+    search_fields = ('staff__full_name', 'club__name')  # تغيير لـ full_name
     raw_id_fields = ('staff', 'approved_by', 'club')
     date_hierarchy = 'date'
     ordering = ['-date']
@@ -135,7 +136,7 @@ class ShiftAdmin(ImportExportModelAdmin):
                 shift_end = form.cleaned_data['shift_end']
                 days_of_week = [int(d) for d in form.cleaned_data['days_of_week']] if form.cleaned_data['days_of_week'] else list(range(7))
                 apply_to_all = form.cleaned_data['apply_to_all_staff']
-                staff_list = User.objects.filter(club=club, is_active=True) if apply_to_all else form.cleaned_data['staff']
+                staff_list = Employee.objects.filter(club=club) if apply_to_all else form.cleaned_data['staff']  # تغيير لـ Employee
                 action_type = form.cleaned_data['action_type']
 
                 current_date = start_date
@@ -204,15 +205,15 @@ class ShiftAdmin(ImportExportModelAdmin):
 
 class StaffAttendanceResource(resources.ModelResource):
     club_name = fields.Field(column_name='Club')
-    staff_username = fields.Field(column_name='Staff')
+    staff_full_name = fields.Field(column_name='Staff')
     shift_id_display = fields.Field(column_name='Shift ID')
     duration = fields.Field(column_name='Duration (hrs)')
 
     def dehydrate_club_name(self, obj):
         return obj.club.name if obj.club else ''
 
-    def dehydrate_staff_username(self, obj):
-        return obj.staff.username if obj.staff else ''
+    def dehydrate_staff_full_name(self, obj):
+        return obj.staff.full_name if obj.staff else ''
 
     def dehydrate_shift_id_display(self, obj):
         return obj.shift.id if obj.shift else ''
@@ -227,7 +228,7 @@ class StaffAttendanceResource(resources.ModelResource):
             'check_in',
             'check_out',
             'club_name',
-            'staff_username',
+            'staff_full_name',
             'shift_id_display',
             'duration',
         )
@@ -238,7 +239,7 @@ class StaffAttendanceAdmin(ImportExportModelAdmin):
     resource_class = StaffAttendanceResource
     list_display = ('staff', 'club', 'check_in', 'check_out', 'shift', 'duration_hours')
     list_filter = ('club', 'check_in', 'check_out')
-    search_fields = ('staff__username', 'club__name')
+    search_fields = ('staff__full_name', 'club__name')  # تغيير لـ full_name
     raw_id_fields = ('staff', 'club', 'shift')
     date_hierarchy = 'check_in'
     ordering = ['-check_in']

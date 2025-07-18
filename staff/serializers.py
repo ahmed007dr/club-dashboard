@@ -1,19 +1,19 @@
 from datetime import datetime
-
 from dateutil.relativedelta import relativedelta
 from django.db.models import Sum, Count, ExpressionWrapper, F, DurationField
 from django.db.models.functions import TruncMonth, TruncDate
 from django.utils import timezone
 from rest_framework import serializers
-
 from .models import Shift, StaffAttendance
 from core.serializers import ClubSerializer
+from employees.models import Employee  # استيراد Employee
+from employees.serializers import EmployeeSerializer  # استيراد Serializer
 from accounts.serializers import UserSerializer
 
 class ShiftSerializer(serializers.ModelSerializer):
-    """Serializer for Shift model, handling shift creation and validation."""
+    """Serializer for Shift model."""
     club_details = ClubSerializer(source='club', read_only=True)
-    staff_details = UserSerializer(source='staff', read_only=True)
+    staff_details = EmployeeSerializer(source='staff', read_only=True)  # تغيير لـ EmployeeSerializer
     approved_by_details = UserSerializer(source='approved_by', read_only=True)
 
     class Meta:
@@ -37,34 +37,27 @@ class ShiftSerializer(serializers.ModelSerializer):
         }
 
     def validate(self, data):
-        """Validate shift dates and times, ensuring logical consistency."""
         date = data.get('date')
         shift_start = data.get('shift_start')
         shift_end = data.get('shift_end')
-        shift_end_date = data.get('shift_end_date', date)  # Default to same day if not provided
+        shift_end_date = data.get('shift_end_date', date)
 
         if not date or not shift_start or not shift_end:
             raise serializers.ValidationError("Date, shift start, and shift end are required.")
 
-        # Convert to datetime for validation
         try:
             shift_start_dt = datetime.combine(date, shift_start)
             shift_end_dt = datetime.combine(shift_end_date or date, shift_end)
         except TypeError as e:
             raise serializers.ValidationError(f"Invalid date or time format: {str(e)}")
 
-        # Ensure shift end is in the future
         shift_end_aware = timezone.make_aware(shift_end_dt)
         if timezone.now() >= shift_end_aware:
             raise serializers.ValidationError("Shift end time must be in the future.")
 
-        # Validate shift_end_date: must be same as date or the next day
         if shift_end_date and shift_end_date != date and shift_end_date != (date + timezone.timedelta(days=1)):
-            raise serializers.ValidationError(
-                "Shift end date must be either the same as start date or the next day."
-            )
+            raise serializers.ValidationError("Shift end date must be either the same as start date or the next day.")
 
-        # If shift_end is before shift_start, assume it spans to the next day
         if shift_end_dt < shift_start_dt and not shift_end_date:
             data['shift_end_date'] = date + timezone.timedelta(days=1)
 
@@ -73,17 +66,16 @@ class ShiftSerializer(serializers.ModelSerializer):
 class StaffAttendanceSerializer(serializers.ModelSerializer):
     duration_hours = serializers.SerializerMethodField()
     shift_details = ShiftSerializer(source='shift', read_only=True)
-    staff_details = UserSerializer(source='staff', read_only=True)
+    staff_details = EmployeeSerializer(source='staff', read_only=True) 
     club_details = ClubSerializer(source='club', read_only=True)
-    rfid_code = serializers.CharField(source='staff.rfid_code', read_only=True)
-    member_name = serializers.CharField(source='staff.username', read_only=True)
+    created_by_details = UserSerializer(source='created_by', read_only=True)
 
     class Meta:
         model = StaffAttendance
         fields = [
             'id', 'staff', 'staff_details', 'club', 'club_details',
             'check_in', 'check_out', 'shift', 'shift_details',
-            'duration_hours', 'rfid_code', 'member_name'
+            'duration_hours', 'created_by', 'created_by_details'
         ]
 
     def get_duration_hours(self, obj):
@@ -98,34 +90,25 @@ class StaffAttendanceSerializer(serializers.ModelSerializer):
                 'check_in': 'تم تسجيل حضور لهذا الموظف اليوم.'
             })
         return data
-    
+
 class MonthlyDataSerializer(serializers.Serializer):
     month = serializers.CharField()
     total_hours = serializers.FloatField()
-    expected_hours = serializers.FloatField()
+    expected_hours = serializers.FloatField(default=168.0) 
     hours_status = serializers.CharField()
     attendance_days = serializers.IntegerField()
     total_salary = serializers.FloatField()
     hours_change = serializers.FloatField()
     percentage_change = serializers.FloatField()
 
-
 class StaffMonthlyHoursSerializer(serializers.Serializer):
     staff_id = serializers.IntegerField()
-    first_name = serializers.CharField()
-    last_name = serializers.CharField()
-    username = serializers.CharField()
-    rfid_code = serializers.CharField()
-    hourly_rate = serializers.FloatField(required=False, allow_null=True, default=0.0)
+    full_name = serializers.CharField()  
     monthly_data = MonthlyDataSerializer(many=True)
 
     class Meta:
         fields = [
             'staff_id',
-            'first_name',
-            'last_name',
-            'username',
-            'rfid_code',
-            'hourly_rate',
+            'full_name',
             'monthly_data'
         ]

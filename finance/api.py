@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from jinja2 import Template
 from decimal import Decimal
 from accounts.models import User
+from employees.models import Employee, EmployeeFinancialRecord
 from staff.models import StaffAttendance
 from .models import Expense, Income, ExpenseCategory, IncomeSource, StockTransaction, StockItem, Schedule
 from .serializers import (
@@ -35,6 +36,7 @@ class StandardPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
     max_page_size = 20
+
 
 def apply_common_filters(queryset, request, user_field=None, source_category_field=None):
     query_params = request.query_params
@@ -88,15 +90,25 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
     elif query_params.get('start_date') or query_params.get('end_date'):
         raise ValueError('تاريخي البداية والنهاية مطلوبان معًا.')
 
-    # Filter by user, amount, description, source/category
-    if query_params.get('user'):
-        user_obj = get_object_from_id_or_name(User, query_params.get('user'), ['id', 'username'])
-        if user_obj and user_obj.club == request.user.club:
-            queryset = queryset.filter(**{user_field: user_obj})
-            applied_filters.append(f"user={user_obj.username}")
+    # Filter by user (paid_by or received_by)
+    if query_params.get('user') and user_field:
+        employee_obj = get_object_from_id_or_name(Employee, query_params.get('user'), ['id', 'full_name'])
+        if employee_obj and employee_obj.club == request.user.club:
+            queryset = queryset.filter(**{user_field: employee_obj})
+            applied_filters.append(f"user={employee_obj.full_name}")
         else:
-            raise ValueError('المستخدم غير موجود أو غير مسموح.')
+            raise ValueError('الموظف غير موجود أو غير مسموح.')
 
+    # Filter by created_by
+    if query_params.get('created_by'):
+        user_obj = get_object_from_id_or_name(User, query_params.get('created_by'), ['id', 'username'])
+        if user_obj and user_obj.club == request.user.club:
+            queryset = queryset.filter(created_by=user_obj)
+            applied_filters.append(f"created_by={user_obj.username}")
+        else:
+            raise ValueError('المستخدم الذي أنشأ السجل غير موجود أو غير مسموح.')
+
+    # Filter by source or category
     if query_params.get('source') and source_category_field == 'source':
         source_obj = get_object_from_id_or_name(IncomeSource, query_params.get('source'), ['id', 'name'])
         if source_obj and source_obj.club == request.user.club:
@@ -112,6 +124,7 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
         else:
             raise ValueError('فئة المصروف غير موجودة.')
 
+    # Filter by amount
     if query_params.get('amount'):
         try:
             queryset = queryset.filter(amount=float(query_params.get('amount')))
@@ -119,6 +132,7 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
         except ValueError:
             raise ValueError('صيغة المبلغ غير صحيحة.')
 
+    # Filter by description
     if query_params.get('description'):
         queryset = queryset.filter(description__icontains=query_params.get('description'))
         applied_filters.append(f"description={query_params.get('description')}")
@@ -133,11 +147,13 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
         elif source_category_field == 'category':
             sample_fields.append('category__name')
         if user_field:
-            sample_fields.append(f"{user_field}__username")
+            sample_fields.append(f"{user_field}__full_name")
+        sample_fields.append('created_by__username')  # إضافة created_by للعينة
         sample_records = queryset[:5].values(*sample_fields)
         logger.debug(f"Sample records: {list(sample_records)}")
     
     return queryset
+
 
 def calculate_totals(queryset, field='amount'):
     """
@@ -170,34 +186,6 @@ def handle_response(data, details_queryset=None, details_serializer=None, detail
     return Response(response_data, status=status_code)
 
 
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def expense_category_api(request):
-    """List or create expense categories, accessible to all authenticated users."""
-    if not request.user.club:
-        logger.error(f"User {request.user.username} has no associated club")
-        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
-    if request.method == 'GET':
-        categories = ExpenseCategory.objects.filter(club=request.user.club)
-        
-        if request.query_params.get('name'):
-            categories = categories.filter(name__icontains=request.query_params.get('name'))
-        if request.query_params.get('description'):
-            categories = categories.filter(description__icontains=request.query_params.get('description'))
-        
-        categories = categories.order_by('-id')
-        paginator = StandardPagination()
-        page = paginator.paginate_queryset(categories, request)
-        serializer = ExpenseCategorySerializer(page, many=True)
-        return paginator.get_paginated_response(serializer.data)
-    
-    elif request.method == 'POST':
-        serializer = ExpenseCategorySerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(club=request.user.club)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
@@ -208,8 +196,8 @@ def expense_api(request):
 
     if request.method == 'GET':
         try:
-            expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club).only(
-                'id', 'amount', 'date', 'category__name', 'paid_by__username', 'description', 'invoice_number'
+            expenses = Expense.objects.select_related('category', 'paid_by', 'related_employee').filter(club=request.user.club).only(
+                'id', 'amount', 'date', 'category__name', 'paid_by__full_name', 'related_employee__full_name', 'description', 'invoice_number'
             )
             
             # Apply default last 24 hours filter if no filters provided
@@ -220,7 +208,7 @@ def expense_api(request):
                     ).order_by('-check_in').first()
                     if attendance:
                         expenses = expenses.filter(
-                            paid_by=request.user,
+                            paid_by=attendance.staff,
                             date__gte=attendance.check_in,
                             date__lte=attendance.check_out or timezone.now()
                         )
@@ -247,55 +235,28 @@ def expense_api(request):
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)    
     elif request.method == 'POST':
         data = request.data.copy()
-        data['paid_by'] = request.user.id
+        try:
+            paid_by_employee = Employee.objects.get(id=request.user.id, club=request.user.club)
+            data['paid_by'] = paid_by_employee.id
+        except Employee.DoesNotExist:
+            return Response({'error': 'الموظف غير موجود'}, status=status.HTTP_400_BAD_REQUEST)
         data['club'] = request.user.club.id
-
         data['date'] = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+        data['created_by'] = request.user.id  # إضافة created_by
 
         if 'related_employee' in data and data['related_employee']:
             try:
-                related_employee = User.objects.get(id=data['related_employee'], club=request.user.club)
-            except User.DoesNotExist:
+                related_employee = Employee.objects.get(id=data['related_employee'], club=request.user.club)
+                data['related_employee'] = related_employee.id
+            except Employee.DoesNotExist:
                 return Response({'error': 'الموظف المرتبط غير موجود'}, status=status.HTTP_400_BAD_REQUEST)
 
         serializer = ExpenseSerializer(data=data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def income_source_api(request):
-    """قائمة أو إنشاء مصادر الإيرادات."""
-    if not request.user.club:
-        logger.error(f"المستخدم {request.user.username} غير مرتبط بنادي")
-        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
-    if request.method == 'GET':
-        # sources = IncomeSource.objects.filter(club=request.user.club, price__gt=0)  # تصفية السعر > 0
-        sources = IncomeSource.objects.filter(club=request.user.club)  # تصفية السعر > 0
-        if request.query_params.get('name'):
-            sources = sources.filter(name__icontains=request.query_params.get('name'))
-        if request.query_params.get('description'):
-            sources = sources.filter(description__icontains=request.query_params.get('description'))
-        sources = sources.order_by('-id')
-        paginator = StandardPagination()
-        page = paginator.paginate_queryset(sources, request)
-        serializer = IncomeSourceSerializer(page, many=True)
-        return paginator.get_paginated_response(serializer.data)
-    
-    elif request.method == 'POST':
-        data = request.data.copy()
-        data['club'] = request.user.club.id
-        data['created_by'] = request.user.id
-        serializer = IncomeSourceSerializer(data=data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def income_api(request):
@@ -305,8 +266,8 @@ def income_api(request):
 
     if request.method == 'GET':
         try:
-            incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club).only(
-                'id', 'amount', 'date', 'source__name', 'received_by__username', 'description', 'quantity'
+            incomes = Income.objects.select_related('source', 'received_by', 'created_by').filter(club=request.user.club).only(
+                'id', 'amount', 'date', 'source__name', 'received_by__full_name', 'created_by__username', 'description', 'quantity'
             )
             
             # Apply default last 24 hours filter if no filters provided
@@ -317,7 +278,7 @@ def income_api(request):
                     ).order_by('-check_in').first()
                     if attendance:
                         incomes = incomes.filter(
-                            received_by=request.user,
+                            received_by=attendance.staff,
                             date__gte=attendance.check_in,
                             date__lte=attendance.check_out or timezone.now()
                         )
@@ -345,10 +306,13 @@ def income_api(request):
             
     elif request.method == 'POST':
         data = request.data.copy()
-        data['received_by'] = request.user.id
+        try:
+            received_by_employee = Employee.objects.get(id=request.user.id, club=request.user.club)
+            data['received_by'] = received_by_employee.id
+        except Employee.DoesNotExist:
+            return Response({'error': 'الموظف غير موجود'}, status=status.HTTP_400_BAD_REQUEST)
         data['club'] = request.user.club.id
-        #data['date'] = timezone.now().isoformat() 
-        #data['date'] = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+        data['created_by'] = request.user.id
         source_id = data.get('source')
         quantity = data.get('quantity', 1)
         if not source_id:
@@ -379,8 +343,12 @@ def income_api(request):
                 income = serializer.save()
                 if source.stock_item:
                     StockTransaction.objects.create(
-                        stock_item=source.stock_item, transaction_type='CONSUME', quantity=quantity,
-                        description=f'بيع عبر الإيراد #{income.id} - {data["description"]}', related_income=income,
+                        club=request.user.club,  # إضافة club
+                        stock_item=source.stock_item,
+                        transaction_type='CONSUME',
+                        quantity=quantity,
+                        description=f'بيع عبر الإيراد #{income.id} - {data["description"]}',
+                        related_income=income,
                         created_by=request.user
                     )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -401,7 +369,9 @@ def expense_detail_api(request, pk):
         serializer = ExpenseSerializer(expense, context={'request': request})
         return Response(serializer.data)
     elif request.method == 'PUT':
-        serializer = ExpenseSerializer(expense, data=request.data, partial=True, context={'request': request})
+        data = request.data.copy()
+        data['created_by'] = request.user
+        serializer = ExpenseSerializer(expense, data=data, partial=True, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -425,7 +395,9 @@ def income_detail_api(request, pk):
         serializer = IncomeSerializer(income)
         return Response(serializer.data)
     elif request.method == 'PUT':
-        serializer = IncomeSerializer(income, data=request.data, partial=True)
+        data = request.data.copy()
+        data['created_by'] = request.user
+        serializer = IncomeSerializer(income, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -443,8 +415,8 @@ def income_summary(request):
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     try:
-        incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club).only(
-            'id', 'amount', 'date', 'source__name', 'received_by__username', 'description'
+        incomes = Income.objects.select_related('source', 'received_by', 'created_by').filter(club=request.user.club).only(
+            'id', 'amount', 'date', 'source__name', 'received_by__full_name', 'created_by__username', 'description'
         )
         
         # Apply default last 24 hours filter if no filters provided
@@ -480,8 +452,8 @@ def expense_summary(request):
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     try:
-        expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club).only(
-            'id', 'amount', 'date', 'category__name', 'paid_by__username', 'description'
+        expenses = Expense.objects.select_related('category', 'paid_by', 'created_by').filter(club=request.user.club).only(
+            'id', 'amount', 'date', 'category__name', 'paid_by__full_name', 'created_by__username', 'description'
         )
         
         # Apply default last 24 hours filter if no filters provided
@@ -517,11 +489,11 @@ def finance_overview(request):
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     try:
-        income_qs = Income.objects.select_related('source', 'received_by').filter(club=request.user.club).only(
-            'id', 'amount', 'date', 'source__name', 'received_by__username'
+        income_qs = Income.objects.select_related('source', 'received_by', 'created_by').filter(club=request.user.club).only(
+            'id', 'amount', 'date', 'source__name', 'received_by__full_name', 'created_by__username'
         )
-        expense_qs = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club).only(
-            'id', 'amount', 'date', 'category__name', 'paid_by__username'
+        expense_qs = Expense.objects.select_related('category', 'paid_by', 'created_by').filter(club=request.user.club).only(
+            'id', 'amount', 'date', 'category__name', 'paid_by__full_name', 'created_by__username'
         )
         
         # Apply common filters
@@ -552,8 +524,8 @@ def expense_all_api(request):
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     try:
-        expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club).only(
-            'id', 'amount', 'date', 'category__name', 'paid_by__username', 'description'
+        expenses = Expense.objects.select_related('category', 'paid_by', 'created_by').filter(club=request.user.club).only(
+            'id', 'amount', 'date', 'category__name', 'paid_by__full_name', 'created_by__username', 'description'
         )
         
         # Apply filters
@@ -575,8 +547,8 @@ def income_all_api(request):
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     try:
-        incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club).only(
-            'id', 'amount', 'date', 'source__name', 'received_by__username', 'description'
+        incomes = Income.objects.select_related('source', 'received_by', 'created_by').filter(club=request.user.club).only(
+            'id', 'amount', 'date', 'source__name', 'received_by__full_name', 'created_by__username', 'description'
         )
         
         # Apply filters
@@ -623,42 +595,34 @@ def daily_summary_api(request):
             date_filter = {'check_in__date': filter_date}
         club_filter = {'club': request.user.club}
         if username:
-            employees = User.objects.filter(**club_filter, username=username)
+            employees = Employee.objects.filter(club=request.user.club, full_name__icontains=username)
             if not employees.exists():
                 return Response({'error': 'الموظف غير موجود في ناديك.'}, status=status.HTTP_404_NOT_FOUND)
         else:
-            employees = User.objects.filter(**club_filter)
+            employees = Employee.objects.filter(club=request.user.club)
         summary = []
         for employee in employees:
             attendances = StaffAttendance.objects.filter(staff=employee, **club_filter, **date_filter)
             employee_summary = {
-                'employee_id': employee.id, 'employee_name': employee.username, 'attendance_periods': [],
-                'total_expenses': 0, 'total_incomes': 0, 'net': 0
+                'employee_id': employee.id, 'employee_name': employee.full_name, 'attendance_periods': [],
+                'total_expenses': 0, 'total_incomes': 0, 'net': 0, 'balance': 0.0
             }
             for attendance in attendances:
-                expenses = Expense.objects.filter(
-                    **club_filter, paid_by=employee, 
-                    date__gte=attendance.check_in, 
-                    date__lte=attendance.check_out or timezone.now()
-                )
-                incomes = Income.objects.filter(
-                    **club_filter, received_by=employee, 
-                    date__gte=attendance.check_in, 
-                    date__lte=attendance.check_out or timezone.now()
-                )
+                expenses = Expense.objects.filter(club=request.user.club, paid_by=employee, date__gte=attendance.check_in, date__lte=attendance.check_out or timezone.now())
+                incomes = Income.objects.filter(club=request.user.club, received_by=employee, date__gte=attendance.check_in, date__lte=attendance.check_out or timezone.now())
                 total_expenses = calculate_totals(expenses)
                 total_incomes = calculate_totals(incomes)
                 expense_details = ExpenseDetailSerializer(expenses, many=True).data
                 income_details = IncomeDetailSerializer(incomes, many=True).data
                 attendance_summary = {
-                    'attendance_id': attendance.id, 
-                    'check_in': attendance.check_in, 
+                    'attendance_id': attendance.id,
+                    'check_in': attendance.check_in,
                     'check_out': attendance.check_out,
-                    'duration_hours': attendance.duration_hours(), 
-                    'expenses': expense_details, 
+                    'duration_hours': attendance.duration_hours(),
+                    'expenses': expense_details,
                     'incomes': income_details,
-                    'total_expenses': total_expenses, 
-                    'total_incomes': total_incomes, 
+                    'total_expenses': total_expenses,
+                    'total_incomes': total_incomes,
                     'net': total_incomes - total_expenses
                 }
                 employee_summary['attendance_periods'].append(attendance_summary)
@@ -666,6 +630,8 @@ def daily_summary_api(request):
                 employee_summary['total_incomes'] += total_incomes
             employee_summary['net'] = employee_summary['total_incomes'] - employee_summary['total_expenses']
             if employee_summary['attendance_periods']:
+                financial_record = EmployeeFinancialRecord.objects.filter(employee=employee, month=filter_date.replace(day=1)).first()
+                employee_summary['balance'] = float(financial_record.balance) if financial_record else 0.0
                 summary.append(employee_summary)
         paginator = StandardPagination()
         page = paginator.paginate_queryset(summary, request)
@@ -673,8 +639,6 @@ def daily_summary_api(request):
     
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -695,11 +659,13 @@ def employee_daily_report_api(request):
         else:
             employee_id = employee_id if employee_id else request.user.id
 
-        employee = get_object_or_404(User, id=employee_id, club=request.user.club)
+        employee = get_object_or_404(Employee, id=employee_id, club=request.user.club)
 
         data, status_code = get_employee_report_data(
             user=request.user, employee_id=employee_id, start_date=start_date, end_date=end_date
         )
+        financial_record = EmployeeFinancialRecord.objects.filter(employee=employee, month=timezone.now().replace(day=1)).first()
+        data['balance'] = float(financial_record.balance) if financial_record else 0.0
         return Response(data, status=status_code)
     
     except ValueError as e:
@@ -721,7 +687,7 @@ def generate_daily_report_pdf(request):
             start_date = timezone.now().date().isoformat()
             end_date = timezone.now().isoformat()
         if employee_id:
-            employee = get_object_or_404(User, id=employee_id, club=request.user.club)
+            employee = get_object_or_404(Employee, id=employee_id, club=request.user.club)
         try:
             start_date_obj = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
             end_date_obj = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
@@ -737,12 +703,15 @@ def generate_daily_report_pdf(request):
         net_profit = total_incomes - total_expenses
         expenses_count = expenses.count()
         incomes_count = incomes.count()
+        financial_record = EmployeeFinancialRecord.objects.filter(employee=employee, month=start_date_obj.replace(day=1)).first() if employee_id else None
+        balance = float(financial_record.balance) if financial_record else 0.0
         report_data = {
-            'employee_name': employee.username if employee_id else 'جميع الموظفين',
+            'employee_name': employee.full_name if employee_id else 'جميع الموظفين',
             'start_date': start_date_obj.strftime('%Y-%m-%d %H:%M:%S'),
             'end_date': end_date_obj.strftime('%Y-%m-%d %H:%M:%S'),
             'shift_date': 'غير محدد',
             'print_date': timezone.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'balance': f"{balance:.2f}",
             'expenses': [
                 {'date': expense.date.strftime('%Y-%m-%d %H:%M:%S'), 'category': expense.category.name, 'amount': f"{expense.amount:.2f}"}
                 for expense in expenses
@@ -796,8 +765,8 @@ def financial_analysis_api(request):
         if period_type not in valid_periods:
             return Response({'error': f'نوع الفترة غير صالح. استخدم: {", ".join(valid_periods)}'}, status=status.HTTP_400_BAD_REQUEST)
         
-        income_qs = Income.objects.filter(club=request.user.club).only('id', 'amount', 'date', 'source__name', 'received_by__username')
-        expense_qs = Expense.objects.filter(club=request.user.club).only('id', 'amount', 'date', 'category__name', 'paid_by__username')
+        income_qs = Income.objects.filter(club=request.user.club).only('id', 'amount', 'date', 'source__name', 'received_by__full_name', 'created_by__username')
+        expense_qs = Expense.objects.filter(club=request.user.club).only('id', 'amount', 'date', 'category__name', 'paid_by__full_name', 'created_by__username')
         
         # Apply filters
         if start and end:
@@ -926,7 +895,7 @@ def financial_analysis_api(request):
         
         response_data = {
             'period_analysis': [
-                {'period': period, 'total_income': data['total_income'], 'total_expense': data['total_expense'], 'net_profit': data['net_profit']}
+                {'period': period.isoformat(), 'total_income': data['total_income'], 'total_expense': data['total_expense'], 'net_profit': data['net_profit']}
                 for period, data in periods.items()
             ],
             'financial_position': financial_position,
@@ -950,10 +919,68 @@ def financial_analysis_api(request):
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def expense_category_api(request):
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.method == 'GET':
+        categories = ExpenseCategory.objects.filter(club=request.user.club)
+        if request.query_params.get('name'):
+            categories = categories.filter(name__icontains=request.query_params.get('name'))
+        if request.query_params.get('description'):
+            categories = categories.filter(description__icontains=request.query_params.get('description'))
+        categories = categories.order_by('-id')
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(categories, request)
+        serializer = ExpenseCategorySerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+    
+    elif request.method == 'POST':
+        data = request.data.copy()
+        data['club'] = request.user.club.id
+        data['created_by'] = request.user.id  # إضافة created_by
+        serializer = ExpenseCategorySerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def income_source_api(request):
+    if not request.user.club:
+        logger.error(f"المستخدم {request.user.username} غير مرتبط بنادي")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.method == 'GET':
+        sources = IncomeSource.objects.filter(club=request.user.club)
+        if request.query_params.get('name'):
+            sources = sources.filter(name__icontains=request.query_params.get('name'))
+        if request.query_params.get('description'):
+            sources = sources.filter(description__icontains=request.query_params.get('description'))
+        sources = sources.order_by('-id')
+        paginator = StandardPagination()
+        page = paginator.paginate_queryset(sources, request)
+        serializer = IncomeSourceSerializer(page, many=True)
+        return paginator.get_paginated_response(serializer.data)
+    
+    elif request.method == 'POST':
+        data = request.data.copy()
+        data['club'] = request.user.club.id
+        data['created_by'] = request.user.id  # إضافة created_by
+        serializer = IncomeSourceSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def stock_item_api(request):
-    """List or create stock items."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
@@ -971,16 +998,18 @@ def stock_item_api(request):
     elif request.method == 'POST':
         data = request.data.copy()
         data['club'] = request.user.club.id
+        data['created_by'] = request.user.id  # إضافة created_by
         serializer = StockItemSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
 
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def stock_inventory_api(request):
-    """List or perform stock inventory checks."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
@@ -1015,7 +1044,10 @@ def stock_inventory_api(request):
                         transaction_type = 'ADD' if difference > 0 else 'CONSUME'
                         quantity = abs(difference)
                         StockTransaction.objects.create(
-                            stock_item=stock_item, transaction_type=transaction_type, quantity=quantity,
+                            club=request.user.club,  # إضافة club
+                            stock_item=stock_item,
+                            transaction_type=transaction_type,
+                            quantity=quantity,
                             description=f'تعديل الجرد اليومي: {"زيادة" if difference > 0 else "نقص"} بمقدار {quantity}',
                             created_by=request.user
                         )
@@ -1031,7 +1063,8 @@ def stock_inventory_api(request):
         except Exception as e:
             logger.error("Error processing inventory: %s", str(e))
             return Response({'error': 'حدث خطأ أثناء تسجيل الجرد'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+        
+        
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def stock_profit_api(request):
@@ -1231,7 +1264,7 @@ def schedule_api(request):
     elif request.method == 'POST':
         data = request.data.copy()
         data['club'] = request.user.club.id
-        data['created_by'] = request.user.id
+        data['created_by'] = request.user
         serializer = ScheduleSerializer(data=data)
         if serializer.is_valid():
             serializer.save()

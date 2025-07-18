@@ -1,9 +1,10 @@
 from django.db import models
 from core.models import Club
+from employees.models import Employee  # استيراد Employee
 
 class Shift(models.Model):
     club = models.ForeignKey(Club, on_delete=models.CASCADE)
-    staff = models.ForeignKey('accounts.User', on_delete=models.CASCADE)
+    staff = models.ForeignKey(Employee, on_delete=models.CASCADE)
     date = models.DateField()
     shift_start = models.TimeField()
     shift_end = models.TimeField()
@@ -11,7 +12,7 @@ class Shift(models.Model):
     approved_by = models.ForeignKey('accounts.User', related_name='approved_shifts', on_delete=models.SET_NULL, null=True, blank=True)
 
     def __str__(self):
-        return f"{self.staff.username} - {self.date} {self.shift_start} to {self.shift_end}"
+        return f"{self.staff.full_name} - {self.date} {self.shift_start} to {self.shift_end}"
 
     class Meta:
         indexes = [
@@ -21,7 +22,7 @@ class Shift(models.Model):
         ]
 
 class StaffAttendance(models.Model):
-    staff = models.ForeignKey('accounts.User', on_delete=models.CASCADE)
+    staff = models.ForeignKey(Employee, on_delete=models.CASCADE)
     club = models.ForeignKey(Club, on_delete=models.CASCADE)
     check_in = models.DateTimeField()
     check_out = models.DateTimeField(null=True, blank=True)
@@ -35,7 +36,7 @@ class StaffAttendance(models.Model):
         return 0
 
     def __str__(self):
-        return f"{self.staff.username} - {self.check_in.date()}"
+        return f"{self.staff.full_name} - {self.check_in.date()}"
 
     class Meta:
         indexes = [

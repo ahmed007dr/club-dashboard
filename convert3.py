@@ -1,37 +1,35 @@
-import sqlite3
 import os
+import django
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
+
+django.setup()
+
+from django.contrib.auth.models import User
+
+
+import sqlite3
 import logging
 from contextlib import contextmanager
 from dateutil.parser import parse
-import django
 from django.conf import settings
 from django.apps import apps
 from django.core.management import call_command
 from django.db import models, connection
 from django.utils import timezone
-from datetime import datetime, timedelta
+from datetime import datetime
 from django.db.models import DateTimeField, BooleanField, CharField, TextField, IntegerField, FloatField, DecimalField, DateField, TimeField
-from accounts.models import User  # للمستخدمين العاديين
 from employees.models import Employee
-from core.models import Club
-from members.models import Member
-from subscriptions.models import SubscriptionType, PaymentMethod, Subscription, Payment, FreezeRequest, CoachProfile, SpecialOffer, Feature
 
 # Configure Django environment
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings")
-try:
-    django.setup()
-    logger.info("Django environment setup successfully.")
-except Exception as e:
-    print(f"Failed to setup Django environment: {e}")
-    raise
+django.setup()
 
-# Configure logging with UTF-8 encoding
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     filename='migration.log',
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    encoding='utf-8'
+    format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -158,7 +156,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                 continue
 
             created_by_id = row_data.get('created_by_id')
-            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):  # لسه باستخدم accounts_user لـ created_by
+            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
                 errors.append(f"Skipping record in {table_name}: invalid created_by_id: {created_by_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
@@ -176,12 +174,6 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                 migration_summary[table_name]['failed'] += 1
                 continue
 
-            created_by_id = row_data.get('created_by_id')
-            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):  # لسه باستخدم accounts_user
-                errors.append(f"Skipping record in {table_name}: invalid created_by_id: {created_by_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
         if table_name == 'subscriptions_freezerequest':
             subscription_id = row_data.get('subscription_id')
             if subscription_id and not check_foreign_key('subscriptions_subscription', 'id', subscription_id, new_db_path):
@@ -190,7 +182,7 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
                 continue
 
             created_by_id = row_data.get('created_by_id')
-            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):  # لسه باستخدم accounts_user
+            if created_by_id and not check_foreign_key('accounts_user', 'id', created_by_id, new_db_path):
                 errors.append(f"Skipping record in {table_name}: invalid created_by_id: {created_by_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
@@ -206,12 +198,6 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             subscription_type_id = row_data.get('subscription_type_id')
             if subscription_type_id and not check_foreign_key('subscriptions_subscriptiontype', 'id', subscription_type_id, new_db_path):
                 errors.append(f"Skipping record in {table_name}: invalid subscription_type_id: {subscription_type_id}, data: {row_data}")
-                migration_summary[table_name]['failed'] += 1
-                continue
-
-            club_id = row_data.get('club_id')
-            if club_id and not check_foreign_key('core_club', 'id', club_id, new_db_path):
-                errors.append(f"Skipping record in {table_name}: invalid club_id: {club_id}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
 
@@ -450,43 +436,44 @@ def migrate_table(model, table_name, old_db_path, new_db_path, migration_summary
             continue
 
         if table_name == 'accounts_user':
-            # الاحتفاظ بـ accounts_user كمستقل للمستخدمين العاديين
+            # تحويل User إلى Employee
             try:
-                # إذا كان الدور "coach" أو "staff"، نحوله لـ Employee
                 user_data = row_data.copy()
-                if user_data.get('role') in ['coach', 'admin', 'reception', 'accountant']:
-                    existing_employee = Employee.objects.filter(club_id=user_data.get('club_id'), rfid_code=user_data.get('rfid_code')).first()
-                    if not existing_employee:
-                        existing_employee = Employee.objects.filter(club_id=user_data.get('club_id'), full_name=user_data.get('first_name', '') + ' ' + user_data.get('last_name', '') or user_data.get('username')).first()
+                existing_employee = Employee.objects.filter(club_id=user_data.get('club_id'), rfid_code=user_data.get('rfid_code')).first()
+                if not existing_employee:
+                    existing_employee = Employee.objects.filter(club_id=user_data.get('club_id'), full_name=user_data.get('first_name', '') + ' ' + user_data.get('last_name', '') or user_data.get('username')).first()
 
-                    if existing_employee:
-                        logger.info(f"Employee already exists for user {user_data.get('username')}, updating.")
-                        employee = existing_employee
-                    else:
-                        employee = Employee(
-                            club_id=user_data.get('club_id'),
-                            full_name=user_data.get('first_name', '') + ' ' + user_data.get('last_name', '') or user_data.get('username'),
-                            card_number=user_data.get('card_number'),
-                            phone_number=user_data.get('phone_number'),
-                            address=user_data.get('address'),
-                            notes=user_data.get('notes'),
-                            hire_date=timezone.now(),
-                            rfid_code=user_data.get('rfid_code'),
-                            default_hourly_rate=user_data.get('hourly_rate') or 15.06,
-                            default_expected_hours=user_data.get('expected_hours') or 168.0,
-                            job_title=_map_role_to_job_title(user_data.get('role', 'reception')),
-                        )
-                        employee.save()
-                        logger.info(f"Created new employee for user {user_data.get('username')} with ID {employee.id}.")
-                    # تحديث row_data ليستخدم employee_id إذا كان coach أو staff
-                    if user_data.get('role') == 'coach':
-                        row_data['coach_id'] = employee.id if 'coach_id' in row_data else employee.id
-                # الاحتفاظ بـ accounts_user للمستخدمين العاديين (غير موظفين)
-                user = User(**{k: v for k, v in row_data.items() if k in [f.name for f in User._meta.fields]})
-                user.save()
+                if existing_employee:
+                    logger.info(f"Employee already exists for user {user_data.get('username')}, updating.")
+                    employee = existing_employee
+                else:
+                    employee = Employee(
+                        club_id=user_data.get('club_id'),
+                        full_name=user_data.get('first_name', '') + ' ' + user_data.get('last_name', '') or user_data.get('username'),
+                        card_number=user_data.get('card_number'),
+                        phone_number=user_data.get('phone_number'),
+                        address=user_data.get('address'),
+                        notes=user_data.get('notes'),
+                        hire_date=timezone.now(),
+                        rfid_code=user_data.get('rfid_code'),
+                        default_hourly_rate=user_data.get('hourly_rate') or 15.06,
+                        default_expected_hours=user_data.get('expected_hours') or 168.0,
+                        job_title=_map_role_to_job_title(user_data.get('role', 'reception')),
+                    )
+                    employee.save()
+                    logger.info(f"Created new employee for user {user_data.get('username')} with ID {employee.id}.")
+
+                # نقل الـ groups
+                user = User.objects.get(id=user_data.get('id'))
+                for group in user.groups.all():
+                    employee.groups.add(group)
+                employee.save()
+
+                # تحديث row_data ليستخدم employee_id بدل user_id في الجداول الأخرى
+                row_data['id'] = employee.id
                 migration_summary[table_name]['success'] += 1
             except Exception as e:
-                errors.append(f"Error migrating user for {table_name}: {e}, data: {row_data}")
+                errors.append(f"Error migrating user to employee for {table_name}: {e}, data: {row_data}")
                 migration_summary[table_name]['failed'] += 1
                 continue
         else:
@@ -657,14 +644,13 @@ def migrate_all_required_tables(old_db_path, new_db_path):
             'invites_freeinvite',
             'tickets_tickettype',
             'tickets_ticket',
-            'employees_employee',
+            'employees_employee',  # إضافة جدول Employee
         ]:
             models[m._meta.db_table] = m
 
     tables = [
         'core_club',
-        'accounts_user',  # للمستخدمين العاديين
-        'employees_employee',  # للموظفين
+        'accounts_user',  # سينقل إلى employees_employee
         'members_member',
         'subscriptions_feature',
         'subscriptions_subscriptiontype',
@@ -699,24 +685,12 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'accounts.User.hourly_rate': 0.00,
         'accounts.User.expected_hours': 176.0,
     }
-    employees_employee_defaults = {
-        'employees.Employee.club': lambda x: Club.objects.get(id=x.get('club_id')) if x.get('club_id') else None,
-        'employees.Employee.phone_number': None,
-        'employees.Employee.card_number': None,
-        'employees.Employee.address': "",
-        'employees.Employee.notes': "",
-        'employees.Employee.hire_date': timezone.now(),
-        'employees.Employee.rfid_code': None,
-        'employees.Employee.default_hourly_rate': 15.06,
-        'employees.Employee.default_expected_hours': 168.0,
-    }
     members_member_defaults = {
         'members.Member.club': None,
         'members.Member.referred_by': None,
     }
     feature_defaults = {
         'subscriptions.Feature.is_active': True,
-        'subscriptions.Feature.club': lambda x: Club.objects.get(id=x.get('club_id')) if x.get('club_id') else None,
     }
     subscriptiontype_defaults = {
         'subscriptions.SubscriptionType.is_private_training': False,
@@ -725,11 +699,9 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'subscriptions.SubscriptionType.is_active': True,
         'subscriptions.SubscriptionType.free_invites_allowed': 1,
         'subscriptions.SubscriptionType.is_golden_only': False,
-        'subscriptions.SubscriptionType.club': lambda x: Club.objects.get(id=x.get('club_id')) if x.get('club_id') else None,
     }
     paymentmethod_defaults = {
         'subscriptions.PaymentMethod.is_active': True,
-        'subscriptions.PaymentMethod.club': lambda x: Club.objects.get(id=x.get('club_id')) if x.get('club_id') else None,
     }
     subscription_defaults = {
         'subscriptions.Subscription.coach': None,
@@ -741,19 +713,14 @@ def migrate_all_required_tables(old_db_path, new_db_path):
         'subscriptions.Subscription.refund_amount': 0.00,
         'subscriptions.Subscription.paid_amount': 0.00,
         'subscriptions.Subscription.entry_count': 0,
-        'subscriptions.Subscription.club': lambda x: Club.objects.get(id=x.get('club_id')) if x.get('club_id') else None,
-        'subscriptions.Subscription.member': lambda x: Member.objects.get(id=x.get('member_id')) if x.get('member_id') else None,
-        'subscriptions.Subscription.type': lambda x: SubscriptionType.objects.get(id=x.get('type_id')) if x.get('type_id') else None,
     }
     payment_defaults = {
         'subscriptions.Payment.transaction_id': None,
         'subscriptions.Payment.notes': "",
-        'subscriptions.Payment.created_by': None,
     }
     freezerequest_defaults = {
         'subscriptions.FreezeRequest.is_active': True,
         'subscriptions.FreezeRequest.cancelled_at': None,
-        'subscriptions.FreezeRequest.created_by': None,
     }
     coachprofile_defaults = {
         'subscriptions.CoachProfile.max_trainees': 0,
@@ -761,8 +728,6 @@ def migrate_all_required_tables(old_db_path, new_db_path):
     specialoffer_defaults = {
         'subscriptions.SpecialOffer.is_active': True,
         'subscriptions.SpecialOffer.is_golden': False,
-        'subscriptions.SpecialOffer.club': lambda x: Club.objects.get(id=x.get('club_id')) if x.get('club_id') else None,
-        'subscriptions.SpecialOffer.subscription_type': lambda x: SubscriptionType.objects.get(id=x.get('subscription_type_id')) if x.get('subscription_type_id') else None,
     }
     attendance_defaults = {
         'attendance.Attendance.approved_by': None,
@@ -840,7 +805,6 @@ def migrate_all_required_tables(old_db_path, new_db_path):
 
     migrate_table(models['core_club'], 'core_club', old_db_path, new_db_path, migration_summary, core_club_defaults)
     migrate_table(models['accounts_user'], 'accounts_user', old_db_path, new_db_path, migration_summary, accounts_user_defaults)
-    migrate_table(models['employees_employee'], 'employees_employee', old_db_path, new_db_path, migration_summary, employees_employee_defaults)
     migrate_table(models['members_member'], 'members_member', old_db_path, new_db_path, migration_summary, members_member_defaults)
     migrate_table(models['subscriptions_feature'], 'subscriptions_feature', old_db_path, new_db_path, migration_summary, feature_defaults)
     migrate_table(models['subscriptions_subscriptiontype'], 'subscriptions_subscriptiontype', old_db_path, new_db_path, migration_summary, subscriptiontype_defaults)
@@ -911,12 +875,7 @@ if __name__ == "__main__":
     OLD_DB_PATH = r"F:\club\gym\src\db_old.sqlite3"
     NEW_DB_PATH = r"F:\club\gym\src\db.sqlite3"
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "project.settings")
-    try:
-        django.setup()
-        logger.info("Django environment setup successfully.")
-    except Exception as e:
-        print(f"Failed to setup Django environment: {e}")
-        raise
+    django.setup()
     migration_summary, errors = migrate_all_required_tables(OLD_DB_PATH, NEW_DB_PATH)
     print_summary(migration_summary)
     print_detailed_errors(migration_summary, errors)
