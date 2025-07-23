@@ -12,24 +12,25 @@ from django.db.models import Case, When, F, BooleanField
 
 class AttendanceSerializer(serializers.ModelSerializer):
     identifier = serializers.CharField(write_only=True)
+    subscription_id = serializers.IntegerField(write_only=True, required=False)
     membership_number = serializers.SerializerMethodField()
     member_name = serializers.SerializerMethodField()
-    rfid_code = serializers.SerializerMethodField()  
+    rfid_code = serializers.SerializerMethodField()
     subscription_details = SubscriptionSerializer(source='subscription', read_only=True)
-    # coach_name = serializers.CharField(source='subscription.coach.username', read_only=True)
 
     class Meta:
         model = Attendance
         fields = [
             'id',
             'identifier',
+            'subscription_id',
             'subscription',
             'subscription_details',
             'attendance_date',
-            'entry_time', 
+            'entry_time',
             'membership_number',
             'member_name',
-            'rfid_code',  
+            'rfid_code',
         ]
         read_only_fields = ['attendance_date', 'entry_time', 'membership_number', 'member_name', 'rfid_code', 'subscription']
 
@@ -40,32 +41,57 @@ class AttendanceSerializer(serializers.ModelSerializer):
         return obj.subscription.member.name
 
     def get_rfid_code(self, obj):
-        return obj.subscription.member.rfid_code  
+        return obj.subscription.member.rfid_code
 
-    def create(self, validated_data):
-        identifier = validated_data.pop('identifier')
+
+    def validate(self, data):
+        identifier = data.get('identifier')
+        subscription_id = data.get('subscription_id')
+        
+        if not identifier:
+            raise serializers.ValidationError({'identifier': 'حقل identifier مطلوب'})
+
         try:
             member = Member.objects.get(Q(rfid_code=identifier) | Q(phone=identifier))
         except Member.DoesNotExist:
             raise serializers.ValidationError({'identifier': 'لم يتم العثور على عضو'})
+
         today = timezone.now().date()
-        active_subscription = Subscription.objects.filter(
-        member=member,
-        start_date__lte=today,
-        end_date__gte=today,
-        type__is_active=True,
-        is_cancelled=False).annotate(can_enter=Case(When(type__max_entries=0, then=True),When(entry_count__lt=F('type__max_entries'), then=True),
-            default=False,
-            output_field=BooleanField()
-        )).filter(can_enter=True).first()
+        active_subscriptions = Subscription.objects.filter(
+            member=member,
+            club=self.context['request'].user.club,
+            start_date__lte=today,
+            end_date__gte=today,
+            type__is_active=True,
+            is_cancelled=False
+        ).annotate(
+            can_enter=Case(
+                When(type__max_entries=0, then=True),
+                When(entry_count__lt=F('type__max_entries'), then=True),
+                default=False,
+                output_field=BooleanField()
+            )
+        ).filter(can_enter=True)
 
-        if not active_subscription:
-            raise serializers.ValidationError({'subscription': 'لا يوجد اشتراك فعال لهذا العضو'})
-        validated_data['subscription'] = active_subscription
-        validated_data['attendance_date'] = today
-        validated_data['entry_time'] = timezone.now().time()
-        return super().create(validated_data)
+        if not active_subscriptions.exists():
+            raise serializers.ValidationError({'subscription': 'لا يوجد اشتراكات فعالة لهذا العضو'})
 
+        if subscription_id:
+            subscription = active_subscriptions.filter(id=subscription_id).first()
+            if not subscription:
+                raise serializers.ValidationError({'subscription_id': 'الاشتراك المحدد غير نشط أو غير موجود'})
+        else:
+            subscription = active_subscriptions.first()
+
+        data['subscription'] = subscription
+        data['attendance_date'] = today
+        data['entry_time'] = timezone.now().time()
+        return data
+    
+    def create(self, validated_data):
+        validated_data.pop('identifier', None)
+        validated_data.pop('subscription_id', None)
+        return Attendance.objects.create(**validated_data)
 
 class EntryLogSerializer(serializers.ModelSerializer):
     identifier = serializers.CharField(write_only=True)

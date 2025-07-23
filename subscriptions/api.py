@@ -359,7 +359,7 @@ def subscription_list(request):
         serializer = SubscriptionSerializer(page or subscriptions, many=True, context={'request': request})
         return paginator.get_paginated_response(serializer.data) if page else Response(serializer.data)
     
-    elif request.method == 'POST':
+    if request.method == 'POST':
         mutable_data = request.data.copy()
         mutable_data['created_by'] = request.user.id
         mutable_data['club'] = request.user.club.id
@@ -371,6 +371,24 @@ def subscription_list(request):
         with transaction.atomic():
             subscription_type = get_object_or_404(SubscriptionType, id=mutable_data['type'], club=request.user.club)
             now = timezone.now()
+
+            # التحقق من أن نوع الاشتراك مختلف عن الاشتراكات النشطة للعضو
+            member_id = mutable_data.get('member')
+            start_date = mutable_data.get('start_date', timezone.now().date())
+            today = timezone.now().date()
+            active_subscriptions = Subscription.objects.filter(
+                member=member_id,
+                club=request.user.club,
+                start_date__lte=today,
+                end_date__gte=today,
+                entry_count__lt=F('type__max_entries'),
+                type__max_entries__gt=0
+            ).exclude(is_cancelled=True)
+            if active_subscriptions.filter(type=subscription_type).exists():
+                return Response(
+                    {"non_field_errors": ["لا يمكن إنشاء اشتراك جديد بنفس نوع اشتراك نشط."]},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
             active_offer = SpecialOffer.objects.filter(
                 subscription_type=subscription_type,

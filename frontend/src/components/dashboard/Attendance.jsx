@@ -120,9 +120,10 @@ const Attendance = () => {
   const canAddAttendance = usePermission("add_attendance");
   const canAddEntryLog = usePermission("change_subscriptiontype");
 
-  const [foundSubscription, setFoundSubscription] = useState(null);
+  const [foundSubscriptions, setFoundSubscriptions] = useState([]); // تغيير إلى قائمة اشتراكات
+  const [selectedSubscription, setSelectedSubscription] = useState(""); // حالة للاشتراك المختار
   const [searchLoading, setSearchLoading] = useState(false);
-  const [newAttendance, setNewAttendance] = useState({ club: "", identifier: "" });
+  const [newAttendance, setNewAttendance] = useState({ club: "", identifier: "", subscription_id: "" });
   const [userClub, setUserClub] = useState(null);
   const [filters, setFilters] = useState({ attendance_date: "", member_name: "" });
   const [page, setPage] = useState(1);
@@ -214,18 +215,17 @@ const Attendance = () => {
     fetchAttendancesData();
   }, [fetchAttendancesData]);
 
-  
   const searchSubscription = useCallback(
     debounce(async (attendance) => {
       if (!attendance.identifier || !attendance.club) {
         setSearchLoading(false);
         return;
       }
-  
+
       setSearchLoading(true);
       try {
         const response = await fetch(
-          `${BASE_URL}subscriptions/api/subscriptions/?identifier=${attendance.identifier}&club=${attendance.club}`,
+          `${BASE_URL}subscriptions/api/subscriptions/?identifier=${attendance.identifier}&club=${attendance.club}&status=active`,
           {
             headers: {
               Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -234,32 +234,35 @@ const Attendance = () => {
             },
           }
         );
-        if (!response.ok) throw new Error("فشل في جلب الاشتراك");
+        if (!response.ok) throw new Error("فشل في جلب الاشتراكات");
         const data = await response.json();
-  
-        const subscription = data.results.find((sub) => {
+
+        const subscriptions = data.results.filter((sub) => {
           const member = sub.member_details || {};
           return (
             member.rfid_code?.toUpperCase() === attendance.identifier ||
             member.phone?.trim() === attendance.identifier
           );
         });
-  
-        if (!subscription) {
-          toast.error("لم يتم العثور على اشتراك فعال لهذا المعرف");
-          setFoundSubscription(null);
+
+        if (!subscriptions.length) {
+          toast.error("لم يتم العثور على اشتراكات فعالة لهذا المعرف");
+          setFoundSubscriptions([]);
+          setSelectedSubscription("");
         } else {
-          setFoundSubscription(subscription);
+          setFoundSubscriptions(subscriptions);
+          setSelectedSubscription(subscriptions[0]?.id.toString() || ""); // اختيار أول اشتراك تلقائيًا
         }
       } catch (err) {
-        toast.error("فشل في البحث عن الاشتراك: " + err.message);
+        toast.error("فشل في البحث عن الاشتراكات: " + err.message);
+        setFoundSubscriptions([]);
+        setSelectedSubscription("");
       } finally {
         setSearchLoading(false);
       }
-    }, 1000), // تأخير لمدة ثانية واحدة
+    }, 1000),
     []
   );
-
 
   // التعامل مع تغيير إدخال نموذج الحضور
   const handleAttendanceInputChange = (e) => {
@@ -269,27 +272,35 @@ const Attendance = () => {
       [name]: name === "identifier" ? value.trim().toUpperCase() : value,
     };
     setNewAttendance(updatedAttendance);
-    setFoundSubscription(null);
-    searchSubscription(updatedAttendance);
+    if (name === "identifier") {
+      setFoundSubscriptions([]);
+      setSelectedSubscription("");
+      searchSubscription(updatedAttendance);
+    } else if (name === "subscription_id") {
+      setSelectedSubscription(value);
+    }
   };
 
   // تسجيل حضور جديد
   const handleAddAttendance = async (e) => {
     e.preventDefault();
-    if (!foundSubscription) {
+    if (!foundSubscriptions.length) {
       toast.error("الرجاء إدخال معرف صحيح");
       return;
     }
     setIsSubmitting(true);
     const attendanceData = {
       identifier: newAttendance.identifier,
+      subscription_id: selectedSubscription || undefined, // إرسال subscription_id إذا تم اختياره
     };
     try {
       await dispatch(addAttendance(attendanceData)).unwrap();
       const time = new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
-      toast.success(`تم إضافة ${foundSubscription.member_details?.name} في ${time} بنجاح!`, { icon: "✅" });
-      setNewAttendance({ club: userClub?.id?.toString() || "", identifier: "" });
-      setFoundSubscription(null);
+      const selectedSub = foundSubscriptions.find(sub => sub.id.toString() === selectedSubscription) || foundSubscriptions[0];
+      toast.success(`تم إضافة ${selectedSub.member_details?.name} في ${time} بنجاح!`, { icon: "✅" });
+      setNewAttendance({ club: userClub?.id?.toString() || "", identifier: "", subscription_id: "" });
+      setFoundSubscriptions([]);
+      setSelectedSubscription("");
       fetchAttendancesData();
     } catch (err) {
       const errorMsg =
@@ -302,6 +313,7 @@ const Attendance = () => {
       setIsSubmitting(false);
     }
   };
+
 
   if (!canViewAttendance) {
     return (
@@ -339,8 +351,7 @@ const Attendance = () => {
       <Card className="shadow-lg border-gray-200 bg-white">
         <CardContent className="p-6">
           <div className="flex gap-6">
-            {/* نموذج إضافة الحضور */}
-            {canAddAttendance && (
+          {canAddAttendance && (
               <div className="w-[70%]">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <FiPlus className="text-blue-600" />
@@ -381,81 +392,106 @@ const Attendance = () => {
                       />
                     </div>
                   </div>
+                  {foundSubscriptions.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1 text-right">اختر الاشتراك</label>
+                      <select
+                        name="subscription_id"
+                        value={selectedSubscription}
+                        onChange={handleAttendanceInputChange}
+                        className="w-full border rounded-lg py-2.5 pr-10 pl-4 text-right"
+                      >
+                        {foundSubscriptions.map((sub) => (
+                          <option key={sub.id} value={sub.id}>
+                            {sub.type_details?.name} (ينتهي: {new Date(sub.end_date).toLocaleDateString("ar-EG")})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   {searchLoading && (
                     <div className="flex justify-center py-2">
                       <Loader2 className="animate-spin w-6 h-6 text-blue-600" />
                     </div>
                   )}
-                  {foundSubscription && (
+                  {foundSubscriptions.length > 0 && (
                     <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm">
                       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        <p className="flex items-center gap-2">
-                          <FiUser className="text-blue-600" />
-                          {foundSubscription.member_details?.name || "غير متاح"}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <FiHash className="text-blue-600" />
-                          #{foundSubscription.member_details?.rfid_code || "غير متاح"}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <FiDollarSign className="text-blue-600" />
-                          المبلغ المتبقي: {foundSubscription.remaining_amount ?? "غير متاح"}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <FiList className="text-blue-600" />
-                          الإدخالات المتبقية:{" "}
-                          <span
-                            className={
-                              Number.isFinite(
-                                Number(foundSubscription.type_details?.max_entries) - Number(foundSubscription.entry_count)
-                              ) && Number(foundSubscription.type_details?.max_entries) - Number(foundSubscription.entry_count) <= 0
-                                ? "text-red-600"
-                                : "text-green-600"
-                            }
-                          >
-                            {Number.isFinite(
-                              Number(foundSubscription.type_details?.max_entries) - Number(foundSubscription.entry_count)
-                            )
-                              ? Number(foundSubscription.type_details?.max_entries) - Number(foundSubscription.entry_count)
-                              : "غير متاح"}
-                          </span>{" "}
-                          / {foundSubscription.type_details?.max_entries ?? "غير متاح"}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <FiTag className="text-blue-600" />
-                          اسم الاشتراك: {foundSubscription.type_details?.name || "غير متاح"}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <FiPhone className="text-blue-600" />
-                          رقم الهاتف: {foundSubscription.member_details?.phone || "غير متاح"}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <FiCalendar className="text-blue-600" />
-                          بداية الاشتراك: {new Date(foundSubscription.start_date).toLocaleDateString("ar-EG") || "غير متاح"}
-                        </p>
-                        <p className="flex items-center gap-2">
-                          <FiCalendar className="text-blue-600" />
-                          نهاية الاشتراك: {new Date(foundSubscription.end_date).toLocaleDateString("ar-EG") || "غير متاح"}
-                        </p>
-                        {foundSubscription.coach_simple && (
-                          <p className="flex items-center gap-2">
-                            <FiUser className="text-blue-600" />
-                            اسم الكابتن: {foundSubscription.coach_simple?.username || "غير متاح"}
-                          </p>
-                        )}
+                        {/* عرض تفاصيل الاشتراك المختار بناءً على selectedSubscription */}
+                        {(() => {
+                          const selectedSub = foundSubscriptions.find(sub => sub.id.toString() === selectedSubscription) || foundSubscriptions[0];
+                          return (
+                            <>
+                              <p className="flex items-center gap-2">
+                                <FiUser className="text-blue-600" />
+                                {selectedSub.member_details?.name || "غير متاح"}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <FiHash className="text-blue-600" />
+                                #{selectedSub.member_details?.rfid_code || "غير متاح"}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <FiDollarSign className="text-blue-600" />
+                                المبلغ المتبقي: {selectedSub.remaining_amount ?? "غير متاح"}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <FiList className="text-blue-600" />
+                                الإدخالات المتبقية:{" "}
+                                <span
+                                  className={
+                                    Number.isFinite(
+                                      Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count)
+                                    ) && Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count) <= 0
+                                      ? "text-red-600"
+                                      : "text-green-600"
+                                  }
+                                >
+                                  {Number.isFinite(
+                                    Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count)
+                                  )
+                                    ? Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count)
+                                    : "غير متاح"}
+                                </span>{" "}
+                                / {selectedSub.type_details?.max_entries ?? "غير متاح"}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <FiTag className="text-blue-600" />
+                                اسم الاشتراك: {selectedSub.type_details?.name || "غير متاح"}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <FiPhone className="text-blue-600" />
+                                رقم الهاتف: {selectedSub.member_details?.phone || "غير متاح"}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <FiCalendar className="text-blue-600" />
+                                بداية الاشتراك: {new Date(selectedSub.start_date).toLocaleDateString("ar-EG") || "غير متاح"}
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <FiCalendar className="text-blue-600" />
+                                نهاية الاشتراك: {new Date(selectedSub.end_date).toLocaleDateString("ar-EG") || "غير متاح"}
+                              </p>
+                              {selectedSub.coach_simple && (
+                                <p className="flex items-center gap-2">
+                                  <FiUser className="text-blue-600" />
+                                  اسم الكابتن: {selectedSub.coach_simple?.username || "غير متاح"}
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}
-                  {!searchLoading && newAttendance.identifier && !foundSubscription && (
+                  {!searchLoading && newAttendance.identifier && !foundSubscriptions.length && (
                     <div className="bg-red-50 p-2 rounded-lg flex items-center gap-2">
                       <FiAlertTriangle className="text-red-600 w-5 h-5" />
-                      <p className="text-red-600 text-sm">لا يوجد اشتراك بهذا المعرف</p>
+                      <p className="text-red-600 text-sm">لا يوجد اشتراكات فعالة لهذا المعرف</p>
                     </div>
                   )}
                   <Button
                     type="submit"
                     className="w-full bg-blue-600 hover:bg-blue-700 hover:scale-105 transition-transform"
-                    disabled={!foundSubscription || isSubmitting}
+                    disabled={!foundSubscriptions.length || isSubmitting}
                   >
                     <FiPlus className="mr-2" />
                     تأكيد الحضور

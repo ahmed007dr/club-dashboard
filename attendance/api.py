@@ -14,7 +14,7 @@ from .serializers import AttendanceSerializer, EntryLogSerializer
 from django.db.models import Case, When, F, BooleanField, Q, Count
 from django.utils.dateparse import parse_datetime
 from staff.models import StaffAttendance
-
+from subscriptions.models import Subscription
 logger = logging.getLogger(__name__)
 
 FULL_ACCESS_ROLES = ['owner', 'admin']
@@ -147,6 +147,7 @@ def delete_attendance_api(request, attendance_id):
     attendance.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def add_attendance_api(request):
@@ -155,10 +156,11 @@ def add_attendance_api(request):
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
-    serializer = AttendanceSerializer(data=request.data)
+    serializer = AttendanceSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():
-        # Get identifier from request data
         identifier = serializer.validated_data.get('identifier')
+        subscription_id = serializer.validated_data.get('subscription_id')
+        
         if not identifier:
             logger.error("Missing 'identifier' in request data")
             return Response(
@@ -168,9 +170,7 @@ def add_attendance_api(request):
         
         # Find member using identifier
         try:
-            member = Member.objects.get(Q(rfid_code=identifier))
-            # member = Member.objects.get(Q(rfid_code=identifier) | Q(phone=identifier))
-
+            member = Member.objects.get(Q(rfid_code=identifier) | Q(phone=identifier))
         except Member.DoesNotExist:
             logger.error(f"No member found for identifier {identifier}")
             return Response(
@@ -180,7 +180,7 @@ def add_attendance_api(request):
         
         # Check rate limit per member
         now = timezone.now()
-        one_minute_ago = now - timedelta(seconds=60)
+        one_minute_ago = now - timedelta(seconds=5)
         recent_count = Attendance.objects.filter(
             subscription__member_id=member.id,
             entry_time__gte=one_minute_ago,
@@ -194,14 +194,52 @@ def add_attendance_api(request):
                 status=status.HTTP_429_TOO_MANY_REQUESTS
             )
         
+        # Get active subscriptions
+        today = timezone.now().date()
+        active_subscriptions = Subscription.objects.filter(
+            member=member,
+            club=request.user.club,
+            start_date__lte=today,
+            end_date__gte=today,
+            type__is_active=True,
+            is_cancelled=False
+        ).annotate(
+            can_enter=Case(
+                When(type__max_entries=0, then=True),
+                When(entry_count__lt=F('type__max_entries'), then=True),
+                default=False,
+                output_field=BooleanField()
+            )
+        ).filter(can_enter=True)
+        
+        if not active_subscriptions.exists():
+            logger.error(f"No active subscriptions for member {member.id}")
+            return Response(
+                {'error': 'لا يوجد اشتراكات نشطة لهذا العضو'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Select subscription
+        if subscription_id:
+            subscription = active_subscriptions.filter(id=subscription_id).first()
+            if not subscription:
+                logger.error(f"Invalid subscription_id {subscription_id} for member {member.id}")
+                return Response(
+                    {'error': 'الاشتراك المحدد غير نشط أو غير موجود'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            subscription = active_subscriptions.first()
+        
         # Create attendance
-        attendance = serializer.save()
-        subscription = attendance.subscription
+        attendance = serializer.save(subscription=subscription)
         if not subscription.can_enter:
             attendance.delete()
+            logger.error(f"Cannot record attendance for subscription {subscription.id}: not active or max entries reached")
             if not subscription.type.is_active:
                 return Response({'error': 'لا يمكن تسجيل الحضور: نوع الاشتراك غير نشط'}, status=status.HTTP_400_BAD_REQUEST)
             return Response({'error': 'لا يمكن تسجيل الحضور: الاشتراك غير نشط أو تم الوصول للحد الأقصى لعدد الدخول'}, status=status.HTTP_400_BAD_REQUEST)
+        
         subscription.entry_count += 1
         subscription.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)

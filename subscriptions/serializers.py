@@ -286,7 +286,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     def get_remaining_free_invites(self, obj):
         used_invites = FreeInvite.objects.filter(subscription=obj).count()
         return max(0, obj.type.free_invites_allowed - used_invites)
-
+    
     def validate(self, data):
         club = data.get('club')
         subscription_type = data.get('type', getattr(self.instance, 'type', None))
@@ -380,6 +380,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
         if member:
             today = timezone.now().date()
+            # التحقق من أن نوع الاشتراك مختلف عن الاشتراكات النشطة
             active_subscriptions = Subscription.objects.filter(
                 member=member,
                 club=club,
@@ -388,13 +389,11 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 entry_count__lt=F('type__max_entries'),
                 type__max_entries__gt=0
             ).exclude(is_cancelled=True)
-            if active_subscriptions.exists() and not self.instance:
-                latest_active_subscription = active_subscriptions.order_by('-end_date').first()
-                max_end_date = latest_active_subscription.end_date
-                if start_date <= max_end_date:
-                    raise serializers.ValidationError(
-                        f"لا يمكن إنشاء اشتراك جديد يبدأ قبل {max_end_date} بسبب وجود اشتراك نشط."
-                    )
+            if active_subscriptions.filter(type=subscription_type).exists() and not self.instance:
+                raise serializers.ValidationError(
+                    "لا يمكن إنشاء اشتراك جديد بنفس نوع اشتراك نشط."
+                )
+            # التحقق من المدفوعات المستحقة
             unpaid_subscriptions = Subscription.objects.filter(member=member, club=club, remaining_amount__gt=0)
             if unpaid_subscriptions.exists() and not self.instance:
                 raise serializers.ValidationError("يجب تسوية المدفوعات المستحقة أولاً.")
