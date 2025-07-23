@@ -56,16 +56,16 @@ const Expenses = () => {
     user: "",
     amount: "",
     description: "",
-    start_date: new Date().toISOString().slice(0, 10), // آخر 24 ساعة
-    end_date: new Date().toISOString().slice(0, 10),
+    start_date: new Date().toISOString().slice(0, 10), // استعادة التاريخ الافتراضي
+    end_date: new Date().toISOString().slice(0, 10),   // استعادة التاريخ الافتراضي
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [userClub, setUserClub] = useState(null);
   const [errors, setErrors] = useState({});
   const [isSummaryClicked, setIsSummaryClicked] = useState(false);
-  const [localExpenses, setLocalExpenses] = useState([]); // لتخزين البيانات المفلترة من الإجمالي
-  const [localTotalExpenses, setLocalTotalExpenses] = useState(0); // لتخزين الإجمالي المحلي
-  const [localTotalExpensesCount, setLocalTotalExpensesCount] = useState(0); // لتخزين عدد المصروفات المحلي
+  const [localExpenses, setLocalExpenses] = useState([]);
+  const [localTotalExpenses, setLocalTotalExpenses] = useState(0);
+  const [localTotalExpensesCount, setLocalTotalExpensesCount] = useState(0);
   const itemsPerPage = 20;
   const maxButtons = 5;
 
@@ -104,19 +104,36 @@ const Expenses = () => {
       });
   }, []);
 
+  const isValidFilter = (filters) => {
+    return (
+      filters.start_date?.length > 0 ||
+      filters.end_date?.length > 0 ||
+      filters.category ||
+      filters.user ||
+      filters.amount ||
+      filters.description
+    );
+  };
+
   const debouncedFetchExpenses = useCallback(
     debounce((filters, page) => {
-      dispatch(
-        fetchExpenses({
-          page,
-          category: filters.category,
-          user: filters.user,
-          amount: filters.amount,
-          description: filters.description,
-          start_date: filters.start_date,
-          end_date: filters.end_date,
-        })
-      );
+      if (isValidFilter(filters)) {
+        dispatch(
+          fetchExpenses({
+            page,
+            category: filters.category || null,
+            user: filters.user || null,
+            amount: filters.amount || null,
+            description: filters.description || null,
+            start_date: filters.start_date || null,
+            end_date: filters.end_date || null,
+          })
+        ).catch((err) => {
+          setErrors({ general: err.message || "فشل في جلب المصروفات" });
+        });
+      } else {
+        setErrors({ general: "يجب تحديد معايير البحث (تاريخ، مدة زمنية، فئة، مستخدم، مبلغ، أو وصف)." });
+      }
     }, 300),
     [dispatch]
   );
@@ -242,7 +259,7 @@ const Expenses = () => {
       XLSX.writeFile(wb, `مصروفات_${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch (err) {
       console.error("فشل في تصدير المصروفات:", err);
-      setErrors({ general: "فشل في تصدير المصروفات إلى إكسيل" });
+      setErrors({ general: "فشل في تصدير المصروفات إلى إكسل" });
     }
   };
 
@@ -541,6 +558,7 @@ const Expenses = () => {
                     handleSelectChange={handleSelectChange}
                     handleReset={handleResetFilters}
                     handleCalculateTotal={handleCalculateTotal}
+                    isValidFilter={isValidFilter} // تأكيد التمرير
                   />
                   {summaryCardDetails && <div className="mt-4">{summaryCardDetails}</div>}
                 </div>

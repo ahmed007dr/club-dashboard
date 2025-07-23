@@ -22,7 +22,6 @@ class Feature(models.Model):
         ]
         unique_together = ['club', 'name']
 
-
 class SubscriptionType(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE, related_name='subscription_types')
     name = models.CharField(max_length=100)
@@ -33,7 +32,8 @@ class SubscriptionType(models.Model):
     is_active = models.BooleanField(default=True)
     max_entries = models.PositiveIntegerField(default=0)
     max_freeze_days = models.PositiveIntegerField(default=0)
-    free_invites_allowed = models.PositiveIntegerField(default=0, help_text="عدد الدعوات المجانية المسموح بها") 
+    free_invites_allowed = models.PositiveIntegerField(default=0, help_text="عدد الدعوات المجانية المسموح بها")
+    free_invite_validity_days = models.PositiveIntegerField(default=7, help_text="عدد الأيام التي تظل فيها الدعوة المجانية صالحة")
     is_golden_only = models.BooleanField(default=False)
 
     def __str__(self):
@@ -51,7 +51,6 @@ class SubscriptionType(models.Model):
             models.Index(fields=['is_active']),
             models.Index(fields=['id']),
         ]
-
 
 class PaymentMethod(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE, related_name='payment_methods')
@@ -78,8 +77,8 @@ class Subscription(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
     member = models.ForeignKey('members.Member', on_delete=models.CASCADE)
     type = models.ForeignKey(SubscriptionType, on_delete=models.CASCADE, related_name='subscriptions')
-    coach = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, 
-                            related_name='private_subscriptions', 
+    coach = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True,
+                            related_name='private_subscriptions',
                             limit_choices_to={'role': 'coach', 'is_active': True})
     start_date = models.DateField()
     end_date = models.DateField(blank=True, null=True)
@@ -130,7 +129,7 @@ class Subscription(models.Model):
     def __str__(self):
         coach_str = f" مع الكابتن {self.coach.username}" if self.coach else ""
         return f"{self.member.name} - {self.type.name}{coach_str}"
-    
+
     def can_enter(self):
         today = timezone.now().date()
         active_freeze = self.freeze_requests.filter(is_active=True, start_date__lte=today).first()
@@ -205,8 +204,8 @@ class FreezeRequest(models.Model):
         ]
 
 class CoachProfile(models.Model):
-    user = models.OneToOneField('accounts.User', on_delete=models.CASCADE, 
-                               related_name='coach_profile', 
+    user = models.OneToOneField('accounts.User', on_delete=models.CASCADE,
+                               related_name='coach_profile',
                                limit_choices_to={'role': 'coach', 'is_active': True})
     max_trainees = models.PositiveIntegerField(default=0)
 
@@ -229,7 +228,6 @@ def update_coach_profile(sender, instance, **kwargs):
         CoachProfile.objects.get_or_create(user=instance, defaults={'max_trainees': 0})
     elif hasattr(instance, 'coach_profile') and (instance.role != 'coach' or not instance.is_active):
         instance.coach_profile.delete()
-
 
 class SpecialOffer(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)

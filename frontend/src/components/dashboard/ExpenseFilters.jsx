@@ -12,10 +12,10 @@ const ExpenseFilters = ({
   handleSelectChange,
   handleReset,
   handleCalculateTotal,
+  isValidFilter,
 }) => {
   return (
     <div className="space-y-4 w-full">
-      {/* السطر الأول: الفئة، المستخدم، المبلغ، الوصف */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="relative">
           <label className="block text-sm font-medium mb-1 text-right">الفئة</label>
@@ -87,12 +87,11 @@ const ExpenseFilters = ({
         </div>
       </div>
 
-      {/* السطر الثاني: فلتر التاريخ من وإلى */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="relative">
           <label className="block text-sm font-medium mb-1 text-right">من</label>
           <div className="relative">
-            <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            {/* <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" /> */}
             <Input
               type="date"
               name="start_date"
@@ -105,7 +104,7 @@ const ExpenseFilters = ({
         <div className="relative">
           <label className="block text-sm font-medium mb-1 text-right">إلى</label>
           <div className="relative">
-            <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            {/* <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" /> */}
             <Input
               type="date"
               name="end_date"
@@ -117,7 +116,6 @@ const ExpenseFilters = ({
         </div>
       </div>
 
-      {/* السطر الثالث: الأزرار */}
       <div className="flex flex-col sm:flex-row justify-between items-end gap-4">
         <div className="flex gap-2">
           <Button onClick={handleReset} variant="outline" className="w-full sm:w-auto text-sm">
@@ -126,6 +124,7 @@ const ExpenseFilters = ({
           <Button
             onClick={handleCalculateTotal}
             className="w-full sm:w-auto bg-teal-600 hover:bg-teal-700 text-white text-sm"
+            disabled={!isValidFilter(filters)}
           >
             حساب الإجمالي
           </Button>
@@ -134,4 +133,5 @@ const ExpenseFilters = ({
     </div>
   );
 };
+
 export default ExpenseFilters;

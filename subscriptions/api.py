@@ -406,7 +406,7 @@ def subscription_list(request):
 
                 if total_paid > 0 or (subscription.coach and subscription.coach_compensation_type == 'external' and subscription.coach_compensation_value > 0):
                     source, _ = IncomeSource.objects.get_or_create(
-                        club=subscription.club, name='Subscription', defaults={'description': 'إيراد عن اشتراك'}
+                        club=subscription.club, name='اشتراكات', defaults={'description': 'إيراد عن اشتراك'}
                     )
                     amount = total_paid
                     if subscription.coach and subscription.coach_compensation_type == 'external':
@@ -494,7 +494,7 @@ def subscription_detail(request, pk):
                 if additional_amount > 0:
                     source, _ = IncomeSource.objects.get_or_create(
                         club=updated_subscription.club, 
-                        name='Subscription', 
+                        name='اشتراكات', 
                         defaults={'description': 'إيراد عن اشتراك'}
                     )
                     description = f"إيراد إضافي لاشتراك {updated_subscription.member.name}"
@@ -676,7 +676,7 @@ def renew_subscription(request, pk):
             new_subscription.save()
             
             source, _ = IncomeSource.objects.get_or_create(
-                club=new_subscription.club, name='Renewal', defaults={'description': 'إيراد عن تجديد اشتراك'}
+                club=new_subscription.club, name='تجديد اشتراك', defaults={'description': 'إيراد عن تجديد اشتراك'}
             )
             amount = total_paid
             if new_subscription.coach and new_subscription.coach_compensation_type == 'external':
@@ -721,7 +721,7 @@ def make_payment(request, pk):
             subscription.save()
 
             source, _ = IncomeSource.objects.get_or_create(
-                club=subscription.club, name='Subscription', defaults={'description': 'إيراد عن اشتراك'}
+                club=subscription.club, name='اشتراكات', defaults={'description': 'إيراد عن اشتراك'}
             )
             Income.objects.create(
                 club=subscription.club, source=source, amount=payment.amount,
@@ -758,7 +758,7 @@ def cancel_subscription(request, pk):
 
         if refund_amount > 0:
             source, _ = IncomeSource.objects.get_or_create(
-                club=subscription.club, name='Refund', defaults={'description': 'إيراد سالب عن استرداد اشتراك'}
+                club=subscription.club, name='الغاء اشتراك', defaults={'description': 'إيراد سالب عن استرداد اشتراك'}
             )
             Income.objects.create(
                 club=subscription.club, source=source, amount=-refund_amount,

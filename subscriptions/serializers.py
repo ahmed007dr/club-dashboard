@@ -1,23 +1,17 @@
 from rest_framework import serializers
-from .models import Subscription, SubscriptionType, FreezeRequest, Payment, PaymentMethod, Feature,SpecialOffer
+from .models import Subscription, SubscriptionType, Payment, PaymentMethod, FreezeRequest, Feature, SpecialOffer
 from core.serializers import ClubSerializer
 from members.serializers import MemberSerializer
 from accounts.serializers import UserSerializer
 from accounts.models import User
 from members.models import Member
 from django.utils import timezone
-from django.db import models
 from django.db.models import Q, Count, Sum, F
 from django.db.models.functions import TruncMonth
 from attendance.models import Attendance
-from rest_framework import serializers
-from django.utils import timezone
-from .models import Feature
+from invites.models import FreeInvite
 from decimal import Decimal, ROUND_HALF_UP
 from datetime import timedelta
-from invites.models import FreeInvite
-
-
 
 class FeatureSerializer(serializers.ModelSerializer):
     class Meta:
@@ -81,8 +75,6 @@ class PaymentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("إجمالي المدفوعات لا يمكن أن يتجاوز سعر الاشتراك.")
         return data
 
-
-
 class SubscriptionTypeSerializer(serializers.ModelSerializer):
     club_details = ClubSerializer(source='club', read_only=True)
     features = FeatureSerializer(many=True, read_only=True)
@@ -104,7 +96,8 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
             'id', 'club', 'club_details', 'name', 'duration_days', 'price',
             'features', 'feature_ids', 'is_active', 'max_entries', 'subscriptions_count',
             'max_freeze_days', 'is_private_training', 'active_subscribers',
-            'special_offer', 'current_discount', 'discounted_price', 'is_golden_only'
+            'special_offer', 'current_discount', 'discounted_price', 'is_golden_only',
+            'free_invites_allowed', 'free_invite_validity_days'
         ]
         extra_kwargs = {
             'club': {'required': True},
@@ -135,11 +128,20 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         max_freeze_days = data.get('max_freeze_days', getattr(self.instance, 'max_freeze_days', 0))
+        free_invites_allowed = data.get('free_invites_allowed', getattr(self.instance, 'free_invites_allowed', 0))
+        free_invite_validity_days = data.get('free_invite_validity_days', getattr(self.instance, 'free_invite_validity_days', 7))
         if max_freeze_days < 0:
             raise serializers.ValidationError({
                 'max_freeze_days': 'يجب أن تكون أيام التجميد غير سالبة'
             })
-
+        if free_invites_allowed < 0:
+            raise serializers.ValidationError({
+                'free_invites_allowed': 'يجب أن يكون عدد الدعوات المجانية غير سالب'
+            })
+        if free_invite_validity_days < 0:
+            raise serializers.ValidationError({
+                'free_invite_validity_days': 'يجب أن تكون أيام صلاحية الدعوة غير سالبة'
+            })
         if self.instance and 'is_private_training' in data:
             if not data['is_private_training'] and self.instance.is_private_training:
                 if Subscription.objects.filter(
@@ -150,9 +152,8 @@ class SubscriptionTypeSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({
                         'is_private_training': 'لا يمكن إلغاء التدريب الخاص لوجود اشتراكات نشطة'
                     })
-
         return data
-    
+
 class FreezeRequestSerializer(serializers.ModelSerializer):
     created_by_details = UserSerializer(source='created_by', read_only=True)
 
@@ -183,7 +184,8 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     special_offer = serializers.PrimaryKeyRelatedField(
         queryset=SpecialOffer.objects.all(), write_only=True, required=False, allow_null=True
     )
-    remaining_free_invites = serializers.SerializerMethodField(read_only=True)  # تأكد إنه read_only
+    remaining_free_invites = serializers.SerializerMethodField()
+
     class Meta:
         model = Subscription
         fields = [
@@ -192,7 +194,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'paid_amount', 'remaining_amount', 'entry_count', 'is_cancelled', 'cancellation_date',
             'refund_amount', 'created_by', 'created_by_details', 'freeze_requests', 'payments',
             'subscriptions_count', 'coach_simple', 'coach_identifier', 'identifier', 'status',
-            'coach_compensation_type', 'coach_compensation_value', 'special_offer','remaining_free_invites'
+            'coach_compensation_type', 'coach_compensation_value', 'special_offer', 'remaining_free_invites'
         ]
         extra_kwargs = {
             'end_date': {'read_only': True},
@@ -242,7 +244,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 'id': obj.coach.id,
                 'username': obj.coach.username,
                 'role': obj.coach.role,
-                'max_trainees': profile.max_trainees
+                'max_trainees': profile.max_traines
             }
         return None
 
@@ -253,7 +255,9 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             'duration_days': obj.type.duration_days,
             'price': obj.type.price,
             'is_active': obj.type.is_active,
-            'max_entries': obj.type.max_entries or 0  
+            'max_entries': obj.type.max_entries or 0,
+            'free_invites_allowed': obj.type.free_invites_allowed,
+            'free_invite_validity_days': obj.type.free_invite_validity_days
         }
 
     def get_freeze_requests(self, obj):
@@ -278,12 +282,9 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             }
             for p in obj.payments.all()
         ]
-    
+
     def get_remaining_free_invites(self, obj):
-        used_invites = FreeInvite.objects.filter(
-            subscription=obj,
-            status__in=['pending', 'used']
-        ).count()
+        used_invites = FreeInvite.objects.filter(subscription=obj).count()
         return max(0, obj.type.free_invites_allowed - used_invites)
 
     def validate(self, data):
@@ -300,15 +301,12 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         coach_compensation_type = data.get('coach_compensation_type')
         coach_compensation_value = data.get('coach_compensation_value', None)
 
-        # إزالة end_date من البيانات إذا تم إرساله
         if 'end_date' in data:
             data.pop('end_date')
 
-        # حساب end_date بناءً على start_date و duration_days
         if subscription_type:
             data['end_date'] = start_date + timedelta(days=subscription_type.duration_days)
 
-        # التعامل مع coach_compensation_value
         if coach_compensation_value is None:
             data['coach_compensation_value'] = Decimal('0.00')
             if not coach:
@@ -316,7 +314,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             elif not coach_compensation_type:
                 data['coach_compensation_type'] = 'from_subscription'
 
-        # حساب السعر الفعلي بناءً على العرض
         effective_price = subscription_type.price
         if special_offer:
             now = timezone.now()
@@ -328,7 +325,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         else:
             effective_price = subscription_type.price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
-        # التحقق من العضو
         if identifier and not member:
             try:
                 member = Member.objects.get(
@@ -339,7 +335,6 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             except Member.DoesNotExist:
                 raise serializers.ValidationError("لا يوجد عضو بهذا المعرف (هاتف، RFID، أو اسم).")
 
-        # التحقق من المدرب
         if coach_identifier and not coach:
             try:
                 coach = User.objects.get(
@@ -380,11 +375,9 @@ class SubscriptionSerializer(serializers.ModelSerializer):
             data['coach_compensation_type'] = None
             data['coach_compensation_value'] = Decimal('0.00')
 
-        # التحقق من النادي ونوع الاشتراك
         if club and subscription_type and subscription_type.club != club:
             raise serializers.ValidationError("نوع الاشتراك يجب أن يكون لنفس النادي.")
 
-        # التحقق من الاشتراكات النشطة والمدفوعات المستحقة
         if member:
             today = timezone.now().date()
             active_subscriptions = Subscription.objects.filter(
@@ -412,14 +405,26 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         validated_data.pop('coach_identifier', None)
         validated_data.pop('identifier', None)
         return Subscription.objects.create(**validated_data)
-    
 
-class MemberBehaviorSerializer(serializers.Serializer):
-    member_name = serializers.CharField(source='member__name')
-    attendance_count = serializers.IntegerField()
-    subscription_count = serializers.IntegerField()
-    is_regular = serializers.BooleanField()
-    is_repeated = serializers.BooleanField()
+class SpecialOfferSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SpecialOffer
+        fields = ['id', 'club', 'subscription_type', 'name', 'discount_percentage', 'start_datetime', 'end_datetime', 'is_active', 'is_golden', 'created_at']
+        extra_kwargs = {
+            'club': {'required': True},
+            'name': {'required': True},
+            'discount_percentage': {'required': True},
+            'start_datetime': {'required': True},
+            'end_datetime': {'required': True},
+        }
+
+    def validate(self, data):
+        if data['start_datetime'] >= data['end_datetime']:
+            raise serializers.ValidationError("تاريخ البداية يجب أن يكون قبل تاريخ النهاية.")
+        if data['discount_percentage'] < 0 or data['discount_percentage'] > 99:
+            raise serializers.ValidationError("نسبة الخصم يجب أن تكون بين 0 و99.")
+        return data
+    
 
 class CoachReportSerializer(serializers.Serializer):
     coach_id = serializers.IntegerField()
@@ -593,23 +598,12 @@ class CoachReportSerializer(serializers.Serializer):
                 'coach_compensation_value': sub.coach_compensation_value,
             })
         return members_data
-    
 
-class SpecialOfferSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = SpecialOffer
-        fields = ['id', 'club', 'subscription_type', 'name', 'discount_percentage', 'start_datetime', 'end_datetime', 'is_active', 'is_golden', 'created_at']
-        extra_kwargs = {
-            'club': {'required': True},
-            'name': {'required': True},
-            'discount_percentage': {'required': True},
-            'start_datetime': {'required': True},
-            'end_datetime': {'required': True},
-        }
 
-    def validate(self, data):
-        if data['start_datetime'] >= data['end_datetime']:
-            raise serializers.ValidationError("تاريخ البداية يجب أن يكون قبل تاريخ النهاية.")
-        if data['discount_percentage'] < 0 or data['discount_percentage'] > 99:
-            raise serializers.ValidationError("نسبة الخصم يجب أن تكون بين 0 و99.")
-        return data
+class MemberBehaviorSerializer(serializers.Serializer):
+    member_name = serializers.CharField(source='member__name')
+    attendance_count = serializers.IntegerField()
+    subscription_count = serializers.IntegerField()
+    is_regular = serializers.BooleanField()
+    is_repeated = serializers.BooleanField()
+
