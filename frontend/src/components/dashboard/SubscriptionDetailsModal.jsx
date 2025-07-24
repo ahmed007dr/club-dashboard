@@ -5,6 +5,17 @@ import { Button } from "@/components/ui/button";
 const SubscriptionDetailsModal = ({ isOpen, onClose, subscription }) => {
   if (!isOpen) return null;
 
+  const statusStyles = {
+    نشط: "bg-green-100 text-green-600",
+    منتهي: "bg-red-100 text-red-600",
+    قادم: "bg-blue-100 text-blue-600",
+    مجمد: "bg-yellow-100 text-yellow-600",
+    ملغي: "bg-gray-100 text-gray-600",
+    متبقي: "bg-orange-100 text-orange-600",
+    "قريب من الانتهاء": "bg-purple-100 text-purple-600",
+    "غير معروف": "bg-gray-100 text-gray-600",
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -56,6 +67,14 @@ const SubscriptionDetailsModal = ({ isOpen, onClose, subscription }) => {
             <div>
               <p className="text-gray-600 font-medium">عدد الإدخالات:</p>
               <p className="text-gray-800">{subscription.entry_count}</p>
+            </div>
+            <div>
+              <p className="text-gray-600 font-medium">الحالة:</p>
+              <span
+                className={`px-2 py-1 rounded text-xs font-medium ${statusStyles[subscription.status] || statusStyles["غير معروف"]}`}
+              >
+                {subscription.status}
+              </span>
             </div>
           </div>
         </div>

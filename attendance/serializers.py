@@ -17,6 +17,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
     member_name = serializers.SerializerMethodField()
     rfid_code = serializers.SerializerMethodField()
     subscription_details = SubscriptionSerializer(source='subscription', read_only=True)
+    timestamp = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
 
     class Meta:
         model = Attendance
@@ -26,13 +27,12 @@ class AttendanceSerializer(serializers.ModelSerializer):
             'subscription_id',
             'subscription',
             'subscription_details',
-            'attendance_date',
-            'entry_time',
+            'timestamp',
             'membership_number',
             'member_name',
             'rfid_code',
         ]
-        read_only_fields = ['attendance_date', 'entry_time', 'membership_number', 'member_name', 'rfid_code', 'subscription']
+        read_only_fields = ['timestamp', 'membership_number', 'member_name', 'rfid_code', 'subscription']
 
     def get_membership_number(self, obj):
         return obj.subscription.member.membership_number
@@ -42,7 +42,6 @@ class AttendanceSerializer(serializers.ModelSerializer):
 
     def get_rfid_code(self, obj):
         return obj.subscription.member.rfid_code
-
 
     def validate(self, data):
         identifier = data.get('identifier')
@@ -84,14 +83,14 @@ class AttendanceSerializer(serializers.ModelSerializer):
             subscription = active_subscriptions.first()
 
         data['subscription'] = subscription
-        data['attendance_date'] = today
-        data['entry_time'] = timezone.now().time()
+        data['timestamp'] = timezone.now().astimezone(timezone.get_current_timezone())
         return data
-    
+
     def create(self, validated_data):
         validated_data.pop('identifier', None)
         validated_data.pop('subscription_id', None)
         return Attendance.objects.create(**validated_data)
+
 
 class EntryLogSerializer(serializers.ModelSerializer):
     identifier = serializers.CharField(write_only=True)

@@ -1,3 +1,4 @@
+
 from rest_framework import serializers
 from .models import Subscription, SubscriptionType, Payment, PaymentMethod, FreezeRequest, Feature, SpecialOffer
 from core.serializers import ClubSerializer
@@ -218,7 +219,13 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         has_active_freeze = obj.freeze_requests.filter(
             is_active=True, start_date__lte=today, end_date__gte=today
         ).exists()
+        is_nearing_expiry = obj.end_date >= today and obj.end_date <= today + timedelta(days=7)
+        has_remaining_amount = obj.remaining_amount > 0
 
+        if has_remaining_amount:
+            return "متبقي"
+        if is_nearing_expiry and not is_expired and not obj.is_cancelled:
+            return "قريب من الانتهاء"
         if obj.is_cancelled:
             return "ملغي"
         if has_active_freeze:
@@ -244,7 +251,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
                 'id': obj.coach.id,
                 'username': obj.coach.username,
                 'role': obj.coach.role,
-                'max_trainees': profile.max_traines
+                'max_trainees': profile.max_trainees
             }
         return None
 
@@ -286,7 +293,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
     def get_remaining_free_invites(self, obj):
         used_invites = FreeInvite.objects.filter(subscription=obj).count()
         return max(0, obj.type.free_invites_allowed - used_invites)
-    
+
     def validate(self, data):
         club = data.get('club')
         subscription_type = data.get('type', getattr(self.instance, 'type', None))
@@ -423,7 +430,6 @@ class SpecialOfferSerializer(serializers.ModelSerializer):
         if data['discount_percentage'] < 0 or data['discount_percentage'] > 99:
             raise serializers.ValidationError("نسبة الخصم يجب أن تكون بين 0 و99.")
         return data
-    
 
 class CoachReportSerializer(serializers.Serializer):
     coach_id = serializers.IntegerField()
@@ -575,7 +581,7 @@ class CoachReportSerializer(serializers.Serializer):
         for sub in subscriptions:
             attendance_count = Attendance.objects.filter(
                 subscription=sub,
-                attendance_date__range=(start_date, end_date)
+                timestamp__date__range=(start_date, end_date)
             ).count()
             max_entries = sub.type.max_entries
             fully_used = max_entries > 0 and sub.entry_count >= max_entries
@@ -598,11 +604,9 @@ class CoachReportSerializer(serializers.Serializer):
             })
         return members_data
 
-
 class MemberBehaviorSerializer(serializers.Serializer):
     member_name = serializers.CharField(source='member__name')
     attendance_count = serializers.IntegerField()
     subscription_count = serializers.IntegerField()
     is_regular = serializers.BooleanField()
     is_repeated = serializers.BooleanField()
-

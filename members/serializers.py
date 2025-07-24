@@ -3,7 +3,6 @@ from django.utils import timezone
 from .models import Member
 from attendance.models import Attendance
 
-
 class MemberSerializer(serializers.ModelSerializer):
     referred_by_name = serializers.CharField(source='referred_by.name', read_only=True)
     club_name = serializers.CharField(source='club.name', read_only=True)
@@ -34,8 +33,8 @@ class MemberSerializer(serializers.ModelSerializer):
         last_attendance = Attendance.objects.filter(
             subscription__member=obj,
             subscription__end_date__gte=timezone.now().date()
-        ).order_by('-attendance_date').first()
-        return last_attendance.attendance_date if last_attendance else None
+        ).order_by('-timestamp').first()
+        return last_attendance.timestamp.date() if last_attendance else None
 
     def get_near_expiry_date(self, obj):
         subscription = obj.subscription_set.filter(

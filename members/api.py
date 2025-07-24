@@ -46,8 +46,8 @@ def member_list_api(request):
 
         checked_in_subscription_ids = Attendance.objects.filter(
             subscription__club=request.user.club,
-            attendance_date=today,
-            entry_time__gte=one_hour_ago.time()
+            timestamp__date=today,
+            timestamp__gte=one_hour_ago
         ).values_list('subscription_id', flat=True)
 
         checked_in_member_ids = Subscription.objects.filter(

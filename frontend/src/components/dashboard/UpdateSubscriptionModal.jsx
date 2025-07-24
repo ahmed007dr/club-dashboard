@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchSubscriptionTypes, updateSubscription, fetchSubscriptions } from '../../redux/slices/subscriptionsSlice';
@@ -32,6 +31,18 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
   const [error, setError] = useState(null);
   const [isModalOpen, setErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  // إضافة statusStyles لعرض حالة الاشتراك
+  const statusStyles = {
+    نشط: "bg-green-100 text-green-600",
+    منتهي: "bg-red-100 text-red-600",
+    قادم: "bg-blue-100 text-blue-600",
+    مجمد: "bg-yellow-100 text-yellow-600",
+    ملغي: "bg-gray-100 text-gray-600",
+    متبقي: "bg-orange-100 text-orange-600",
+    "قريب من الانتهاء": "bg-purple-100 text-purple-600",
+    "غير معروف": "bg-gray-100 text-gray-600",
+  };
 
   const fetchAllCoaches = useCallback(async () => {
     try {
@@ -126,7 +137,6 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-//     console.log('handleSubmit triggered', { formData, foundMember });
 
     if (!formData.club || !formData.type || !formData.start_date || !formData.paid_amount) {
       setErrorMessage('يرجى ملء جميع الحقول المطلوبة');
@@ -325,6 +335,14 @@ const UpdateSubscriptionModal = ({ isOpen, onClose, subscription, onSubmit }) =>
                     </option>
                   ))}
               </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1 text-gray-700">الحالة</label>
+              <span
+                className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusStyles[subscription.status] || statusStyles["غير معروف"]}`}
+              >
+                {subscription.status}
+              </span>
             </div>
             <div>
               <label className="block text-xs font-medium mb-1 text-gray-700">المدرب</label>

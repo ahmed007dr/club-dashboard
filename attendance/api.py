@@ -32,12 +32,12 @@ def attendance_heatmap_api(request):
     )
     daily_counts = (
         attendances
-        .values('attendance_date')
+        .values('timestamp__date')
         .annotate(count=Count('id'))
-        .order_by('attendance_date')
+        .order_by('timestamp__date')
     )
     heatmap_data = [
-        {'date': entry['attendance_date'].isoformat(), 'count': entry['count']}
+        {'date': entry['timestamp__date'].isoformat(), 'count': entry['count']}
         for entry in daily_counts
     ]
     return Response(heatmap_data)
@@ -61,73 +61,69 @@ def member_attendance_heatmap_api(request):
     )
     daily_counts = (
         attendances
-        .values('attendance_date')
+        .values('timestamp__date')
         .annotate(count=Count('id'))
-        .order_by('attendance_date')
+        .order_by('timestamp__date')
     )
     heatmap_data = [
-        {'date': entry['attendance_date'].isoformat(), 'count': entry['count']}
+        {'date': entry['timestamp__date'].isoformat(), 'count': entry['count']}
         for entry in daily_counts
     ]
     return Response(heatmap_data)
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def attendance_list_api(request):
-    """Get paginated list of attendances with optional filters, restricted to active shift for non-owner/admin users by default."""
+    """List attendance records with pagination and filtering."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
-    rfid = request.GET.get('rfid', '')
-    attendance_date = request.GET.get('attendance_date', '')
-    member_name = request.GET.get('member_name', '')
-    page_size = request.GET.get('page_size', 20)
 
-    attendances = Attendance.objects.select_related('subscription', 'subscription__member').filter(
-        subscription__club=request.user.club
-    )
+    # Get query parameters
+    page = request.query_params.get('page', 1)
+    page_size = request.query_params.get('page_size', 20)
+    member_name = request.query_params.get('member_name', '')
+    timestamp = request.query_params.get('timestamp', '')
 
-    # Restrict attendances to those linked to subscriptions created during active shift for non-owner/admin users, unless filtering
-    is_search_mode = rfid or member_name or attendance_date
-    if not is_search_mode and request.user.role not in ['owner', 'admin']:
-        attendance = StaffAttendance.objects.filter(
-            staff=request.user, club=request.user.club, check_out__isnull=True
-        ).order_by('-check_in').first()
-        if not attendance:
-            logger.warning(f"No active shift for user: {request.user.username}")
-            return Response({'error': 'لا توجد وردية مفتوحة.'}, status=status.HTTP_403_FORBIDDEN)
-        attendances = attendances.filter(
-            subscription__created_by=request.user,
-            subscription__start_date__gte=attendance.check_in,
-            subscription__start_date__lte=attendance.check_out or timezone.now()
-        )
+    try:
+        page = int(page)
+        page_size = int(page_size)
+    except ValueError:
+        logger.error(f"Invalid page or page_size: {page}, {page_size}")
+        return Response({'error': 'رقم الصفحة أو حجم الصفحة غير صالح.'}, status=status.HTTP_400_BAD_REQUEST)
 
-    if not is_search_mode:
-        start_date = timezone.now().date() - timedelta(days=2)
-        attendances = attendances.filter(attendance_date__gte=start_date)
+    # Build queryset
+    queryset = Attendance.objects.filter(subscription__club=request.user.club)
 
-    if rfid:
-        attendances = attendances.filter(subscription__member__rfid_code__iexact=rfid)
-    if attendance_date:
-        try:
-            date_obj = parse_datetime(attendance_date)
-            if not date_obj:
-                return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
-            date_obj = timezone.make_aware(date_obj) if timezone.is_naive(date_obj) else date_obj
-            attendances = attendances.filter(attendance_date=date_obj.date())
-        except ValueError:
-            return Response({'error': 'Invalid date format. Use YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+    if request.user.role != 'owner':
+        queryset = queryset.filter(subscription__club=request.user.club)
+
     if member_name:
-        attendances = attendances.filter(subscription__member__name__icontains=member_name)
+        queryset = queryset.filter(subscription__member__name__icontains=member_name)
 
-    attendances = attendances.order_by('-attendance_date', '-entry_time')
+    if timestamp:
+        try:
+            date = timezone.datetime.strptime(timestamp, '%Y-%m-%d').date()
+            queryset = queryset.filter(timestamp__date=date)
+        except ValueError:
+            logger.error(f"Invalid timestamp format: {timestamp}")
+            return Response({'error': 'صيغة التاريخ غير صالحة.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Pagination
     paginator = PageNumberPagination()
     paginator.page_size = page_size
-    result_page = paginator.paginate_queryset(attendances, request)
-    serializer = AttendanceSerializer(result_page, many=True)
-    return paginator.get_paginated_response(serializer.data)
+    paginated_queryset = paginator.paginate_queryset(queryset, request)
+
+    # Serialize data
+    serializer = AttendanceSerializer(paginated_queryset, many=True)
+    response_data = {
+        'count': paginator.page.paginator.count,
+        'results': serializer.data
+    }
+    return Response(response_data, status=status.HTTP_200_OK)
+
+
 
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
@@ -183,8 +179,8 @@ def add_attendance_api(request):
         one_minute_ago = now - timedelta(seconds=5)
         recent_count = Attendance.objects.filter(
             subscription__member_id=member.id,
-            entry_time__gte=one_minute_ago,
-            entry_time__lte=now
+            timestamp__gte=one_minute_ago,
+            timestamp__lte=now
         ).count()
         
         if recent_count >= 1:
@@ -256,17 +252,15 @@ def attendance_last_hour_api(request):
     now = timezone.now()
     one_hour_ago = now - timedelta(hours=1)
     
-    today = now.date()
-    
     attendances = Attendance.objects.filter(
         subscription__club=request.user.club,
-        attendance_date=today, 
-        entry_time__gte=one_hour_ago.time(),
-        entry_time__lte=now.time()  
+        timestamp__gte=one_hour_ago,
+        timestamp__lte=now
     )
     
     count = attendances.count()
     return Response({"count": count}, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -285,12 +279,11 @@ def attendance_hourly_api(request):
 
     attendances = Attendance.objects.filter(
         subscription__club=request.user.club,
-        attendance_date=target_date
+        timestamp__date=target_date
     )
     hourly_counts = (
         attendances
-        .filter(entry_time__isnull=False)
-        .annotate(hour=ExtractHour('entry_time'))
+        .annotate(hour=ExtractHour('timestamp'))
         .values('hour')
         .annotate(count=Count('id'))
         .order_by('hour')
@@ -311,25 +304,25 @@ def attendance_weekly_api(request):
     
     today = timezone.now().date()
     end_date = today
-    while end_date.weekday() != 4:
+    while end_date.weekday() != 4:  # الجمعة (نهاية الأسبوع)
         end_date -= timedelta(days=1)
     start_date = end_date - timedelta(days=6)
     week_days = [start_date + timedelta(days=i) for i in range(7)]
 
     attendances = Attendance.objects.filter(
         subscription__club=request.user.club,
-        attendance_date__gte=start_date,
-        attendance_date__lte=end_date
+        timestamp__date__gte=start_date,
+        timestamp__date__lte=end_date
     )
     daily_counts = (
         attendances
-        .values('attendance_date')
+        .values('timestamp__date')
         .annotate(count=Count('id'))
-        .order_by('attendance_date')
+        .order_by('timestamp__date')
     )
     daily_data = [{'date': date.isoformat(), 'count': 0} for date in week_days]
     for entry in daily_counts:
-        date_str = entry['attendance_date'].isoformat()
+        date_str = entry['timestamp__date'].isoformat()
         for data in daily_data:
             if data['date'] == date_str:
                 data['count'] = entry['count']
@@ -350,18 +343,18 @@ def attendance_monthly_api(request):
 
     attendances = Attendance.objects.filter(
         subscription__club=request.user.club,
-        attendance_date__gte=start_date,
-        attendance_date__lte=today
+        timestamp__date__gte=start_date,
+        timestamp__date__lte=today
     )
     daily_counts = (
         attendances
-        .values('attendance_date')
+        .values('timestamp__date')
         .annotate(count=Count('id'))
-        .order_by('attendance_date')
+        .order_by('timestamp__date')
     )
     daily_data = [{'date': date.isoformat(), 'count': 0} for date in days]
     for entry in daily_counts:
-        date_str = entry['attendance_date'].isoformat()
+        date_str = entry['timestamp__date'].isoformat()
         for data in daily_data:
             if data['date'] == date_str:
                 data['count'] = entry['count']

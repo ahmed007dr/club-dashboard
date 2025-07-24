@@ -1,4 +1,3 @@
-
 import React, { useCallback, useState } from "react";
 import { useDispatch } from "react-redux";
 import { fetchSubscriptions } from "@/redux/slices/subscriptionsSlice";
@@ -22,7 +21,6 @@ const SubscriptionFilters = ({
   const handleFilterChange = useCallback(
     (e) => {
       const { name, value } = e.target;
-//       console.log("Filter change:", name, value);
       setFilters((prev) => ({ ...prev, [name]: value }));
       setError(null);
       setSearchTriggered(false);
@@ -56,8 +54,6 @@ const SubscriptionFilters = ({
 
     queryParams.append("page", "1");
     queryParams.append("pageSize", itemsPerPage.toString());
-
-//     console.log("Final query params:", queryParams.toString());
 
     dispatch(fetchSubscriptions(Object.fromEntries(queryParams)))
       .unwrap()
@@ -162,10 +158,13 @@ const SubscriptionFilters = ({
             className="w-full border border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-lg px-3 py-2.5 text-sm text-right"
           >
             <option value="">كل الحالات</option>
-            <option value="Active">نشط</option>
-            <option value="Expired">منتهي</option>
-            <option value="Upcoming">قادمة</option>
-            {/* إزالة Frozen لحين دعمه في الباك إند */}
+            <option value="active">نشط</option>
+            <option value="expired">منتهي</option>
+            <option value="upcoming">قادم</option>
+            <option value="frozen">مجمد</option>
+            <option value="cancelled">ملغي</option>
+            <option value="remaining">متبقي</option>
+            <option value="nearing_expiry">قريب من الانتهاء</option>
           </select>
         </div>
         <div className="flex items-end gap-2 col-span-1 sm:col-span-2 lg:col-span-4">
@@ -188,3 +187,4 @@ const SubscriptionFilters = ({
 };
 
 export default SubscriptionFilters;
+

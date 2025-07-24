@@ -76,6 +76,8 @@ const SubscriptionTable = ({
     قادم: "bg-blue-100 text-blue-600",
     مجمد: "bg-yellow-100 text-yellow-600",
     ملغي: "bg-gray-100 text-gray-600",
+    متبقي: "bg-orange-100 text-orange-600",
+    "قريب من الانتهاء": "bg-purple-100 text-purple-600",
     "غير معروف": "bg-gray-100 text-gray-600",
   };
 
@@ -368,7 +370,7 @@ const SubscriptionTable = ({
                           <FaRedo className="mr-2" /> تجديد
                         </DropdownMenuItem>
                       )}
-                      {canUpdateSubscription && subscription.status !== "مجمد" && (
+                      {canUpdateSubscription && subscription.status !== "مجمد" && subscription.status !== "ملغي" && (
                         <DropdownMenuItem
                           onClick={() => {
                             setSelectedSubscription(subscription);

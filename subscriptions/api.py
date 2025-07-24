@@ -241,7 +241,7 @@ def active_subscription_types(request):
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     types = SubscriptionType.objects.filter(is_active=True, club=request.user.club)
-    types = types.order_by('id')
+    types = types.order_by('-id') 
     paginator = PageNumberPagination()
     page = paginator.paginate_queryset(types, request)
     serializer = SubscriptionTypeSerializer(page, many=True)
@@ -259,17 +259,20 @@ def subscription_list(request):
     if request.method == 'GET':
         search_term = request.query_params.get('searchTerm', request.query_params.get('search_term', '')).strip()
         identifier = request.query_params.get('identifier', '').strip()
-        club_id = request.query_params.get('club', request.user.club.id)
         status_param = request.query_params.get('status', '').strip()
         today = timezone.now().date()
         ordering = request.query_params.get('ordering', '')
 
         # التحقق من وجود معايير بحث
-        if not (search_term or identifier or status_param):
+        if not (search_term or identifier or status_param or
+                request.query_params.get('member_id') or
+                request.query_params.get('type_id') or
+                request.query_params.get('start_date') or
+                request.query_params.get('end_date')):
             logger.info(f"No search criteria provided by user: {request.user.username}")
-            return Response({'message': 'يرجى إدخال معايير البحث (اسم، رقم هاتف، RFID، أو حالة الاشتراك).'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'message': 'يرجى إدخال معايير البحث (اسم، رقم هاتف، RFID، حالة الاشتراك، معرف العضو، نوع الاشتراك، تاريخ البدء، أو تاريخ الانتهاء).'}, status=status.HTTP_400_BAD_REQUEST)
 
-        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=club_id)
+        subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club.id)
 
         # تحديد الوصول بناءً على الدور
         if request.user.role not in ['owner', 'admin']:
@@ -285,6 +288,10 @@ def subscription_list(request):
                     start_date__lte=attendance.check_out or timezone.now()
                 )
             subscriptions = subscriptions.filter(filters)
+
+        # إضافة فلتر افتراضي للمبالغ المتبقية إذا لم يتم تحديد status_param
+        if not status_param:
+            subscriptions = subscriptions.filter(remaining_amount__gt=0)
 
         if identifier:
             subscriptions = subscriptions.annotate(
@@ -309,7 +316,7 @@ def subscription_list(request):
                 Q(member__rfid_code=identifier) | Q(member__phone=identifier)
             )
 
-        elif search_term or status_param:
+        if search_term or status_param:
             # فلترة بالبحث
             if search_term:
                 subscriptions = subscriptions.filter(
@@ -322,12 +329,15 @@ def subscription_list(request):
             for param, field in [
                 ('member_id', 'member_id'),
                 ('type_id', 'type_id'),
-                ('club_id', 'club_id'),
                 ('start_date', 'start_date__gte'),
                 ('end_date', 'end_date__lte'),
             ]:
                 if request.query_params.get(param):
-                    subscriptions = subscriptions.filter(**{field: request.query_params.get(param)})
+                    try:
+                        subscriptions = subscriptions.filter(**{field: request.query_params.get(param)})
+                    except ValueError as e:
+                        logger.error(f"Invalid value for {param}: {request.query_params.get(param)}")
+                        return Response({'error': f'قيمة غير صالحة لـ {param}'}, status=status.HTTP_400_BAD_REQUEST)
 
             # فلترة بالحالة
             if status_param:
@@ -344,21 +354,37 @@ def subscription_list(request):
                     )
                 elif status_param == 'upcoming':
                     subscriptions = subscriptions.filter(start_date__gt=today)
+                elif status_param == 'remaining':
+                    subscriptions = subscriptions.filter(remaining_amount__gt=0)
+                elif status_param == 'cancelled':
+                    subscriptions = subscriptions.filter(is_cancelled=True)
+                elif status_param == 'nearing_expiry':
+                    subscriptions = subscriptions.filter(
+                        end_date__range=(today, today + timedelta(days=7))
+                    )
+                else:
+                    logger.error(f"Invalid status parameter: {status_param}")
+                    return Response({'error': f'حالة غير صالحة: {status_param}'}, status=status.HTTP_400_BAD_REQUEST)
 
         if ordering:
-            if ordering in ['remaining_amount', '-remaining_amount', 'start_date', '-start_date']:
-                subscriptions = subscriptions.order_by(ordering, '-id')
+            if ordering in ['remaining_amount', '-remaining_amount', 'start_date', '-start_date', 'end_date', '-end_date']:
+                subscriptions = subscriptions.order_by(ordering, '-end_date')
             else:
-                subscriptions = subscriptions.order_by(ordering)
+                try:
+                    subscriptions = subscriptions.order_by(ordering)
+                except Exception as e:
+                    logger.error(f"Invalid ordering parameter: {ordering}")
+                    return Response({'error': f'ترتيب غير صالح: {ordering}'}, status=status.HTTP_400_BAD_REQUEST)
         else:
-            subscriptions = subscriptions.order_by('-remaining_amount', '-start_date')
+            subscriptions = subscriptions.order_by('-remaining_amount', 'end_date')
 
         # Pagination and serialization
         paginator = PageNumberPagination()
+        paginator.page_size = min(int(request.query_params.get('page_size', 20)), 100)  # تحديد أقصى حجم للصفحة
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page or subscriptions, many=True, context={'request': request})
         return paginator.get_paginated_response(serializer.data) if page else Response(serializer.data)
-    
+
     if request.method == 'POST':
         mutable_data = request.data.copy()
         mutable_data['created_by'] = request.user.id
@@ -834,179 +860,6 @@ def subscription_stats(request):
     }
     return Response(stats)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def subscription_analytics(request):
-    """Get subscription analytics."""
-    if not request.user.club:
-        logger.error(f"User {request.user.username} has no associated club")
-        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
-    today = timezone.now().date()
-    club = request.user.club
-    start = request.query_params.get('start_date')
-    end = request.query_params.get('end_date')
-    s_type = request.query_params.get('subscription_type')
-    coach = request.query_params.get('coach')
-    
-    try:
-        start_date = datetime.strptime(start, '%Y-%m-%d').date() if start else today - timedelta(days=90)
-        end_date = datetime.strptime(end, '%Y-%m-%d').date() if end else today
-    except ValueError:
-        return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
-
-    base_filter = {'club': club, 'start_date__lte': end_date, 'end_date__gte': start_date}
-    if s_type:
-        base_filter['type_id'] = s_type
-    if coach:
-        base_filter['coach_id'] = coach
-    
-    base_qs = Subscription.objects.filter(**base_filter).select_related('type', 'member', 'coach').distinct()
-    total_subs = base_qs.count()
-    popular_qs = SubscriptionType.objects.filter(club=club).annotate(
-        total=Count('subscriptions', filter=Q(subscriptions__start_date__gte=start_date, subscriptions__start_date__lte=end_date))
-    ).values('name', 'total').order_by('-total')[:5]
-    att_qs = base_qs.prefetch_related('attendance_attendances')
-    att_stats = att_qs.values('type__name').annotate(
-        total_attendance=Count('attendance_attendances', filter=Q(attendance_attendances__attendance_date__range=(start_date, end_date)))
-    )
-    for item in att_stats:
-        matching_subs = att_qs.filter(type__name=item['type__name'])
-        total_att = sum(
-            matching_subs.filter(attendance_attendances__attendance_date__range=(start_date, end_date)).count()
-            for s in matching_subs
-        )
-        item['avg_attendance'] = round(total_att / len(matching_subs) if matching_subs else 0, 2)
-    
-    att_by_day = Attendance.objects.filter(
-        subscription__club=club, attendance_date__range=(start_date, end_date)
-    ).filter(subscription__type_id=s_type if s_type else Q(), subscription__coach_id=coach if coach else Q()).annotate(
-        day_of_week=Case(
-            When(attendance_date__week_day=2, then=0), When(attendance_date__week_day=3, then=1),
-            When(attendance_date__week_day=4, then=2), When(attendance_date__week_day=5, then=3),
-            When(attendance_date__week_day=6, then=4), When(attendance_date__week_day=7, then=5),
-            When(attendance_date__week_day=1, then=6), output_field=IntegerField()
-        )
-    ).values('day_of_week').annotate(total_entries=Count('id')).order_by('day_of_week')
-    
-    freeze_filter = {'subscriptions__start_date__gte': start_date, 'subscriptions__start_date__lte': end_date}
-    if s_type:
-        freeze_filter['subscriptions__type_id'] = s_type
-    if coach:
-        freeze_filter['subscriptions__coach_id'] = coach
-    freeze_stats = SubscriptionType.objects.filter(club=club).prefetch_related('subscriptions__freeze_requests').annotate(
-        total=Count('subscriptions', filter=Q(**freeze_filter)),
-        total_freezes=Count('subscriptions__freeze_requests', filter=Q(
-            subscriptions__freeze_requests__start_date__gte=start_date, subscriptions__freeze_requests__end_date__lte=end_date,
-            subscriptions__freeze_requests__is_active=True, **({'subscriptions__type_id': s_type} if s_type else {}),
-            **({'subscriptions__coach_id': coach} if coach else {})
-        )),
-        frozen_subscriptions=Count('subscriptions', filter=Q(
-            subscriptions__freeze_requests__start_date__gte=start_date, subscriptions__freeze_requests__end_date__lte=end_date,
-            subscriptions__freeze_requests__is_active=True, **({'subscriptions__type_id': s_type} if s_type else {}),
-            **({'subscriptions__coach_id': coach} if coach else {})
-        ))
-    ).annotate(
-        freeze_percentage=ExpressionWrapper(
-            100.0 * F('frozen_subscriptions') / Case(When(total__gt=0, then=F('total')), default=Value(1), output_field=FloatField()),
-            output_field=FloatField()
-        )
-    ).values('name', 'total', 'total_freezes', 'frozen_subscriptions', 'freeze_percentage').order_by('-total_freezes')
-    
-    revenue_filter = {'subscriptions__club': club, 'subscriptions__start_date__lte': end_date, 'subscriptions__end_date__gte': start_date}
-    if s_type:
-        revenue_filter['subscriptions__type_id'] = s_type
-    if coach:
-        revenue_filter['subscriptions__coach_id'] = coach
-    revenue_stats = SubscriptionType.objects.filter(club=club).prefetch_related('subscriptions').annotate(
-        total_revenue=Sum('subscriptions__paid_amount', filter=Q(**revenue_filter)),
-        coach_compensation_revenue=Sum('subscriptions__coach_compensation_value', filter=Q(
-            subscriptions__coach_compensation_type='external', **revenue_filter
-        )),
-        remaining_amount=Sum('subscriptions__remaining_amount', filter=Q(**revenue_filter))
-    ).values('name', 'total_revenue', 'coach_compensation_revenue', 'remaining_amount').order_by('-total_revenue')
-    
-    member_behavior = base_qs.annotate(
-        attendance_count=Count('attendance_attendances', filter=Q(attendance_attendances__attendance_date__range=(start_date, end_date))),
-        subscription_count=Count('member__subscription')
-    ).values('member__name', 'attendance_count', 'subscription_count').annotate(
-        is_regular=Case(When(attendance_count__gte=10, then=True), default=False, output_field=IntegerField()),
-        is_repeated=Case(When(subscription_count__gte=2, then=True), default=False, output_field=IntegerField())
-    ).order_by('-attendance_count')[:10]
-    
-    inactive_members = base_qs.annotate(last_attendance=Max('attendance_attendances__attendance_date')).filter(
-        Q(last_attendance__lte=today - timedelta(days=30)) | Q(last_attendance__isnull=True)
-    ).values('member__name').annotate(subscription_count=Count('id'))[:10]
-    
-    coach_stats = User.objects.filter(role='coach', is_active=True, club=club).annotate(
-        total_clients=Count('private_subscriptions', filter=Q(
-            private_subscriptions__start_date__lte=end_date, private_subscriptions__end_date__gte=start_date,
-            private_subscriptions__type__is_private_training=True, **({'private_subscriptions__type_id': s_type} if s_type else {})
-        )),
-        total_attendance=Count('private_subscriptions__attendance_attendances', filter=Q(
-            private_subscriptions__attendance_attendances__attendance_date__range=(start_date, end_date),
-            **({'private_subscriptions__type_id': s_type} if s_type else {})
-        )),
-        total_revenue=Sum('private_subscriptions__coach_compensation_value', filter=Q(
-            private_subscriptions__start_date__lte=end_date, private_subscriptions__end_date__gte=start_date,
-            private_subscriptions__coach_compensation_type='external', **({'private_subscriptions__type_id': s_type} if s_type else {})
-        ))
-    ).values('username', 'total_clients', 'total_attendance', 'total_revenue').order_by('-total_clients')
-    
-    temporal_stats = base_qs.annotate(month=TruncMonth('start_date')).values('month').annotate(
-        total_subscriptions=Count('id'), total_revenue=Sum('paid_amount')
-    ).order_by('month')
-    
-    renewal_filter = {'subscriptions__end_date__lt': end_date, 'subscriptions__start_date__gte': start_date}
-    if s_type:
-        renewal_filter['subscriptions__type_id'] = s_type
-    if coach:
-        renewal_filter['subscriptions__coach_id'] = coach
-    renewal_stats = SubscriptionType.objects.filter(club=club).annotate(
-        expired_subscriptions=Count('subscriptions', filter=Q(**renewal_filter)),
-        renewed_subscriptions=Count('subscriptions', filter=Q(
-            subscriptions__end_date__lt=end_date, subscriptions__start_date__gte=start_date,
-            subscriptions__member__subscription__start_date__gt=F('subscriptions__end_date'),
-            subscriptions__member__subscription__start_date__lte=F('subscriptions__end_date') + timedelta(days=30),
-            subscriptions__member__subscription__type=F('subscriptions__type'), **({'subscriptions__type_id': s_type} if s_type else {}),
-            **({'subscriptions__coach_id': coach} if coach else {})
-        ))
-    ).annotate(
-        renewal_rate=ExpressionWrapper(
-            100.0 * F('renewed_subscriptions') / Case(When(expired_subscriptions__gt=0, then=F('expired_subscriptions')), default=Value(1), output_field=FloatField()),
-            output_field=FloatField()
-        )
-    ).values('name', 'expired_subscriptions', 'renewed_subscriptions', 'renewal_rate').order_by('-renewal_rate')
-    
-    nearing_expiry = Subscription.objects.filter(
-        club=club, end_date__range=(today, today + timedelta(days=7)), **({'type_id': s_type} if s_type else {}), **({'coach_id': coach} if coach else {})
-    ).order_by('end_date')
-    
-    response = {
-        'popular_subscription_types': list(popular_qs),
-        'attendance_analysis': {
-            'highest_attendance_types': list(att_stats),
-            'by_day_of_week': [
-                {'day': ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'][d['day_of_week']], 'total_entries': d['total_entries']}
-                for d in att_by_day
-            ]
-        },
-        'freeze_analysis': list(freeze_stats),
-        'revenue_analysis': list(revenue_stats),
-        'member_behavior': {'active_members': MemberBehaviorSerializer(member_behavior, many=True).data, 'inactive_members': list(inactive_members)},
-        'coach_analysis': list(coach_stats),
-        'temporal_analysis': [
-            {'month': t['month'].strftime('%Y-%m'), 'total_subscriptions': t['total_subscriptions'], 'total_revenue': t['total_revenue'] or 0}
-            for t in temporal_stats
-        ],
-        'renewal_rate_by_type': [
-            {'name': r['name'], 'expired_subscriptions': r['expired_subscriptions'], 'renewed_subscriptions': r['renewed_subscriptions'], 'renewal_rate': round(r['renewal_rate'], 2)}
-            for r in renewal_stats
-        ],
-        'nearing_expiry': SubscriptionSerializer(nearing_expiry, many=True).data,
-        'date_range': {'start_date': str(start_date), 'end_date': str(end_date)}
-    }
-    return Response(response)
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -1071,6 +924,232 @@ def cancel_freeze(request, freeze_id):
     serializer = SubscriptionSerializer(subscription)
     return Response(serializer.data)
 
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def special_offer_list(request):
+    """List or create special offers."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.method == 'GET':
+        offers = SpecialOffer.objects.filter(club=request.user.club, is_active=True)
+        serializer = SpecialOfferSerializer(offers, many=True)
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        serializer = SpecialOfferSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save(club=request.user.club)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def special_offer_detail(request, pk):
+    """Retrieve, update, or delete a special offer."""
+    offer = get_object_or_404(SpecialOffer, pk=pk, club=request.user.club)
+    
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.method == 'GET':
+        serializer = SpecialOfferSerializer(offer)
+        return Response(serializer.data)
+    
+    elif request.method == 'PUT':
+        if request.user.role not in FULL_ACCESS_ROLES:
+            return Response({'error': 'غير مسموح بالتعديل.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = SpecialOfferSerializer(offer, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        if request.user.role not in FULL_ACCESS_ROLES:
+            return Response({'error': 'غير مسموح بالحذف.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        offer.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def subscription_analytics(request):
+    """Get subscription analytics."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    today = timezone.now().date()
+    club = request.user.club
+    start = request.query_params.get('start_date')
+    end = request.query_params.get('end_date')
+    s_type = request.query_params.get('subscription_type')
+    coach = request.query_params.get('coach')
+    
+    try:
+        start_date = datetime.strptime(start, '%Y-%m-%d').date() if start else today - timedelta(days=90)
+        end_date = datetime.strptime(end, '%Y-%m-%d').date() if end else today
+    except ValueError:
+        return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+
+    base_filter = {'club': club, 'start_date__lte': end_date, 'end_date__gte': start_date}
+    if s_type:
+        base_filter['type_id'] = s_type
+    if coach:
+        base_filter['coach_id'] = coach
+    
+    base_qs = Subscription.objects.filter(**base_filter).select_related('type', 'member', 'coach').distinct()
+    total_subs = base_qs.count()
+    popular_qs = SubscriptionType.objects.filter(club=club).annotate(
+        total=Count('subscriptions', filter=Q(subscriptions__start_date__gte=start_date, subscriptions__start_date__lte=end_date))
+    ).values('name', 'total').order_by('-total')[:5]
+    att_qs = base_qs.prefetch_related('attendance_attendances')
+    att_stats = att_qs.values('type__name').annotate(
+        total_attendance=Count('attendance_attendances', filter=Q(attendance_attendances__timestamp__date__range=(start_date, end_date)))
+    )
+    for item in att_stats:
+        matching_subs = att_qs.filter(type__name=item['type__name'])
+        total_att = sum(
+            matching_subs.filter(attendance_attendances__timestamp__date__range=(start_date, end_date)).count()
+            for s in matching_subs
+        )
+        item['avg_attendance'] = round(total_att / len(matching_subs) if matching_subs else 0, 2)
+    
+    att_by_day = Attendance.objects.filter(
+        subscription__club=club, timestamp__date__range=(start_date, end_date)
+    ).filter(subscription__type_id=s_type if s_type else Q(), subscription__coach_id=coach if coach else Q()).annotate(
+        day_of_week=Case(
+            When(timestamp__week_day=2, then=0), When(timestamp__week_day=3, then=1),
+            When(timestamp__week_day=4, then=2), When(timestamp__week_day=5, then=3),
+            When(timestamp__week_day=6, then=4), When(timestamp__week_day=7, then=5),
+            When(timestamp__week_day=1, then=6), output_field=IntegerField()
+        )
+    ).values('day_of_week').annotate(total_entries=Count('id')).order_by('day_of_week')
+    
+    freeze_filter = {'subscriptions__start_date__gte': start_date, 'subscriptions__start_date__lte': end_date}
+    if s_type:
+        freeze_filter['subscriptions__type_id'] = s_type
+    if coach:
+        freeze_filter['subscriptions__coach_id'] = coach
+    freeze_stats = SubscriptionType.objects.filter(club=club).prefetch_related('subscriptions__freeze_requests').annotate(
+        total=Count('subscriptions', filter=Q(**freeze_filter)),
+        total_freezes=Count('subscriptions__freeze_requests', filter=Q(
+            subscriptions__freeze_requests__start_date__gte=start_date, subscriptions__freeze_requests__end_date__lte=end_date,
+            subscriptions__freeze_requests__is_active=True, **({'subscriptions__type_id': s_type} if s_type else {}),
+            **({'subscriptions__coach_id': coach} if coach else {})
+        )),
+        frozen_subscriptions=Count('subscriptions', filter=Q(
+            subscriptions__freeze_requests__start_date__gte=start_date, subscriptions__freeze_requests__end_date__lte=end_date,
+            subscriptions__freeze_requests__is_active=True, **({'subscriptions__type_id': s_type} if s_type else {}),
+            **({'subscriptions__coach_id': coach} if coach else {})
+        ))
+    ).annotate(
+        freeze_percentage=ExpressionWrapper(
+            100.0 * F('frozen_subscriptions') / Case(When(total__gt=0, then=F('total')), default=Value(1), output_field=FloatField()),
+            output_field=FloatField()
+        )
+    ).values('name', 'total', 'total_freezes', 'frozen_subscriptions', 'freeze_percentage').order_by('-total_freezes')
+    
+    revenue_filter = {'subscriptions__club': club, 'subscriptions__start_date__lte': end_date, 'subscriptions__start_date__gte': start_date}
+    if s_type:
+        revenue_filter['subscriptions__type_id'] = s_type
+    if coach:
+        revenue_filter['subscriptions__coach_id'] = coach
+    revenue_stats = SubscriptionType.objects.filter(club=club).prefetch_related('subscriptions').annotate(
+        total_revenue=Sum('subscriptions__paid_amount', filter=Q(**revenue_filter)),
+        coach_compensation_revenue=Sum('subscriptions__coach_compensation_value', filter=Q(
+            subscriptions__coach_compensation_type='external', **revenue_filter
+        )),
+        remaining_amount=Sum('subscriptions__remaining_amount', filter=Q(**revenue_filter))
+    ).values('name', 'total_revenue', 'coach_compensation_revenue', 'remaining_amount').order_by('-total_revenue')
+    
+    member_behavior = base_qs.annotate(
+        attendance_count=Count('attendance_attendances', filter=Q(attendance_attendances__timestamp__date__range=(start_date, end_date))),
+        subscription_count=Count('member__subscription')
+    ).values('member__name', 'attendance_count', 'subscription_count').annotate(
+        is_regular=Case(When(attendance_count__gte=10, then=True), default=False, output_field=IntegerField()),
+        is_repeated=Case(When(subscription_count__gte=2, then=True), default=False, output_field=IntegerField())
+    ).order_by('-attendance_count')[:10]
+    
+    inactive_members = base_qs.annotate(last_attendance=Max('attendance_attendances__timestamp__date')).filter(
+        Q(last_attendance__lte=today - timedelta(days=30)) | Q(last_attendance__isnull=True)
+    ).values('member__name').annotate(subscription_count=Count('id'))[:10]
+    
+    coach_stats = User.objects.filter(role='coach', is_active=True, club=club).annotate(
+        total_clients=Count('private_subscriptions', filter=Q(
+            private_subscriptions__start_date__lte=end_date, private_subscriptions__end_date__gte=start_date,
+            private_subscriptions__type__is_private_training=True, **({'private_subscriptions__type_id': s_type} if s_type else {})
+        )),
+        total_attendance=Count('private_subscriptions__attendance_attendances', filter=Q(
+            private_subscriptions__attendance_attendances__timestamp__date__range=(start_date, end_date),
+            **({'private_subscriptions__type_id': s_type} if s_type else {})
+        )),
+        total_revenue=Sum('private_subscriptions__coach_compensation_value', filter=Q(
+            private_subscriptions__start_date__lte=end_date, private_subscriptions__end_date__gte=start_date,
+            private_subscriptions__coach_compensation_type='external', **({'private_subscriptions__type_id': s_type} if s_type else {})
+        ))
+    ).values('username', 'total_clients', 'total_attendance', 'total_revenue').order_by('-total_clients')
+    
+    temporal_stats = base_qs.annotate(month=TruncMonth('start_date')).values('month').annotate(
+        total_subscriptions=Count('id'), total_revenue=Sum('paid_amount')
+    ).order_by('month')
+    
+    renewal_filter = {'subscriptions__end_date__lt': end_date, 'subscriptions__start_date__gte': start_date}
+    if s_type:
+        renewal_filter['subscriptions__type_id'] = s_type
+    if coach:
+        renewal_filter['subscriptions__coach_id'] = coach
+    renewal_stats = SubscriptionType.objects.filter(club=club).annotate(
+        expired_subscriptions=Count('subscriptions', filter=Q(**renewal_filter)),
+        renewed_subscriptions=Count('subscriptions', filter=Q(
+            subscriptions__end_date__lt=end_date, subscriptions__start_date__gte=start_date,
+            subscriptions__member__subscription__start_date__gt=F('subscriptions__end_date'),
+            subscriptions__member__subscription__start_date__lte=F('subscriptions__end_date') + timedelta(days=30),
+            subscriptions__member__subscription__type=F('subscriptions__type'), **({'subscriptions__type_id': s_type} if s_type else {}),
+            **({'subscriptions__coach_id': coach} if coach else {})
+        ))
+    ).annotate(
+        renewal_rate=ExpressionWrapper(
+            100.0 * F('renewed_subscriptions') / Case(When(expired_subscriptions__gt=0, then=F('expired_subscriptions')), default=Value(1), output_field=FloatField()),
+            output_field=FloatField()
+        )
+    ).values('name', 'expired_subscriptions', 'renewed_subscriptions', 'renewal_rate').order_by('-renewal_rate')
+    
+    nearing_expiry = Subscription.objects.filter(
+        club=club, end_date__range=(today, today + timedelta(days=7)), **({'type_id': s_type} if s_type else {}), **({'coach_id': coach} if coach else {})
+    ).order_by('end_date')
+    
+    response = {
+        'popular_subscription_types': list(popular_qs),
+        'attendance_analysis': {
+            'highest_attendance_types': list(att_stats),
+            'by_day_of_week': [
+                {'day': ['الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'][d['day_of_week']], 'total_entries': d['total_entries']}
+                for d in att_by_day
+            ]
+        },
+        'freeze_analysis': list(freeze_stats),
+        'revenue_analysis': list(revenue_stats),
+        'member_behavior': {'active_members': MemberBehaviorSerializer(member_behavior, many=True).data, 'inactive_members': list(inactive_members)},
+        'coach_analysis': list(coach_stats),
+        'temporal_analysis': [
+            {'month': t['month'].strftime('%Y-%m'), 'total_subscriptions': t['total_subscriptions'], 'total_revenue': t['total_revenue'] or 0}
+            for t in temporal_stats
+        ],
+        'renewal_rate_by_type': [
+            {'name': r['name'], 'expired_subscriptions': r['expired_subscriptions'], 'renewed_subscriptions': r['renewed_subscriptions'], 'renewal_rate': round(r['renewal_rate'], 2)}
+            for r in renewal_stats
+        ],
+        'nearing_expiry': SubscriptionSerializer(nearing_expiry, many=True).data,
+        'date_range': {'start_date': str(start_date), 'end_date': str(end_date)}
+    }
+    return Response(response)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def coach_report(request, coach_id):
@@ -1133,55 +1212,3 @@ def coach_report(request, coach_id):
     
     serializer = CoachReportSerializer(report)
     return Response(serializer.data)
-
-@api_view(['GET', 'POST'])
-@permission_classes([IsAuthenticated])
-def special_offer_list(request):
-    """List or create special offers."""
-    if not request.user.club:
-        logger.error(f"User {request.user.username} has no associated club")
-        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
-    if request.method == 'GET':
-        offers = SpecialOffer.objects.filter(club=request.user.club, is_active=True)
-        serializer = SpecialOfferSerializer(offers, many=True)
-        return Response(serializer.data)
-
-    elif request.method == 'POST':
-        serializer = SpecialOfferSerializer(data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save(club=request.user.club)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET', 'PUT', 'DELETE'])
-@permission_classes([IsAuthenticated])
-def special_offer_detail(request, pk):
-    """Retrieve, update, or delete a special offer."""
-    offer = get_object_or_404(SpecialOffer, pk=pk, club=request.user.club)
-    
-    if not request.user.club:
-        logger.error(f"User {request.user.username} has no associated club")
-        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
-    if request.method == 'GET':
-        serializer = SpecialOfferSerializer(offer)
-        return Response(serializer.data)
-    
-    elif request.method == 'PUT':
-        if request.user.role not in FULL_ACCESS_ROLES:
-            return Response({'error': 'غير مسموح بالتعديل.'}, status=status.HTTP_403_FORBIDDEN)
-        
-        serializer = SpecialOfferSerializer(offer, data=request.data, context={'request': request})
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    elif request.method == 'DELETE':
-        if request.user.role not in FULL_ACCESS_ROLES:
-            return Response({'error': 'غير مسموح بالحذف.'}, status=status.HTTP_403_FORBIDDEN)
-        
-        offer.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-

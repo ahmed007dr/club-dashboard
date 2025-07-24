@@ -352,153 +352,153 @@ const Attendance = () => {
         <CardContent className="p-6">
           <div className="flex gap-6">
           {canAddAttendance && (
-              <div className="w-[70%]">
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                  <FiPlus className="text-blue-600" />
-                  إضافة حضور
-                </h3>
-                <form onSubmit={handleAddAttendance} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-right">النادي</label>
-                    <select
-                      name="club"
-                      value={newAttendance.club}
-                      onChange={handleAttendanceInputChange}
-                      className="w-full border rounded-lg py-2.5 pr-10 pl-4 text-right"
-                      disabled
-                      required
-                    >
-                      {userClub ? (
-                        <option value={userClub.id}>{userClub.name}</option>
-                      ) : (
-                        <option value="">جاري التحميل...</option>
-                      )}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1 text-right">رقم الهاتف أو كود RFID</label>
-                    <div className="relative">
-                      <FiTag className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <Input
-                        type="text"
-                        name="identifier"
-                        value={newAttendance.identifier}
-                        onChange={handleAttendanceInputChange}
-                        placeholder="أدخل رقم الهاتف أو كود RFID"
-                        className="w-full py-2.5 pr-10 pl-4 text-right"
-                        required
-                        autoFocus
-                        disabled={!newAttendance.club}
-                      />
-                    </div>
-                  </div>
-                  {foundSubscriptions.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium mb-1 text-right">اختر الاشتراك</label>
-                      <select
-                        name="subscription_id"
-                        value={selectedSubscription}
-                        onChange={handleAttendanceInputChange}
-                        className="w-full border rounded-lg py-2.5 pr-10 pl-4 text-right"
-                      >
-                        {foundSubscriptions.map((sub) => (
-                          <option key={sub.id} value={sub.id}>
-                            {sub.type_details?.name} (ينتهي: {new Date(sub.end_date).toLocaleDateString("ar-EG")})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {searchLoading && (
-                    <div className="flex justify-center py-2">
-                      <Loader2 className="animate-spin w-6 h-6 text-blue-600" />
-                    </div>
-                  )}
-                  {foundSubscriptions.length > 0 && (
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm">
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                        {/* عرض تفاصيل الاشتراك المختار بناءً على selectedSubscription */}
-                        {(() => {
-                          const selectedSub = foundSubscriptions.find(sub => sub.id.toString() === selectedSubscription) || foundSubscriptions[0];
-                          return (
-                            <>
-                              <p className="flex items-center gap-2">
-                                <FiUser className="text-blue-600" />
-                                {selectedSub.member_details?.name || "غير متاح"}
-                              </p>
-                              <p className="flex items-center gap-2">
-                                <FiHash className="text-blue-600" />
-                                #{selectedSub.member_details?.rfid_code || "غير متاح"}
-                              </p>
-                              <p className="flex items-center gap-2">
-                                <FiDollarSign className="text-blue-600" />
-                                المبلغ المتبقي: {selectedSub.remaining_amount ?? "غير متاح"}
-                              </p>
-                              <p className="flex items-center gap-2">
-                                <FiList className="text-blue-600" />
-                                الإدخالات المتبقية:{" "}
-                                <span
-                                  className={
-                                    Number.isFinite(
-                                      Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count)
-                                    ) && Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count) <= 0
-                                      ? "text-red-600"
-                                      : "text-green-600"
-                                  }
-                                >
-                                  {Number.isFinite(
-                                    Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count)
-                                  )
-                                    ? Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count)
-                                    : "غير متاح"}
-                                </span>{" "}
-                                / {selectedSub.type_details?.max_entries ?? "غير متاح"}
-                              </p>
-                              <p className="flex items-center gap-2">
-                                <FiTag className="text-blue-600" />
-                                اسم الاشتراك: {selectedSub.type_details?.name || "غير متاح"}
-                              </p>
-                              <p className="flex items-center gap-2">
-                                <FiPhone className="text-blue-600" />
-                                رقم الهاتف: {selectedSub.member_details?.phone || "غير متاح"}
-                              </p>
-                              <p className="flex items-center gap-2">
-                                <FiCalendar className="text-blue-600" />
-                                بداية الاشتراك: {new Date(selectedSub.start_date).toLocaleDateString("ar-EG") || "غير متاح"}
-                              </p>
-                              <p className="flex items-center gap-2">
-                                <FiCalendar className="text-blue-600" />
-                                نهاية الاشتراك: {new Date(selectedSub.end_date).toLocaleDateString("ar-EG") || "غير متاح"}
-                              </p>
-                              {selectedSub.coach_simple && (
-                                <p className="flex items-center gap-2">
-                                  <FiUser className="text-blue-600" />
-                                  اسم الكابتن: {selectedSub.coach_simple?.username || "غير متاح"}
-                                </p>
-                              )}
-                            </>
-                          );
-                        })()}
+                  <div className="w-[70%]">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <FiPlus className="text-blue-600" />
+                      إضافة حضور
+                    </h3>
+                    <form onSubmit={handleAddAttendance} className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-right">النادي</label>
+                        <select
+                          name="club"
+                          value={newAttendance.club}
+                          onChange={handleAttendanceInputChange}
+                          className="w-full border rounded-lg py-2.5 pr-10 pl-4 text-right"
+                          disabled
+                          required
+                        >
+                          {userClub ? (
+                            <option value={userClub.id}>{userClub.name}</option>
+                          ) : (
+                            <option value="">جاري التحميل...</option>
+                          )}
+                        </select>
                       </div>
-                    </div>
-                  )}
-                  {!searchLoading && newAttendance.identifier && !foundSubscriptions.length && (
-                    <div className="bg-red-50 p-2 rounded-lg flex items-center gap-2">
-                      <FiAlertTriangle className="text-red-600 w-5 h-5" />
-                      <p className="text-red-600 text-sm">لا يوجد اشتراكات فعالة لهذا المعرف</p>
-                    </div>
-                  )}
-                  <Button
-                    type="submit"
-                    className="w-full bg-blue-600 hover:bg-blue-700 hover:scale-105 transition-transform"
-                    disabled={!foundSubscriptions.length || isSubmitting}
-                  >
-                    <FiPlus className="mr-2" />
-                    تأكيد الحضور
-                  </Button>
-                </form>
-              </div>
-            )}
+                      <div>
+                        <label className="block text-sm font-medium mb-1 text-right">رقم الهاتف أو كود RFID</label>
+                        <div className="relative">
+                          <FiTag className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                          <Input
+                            type="text"
+                            name="identifier"
+                            value={newAttendance.identifier}
+                            onChange={handleAttendanceInputChange}
+                            placeholder="أدخل رقم الهاتف أو كود RFID"
+                            className="w-full py-2.5 pr-10 pl-4 text-right"
+                            required
+                            autoFocus
+                            disabled={!newAttendance.club}
+                          />
+                        </div>
+                      </div>
+                      {foundSubscriptions.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium mb-1 text-right">اختر الاشتراك</label>
+                          <select
+                            name="subscription_id"
+                            value={selectedSubscription}
+                            onChange={handleAttendanceInputChange}
+                            className="w-full border rounded-lg py-2.5 pr-10 pl-4 text-right"
+                          >
+                            {foundSubscriptions.map((sub) => (
+                              <option key={sub.id} value={sub.id}>
+                                {sub.type_details?.name} (ينتهي: {new Date(sub.end_date).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" })})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      {searchLoading && (
+                        <div className="flex justify-center py-2">
+                          <Loader2 className="animate-spin w-6 h-6 text-blue-600" />
+                        </div>
+                      )}
+                      {foundSubscriptions.length > 0 && (
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-sm">
+                          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                            {(() => {
+                              const selectedSub = foundSubscriptions.find(sub => sub.id.toString() === selectedSubscription) || foundSubscriptions[0];
+                              return (
+                                <>
+                                  <p className="flex items-center gap-2">
+                                    <FiUser className="text-blue-600" />
+                                    {selectedSub.member_details?.name || "غير متاح"}
+                                  </p>
+                                  <p className="flex items-center gap-2">
+                                    <FiHash className="text-blue-600" />
+                                    #{selectedSub.member_details?.rfid_code || "غير متاح"}
+                                  </p>
+                                  <p className="flex items-center gap-2">
+                                    <FiDollarSign className="text-blue-600" />
+                                    المبلغ المتبقي: {selectedSub.remaining_amount ?? "غير متاح"}
+                                  </p>
+                                  <p className="flex items-center gap-2">
+                                    <FiList className="text-blue-600" />
+                                    الإدخالات المتبقية:{" "}
+                                    <span
+                                      className={
+                                        Number.isFinite(
+                                          Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count)
+                                        ) && Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count) <= 0
+                                          ? "text-red-600"
+                                          : "text-green-600"
+                                      }
+                                    >
+                                      {Number.isFinite(
+                                        Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count)
+                                      )
+                                        ? Number(selectedSub.type_details?.max_entries) - Number(selectedSub.entry_count)
+                                        : "غير متاح"}
+                                    </span>{" "}
+                                    / {selectedSub.type_details?.max_entries ?? "غير متاح"}
+                                  </p>
+                                  <p className="flex items-center gap-2">
+                                    <FiTag className="text-blue-600" />
+                                    اسم الاشتراك: {selectedSub.type_details?.name || "غير متاح"}
+                                  </p>
+                                  <p className="flex items-center gap-2">
+                                    <FiPhone className="text-blue-600" />
+                                    رقم الهاتف: {selectedSub.member_details?.phone || "غير متاح"}
+                                  </p>
+                                  <p className="flex items-center gap-2">
+                                    <FiCalendar className="text-blue-600" />
+                                    بداية الاشتراك: {new Date(selectedSub.start_date).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" }) || "غير متاح"}
+                                  </p>
+                                  <p className="flex items-center gap-2">
+                                    <FiCalendar className="text-blue-600" />
+                                    نهاية الاشتراك: {new Date(selectedSub.end_date).toLocaleDateString("ar-EG", { timeZone: "Africa/Cairo" }) || "غير متاح"}
+                                  </p>
+                                  {selectedSub.coach_simple && (
+                                    <p className="flex items-center gap-2">
+                                      <FiUser className="text-blue-600" />
+                                      اسم الكابتن: {selectedSub.coach_simple?.username || "غير متاح"}
+                                    </p>
+                                  )}
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      )}
+                      {!searchLoading && newAttendance.identifier && !foundSubscriptions.length && (
+                        <div className="bg-red-50 p-2 rounded-lg flex items-center gap-2">
+                          <FiAlertTriangle className="text-red-600 w-5 h-5" />
+                          <p className="text-red-600 text-sm">لا يوجد اشتراكات فعالة لهذا المعرف</p>
+                        </div>
+                      )}
+                      <Button
+                        type="submit"
+                        className="w-full bg-blue-600 hover:bg-blue-700 hover:scale-105 transition-transform"
+                        disabled={!foundSubscriptions.length || isSubmitting}
+                      >
+                        <FiPlus className="mr-2" />
+                        تأكيد الحضور
+                      </Button>
+                    </form>
+                  </div>
+                )}
+
 
             {/* الإحصائيات */}
             <div className="w-[30%]">
@@ -526,99 +526,104 @@ const Attendance = () => {
       </Card>
 
       {/* الجزء السفلي: سجلات الحضور */}
+
       <Card className="shadow-lg border-gray-200 bg-white">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-right text-xl flex items-center gap-2">
-            <FiUsers className="text-blue-600 w-6 h-6" />
-            سجلات الحضور
-          </CardTitle>
-          <Button
-            variant="outline"
-            className="flex items-center gap-2"
-            onClick={() => setShowTable(!showTable)}
-          >
-            {showTable ? <FiEyeOff /> : <FiEye />}
-            {showTable ? "إخفاء السجلات" : "إظهار السجلات"}
-          </Button>
-        </CardHeader>
-        {showTable && (
-          <CardContent className="space-y-6">
-            <FilterComponent
-              filters={filters}
-              setFilters={setFilters}
-              onReset={() => setFilters({ attendance_date: "", member_name: "" })}
-            />
-            {loading ? (
-              <div className="flex justify-center py-6">
-                <Loader2 className="animate-spin w-8 h-8 text-blue-600" />
-              </div>
-            ) : error ? (
-              <div className="bg-red-50 p-4 rounded-lg">خطأ: {error}</div>
-            ) : (
-              <>
-                <div className="rounded-md border overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead>
-                      <tr className="bg-blue-50">
-                        <th className="px-4 py-3 text-right text-sm font-semibold">RFID</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold">تاريخ الحضور</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold">اسم العضو</th>
-                        <th className="px-4 py-3 text-right text-sm font-semibold">الإجراءات</th>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-right text-xl flex items-center gap-2">
+          <FiUsers className="text-blue-600 w-6 h-6" />
+          سجلات الحضور
+        </CardTitle>
+        <Button
+          variant="outline"
+          className="flex items-center gap-2"
+          onClick={() => setShowTable(!showTable)}
+        >
+          {showTable ? <FiEyeOff /> : <FiEye />}
+          {showTable ? "إخفاء السجلات" : "إظهار السجلات"}
+        </Button>
+      </CardHeader>
+      {showTable && (
+        <CardContent className="space-y-6">
+          <FilterComponent
+            filters={filters}
+            setFilters={setFilters}
+            onReset={() => setFilters({ attendance_date: "", member_name: "" })}
+          />
+          {loading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="animate-spin w-8 h-8 text-blue-600" />
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 p-4 rounded-lg">خطأ: {error}</div>
+          ) : (
+            <>
+              <div className="rounded-md border overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead>
+                    <tr className="bg-blue-50">
+                      <th className="px-4 py-3 text-right text-sm font-semibold">RFID</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold">تاريخ الحضور</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold">اسم العضو</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold">نوع الاشتراك</th>
+                      <th className="px-4 py-3 text-right text-sm font-semibold">الإجراءات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {attendances?.map((attendance) => (
+                      <tr key={attendance.id} className="hover:bg-blue-50 transition-colors">
+                        <td className="px-4 py-3">{attendance.rfid_code || "غير متاح"}</td>
+                        <td className="px-4 py-3">
+                          {new Date(attendance.timestamp).toLocaleString("ar-EG", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            timeZone: "Africa/Cairo"
+                          })}
+                        </td>
+                        <td className="px-4 py-3">{attendance.member_name || "غير متاح"}</td>
+                        <td className="px-4 py-3">{attendance.subscription_details?.type_details?.name || "غير متاح"}</td>
+                        <td className="px-4 py-3">
+                          <DropdownMenu dir="rtl">
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" className="p-2">
+                                <MoreVertical className="h-5 w-5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent>
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  dispatch(deleteAttendance(attendance.id))
+                                    .unwrap()
+                                    .then(() => toast.success("تم الحذف"))
+                                    .catch(() => toast.error("فشل في الحذف"))
+                                }
+                                className="text-red-600"
+                              >
+                                <FiTrash className="mr-2" />
+                                حذف
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {attendances?.map((attendance) => (
-                        <tr key={attendance.id} className="hover:bg-blue-50 transition-colors">
-                          <td className="px-4 py-3">{attendance.rfid_code || "غير متاح"}</td>
-                          <td className="px-4 py-3">
-                            {new Date(attendance.attendance_date + "T" + attendance.entry_time).toLocaleString("ar-EG", {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </td>
-                          <td className="px-4 py-3">{attendance.member_name || "غير متاح"}</td>
-                          <td className="px-4 py-3">
-                            <DropdownMenu dir="rtl">
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="p-2">
-                                  <MoreVertical className="h-5 w-5" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent>
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    dispatch(deleteAttendance(attendance.id))
-                                      .unwrap()
-                                      .then(() => toast.success("تم الحذف"))
-                                      .catch(() => toast.error("فشل في الحذف"))
-                                  }
-                                  className="text-red-600"
-                                >
-                                  <FiTrash className="mr-2" />
-                                  حذف
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <PaginationControls
-                  currentPage={page}
-                  totalItems={attendanceCount}
-                  itemsPerPage={itemsPerPage}
-                  onPageChange={setPage}
-                />
-              </>
-            )}
-          </CardContent>
-        )}
-      </Card>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <PaginationControls
+                currentPage={page}
+                totalItems={attendanceCount}
+                itemsPerPage={itemsPerPage}
+                onPageChange={setPage}
+              />
+            </>
+          )}
+        </CardContent>
+      )}
+    </Card>
+
 
       {/* نافذة سجلات الدخول */}
       {isEntryLogsOpen && (
