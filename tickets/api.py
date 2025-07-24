@@ -133,21 +133,17 @@ def add_ticket_api(request):
             today = timezone.now().date()
             date_prefix = today.strftime('%Y%m%d')
 
-            # الحصول على عدد التذاكر الحالية مع قفل لتجنب التعارض
+            # الحصول على عدد التذاكر الحالية
             ticket_count = Ticket.objects.filter(
                 club=club, ticket_type=ticket_type, issue_datetime__date=today
             ).select_for_update().count()
 
-            # تخصيص أرقام تسلسلية للتذاكر
+            # تخصيص أرقام تسلسلية
             tickets_to_create = []
             serial_numbers = []
-            current_count = ticket_count
-            tickets_needed = num_tickets
-            serial_index = current_count + 1
-
-            while tickets_needed > 0:
+            serial_index = ticket_count + 1
+            for _ in range(num_tickets):
                 serial_number = f"{date_prefix}-{str(serial_index).zfill(4)}"
-                # إذا كان الرقم التسلسلي موجودًا، جرب الرقم التالي
                 while Ticket.objects.filter(serial_number=serial_number).exists():
                     serial_index += 1
                     serial_number = f"{date_prefix}-{str(serial_index).zfill(4)}"
@@ -163,7 +159,6 @@ def add_ticket_api(request):
                         serial_number=serial_number
                     )
                 )
-                tickets_needed -= 1
                 serial_index += 1
 
             Ticket.objects.bulk_create(tickets_to_create)
@@ -178,11 +173,11 @@ def add_ticket_api(request):
                     source=source,
                     amount=total_amount,
                     description=f"بيع {num_tickets} تذكرة من نوع {ticket_type.name} (أرقام: {serial_numbers[0]} إلى {serial_numbers[-1]})",
-                    date=today,
-                    received_by=request.user
+                    date=timezone.now(), 
+                    received_by=request.user,
+                    quantity=num_tickets 
                 )
 
-            # استرجاع التذاكر التي تم إنشاؤها
             created_tickets = Ticket.objects.filter(serial_number__in=serial_numbers)
             response_serializer = TicketSerializer(created_tickets, many=True)
             return Response(response_serializer.data, status=status.HTTP_201_CREATED)
@@ -190,7 +185,7 @@ def add_ticket_api(request):
     except Exception as e:
         logger.error(f"Error creating tickets: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+    
 @api_view(['DELETE'])
 @permission_classes([IsAuthenticated])
 def delete_ticket_api(request, ticket_id):

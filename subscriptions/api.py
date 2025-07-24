@@ -463,7 +463,7 @@ def subscription_list(request):
                         )
                     Income.objects.create(
                         club=subscription.club, source=source, amount=amount, description=description,
-                        date=timezone.now().date(), received_by=request.user
+                        date=timezone.now(), received_by=request.user
                     )
 
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -731,7 +731,8 @@ def renew_subscription(request, pk):
                     f" مع الكابتن {new_subscription.coach.username} بمبلغ خارجي {new_subscription.coach_compensation_value} جنيه"
                     if new_subscription.coach and new_subscription.coach_compensation_type == 'external' else ""
                 ),
-                date=timezone.now().date(), received_by=request.user
+                date=timezone.now(),
+                received_by=request.user
             )
             
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -770,7 +771,7 @@ def make_payment(request, pk):
             Income.objects.create(
                 club=subscription.club, source=source, amount=payment.amount,
                 description=f"إيراد اشتراك {subscription.member.name}",
-                date=timezone.now().date(), received_by=request.user
+                date=timezone.now(), received_by=request.user
             )
 
             serializer = SubscriptionSerializer(subscription)
@@ -807,7 +808,7 @@ def cancel_subscription(request, pk):
             Income.objects.create(
                 club=subscription.club, source=source, amount=-refund_amount,
                 description=f"استرداد اشتراك {subscription.member.name}",
-                date=timezone.now().date(), received_by=request.user
+                date=timezone.now(), received_by=request.user
             )
 
         serializer = SubscriptionSerializer(subscription)
