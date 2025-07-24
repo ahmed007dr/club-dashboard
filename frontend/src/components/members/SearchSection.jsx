@@ -135,7 +135,7 @@ const SearchSection = ({ searchQuery, setSearchQuery, setSelectedMember, isLoadi
               <SelectContent>
                 {searchResults.map((member) => (
                   <SelectItem key={member.id} value={member.id}>
-                    {member.name} (رقم العضوية: {member.membership_number || "غير متوفر"})
+                    {member.name} (كارت العضويه: {member.rfid_code || "غير متوفر"})
                   </SelectItem>
                 ))}
               </SelectContent>

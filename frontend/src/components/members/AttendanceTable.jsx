@@ -17,13 +17,18 @@ const AttendanceTable = ({ selectedMember, selectedSubscriptionAttendance }) => 
   const [filterSubscriptionType, setFilterSubscriptionType] = useState("");
   const itemsPerPage = 20;
 
-  const formatDate = (dateString) => {
-    const options = { year: "numeric", month: "long", day: "numeric" };
-    return dateString ? new Date(dateString).toLocaleDateString("ar-EG", options) : "غير متوفر";
-  };
-
-  const formatTime = (timeString) => {
-    return timeString ? new Date(`1970-01-01T${timeString}`).toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }) : "غير متوفر";
+  const formatDateTime = (timestamp) => {
+    if (!timestamp) return "غير متوفر";
+    const date = new Date(timestamp);
+    const options = {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    };
+    return date.toLocaleString("ar-EG", options);
   };
 
   const handleFilter = () => {
@@ -33,7 +38,7 @@ const AttendanceTable = ({ selectedMember, selectedSubscriptionAttendance }) => 
       member_name: selectedMember.name,
       rfid_code: selectedMember.rfid_code,
       subscription: selectedSubscriptionAttendance,
-      attendance_date: filterDate,
+      timestamp: filterDate, // تعديل من attendance_date إلى timestamp
       subscription_type: filterSubscriptionType
     }));
     setAttendancePage(1);
@@ -48,7 +53,7 @@ const AttendanceTable = ({ selectedMember, selectedSubscriptionAttendance }) => 
         member_name: selectedMember.name,
         rfid_code: selectedMember.rfid_code,
         subscription: selectedSubscriptionAttendance,
-        attendance_date: filterDate,
+        timestamp: filterDate, // تعديل من attendance_date إلى timestamp
         subscription_type: filterSubscriptionType
       }));
     }
@@ -123,10 +128,7 @@ const AttendanceTable = ({ selectedMember, selectedSubscriptionAttendance }) => 
                           نوع الاشتراك
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          تاريخ الحضور
-                        </th>
-                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          ساعة الحضور
+                          التاريخ والوقت
                         </th>
                         <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                           اسم الكابتن
@@ -140,10 +142,7 @@ const AttendanceTable = ({ selectedMember, selectedSubscriptionAttendance }) => 
                             {attendance.subscription_details?.type_details?.name || "غير متوفر"}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatDate(attendance.attendance_date)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatTime(attendance.entry_time)}
+                            {formatDateTime(attendance.timestamp)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {attendance.subscription_details?.coach_details?.username || "غير متوفر"}

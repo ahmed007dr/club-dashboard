@@ -22,14 +22,14 @@ const debounce = (func, delay) => {
 };
 
 // مكون الفلاتر
-const FilterComponent = ({ filters, setFilters, onReset }) => (
+const FilterComponent = ({ filters, setFilters, onReset, onSearch }) => (
   <div className="flex flex-col sm:flex-row gap-4 mb-4">
     <div className="relative flex-1">
       <FiSearch className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
       <Input
         placeholder="ابحث باسم العضو"
         value={filters.member_name}
-        onChange={(e) => setFilters((prev) => ({ ...prev, member_name: e.target.value }))}
+        onChange={(e) => setFilters((prev) => ({ ...prev, member_name: e.target.value.trim() }))}
         className="py-2 pr-10 pl-4 text-right"
       />
     </div>
@@ -43,7 +43,7 @@ const FilterComponent = ({ filters, setFilters, onReset }) => (
       />
     </div>
     <Button onClick={onReset} variant="outline">إعادة تعيين</Button>
-    <Button>بحث</Button>
+    <Button onClick={onSearch}>بحث</Button>
   </div>
 );
 

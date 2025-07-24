@@ -110,6 +110,9 @@ def attendance_list_api(request):
             logger.error(f"Invalid timestamp format: {timestamp}")
             return Response({'error': 'صيغة التاريخ غير صالحة.'}, status=status.HTTP_400_BAD_REQUEST)
 
+    # Sort by timestamp in descending order
+    queryset = queryset.order_by('-timestamp')
+
     # Pagination
     paginator = PageNumberPagination()
     paginator.page_size = page_size
@@ -122,7 +125,6 @@ def attendance_list_api(request):
         'results': serializer.data
     }
     return Response(response_data, status=status.HTTP_200_OK)
-
 
 
 @api_view(['DELETE'])

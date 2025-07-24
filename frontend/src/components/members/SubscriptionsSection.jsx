@@ -21,6 +21,18 @@ import { motion } from "framer-motion";
 import axios from "axios";
 import BASE_URL from "@/config/api";
 
+// إضافة statusStyles لعرض الحالة
+const statusStyles = {
+  نشط: "bg-green-100 text-green-600",
+  منتهي: "bg-red-100 text-red-600",
+  قادم: "bg-blue-100 text-blue-600",
+  مجمد: "bg-yellow-100 text-yellow-600",
+  ملغي: "bg-gray-100 text-gray-600",
+  متبقي: "bg-orange-100 text-orange-600",
+  "قريب من الانتهاء": "bg-purple-100 text-purple-600",
+  "غير معروف": "bg-gray-100 text-gray-600",
+};
+
 // Fetch all subscription types (نفس منطق CreateSubscription)
 const fetchAllSubscriptionTypes = async () => {
   try {
@@ -591,6 +603,14 @@ const UpdateSubscriptionModal = ({ subscription, closeModal, dispatch, selectedM
               </div>
             </>
           )}
+          <div>
+            <label className="block text-sm font-medium mb-1">الحالة</label>
+            <span
+              className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusStyles[subscription.status] || statusStyles["غير معروف"]}`}
+            >
+              {subscription.status}
+            </span>
+          </div>
           <div className="flex justify-end gap-3 mt-6">
             <Button onClick={closeModal} variant="outline">إلغاء</Button>
             <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={isSubmitting}>
@@ -848,7 +868,7 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
                     ? sub.freeze_requests.find((fr) => fr.is_active)
                     : null;
                   const today = new Date().toISOString().split("T")[0];
-                  const isActive = sub.start_date <= today && sub.end_date >= today && !sub.is_cancelled;
+                  const isActive = sub.start_date <= today && sub.end_date >= today && !sub.is_cancelled && sub.status !== "مجمد" && sub.status !== "ملغي";
                   return (
                     <motion.div
                       key={sub.id}
@@ -865,6 +885,11 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
                           </p>
                           <p className="text-sm text-gray-500">RFID: {sub.member_details?.rfid_code || "غير متوفر"}</p>
                           <p className="text-sm text-gray-500">المدة: {sub.type_details?.duration_days} يوم</p>
+                          <p className="text-sm text-gray-500">
+                            <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusStyles[sub.status] || statusStyles["غير معروف"]}`}>
+                              {sub.status}
+                            </span>
+                          </p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-500">التواريخ</p>
@@ -887,7 +912,7 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
                             <FaCheck className="text-blue-600" />
                             المدفوع: {sub.paid_amount || 0} ج.م
                           </p>
-                          <p className={`flex items-center gap-2 ${parseFloat(sub.remaining_amount || 0) < 0 ? "text-red-600" : "text-green-600"}`}>
+                          <p className={`flex items-center gap-2 ${parseFloat(sub.remaining_amount || 0) > 0 ? "text-red-600" : "text-green-600"}`}>
                             <FaExclamation className="text-blue-600" />
                             المتبقي: {sub.remaining_amount || 0} ج.م
                           </p>
@@ -973,9 +998,9 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
                             >
                               إلغاء الاشتراك
                             </Button>
-                            {parseFloat(sub.remaining_amount) < 0 && (
+                            {parseFloat(sub.remaining_amount) > 0 && (
                               <Button
-                                onClick={() => handleMakePayment(sub.id, Math.abs(sub.remaining_amount))}
+                                onClick={() => handleMakePayment(sub.id, parseFloat(sub.remaining_amount))}
                                 className="bg-purple-600 hover:bg-purple-700"
                               >
                                 سداد المديونية
