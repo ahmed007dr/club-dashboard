@@ -303,7 +303,6 @@ const DailyReportButton = () => {
                       className="w-full text-right bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-600"
                       disabled={loading || previewLoading}
                     />
-                    <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   </div>
                 </div>
                 <div>
@@ -322,7 +321,6 @@ const DailyReportButton = () => {
                       className="w-full text-right bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-600"
                       disabled={loading || previewLoading}
                     />
-                    <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                   </div>
                 </div>
               </div>

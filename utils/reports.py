@@ -46,11 +46,11 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
             income_filters['received_by'] = employee
             expense_filters['paid_by'] = employee
 
-        incomes = Income.objects.filter(**income_filters).order_by('date').values('source__name').annotate(
+        incomes = Income.objects.filter(**income_filters).values('source__name').annotate(
             count=Sum('quantity'), total=Sum('amount')
         )
 
-        expenses = Expense.objects.filter(**expense_filters).order_by('date').values('category__name', 'description').annotate(
+        expenses = Expense.objects.filter(**expense_filters).values('category__name').annotate(
             total=Sum('amount')
         )
 
@@ -64,12 +64,18 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
             'check_in': timezone.localtime(start).isoformat(),
             'check_out': timezone.localtime(end).isoformat(),
             'incomes': [
-                {'source': SOURCE_TRANSLATIONS.get(item['source__name'], item['source__name']) or 'غير محدد', 'count': item['count'], 'total': float(item['total'])}
+                {
+                    'source': SOURCE_TRANSLATIONS.get(item['source__name'], item['source__name']) or 'غير محدد',
+                    'count': item['count'],
+                    'total': float(item['total'])
+                }
                 for item in incomes
             ],
             'expenses': [
-                {'category': item['category__name'] or 'غير محدد', 'description': item['description'] or 'بدون وصف', 
-                 'total': float(item['total'])}
+                {
+                    'category': item['category__name'] or 'غير محدد',
+                    'total': float(item['total'])
+                }
                 for item in expenses
             ],
             'total_income': float(total_income),
