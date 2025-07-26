@@ -304,7 +304,7 @@ def income_api(request):
             # Apply common filters
             incomes = apply_common_filters(incomes, request, user_field='received_by', source_category_field='source')
             
-            incomes = incomes.order_by('date')  # Order by date ascending
+            incomes = incomes.order_by('-date')  # Order by date ascending
             paginator = StandardPagination()
             page = paginator.paginate_queryset(incomes, request)
             serializer = IncomeSerializer(page, many=True)
