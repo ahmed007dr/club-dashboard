@@ -122,27 +122,17 @@ def migrate_attendance_table(old_db_path, new_db_path):
         entry_time = row_data.get('entry_time')
         if attendance_date and entry_time:
             try:
-                # Handle entry_time with or without microseconds
-                try:
-                    # Try parsing with microseconds
-                    parsed_time = datetime.strptime(str(entry_time), '%H:%M:%S.%f').time()
-                except ValueError:
-                    # Fallback to parsing without microseconds
-                    parsed_time = datetime.strptime(str(entry_time), '%H:%M:%S').time()
-
-                combined_datetime = datetime.combine(
-                    datetime.strptime(str(attendance_date), '%Y-%m-%d').date(),
-                    parsed_time
-                )
-                row_data['timestamp'] = timezone.make_aware(combined_datetime, pytz.timezone('Africa/Cairo'))
+                parsed_time = datetime.strptime(str(entry_time), '%H:%M:%S.%f').time() if '.' in str(entry_time) else datetime.strptime(str(entry_time), '%H:%M:%S').time()
+                combined_datetime = datetime.combine(datetime.strptime(str(attendance_date), '%Y-%m-%d').date(), parsed_time)
+                row_data['timestamp'] = timezone.make_aware(combined_datetime, pytz.timezone('Africa/Cairo'))  # تعيين timestamp مباشرة
                 row_data.pop('attendance_date', None)
                 row_data.pop('entry_time', None)
             except ValueError as e:
-                errors.append(f"Error parsing date/time for attendance_attendance (row {row_index}): attendance_date={attendance_date}, entry_time={entry_time}, error: {e}")
+                errors.append(f"Error parsing date/time for attendance_attendance (row {row_index}): {e}")
                 migration_summary['attendance_attendance']['failed'] += 1
                 continue
         else:
-            errors.append(f"Skipping record in attendance_attendance (row {row_index}): missing attendance_date or entry_time: {row_data}")
+            errors.append(f"Skipping record (row {row_index}): missing attendance_date or entry_time")
             migration_summary['attendance_attendance']['failed'] += 1
             continue
 
@@ -158,11 +148,18 @@ def migrate_attendance_table(old_db_path, new_db_path):
 
         row_data.pop('row_index', None)
 
+        # try:
+        #     obj = model(**row_data)
+        #     batch.append(obj)
+        # except Exception as e:
+        #     errors.append(f"Error creating object for attendance_attendance (row {row_index}): {e}, data: {row_data}")
+        #     migration_summary['attendance_attendance']['failed'] += 1
+        #     continue
         try:
             obj = model(**row_data)
             batch.append(obj)
         except Exception as e:
-            errors.append(f"Error creating object for attendance_attendance (row {row_index}): {e}, data: {row_data}")
+            errors.append(f"Error creating object (row {row_index}): {e}")
             migration_summary['attendance_attendance']['failed'] += 1
             continue
 

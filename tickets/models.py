@@ -23,7 +23,7 @@ class Ticket(models.Model):
     notes = models.CharField(max_length=255)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     issue_datetime = models.DateTimeField(default=timezone.now)
-    issued_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, related_name='issued_tickets')
+    issued_by = models.ForeignKey('accounts.User', on_delete=models.SET_NULL, null=True, blank=True, related_name='issued_tickets')
     serial_number = models.CharField(max_length=30, unique=True)
 
     def __str__(self):

@@ -2,10 +2,9 @@ from django.db import models
 from accounts.models import User
 from django.utils import timezone
 
-
 class FreeInvite(models.Model):
     club = models.ForeignKey('core.Club', on_delete=models.CASCADE)
-    subscription = models.ForeignKey('subscriptions.Subscription', on_delete=models.CASCADE, related_name='free_invites')  
+    subscription = models.ForeignKey('subscriptions.Subscription', on_delete=models.SET_NULL, null=True, blank=True, related_name='free_invites')  
     guest_name = models.CharField(max_length=255)
     phone = models.CharField(max_length=20)
     date = models.DateField()

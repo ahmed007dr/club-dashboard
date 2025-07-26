@@ -29,13 +29,21 @@ class MemberSerializer(serializers.ModelSerializer):
             'gender': {'required': False, 'allow_null': True}, 
         }
 
+    # def get_last_attendance_date(self, obj):
+    #     last_attendance = Attendance.objects.filter(
+    #         subscription__member=obj,
+    #         subscription__end_date__gte=timezone.now().date()
+    #     ).order_by('-timestamp').first()
+    #     return last_attendance.timestamp.date() if last_attendance else None
+    
     def get_last_attendance_date(self, obj):
         last_attendance = Attendance.objects.filter(
             subscription__member=obj,
             subscription__end_date__gte=timezone.now().date()
         ).order_by('-timestamp').first()
-        return last_attendance.timestamp.date() if last_attendance else None
-
+        return last_attendance.timestamp.date() if last_attendance and last_attendance.timestamp else None
+    
+    
     def get_near_expiry_date(self, obj):
         subscription = obj.subscription_set.filter(
             end_date__gte=timezone.now().date()

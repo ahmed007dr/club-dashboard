@@ -39,6 +39,7 @@ def attendance_heatmap_api(request):
     heatmap_data = [
         {'date': entry['timestamp__date'].isoformat(), 'count': entry['count']}
         for entry in daily_counts
+        if entry['timestamp__date'] is not None  # تخطي السجلات التي تحتوي على None
     ]
     return Response(heatmap_data)
 
