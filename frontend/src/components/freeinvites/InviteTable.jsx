@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { Table, Button, Tag, Space } from 'antd';
@@ -18,7 +17,7 @@ import { toast } from 'react-hot-toast';
  */
 const InviteTable = ({ invites, loading, onEdit, onDelete, onMarkUsed }) => {
   const dispatch = useDispatch();
-  const { remainingInvites } = useSelector((state) => state.invites);
+  const { remainingInvites } = useSelector((state) => state.invites || {});
   const canEditInvites = usePermission('change_freeinvite');
   const canDeleteInvites = usePermission('delete_freeinvite');
 
@@ -58,7 +57,13 @@ const InviteTable = ({ invites, loading, onEdit, onDelete, onMarkUsed }) => {
       {
         title: 'الدعوات المتبقية',
         key: 'remaining_invites',
-        render: (record) => getRemainingInvites(record.subscription.id),
+        render: (record) => {
+          if (!record.subscription) {
+            console.warn(`Invite ID ${record.id} has no subscription`, record);
+            return 'غير متوفر';
+          }
+          return getRemainingInvites(record.subscription.id);
+        },
       },
       {
         title: 'اسم الضيف',
@@ -139,7 +144,7 @@ const InviteTable = ({ invites, loading, onEdit, onDelete, onMarkUsed }) => {
   return (
     <Table
       columns={columns}
-      dataSource={invites}
+      dataSource={invites || []}
       loading={loading}
       rowKey="id"
       pagination={false}
@@ -163,8 +168,8 @@ InviteTable.propTypes = {
         membership_number: PropTypes.string,
       }),
       subscription: PropTypes.shape({
-        id: PropTypes.number.isRequired,
-      }).isRequired,
+        id: PropTypes.number,
+      }),
       subscription_details: PropTypes.shape({
         type_name: PropTypes.string,
       }),

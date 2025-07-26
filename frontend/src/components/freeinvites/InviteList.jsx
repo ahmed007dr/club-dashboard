@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { useDispatch, useSelector } from 'react-redux';
@@ -10,7 +9,7 @@ import {
   markInviteAsUsed,
   clearError,
 } from '../../redux/slices/invitesSlice';
-import { Modal, Button, Space, Form } from 'antd';
+import { Modal, Button, Space, Form, Select } from 'antd';
 import { RiVipCrown2Line } from 'react-icons/ri';
 import { toast } from 'react-hot-toast';
 import moment from 'moment';
@@ -28,10 +27,10 @@ import BASE_URL from '../../config/api';
 const InviteList = () => {
   const dispatch = useDispatch();
   const {
-    invites: { results: invites = [], count: totalItems = 0, next, previous },
+    invites: { results: invites = [], count: totalItems = 0, next, previous } = {},
     loading,
     error,
-  } = useSelector((state) => state.invites);
+  } = useSelector((state) => state.invites || {});
 
   const [userClub, setUserClub] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
@@ -65,22 +64,36 @@ const InviteList = () => {
         Authorization: `Bearer ${localStorage.getItem('token')}`,
       },
     })
-      .then((response) => response.json())
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        return response.json();
+      })
       .then((data) => {
-        if (data?.club?.id) {
+        if (data?.club?.id && data?.club?.name) {
           setUserClub({ id: data.club.id, name: data.club.name });
+        } else {
+          throw new Error('No club data found in profile');
         }
         setLoadingProfile(false);
       })
       .catch((err) => {
         console.error('Failed to fetch profile:', err);
+        toast.error('فشل في جلب بيانات الملف الشخصي');
         setLoadingProfile(false);
       });
   }, [canViewInvites]);
 
   // Fetch invites with debounced filters
   useEffect(() => {
-    if (userClub && canViewInvites) {
+    if (userClub?.id && canViewInvites) {
+      console.log('Fetching invites with params:', {
+        page: currentPage,
+        page_size: itemsPerPage,
+        club: userClub.id,
+        guest_name: debouncedFilters.filterGuestName,
+        status: debouncedFilters.filterStatus,
+        date: debouncedFilters.filterDate,
+      });
       dispatch(
         fetchFreeInvites({
           page: currentPage,
@@ -109,12 +122,14 @@ const InviteList = () => {
 
   // Modal handlers
   const openAddModal = () => {
+    if (!userClub) return;
     form.resetFields();
-    form.setFieldsValue({ club: userClub?.id, status: 'pending' });
+    form.setFieldsValue({ club: userClub.id, status: 'pending' });
     setShowAddModal(true);
   };
 
   const openEditModal = (invite) => {
+    if (!invite) return;
     setSelectedInvite(invite);
     form.setFieldsValue({
       club: userClub?.id,
@@ -122,13 +137,14 @@ const InviteList = () => {
       phone: invite.phone,
       date: invite.date ? moment(invite.date) : null,
       status: invite.status,
-      invited_by: invite.invited_by_details?.membership_number,
+      invited_by: invite.invited_by_details?.membership_number || '',
       rfid_code: invite.rfid_code || '',
     });
     setShowEditModal(true);
   };
 
   const openDeleteModal = (invite) => {
+    if (!invite) return;
     setSelectedInvite(invite);
     setShowDeleteModal(true);
   };
@@ -155,7 +171,7 @@ const InviteList = () => {
     try {
       await dispatch(
         editInviteById({
-          inviteId: selectedInvite.id,
+          inviteId: selectedInvite?.id,
           inviteData: {
             ...values,
             club: Number(values.club),
@@ -166,6 +182,7 @@ const InviteList = () => {
       ).unwrap();
       toast.success('تم تعديل الدعوة بنجاح');
       setShowEditModal(false);
+      setSelectedInvite(null);
     } catch (err) {
       toast.error('فشل في تعديل الدعوة');
     }
@@ -173,15 +190,17 @@ const InviteList = () => {
 
   const handleDeleteInvite = async () => {
     try {
-      await dispatch(deleteInviteById(selectedInvite.id)).unwrap();
+      await dispatch(deleteInviteById(selectedInvite?.id)).unwrap();
       toast.success('تم حذف الدعوة بنجاح');
       setShowDeleteModal(false);
+      setSelectedInvite(null);
     } catch (err) {
       toast.error('فشل في حذف الدعوة');
     }
   };
 
   const handleMarkUsed = async (invite) => {
+    if (!invite?.id) return;
     try {
       await dispatch(markInviteAsUsed(invite.id)).unwrap();
       toast.success('تم تعليم الدعوة كمستخدمة');
@@ -214,8 +233,8 @@ const InviteList = () => {
           <RiVipCrown2Line className="text-blue-600 w-8 h-8" />
           <h2 className="text-2xl font-bold">الدعوات المجانية</h2>
         </div>
-        {canAddInvites && (
-          <Button type="primary" onClick={openAddModal} disabled={!userClub}>
+        {canAddInvites && userClub && (
+          <Button type="primary" onClick={openAddModal}>
             إضافة دعوة جديدة
           </Button>
         )}
@@ -237,77 +256,78 @@ const InviteList = () => {
       />
 
       <InviteTable
-        invites={invites}
+        invites={invites || []}
         loading={loading}
         onEdit={openEditModal}
         onDelete={openDeleteModal}
         onMarkUsed={handleMarkUsed}
       />
 
-      <div className="flex flex-col sm:flex-row justify-between items-center mt-6" dir="rtl">
-        {totalItems > 0 && (
-          <>
-            <div className="text-sm text-gray-700">
-              عرض {(currentPage - 1) * itemsPerPage + 1}–
-              {Math.min(currentPage * itemsPerPage, totalItems)} من {totalItems} دعوة
-            </div>
-            <Space>
-              <Select
-                value={itemsPerPage}
-                onChange={(value) => {
-                  setItemsPerPage(value);
-                  setCurrentPage(1);
-                }}
-                options={[10, 20, 50].map((size) => ({
-                  label: `${size} لكل صفحة`,
-                  value: size,
-                }))}
-              />
-              <Button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-              >
-                الأول
-              </Button>
-              <Button
-                onClick={() => setCurrentPage(currentPage - 1)}
-                disabled={currentPage === 1}
-              >
-                السابق
-              </Button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1)
-                .slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2))
-                .map((page) => (
-                  <Button
-                    key={page}
-                    type={currentPage === page ? 'primary' : 'default'}
-                    onClick={() => setCurrentPage(page)}
-                  >
-                    {page}
-                  </Button>
-                ))}
-              <Button
-                onClick={() => setCurrentPage(currentPage + 1)}
-                disabled={currentPage === totalPages}
-              >
-                التالي
-              </Button>
-              <Button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-              >
-                الأخير
-              </Button>
-            </Space>
-          </>
-        )}
-      </div>
+      {totalItems > 0 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center mt-6" dir="rtl">
+          <div className="text-sm text-gray-700">
+            عرض {(currentPage - 1) * itemsPerPage + 1}–
+            {Math.min(currentPage * itemsPerPage, totalItems)} من {totalItems} دعوة
+          </div>
+          <Space>
+            <Select
+              value={itemsPerPage}
+              onChange={(value) => {
+                setItemsPerPage(value);
+                setCurrentPage(1);
+              }}
+              options={[10, 20, 50].map((size) => ({
+                label: `${size} لكل صفحة`,
+                value: size,
+              }))}
+            />
+            <Button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+            >
+              الأول
+            </Button>
+            <Button
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              السابق
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .slice(Math.max(0, currentPage - 3), Math.min(totalPages, currentPage + 2))
+              .map((page) => (
+                <Button
+                  key={page}
+                  type={currentPage === page ? 'primary' : 'default'}
+                  onClick={() => setCurrentPage(page)}
+                >
+                  {page}
+                </Button>
+              ))}
+            <Button
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              التالي
+            </Button>
+            <Button
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+            >
+              الأخير
+            </Button>
+          </Space>
+        </div>
+      )}
 
       {/* Add Invite Modal */}
       <Modal
         open={showAddModal}
-        title="إضافة دعوة جديدة"
-        onCancel={() => setShowAddModal(false)}
+        title="إنشاء دعوة جديدة"
+        onCancel={() => {
+          setShowAddModal(false);
+          form.resetFields();
+        }}
         footer={null}
       >
         <InviteForm
@@ -316,7 +336,10 @@ const InviteList = () => {
           initialValues={{ club: userClub?.id, status: 'pending' }}
           isEditMode={false}
           userClub={userClub}
-          onCancel={() => setShowAddModal(false)}
+          onCancel={() => {
+            setShowAddModal(false);
+            form.resetFields();
+          }}
         />
       </Modal>
 
@@ -324,49 +347,67 @@ const InviteList = () => {
       <Modal
         open={showEditModal}
         title="تعديل الدعوة"
-        onCancel={() => setShowEditModal(false)}
+        onCancel={() => {
+          setShowEditModal(false);
+          setSelectedInvite(null);
+        }}
         footer={null}
       >
-        <InviteForm
-          form={form}
-          onSubmit={handleEditInvite}
-          initialValues={{
-            club: userClub?.id,
-            guest_name: selectedInvite?.guest_name,
-            phone: selectedInvite?.phone,
-            date: selectedInvite?.date ? moment(selectedInvite.date) : null,
-            status: selectedInvite?.status,
-            invited_by: selectedInvite?.invited_by_details?.membership_number,
-            rfid_code: selectedInvite?.rfid_code || '',
-          }}
-          isEditMode={true}
-          userClub={userClub}
-          onCancel={() => setShowEditModal(false)}
-        />
+        {selectedInvite && (
+          <InviteForm
+            form={form}
+            onSubmit={handleEditInvite}
+            initialValues={{
+              club: userClub?.id,
+              guest_name: selectedInvite.guest_name,
+              phone: selectedInvite.phone,
+              date: selectedInvite.date ? moment(selectedInvite.date) : null,
+              status: selectedInvite.status,
+              invited_by: selectedInvite.invited_by_details?.membership_number || '',
+              rfid_code: selectedInvite.rfid_code || '',
+            }}
+            isEditMode={true}
+            userClub={userClub}
+            onCancel={() => {
+              setShowEditModal(false);
+              setSelectedInvite(null);
+            }}
+          />
+        )}
       </Modal>
 
       {/* Delete Invite Modal */}
       <Modal
         open={showDeleteModal}
         title="حذف الدعوة"
-        onCancel={() => setShowDeleteModal(false)}
+        onCancel={() => {
+          setShowDeleteModal(false);
+          setSelectedInvite(null);
+        }}
         footer={
           <Space>
-            <Button onClick={() => setShowDeleteModal(false)}>إلغاء</Button>
+            <Button
+              onClick={() => {
+                setShowDeleteModal(false);
+                setSelectedInvite(null);
+              }}
+            >
+              إلغاء
+            </Button>
             <Button type="primary" danger onClick={handleDeleteInvite}>
               حذف
             </Button>
           </Space>
         }
       >
-        <p>هل أنت متأكد أنك تريد حذف دعوة "{selectedInvite?.guest_name}"؟</p>
+        {selectedInvite && (
+          <p>هل أنت متأكد أنك تريد حذف دعوة "{selectedInvite.guest_name}"؟</p>
+        )}
       </Modal>
     </div>
   );
 };
 
-InviteList.propTypes = {
-  // No props are passed directly to InviteList
-};
+InviteList.propTypes = {};
 
 export default InviteList;

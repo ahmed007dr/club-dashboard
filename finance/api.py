@@ -51,7 +51,7 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
         raise ValueError('لا يمكن استخدام "date" مع "start_date" أو "end_date" في نفس الطلب.')
 
     # Filter by specific date or datetime
-    if query_params.get('date'):
+    if query_params.get('-date'):
         try:
             date_input = query_params.get('date')
             # Try parsing as full datetime (YYYY-MM-DD HH:MM:SS)
@@ -194,11 +194,13 @@ def expense_category_api(request):
             categories = categories.filter(description__icontains=request.query_params.get('description'))
         
         categories = categories.order_by('-id')
-        paginator = StandardPagination()
-        page = paginator.paginate_queryset(categories, request)
-        serializer = ExpenseCategorySerializer(page, many=True)
-        return paginator.get_paginated_response(serializer.data)
-    
+        # paginator = StandardPagination()
+        # page = paginator.paginate_queryset(categories, request)
+        # serializer = ExpenseCategorySerializer(page, many=True)
+        # return paginator.get_paginated_response(serializer.data)
+        serializer = ExpenseCategorySerializer(categories, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     elif request.method == 'POST':
         serializer = ExpenseCategorySerializer(data=request.data)
         if serializer.is_valid():
@@ -266,11 +268,13 @@ def income_source_api(request):
         if request.query_params.get('description'):
             sources = sources.filter(description__icontains=request.query_params.get('description'))
         sources = sources.order_by('-id')
-        paginator = StandardPagination()
-        page = paginator.paginate_queryset(sources, request)
-        serializer = IncomeSourceSerializer(page, many=True)
-        return paginator.get_paginated_response(serializer.data)
-    
+        # paginator = StandardPagination()
+        # page = paginator.paginate_queryset(sources, request)
+        # serializer = IncomeSourceSerializer(page, many=True)
+        # return paginator.get_paginated_response(serializer.data)
+        serializer = IncomeSourceSerializer(sources, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
     elif request.method == 'POST':
         data = request.data.copy()
         data['club'] = request.user.club.id
@@ -304,7 +308,7 @@ def income_api(request):
             # Apply common filters
             incomes = apply_common_filters(incomes, request, user_field='received_by', source_category_field='source')
             
-            incomes = incomes.order_by('-date')  # Order by date ascending
+            incomes = incomes.order_by('-date')  
             paginator = StandardPagination()
             page = paginator.paginate_queryset(incomes, request)
             serializer = IncomeSerializer(page, many=True)
