@@ -172,6 +172,23 @@ def active_users_api(request):
     serializer = UserSerializer(users, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_users_with_expenses(request):
+    """Retrieve a list of users from the same club who have expenses (either as paid_by or related_employee)."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
+
+    users = User.objects.filter(
+        Q(expenses_paid__isnull=False) | Q(related_expenses__isnull=False),
+        club=request.user.club
+    ).distinct().prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club')
+
+    serializer = UserProfileSerializer(users, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def coach_list(request):

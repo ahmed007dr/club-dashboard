@@ -40,27 +40,26 @@ const Expenses = () => {
   const [showModal, setShowModal] = useState(false);
   const [currentExpense, setCurrentExpense] = useState(null);
   const [newExpense, setNewExpense] = useState({
-    club: "",
     category: "",
     amount: "",
     description: "",
-    date: "",
-    invoice_number: "",
-    attachment: null,
     related_employee: "",
+    attachment: null,
   });
   const [confirmDeleteModal, setConfirmDeleteModal] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState(null);
   const [filters, setFilters] = useState({
     category: "",
     user: "",
+    related_employee: "",
     amount: "",
     description: "",
-    start_date: new Date().toISOString().slice(0, 10), // استعادة التاريخ الافتراضي
-    end_date: new Date().toISOString().slice(0, 10),   // استعادة التاريخ الافتراضي
+    start_date: new Date().toISOString().slice(0, 10),
+    end_date: new Date().toISOString().slice(0, 10),
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [userClub, setUserClub] = useState(null);
+  const [users, setUsers] = useState([]);
   const [errors, setErrors] = useState({});
   const [isSummaryClicked, setIsSummaryClicked] = useState(false);
   const [localExpenses, setLocalExpenses] = useState([]);
@@ -83,26 +82,34 @@ const Expenses = () => {
 
   useEffect(() => {
     dispatch(fetchExpenseCategories());
-  }, [dispatch]);
+    const fetchData = async () => {
+      try {
+        const profileResponse = await fetch(`${BASE_URL}accounts/api/profile/`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const profileData = await profileResponse.json();
+        setUserClub({ id: profileData.club.id, name: profileData.club.name });
 
-  useEffect(() => {
-    fetch(`${BASE_URL}accounts/api/profile/`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json",
-      },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        setUserClub({ id: data.club.id, name: data.club.name });
-        setNewExpense((prev) => ({ ...prev, club: data.club.id.toString() }));
-      })
-      .catch((err) => {
-        console.error("فشل في تحميل بيانات المستخدم:", err);
-        setErrors({ general: "فشل في تحميل بيانات المستخدم" });
-      });
-  }, []);
+        const usersResponse = await fetch(`${BASE_URL}accounts/api/users/`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const usersData = await usersResponse.json();
+        setUsers(usersData.results || []);
+      } catch (err) {
+        console.error("فشل في تحميل البيانات:", err);
+        setErrors({ general: "فشل في تحميل بيانات المستخدم أو المستخدمين" });
+      }
+    };
+    fetchData();
+  }, [dispatch]);
 
   const isValidFilter = (filters) => {
     return (
@@ -110,6 +117,7 @@ const Expenses = () => {
       filters.end_date?.length > 0 ||
       filters.category ||
       filters.user ||
+      filters.related_employee ||
       filters.amount ||
       filters.description
     );
@@ -123,6 +131,7 @@ const Expenses = () => {
             page,
             category: filters.category || null,
             user: filters.user || null,
+            related_employee: filters.related_employee || null,
             amount: filters.amount || null,
             description: filters.description || null,
             start_date: filters.start_date || null,
@@ -132,7 +141,7 @@ const Expenses = () => {
           setErrors({ general: err.message || "فشل في جلب المصروفات" });
         });
       } else {
-        setErrors({ general: "يجب تحديد معايير البحث (تاريخ، مدة زمنية، فئة، مستخدم، مبلغ، أو وصف)." });
+        setErrors({ general: "يجب تحديد معايير البحث (تاريخ، مدة زمنية، فئة، مستخدم، موظف مرتبط، مبلغ، أو وصف)." });
       }
     }, 300),
     [dispatch]
@@ -155,10 +164,8 @@ const Expenses = () => {
 
   const validateForm = (data) => {
     const newErrors = {};
-    if (!data.club || isNaN(parseInt(data.club))) newErrors.club = "النادي مطلوب.";
     if (!data.category || isNaN(parseInt(data.category))) newErrors.category = "الفئة مطلوبة.";
     if (!data.amount && data.amount !== 0) newErrors.amount = "المبلغ مطلوب.";
-    if (!data.date) newErrors.date = "التاريخ مطلوب.";
     if (data.related_employee && isNaN(parseInt(data.related_employee))) newErrors.related_employee = "الموظف المرتبط غير صالح.";
     return newErrors;
   };
@@ -172,13 +179,11 @@ const Expenses = () => {
     }
 
     const expenseData = {
-      club: parseInt(data.club),
       category: parseInt(data.category),
       amount: parseFloat(data.amount),
-      date: data.date,
       description: data.description || "",
-      invoice_number: data.invoice_number || "",
       related_employee: data.related_employee ? parseInt(data.related_employee) : null,
+      attachment: data.attachment || null,
     };
 
     const action = currentExpense
@@ -190,14 +195,11 @@ const Expenses = () => {
       setShowModal(false);
       setCurrentExpense(null);
       setNewExpense({
-        club: userClub?.id.toString() || "",
         category: "",
         amount: "",
         description: "",
-        date: "",
-        invoice_number: "",
-        attachment: null,
         related_employee: "",
+        attachment: null,
       });
       setErrors({});
       setCurrentPage(1);
@@ -214,6 +216,7 @@ const Expenses = () => {
         fetchAllExpenses({
           category: filters.category,
           user: filters.user,
+          related_employee: filters.related_employee,
           amount: filters.amount,
           description: filters.description,
           start_date: filters.start_date,
@@ -293,14 +296,11 @@ const Expenses = () => {
   const handleEditClick = (expense) => {
     const sanitizedExpense = {
       ...expense,
-      club: expense.club?.toString() || userClub?.id.toString() || "",
       category: expense.category?.toString() || "",
       amount: expense.amount?.toString() || "",
       description: expense.description || "",
-      date: expense.date || "",
-      invoice_number: expense.invoice_number || "",
-      attachment: null,
       related_employee: expense.related_employee?.toString() || "",
+      attachment: null,
     };
     setCurrentExpense(sanitizedExpense);
     setShowModal(true);
@@ -348,6 +348,7 @@ const Expenses = () => {
     setFilters({
       category: "",
       user: "",
+      related_employee: "",
       amount: "",
       description: "",
       start_date: today,
@@ -368,6 +369,7 @@ const Expenses = () => {
         fetchExpenseSummary({
           category: filters.category || null,
           user: filters.user || null,
+          related_employee: filters.related_employee || null,
           amount: filters.amount || null,
           description: filters.description || null,
           start_date: startDate,
@@ -553,12 +555,12 @@ const Expenses = () => {
                   <ExpenseFilters
                     filters={filters}
                     expenseCategories={expenseCategories}
-                    users={[]} // سيتم استبداله ببيانات المستخدمين إذا توفرت
+                    users={users}
                     handleFilterChange={handleFilterChange}
                     handleSelectChange={handleSelectChange}
                     handleReset={handleResetFilters}
                     handleCalculateTotal={handleCalculateTotal}
-                    isValidFilter={isValidFilter} // تأكيد التمرير
+                    isValidFilter={isValidFilter}
                   />
                   {summaryCardDetails && <div className="mt-4">{summaryCardDetails}</div>}
                 </div>
@@ -568,14 +570,11 @@ const Expenses = () => {
                       onClick={() => {
                         setCurrentExpense(null);
                         setNewExpense({
-                          club: userClub?.id.toString() || "",
                           category: "",
                           amount: "",
                           description: "",
-                          date: "",
-                          invoice_number: "",
-                          attachment: null,
                           related_employee: "",
+                          attachment: null,
                         });
                         setShowModal(true);
                       }}
@@ -611,14 +610,14 @@ const Expenses = () => {
               )}
 
               <ExpenseTable
-                expenses={isSummaryClicked ? localExpenses : expenses} // استخدام localExpenses عند الإجمالي
+                expenses={isSummaryClicked ? localExpenses : expenses}
                 handleEditClick={handleEditClick}
                 handleDeleteClick={handleDeleteClick}
                 canEditExpense={canEditExpense}
                 canDeleteExpense={canDeleteExpense}
               />
               <ExpenseCards
-                expenses={isSummaryClicked ? localExpenses : expenses} // استخدام localExpenses عند الإجمالي
+                expenses={isSummaryClicked ? localExpenses : expenses}
                 handleEditClick={handleEditClick}
                 handleDeleteClick={handleDeleteClick}
                 canEditExpense={canEditExpense}
@@ -642,6 +641,7 @@ const Expenses = () => {
         newExpense={newExpense}
         userClub={userClub}
         expenseCategories={expenseCategories}
+        users={users}
         handleChange={handleChange}
         handleSave={handleSave}
         errors={errors}

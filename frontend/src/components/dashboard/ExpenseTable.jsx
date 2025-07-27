@@ -18,7 +18,8 @@ const ExpenseTable = ({ expenses, handleEditClick, handleDeleteClick, canEditExp
           <th className="px-4 py-3 text-right text-sm font-semibold">المبلغ</th>
           <th className="px-4 py-3 text-right text-sm font-semibold">الوصف</th>
           <th className="px-4 py-3 text-right text-sm font-semibold">التاريخ</th>
-          <th className="px-4 py-3 text-right text-sm font-semibold">الموظف</th>
+          <th className="px-4 py-3 text-right text-sm font-semibold">تسجيل بواسطة</th>
+          <th className="px-4 py-3 text-right text-sm font-semibold">الموظف المرتبط</th>
           <th className="px-4 py-3 text-right text-sm font-semibold">الإجراءات</th>
         </tr>
       </thead>
@@ -42,9 +43,14 @@ const ExpenseTable = ({ expenses, handleEditClick, handleDeleteClick, canEditExp
                 {expense.date || "غير متاح"}
               </td>
               <td className="px-4 py-3 text-sm text-gray-800">
+                {expense.paid_by_details?.first_name && expense.paid_by_details?.last_name
+                  ? `${expense.paid_by_details.first_name} ${expense.paid_by_details.last_name}`
+                  : expense.paid_by_details?.username || "غير متاح"}
+              </td>
+              <td className="px-4 py-3 text-sm text-gray-800">
                 {expense.related_employee_details?.first_name && expense.related_employee_details?.last_name
                   ? `${expense.related_employee_details.first_name} ${expense.related_employee_details.last_name}`
-                  : expense.related_employee_details?.username || expense.paid_by_details?.username || "غير متاح"}
+                  : expense.related_employee_details?.username || "غير محدد"}
               </td>
               <td className="px-4 py-3 text-sm flex gap-2 justify-end">
                 <DropdownMenu dir="rtl">
@@ -77,7 +83,7 @@ const ExpenseTable = ({ expenses, handleEditClick, handleDeleteClick, canEditExp
           ))
         ) : (
           <tr>
-            <td colSpan="7" className="px-4 py-3 text-center text-sm text-gray-500">
+            <td colSpan="8" className="px-4 py-3 text-center text-sm text-gray-500">
               لا توجد مصروفات متاحة
             </td>
           </tr>

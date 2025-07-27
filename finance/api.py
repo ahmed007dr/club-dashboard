@@ -217,19 +217,17 @@ def expense_api(request):
 
     if request.method == 'GET':
         try:
-            expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club).only(
-                'id', 'amount', 'date', 'category__name', 'paid_by__username', 'description', 'invoice_number'
+            expenses = Expense.objects.select_related('category', 'paid_by', 'related_employee').filter(club=request.user.club).only(
+                'id', 'amount', 'date', 'category__name', 'paid_by__username', 'related_employee__username', 'description', 'invoice_number'
             )
             
-            # Apply default filter for last 24 hours if no filters provided
-            if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'category', 'user', 'amount', 'description']):
+            if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'category', 'user', 'related_employee', 'amount', 'description']):
                 last_24_hours = timezone.now() - timedelta(hours=24)
                 expenses = expenses.filter(date__gte=last_24_hours)
             else:
-                # Apply common filters if any are provided
                 expenses = apply_common_filters(expenses, request, user_field='paid_by', source_category_field='category')
             
-            expenses = expenses.order_by('date')  # Order by date ascending
+            expenses = expenses.order_by('-date')
             paginator = StandardPagination()
             page = paginator.paginate_queryset(expenses, request)
             serializer = ExpenseSerializer(page, many=True, context={'request': request})
@@ -470,7 +468,6 @@ def income_summary(request):
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def expense_summary(request):
@@ -480,19 +477,19 @@ def expense_summary(request):
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
     
     try:
-        expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club).only(
-            'id', 'amount', 'date', 'category__name', 'paid_by__username', 'description'
+        expenses = Expense.objects.select_related('category', 'paid_by', 'related_employee').filter(club=request.user.club).only(
+            'id', 'amount', 'date', 'category__name', 'paid_by__username', 'related_employee__username', 'description'
         )
         
         # Require at least one filter to proceed
-        if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'category', 'user', 'amount', 'description']):
-            return Response({'error': 'يجب تحديد معايير البحث (تاريخ، مدة زمنية، فئة، مستخدم، مبلغ، أو وصف).'}, status=status.HTTP_400_BAD_REQUEST)
+        if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'category', 'user', 'related_employee', 'amount', 'description']):
+            return Response({'error': 'يجب تحديد معايير البحث (تاريخ، مدة زمنية، فئة، مستخدم، موظف مرتبط، مبلغ، أو وصف).'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Apply common filters
         expenses = apply_common_filters(expenses, request, user_field='paid_by', source_category_field='category')
         
         # Order by date ascending
-        expenses = expenses.order_by('date')
+        expenses = expenses.order_by('-date')
         
         # Calculate total
         total = calculate_totals(expenses)
@@ -508,7 +505,7 @@ def expense_summary(request):
     
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
+    
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def finance_overview(request):

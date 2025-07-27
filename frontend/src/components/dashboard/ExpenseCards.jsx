@@ -1,13 +1,13 @@
-import React from 'react';
-import { CiEdit, CiTrash } from 'react-icons/ci';
-import { MoreVertical } from 'lucide-react';
-import { Button } from '../ui/Button';
+import React from "react";
+import { CiEdit, CiTrash } from "react-icons/ci";
+import { MoreVertical } from "lucide-react";
+import { Button } from "../ui/Button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '../ui/DropdownMenu';
+} from "../ui/DropdownMenu";
 
 const ExpenseCards = ({ expenses, handleEditClick, handleDeleteClick, canEditExpense, canDeleteExpense }) => (
   <div className="lg:hidden space-y-4">
@@ -33,6 +33,22 @@ const ExpenseCards = ({ expenses, handleEditClick, handleDeleteClick, canEditExp
             <div>
               <p className="text-xs text-gray-500">التاريخ</p>
               <p>{expense.date || "غير متاح"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">تسجيل بواسطة</p>
+              <p>
+                {expense.paid_by_details?.first_name && expense.paid_by_details?.last_name
+                  ? `${expense.paid_by_details.first_name} ${expense.paid_by_details.last_name}`
+                  : expense.paid_by_details?.username || "غير متاح"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">الموظف المرتبط</p>
+              <p>
+                {expense.related_employee_details?.first_name && expense.related_employee_details?.last_name
+                  ? `${expense.related_employee_details.first_name} ${expense.related_employee_details.last_name}`
+                  : expense.related_employee_details?.username || "غير محدد"}
+              </p>
             </div>
             <div className="col-span-2">
               <p className="text-xs text-gray-500">الوصف</p>
