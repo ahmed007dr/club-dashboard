@@ -67,7 +67,6 @@
 .scrollable-table table {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
 }
 
 .scrollable-table th, .scrollable-table td {
@@ -75,6 +74,8 @@
   text-align: right;
   border-bottom: 1px solid #e5e7eb;
   font-size: 1.125rem;
+  overflow-wrap: break-word;
+  min-width: 100px;
 }
 
 .scrollable-table th {
@@ -86,7 +87,5 @@
 }
 
 .scrollable-table td {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }

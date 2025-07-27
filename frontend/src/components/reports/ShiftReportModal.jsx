@@ -16,25 +16,29 @@ const ShiftReportModal = ({ isOpen, onOpenChange, shiftReportData }) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl text-right bg-white dark:bg-gray-800">
+      {/* <DialogContent className="max-w-6xl text-right bg-white dark:bg-gray-800"> */}
+      <DialogContent className="max-w-[95vw] sm:max-w-[1800px] text-right bg-white dark:bg-gray-800">
+
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-gray-800 dark:text-white">
+          {/* <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-gray-800 dark:text-white"> */}
+          <DialogTitle className="text-2xl font-bold flex items-center gap-3 text-gray-800 dark:text-white mx-6 my-4">
+
             <Clock className="text-indigo-600 w-8 h-8" />
             تقرير الشيفتات
           </DialogTitle>
         </DialogHeader>
         <div className="scrollable-table">
-          <table className="w-full text-lg">
+          <table className="w-full text-lg " dir="rtl">
             <thead>
               <tr className="bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300">
-                <th className="p-4">اسم المستخدم</th>
-                <th className="p-4">الدور</th>
-                <th className="p-4">بداية الشيفت</th>
-                <th className="p-4">نهاية الشيفت</th>
-                <th className="p-4">مدة الشيفت (ساعات)</th>
-                <th className="p-4">إجمالي الإيرادات</th>
-                <th className="p-4">إجمالي المصروفات</th>
-                <th className="p-4">صافي الربح</th>
+                <th className="p-4 min-w-[150px]">اسم المستخدم</th>
+                <th className="p-4 min-w-[100px]">الدور</th>
+                <th className="p-4 min-w-[200px]">بداية الشيفت</th>
+                <th className="p-4 min-w-[200px]">نهاية الشيفت</th>
+                <th className="p-4 min-w-[120px]">مدة الشيفت (ساعات)</th>
+                <th className="p-4 min-w-[120px]">إجمالي الإيرادات</th>
+                <th className="p-4 min-w-[120px]">إجمالي المصروفات</th>
+                <th className="p-4 min-w-[120px]">صافي الربح</th>
               </tr>
             </thead>
             <tbody>
