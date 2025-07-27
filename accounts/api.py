@@ -225,6 +225,25 @@ def api_users_with_expenses(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def api_system_users(request):
+    """List users who actively perform operations in the system."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Filter users who are in FULL_ACCESS_ROLES or have role 'reception'
+    system_users = User.objects.filter(
+        club=request.user.club,
+        is_active=True
+    ).filter(
+        Q(role__in=FULL_ACCESS_ROLES) | Q(role='reception')
+    ).distinct().prefetch_related('groups', 'user_permissions', 'groups__permissions')
+    
+    serializer = UserProfileSerializer(system_users, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def coach_list(request):
     """List active coaches."""
     if not request.user.club:

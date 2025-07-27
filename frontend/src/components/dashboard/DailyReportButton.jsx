@@ -64,7 +64,7 @@ const DailyReportButton = () => {
   useEffect(() => {
     if (userRole === 'admin' || userRole === 'owner') {
       setEmployeeLoading(true);
-      api.get('accounts/api/active-users/')
+      api.get('accounts/api/system-users/')
         .then((response) => setEmployees(response.data || []))
         .catch((error) => {
           console.error('خطأ في جلب الموظفين:', error);

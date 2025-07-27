@@ -19,4 +19,5 @@ urlpatterns = [
     path('api/users_with_expenses/', api.api_users_with_expenses, name='api_users_with_expenses'),
     path('api/users_with_paid_expenses/', api.api_users_with_paid_expenses, name='api_users_with_paid_expenses'),
     path('api/users_with_related_expenses/', api.api_users_with_related_expenses, name='api_users_with_related_expenses'),
+    path('api/system-users/', api.api_system_users, name='api_system_users'),
 ]
