@@ -216,22 +216,22 @@ const Main = () => {
             gradient="from-purple-500 to-indigo-600"
             bgGradient="from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20"
           />
-          <DataCard
+          {/* <DataCard
             label="إجمالي الحضور"
             value={totalAttendances}
             icon={<FaRegCalendarCheck />}
             link="/attendance"
             gradient="from-orange-500 to-red-600"
             bgGradient="from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20"
-          />
-          <DataCard
+          /> */}
+          {/* <DataCard
             label="إجمالي الموظفين"
             value={totalStaff}
             icon={<BsPeopleFill />}
             link="/staff"
             gradient="from-pink-500 to-rose-600"
             bgGradient="from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20"
-          />
+          /> */}
           <DataCard
             label="الدعوات"
             value={totalInvites}

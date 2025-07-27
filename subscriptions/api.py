@@ -270,7 +270,7 @@ def subscription_list(request):
                 request.query_params.get('start_date') or
                 request.query_params.get('end_date')):
             logger.info(f"No search criteria provided by user: {request.user.username}")
-            return Response({'message': 'يرجى إدخال معايير البحث (اسم، رقم هاتف، RFID، حالة الاشتراك، معرف العضو، نوع الاشتراك، تاريخ البدء، أو تاريخ الانتهاء).'}, status=status.HTTP_400_BAD_REQUEST)
+            # return Response({'message': 'يرجى إدخال معايير البحث (اسم، رقم هاتف، RFID، حالة الاشتراك، معرف العضو، نوع الاشتراك، تاريخ البدء، أو تاريخ الانتهاء).'}, status=status.HTTP_400_BAD_REQUEST)
 
         subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club.id)
 
