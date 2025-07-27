@@ -175,6 +175,40 @@ def active_users_api(request):
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+def api_users_with_paid_expenses(request):
+    """Retrieve a list of users from the same club who have paid expenses (as paid_by)."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
+
+    users = User.objects.filter(
+        expenses_paid__isnull=False,
+        expenses_paid__amount__gt=0,
+        club=request.user.club
+    ).distinct().prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club')
+
+    serializer = UserProfileSerializer(users, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_users_with_related_expenses(request):
+    """Retrieve a list of users from the same club who are related to expenses (as related_employee)."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
+
+    users = User.objects.filter(
+        related_expenses__isnull=False,
+        related_expenses__amount__gt=0,
+        club=request.user.club
+    ).distinct().prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club')
+
+    serializer = UserProfileSerializer(users, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
 def api_users_with_expenses(request):
     """Retrieve a list of users from the same club who have expenses (either as paid_by or related_employee)."""
     if not request.user.club:
@@ -182,7 +216,7 @@ def api_users_with_expenses(request):
         return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
 
     users = User.objects.filter(
-        Q(expenses_paid__isnull=False) | Q(related_expenses__isnull=False),
+        Q(expenses_paid__isnull=False, expenses_paid__amount__gt=0) | Q(related_expenses__isnull=False, related_expenses__amount__gt=0),
         club=request.user.club
     ).distinct().prefetch_related('groups', 'user_permissions', 'groups__permissions', 'club')
 

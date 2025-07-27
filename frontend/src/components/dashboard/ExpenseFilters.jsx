@@ -14,7 +14,8 @@ const ErrorFallback = ({ error }) => (
 const ExpenseFilters = ({
   filters,
   expenseCategories,
-  users,
+  paidByUsers,
+  relatedEmployeeUsers,
   handleFilterChange,
   handleSelectChange,
   handleReset,
@@ -40,7 +41,7 @@ const ExpenseFilters = ({
                 <SelectContent>
                   <SelectItem value="all">جميع الفئات</SelectItem>
                   {expenseCategories
-                    .filter((category) => category.id)
+                    ?.filter((category) => category.id)
                     .map((category) => (
                       <SelectItem key={category.id} value={category.id.toString()}>
                         {category.name}
@@ -66,13 +67,19 @@ const ExpenseFilters = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">جميع المستخدمين</SelectItem>
-                  {users
-                    .filter((user) => user.id)
-                    .map((user) => (
-                      <SelectItem key={user.id} value={user.id.toString()}>
-                        {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
-                      </SelectItem>
-                    ))}
+                  {Array.isArray(paidByUsers) && paidByUsers.length > 0 ? (
+                    paidByUsers
+                      .filter((user) => user.id)
+                      .map((user) => (
+                        <SelectItem key={user.id} value={user.id.toString()}>
+                          {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
+                        </SelectItem>
+                      ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      لا يوجد مستخدمين
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -93,13 +100,19 @@ const ExpenseFilters = ({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">جميع الموظفين</SelectItem>
-                  {users
-                    .filter((user) => user.id)
-                    .map((user) => (
-                      <SelectItem key={user.id} value={user.id.toString()}>
-                        {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
-                      </SelectItem>
-                    ))}
+                  {Array.isArray(relatedEmployeeUsers) && relatedEmployeeUsers.length > 0 ? (
+                    relatedEmployeeUsers
+                      .filter((user) => user.id)
+                      .map((user) => (
+                        <SelectItem key={user.id} value={user.id.toString()}>
+                          {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
+                        </SelectItem>
+                      ))
+                  ) : (
+                    <SelectItem value="none" disabled>
+                      لا يوجد موظفين
+                    </SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

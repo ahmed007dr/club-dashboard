@@ -149,11 +149,12 @@ class IncomeSummarySerializer(serializers.ModelSerializer):
 class ExpenseDetailSerializer(serializers.ModelSerializer):
     date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
     category_name = serializers.CharField(source='category.name', read_only=True)
+    related_employee_username = serializers.CharField(source='related_employee.username', read_only=True, allow_null=True)
 
     class Meta:
         model = Expense
-        fields = ['id', 'amount', 'date', 'category_name']
-
+        fields = ['id', 'amount', 'date', 'category_name', 'related_employee_username']
+        
 class IncomeDetailSerializer(serializers.ModelSerializer):
     date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
     source_name = serializers.CharField(source='source.name', read_only=True)

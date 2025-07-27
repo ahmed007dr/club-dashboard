@@ -45,12 +45,13 @@ const ExpenseTable = ({ expenses, handleEditClick, handleDeleteClick, canEditExp
               <td className="px-4 py-3 text-sm text-gray-800">
                 {expense.paid_by_details?.first_name && expense.paid_by_details?.last_name
                   ? `${expense.paid_by_details.first_name} ${expense.paid_by_details.last_name}`
-                  : expense.paid_by_details?.username || "غير متاح"}
+                  : expense.paid_by_details?.username || expense.paid_by_username || "غير متاح"}
               </td>
               <td className="px-4 py-3 text-sm text-gray-800">
-                {expense.related_employee_details?.first_name && expense.related_employee_details?.last_name
-                  ? `${expense.related_employee_details.first_name} ${expense.related_employee_details.last_name}`
-                  : expense.related_employee_details?.username || "غير محدد"}
+                {expense.related_employee_username ||
+                  (expense.related_employee_details?.first_name && expense.related_employee_details?.last_name
+                    ? `${expense.related_employee_details.first_name} ${expense.related_employee_details.last_name}`
+                    : expense.related_employee_details?.username || "غير محدد")}
               </td>
               <td className="px-4 py-3 text-sm flex gap-2 justify-end">
                 <DropdownMenu dir="rtl">

@@ -59,7 +59,8 @@ const Expenses = () => {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [userClub, setUserClub] = useState(null);
-  const [users, setUsers] = useState([]);
+  const [paidByUsers, setPaidByUsers] = useState([]);
+  const [relatedEmployeeUsers, setRelatedEmployeeUsers] = useState([]);
   const [errors, setErrors] = useState({});
   const [isSummaryClicked, setIsSummaryClicked] = useState(false);
   const [localExpenses, setLocalExpenses] = useState([]);
@@ -91,21 +92,34 @@ const Expenses = () => {
             "Content-Type": "application/json",
           },
         });
+        if (!profileResponse.ok) throw new Error("فشل في جلب بيانات الملف الشخصي");
         const profileData = await profileResponse.json();
         setUserClub({ id: profileData.club.id, name: profileData.club.name });
 
-        const usersResponse = await fetch(`${BASE_URL}accounts/api/users/`, {
+        const paidByResponse = await fetch(`${BASE_URL}accounts/api/users_with_paid_expenses/`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "application/json",
           },
         });
-        const usersData = await usersResponse.json();
-        setUsers(usersData.results || []);
+        if (!paidByResponse.ok) throw new Error("فشل في جلب المستخدمين الذين سجلوا مصروفات");
+        const paidByData = await paidByResponse.json();
+        setPaidByUsers(paidByData || []);
+
+        const relatedEmployeeResponse = await fetch(`${BASE_URL}accounts/api/users_with_related_expenses/`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!relatedEmployeeResponse.ok) throw new Error("فشل في جلب الموظفين المرتبطين");
+        const relatedEmployeeData = await relatedEmployeeResponse.json();
+        setRelatedEmployeeUsers(relatedEmployeeData || []);
       } catch (err) {
         console.error("فشل في تحميل البيانات:", err);
-        setErrors({ general: "فشل في تحميل بيانات المستخدم أو المستخدمين" });
+        setErrors({ general: err.message || "فشل في تحميل بيانات المستخدم أو المستخدمين" });
       }
     };
     fetchData();
@@ -131,7 +145,7 @@ const Expenses = () => {
             page,
             category: filters.category || null,
             user: filters.user || null,
-            related_employee: filters.related_employee || null,
+            related_employee: filters.related_employee ? parseInt(filters.related_employee) : null,
             amount: filters.amount || null,
             description: filters.description || null,
             start_date: filters.start_date || null,
@@ -204,6 +218,34 @@ const Expenses = () => {
       setErrors({});
       setCurrentPage(1);
       dispatch(fetchExpenses({ page: 1, ...filters }));
+      
+      // Reload users after saving expense
+      try {
+        const paidByResponse = await fetch(`${BASE_URL}accounts/api/users_with_paid_expenses/`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!paidByResponse.ok) throw new Error("فشل في جلب المستخدمين الذين سجلوا مصروفات");
+        const paidByData = await paidByResponse.json();
+        setPaidByUsers(paidByData || []);
+
+        const relatedEmployeeResponse = await fetch(`${BASE_URL}accounts/api/users_with_related_expenses/`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!relatedEmployeeResponse.ok) throw new Error("فشل في جلب الموظفين المرتبطين");
+        const relatedEmployeeData = await relatedEmployeeResponse.json();
+        setRelatedEmployeeUsers(relatedEmployeeData || []);
+      } catch (err) {
+        console.error("فشل في إعادة تحميل المستخدمين:", err);
+        setErrors({ general: err.message || "فشل في إعادة تحميل قائمة المستخدمين" });
+      }
     } catch (err) {
       console.error("فشل في حفظ المصروف:", err);
       setErrors({ general: err.message || "فشل في حفظ المصروف. تحقق من البيانات." });
@@ -214,29 +256,30 @@ const Expenses = () => {
     try {
       await dispatch(
         fetchAllExpenses({
-          category: filters.category,
-          user: filters.user,
-          related_employee: filters.related_employee,
-          amount: filters.amount,
-          description: filters.description,
-          start_date: filters.start_date,
-          end_date: filters.end_date,
+          category: filters.category || null,
+          user: filters.user || null,
+          related_employee: filters.related_employee ? parseInt(filters.related_employee) : null,
+          amount: filters.amount || null,
+          description: filters.description || null,
+          start_date: filters.start_date || null,
+          end_date: filters.end_date || null,
         })
       ).unwrap();
 
       const data = allExpenses.map((expense) => ({
         'النادي': expense.club_details?.name || "غير متاح",
-        'الفئة': expense.category_details?.name || "غير متاح",
+        'الفئة': expense.category_details?.name || expense.category_name || "غير متاح",
         'المبلغ': expense.amount ? `${expense.amount} جنيه` : "غير متاح",
         'الوصف': expense.description || "غير متاح",
         'التاريخ': expense.date || "غير متاح",
         'رقم الفاتورة': expense.invoice_number || "غير متاح",
-        'الموظف المرتبط': expense.related_employee_details?.first_name && expense.related_employee_details?.last_name
-          ? `${expense.related_employee_details.first_name} ${expense.related_employee_details.last_name}`
-          : expense.related_employee_details?.username || 'غير متاح',
+        'الموظف المرتبط': expense.related_employee_username ||
+          (expense.related_employee_details?.first_name && expense.related_employee_details?.last_name
+            ? `${expense.related_employee_details.first_name} ${expense.related_employee_details.last_name}`
+            : expense.related_employee_details?.username || 'غير محدد'),
         'الموظف المدفوع بواسطة': expense.paid_by_details?.first_name && expense.paid_by_details?.last_name
           ? `${expense.paid_by_details.first_name} ${expense.paid_by_details.last_name}`
-          : expense.paid_by_details?.username || 'غير متاح',
+          : expense.paid_by_details?.username || expense.paid_by_username || 'غير متاح',
       }));
 
       if (isSummaryClicked && totalExpensesCount > 0) {
@@ -369,7 +412,7 @@ const Expenses = () => {
         fetchExpenseSummary({
           category: filters.category || null,
           user: filters.user || null,
-          related_employee: filters.related_employee || null,
+          related_employee: filters.related_employee ? parseInt(filters.related_employee) : null,
           amount: filters.amount || null,
           description: filters.description || null,
           start_date: startDate,
@@ -555,7 +598,8 @@ const Expenses = () => {
                   <ExpenseFilters
                     filters={filters}
                     expenseCategories={expenseCategories}
-                    users={users}
+                    paidByUsers={paidByUsers}
+                    relatedEmployeeUsers={relatedEmployeeUsers}
                     handleFilterChange={handleFilterChange}
                     handleSelectChange={handleSelectChange}
                     handleReset={handleResetFilters}
@@ -641,7 +685,7 @@ const Expenses = () => {
         newExpense={newExpense}
         userClub={userClub}
         expenseCategories={expenseCategories}
-        users={users}
+        users={relatedEmployeeUsers}
         handleChange={handleChange}
         handleSave={handleSave}
         errors={errors}
