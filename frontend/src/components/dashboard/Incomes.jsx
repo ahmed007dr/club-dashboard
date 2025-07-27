@@ -1,4 +1,4 @@
-import { FiDollarSign, FiFilter, FiDownload, FiList, FiCalendar ,FiPlus} from "react-icons/fi";
+import { FiDollarSign, FiFilter,FiAlertTriangle, FiDownload, FiList, FiCalendar ,FiPlus} from "react-icons/fi";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import React, { useState, useEffect, useCallback } from "react";
@@ -98,8 +98,8 @@ const Incomes = () => {
   const handleCalculateTotal = () => {
     dispatch(
       fetchIncomeSummary({
-        start: filters.start_date || null,
-        end: filters.end_date || null,
+        start_date: filters.start_date || null,
+        end_date: filters.end_date || null,
         source: filters.source || null,
         stock_item: filters.stockItem || null,
       })
@@ -287,23 +287,9 @@ const Incomes = () => {
 
                     {/* السطر الثاني: التاريخ من وإلى */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="relative">
-                        <label className="block text-sm font-medium mb-1 text-right">من</label>
-                        <div className="relative">
-                          <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                          <Input
-                            type="date"
-                            name="start_date"
-                            value={filters.start_date}
-                            onChange={handleFilterChange}
-                            className="w-full text-right"
-                          />
-                        </div>
-                      </div>
-                      <div className="relative">
+                    <div className="relative">
                         <label className="block text-sm font-medium mb-1 text-right">إلى</label>
                         <div className="relative">
-                          <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <Input
                             type="date"
                             name="end_date"
@@ -313,6 +299,22 @@ const Incomes = () => {
                           />
                         </div>
                       </div>
+                      
+
+                      <div className="relative">
+                        <label className="block text-sm font-medium mb-1 text-right">من</label>
+                        <div className="relative">
+                          <Input
+                            type="date"
+                            name="start_date"
+                            value={filters.start_date}
+                            onChange={handleFilterChange}
+                            className="w-full text-right"
+                          />
+                        </div>
+                      </div>
+                      
+
                     </div>
 
                     {/* السطر الثالث: الأزرار */}

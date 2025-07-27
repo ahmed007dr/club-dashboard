@@ -154,7 +154,9 @@ def calculate_totals(queryset, field='amount'):
     logger.debug(f"Calculated total for {field}: {total} for {queryset.count()} records")
     return float(total)
 
-def handle_response(data, details_queryset=None, details_serializer=None, details_key=None, status_code=status.HTTP_200_OK):
+
+def handle_response(data, details_queryset=None, details_serializer=None, details_key=None, translated_details=None, status_code=status.HTTP_200_OK):
+# def handle_response(data, details_queryset=None, details_serializer=None, details_key=None, status_code=status.HTTP_200_OK):
     response_data = data.copy()
     if details_queryset and details_serializer and details_key:
         response_data[details_key] = details_serializer(details_queryset, many=True).data
@@ -214,7 +216,7 @@ def expense_api(request):
             else:
                 expenses = apply_common_filters(expenses, request, user_field='paid_by', source_category_field='category')
             
-            expenses = expenses.order_by('date')
+            expenses = expenses.order_by('-date')
             paginator = StandardPagination()
             page = paginator.paginate_queryset(expenses, request)
             serializer = ExpenseSerializer(page, many=True, context={'request': request})
@@ -423,7 +425,8 @@ def income_summary(request):
         )
         
         # Require at least one filter to proceed
-        if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'source', 'user', 'amount', 'description']):
+        # if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'source', 'user', 'amount', 'description']):
+        if not any(request.query_params.get(param) for param in ['date', 'start', 'end', 'start_date', 'end_date', 'source', 'user', 'amount', 'description']):
             return Response({'error': 'يجب تحديد معايير البحث (تاريخ، مدة زمنية، مصدر، مستخدم، مبلغ، أو وصف).'}, status=status.HTTP_400_BAD_REQUEST)
         
         # Apply common filters

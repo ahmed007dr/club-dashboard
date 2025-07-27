@@ -21,7 +21,7 @@ const StaffSalaryReport = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch staff list for dropdown
+  // Fetch staff list with related expenses for dropdown
   useEffect(() => {
     const fetchStaffList = async () => {
       try {
@@ -30,15 +30,19 @@ const StaffSalaryReport = () => {
           setError('يرجى تسجيل الدخول لعرض البيانات.');
           return;
         }
-        const response = await axios.get(`${BASE_URL}staff/api/staff-list/`, {
+        const response = await axios.get(`${BASE_URL}accounts/api/users_with_related_expenses/`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (!Array.isArray(response.data)) {
+          throw new Error('استجابة غير متوقعة من API الموظفين المرتبطين');
+        }
         setStaffList(response.data);
       } catch (err) {
+        console.error('Failed to fetch staff list:', err);
         setError(
           err.response?.status === 401
             ? 'غير مصرح لك. يرجى تسجيل الدخول مرة أخرى.'
-            : 'حدث خطأ أثناء جلب قائمة الموظفين.'
+            : 'حدث خطأ أثناء جلب قائمة الموظفين المرتبطين.'
         );
       }
     };
@@ -50,19 +54,24 @@ const StaffSalaryReport = () => {
     const fetchExpenses = async () => {
       try {
         const token = localStorage.getItem('token');
-        if (!token) return;
+        if (!token) {
+          setError('يرجى تسجيل الدخول لعرض البيانات.');
+          return;
+        }
         const response = await axios.get(`${BASE_URL}finance/api/expenses/`, {
           headers: { Authorization: `Bearer ${token}` },
           params: {
             start_date: `${selectedMonth}-01`,
             end_date: moment(selectedMonth, 'YYYY-MM').endOf('month').format('YYYY-MM-DD'),
+            related_employee: selectedStaff !== 'all' ? selectedStaff : undefined,
           },
         });
         console.log('Expenses API response:', response.data); // للتصحيح
         const expensesByEmployee = response.data.results.reduce((acc, expense) => {
-          if (expense.related_employee) {
-            if (!acc[expense.related_employee]) acc[expense.related_employee] = 0;
-            acc[expense.related_employee] += parseFloat(expense.amount);
+          if (expense.related_employee_details?.id) {
+            const employeeId = expense.related_employee_details.id;
+            if (!acc[employeeId]) acc[employeeId] = 0;
+            acc[employeeId] += parseFloat(expense.amount || 0);
           }
           return acc;
         }, {});
@@ -73,7 +82,7 @@ const StaffSalaryReport = () => {
       }
     };
     fetchExpenses();
-  }, [selectedMonth]);
+  }, [selectedMonth, selectedStaff]);
 
   // Fetch report data
   const fetchReport = async () => {
@@ -167,14 +176,16 @@ const StaffSalaryReport = () => {
         acc[month] = [];
       }
       const expenses = employeeExpenses[staff.id] || 0;
+      const netSalary = (entry.total_salary || 0) - expenses;
       acc[month].push({ 
         ...entry, 
+        id: staff.id, // إضافة id لضمان الربط الصحيح
         first_name: staff.first_name || '', 
         last_name: staff.last_name || '', 
         username: staff.username || 'غير متوفر',
         hourly_rate: staff.hourly_rate,
         expenses,
-        net_salary: (entry.total_salary || 0) - expenses,
+        net_salary: netSalary,
       });
     });
     return acc;
@@ -266,11 +277,17 @@ const StaffSalaryReport = () => {
             }
           >
             <Option value="all">الكل</Option>
-            {staffList.map((staff) => (
-              <Option key={staff.id} value={staff.id}>
-                {staff.first_name && staff.last_name ? `${staff.first_name} ${staff.last_name}` : staff.username || 'اسم غير متوفر'}
+            {Array.isArray(staffList) && staffList.length > 0 ? (
+              staffList.map((staff) => (
+                <Option key={staff.id} value={staff.id.toString()}>
+                  {staff.first_name && staff.last_name ? `${staff.first_name} ${staff.last_name}` : staff.username || 'اسم غير متوفر'}
+                </Option>
+              ))
+            ) : (
+              <Option value="none" disabled>
+                لا يوجد موظفين مرتبطين
               </Option>
-            ))}
+            )}
           </Select>
         </div>
         <Button
@@ -346,7 +363,7 @@ const StaffSalaryReport = () => {
                 <Table
                   columns={columns}
                   dataSource={groupedByMonth[month]}
-                  rowKey={(record) => `${record.first_name && record.last_name ? `${record.first_name}_${record.last_name}` : record.username || 'اسم_غير_متوفر'}-${month}`}
+                  rowKey={(record) => `${record.id}-${month}`}
                   pagination={false}
                   locale={{ emptyText: 'لا توجد بيانات رواتب لهذا الشهر' }}
                   style={{ background: '#fff', borderRadius: '8px' }}
