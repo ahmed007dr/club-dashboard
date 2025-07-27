@@ -1,16 +1,29 @@
+import logging
+from datetime import datetime
+
+from django.db.models import Q,Sum
+from django.utils import timezone
+from django.contrib.auth import authenticate
+
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
-from .serializers import UserProfileSerializer, LoginSerializer, RFIDLoginSerializer, UserSerializer
-from .models import User
 from rest_framework.pagination import PageNumberPagination
-from django.db.models import Q
+
+from accounts.models import User
+from accounts.serializers import (
+    UserProfileSerializer,
+    LoginSerializer,
+    RFIDLoginSerializer,
+    UserSerializer
+)
+
 from staff.models import StaffAttendance
-from django.utils import timezone
-import logging
+
+from finance.models import Expense, Income, StockTransaction
+from finance.serializers import ExpenseSerializer, IncomeSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +254,83 @@ def api_system_users(request):
     
     serializer = UserProfileSerializer(system_users, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def api_shift_reports(request):
+    """List simplified shift reports for users who perform operations in the system."""
+    if not request.user.club:
+        logger.error(f"User {request.user.username} has no associated club")
+        return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Get date range from query parameters
+    start_date = request.query_params.get('start_date')
+    end_date = request.query_params.get('end_date')
+
+    try:
+        if start_date and end_date:
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            start_date = timezone.make_aware(start_date)
+            end_date = timezone.make_aware(end_date.replace(hour=23, minute=59, second=59))
+        else:
+            # Default to last 7 days if no dates provided
+            end_date = timezone.now()
+            start_date = end_date - timezone.timedelta(days=7)
+    except ValueError:
+        return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Filter users who perform operations (owner, admin, reception)
+    system_users = User.objects.filter(
+        club=request.user.club,
+        is_active=True,
+        role__in=FULL_ACCESS_ROLES + ['reception']
+    ).distinct()
+
+    report_data = []
+    for user in system_users:
+        # Get shifts within the date range
+        shifts = StaffAttendance.objects.filter(
+            staff=user,
+            check_in__range=[start_date, end_date]
+        ).select_related('staff').order_by('check_in')
+
+        user_shifts = []
+        for shift in shifts:
+            # Get total expenses and incomes during the shift
+            expenses = Expense.objects.filter(
+                paid_by=user,
+                date__range=[shift.check_in, shift.check_out or timezone.now()]
+            ).aggregate(total_expense=Sum('amount'))['total_expense'] or 0
+            incomes = Income.objects.filter(
+                received_by=user,
+                date__range=[shift.check_in, shift.check_out or timezone.now()]
+            ).aggregate(total_income=Sum('amount'))['total_income'] or 0
+            
+            # Calculate shift duration in hours
+            end_time = shift.check_out or timezone.now()
+            duration = (end_time - shift.check_in).total_seconds() / 3600  # Convert to hours
+
+            user_shifts.append({
+                'shift_id': shift.id,
+                'check_in': shift.check_in.isoformat(),
+                'check_out': shift.check_out.isoformat() if shift.check_out else None,
+                'total_expense': float(expenses),
+                'total_income': float(incomes),
+                'net_profit': float(incomes - expenses),
+                'shift_duration': round(duration, 2) 
+
+            })
+
+        report_data.append({
+            'user_id': user.id,
+            'username': user.username,
+            'role': user.role,
+            'shifts': user_shifts
+        })
+
+    return Response(report_data, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

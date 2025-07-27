@@ -1,0 +1,92 @@
+@media print {
+  .no-print { display: none !important; }
+  .print-report { margin: 0; padding: 20px; background: white; border: none; box-shadow: none; }
+  .print-report table { width: 100%; border-collapse: collapse; }
+  .print-report th, .print-report td { border: 1px solid #e5e7eb; padding: 12px; text-align: right; }
+  .print-report th { background: #f3f4f6; font-weight: 600; }
+}
+
+.react-datepicker__input-container input {
+  direction: rtl;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
+  width: 100%;
+  font-size: 0.875rem;
+}
+
+.react-datepicker__header {
+  background-color: #f3f4f6;
+  border-bottom: none;
+  border-radius: 4px 4px 0 0;
+}
+
+.react-datepicker {
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-family: inherit;
+}
+
+.react-datepicker__day-name, .react-datepicker__day, .react-datepicker__time-name {
+  color: #1f2937;
+}
+
+.react-datepicker__day--selected, .react-datepicker__day--keyboard-selected {
+  background-color: #1e40af;
+  color: white;
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.hidden-button {
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.hidden-button:hover {
+  opacity: 1;
+}
+
+.scrollable-table {
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: block;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.scrollable-table table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.scrollable-table th, .scrollable-table td {
+  padding: 16px;
+  text-align: right;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 1.125rem;
+}
+
+.scrollable-table th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.scrollable-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
