@@ -211,12 +211,12 @@ class SubscriptionAdmin(ImportExportModelAdmin):
         'payments_list',
     )
     list_filter = ('club', 'type', 'start_date', 'end_date', 'is_cancelled')
-    search_fields = ('member__name', 'member__phone', 'type__name', 'club__name')
+    search_fields = ('member__name', 'member__phone', 'type__name', 'club__name','member__rfid_code')
     list_select_related = ('member', 'type', 'club', 'created_by')
     autocomplete_fields = ('member', 'type', 'created_by')
     ordering = ('-start_date',)
     readonly_fields = (
-        'remaining_amount', 'entry_count', 'active_freeze_status', 'total_freeze_days_used',
+         'entry_count', 'active_freeze_status', 'total_freeze_days_used',
         'is_cancelled', 'cancellation_date', 'refund_amount', 'payments_list'
     )
     date_hierarchy = 'start_date'

@@ -26,6 +26,8 @@ from .serializers import (
 )
 from utils.convert_to_name import get_object_from_id_or_name
 from utils.reports import get_employee_report_data
+from operator import or_
+from functools import reduce
 
 logger = logging.getLogger(__name__)
 
@@ -42,56 +44,64 @@ class StandardPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 20
 
-def apply_common_filters(queryset, request, user_field=None, source_category_field=None):
+def apply_common_filters(queryset, request, user_field=None, source_category_field=None, restrict_to_attendance=False):
     query_params = request.query_params
     applied_filters = []
 
-    if query_params.get('date') and (query_params.get('start_date') or query_params.get('end_date')):
-        raise ValueError('لا يمكن استخدام "date" مع "start_date" أو "end_date" في نفس الطلب.')
+    # تخطي فلاتر التاريخ إذا كانت التصفية تعتمد على فترات الحضور
+    if not restrict_to_attendance:
+        if query_params.get('date') and (query_params.get('start_date') or query_params.get('end_date')):
+            raise ValueError('لا يمكن استخدام "date" مع "start_date" أو "end_date" في نفس الطلب.')
 
-    if query_params.get('date'):
-        try:
-            date_input = query_params.get('date')
+        if query_params.get('date'):
             try:
-                date_obj = datetime.strptime(date_input, '%Y-%m-%d %H:%M:%S')
-                date_obj = timezone.make_aware(date_obj)
-                queryset = queryset.filter(date=date_obj)
-                applied_filters.append(f"date={date_obj}")
+                date_input = query_params.get('date')
+                try:
+                    date_obj = datetime.strptime(date_input, '%Y-%m-%d %H:%M:%S')
+                    date_obj = timezone.make_aware(date_obj)
+                    queryset = queryset.filter(date=date_obj)
+                    applied_filters.append(f"date={date_obj}")
+                except ValueError:
+                    date_obj = datetime.strptime(date_input, '%Y-%m-%d')
+                    start_of_day = timezone.make_aware(date_obj.replace(hour=0, minute=0, second=0))
+                    end_of_day = timezone.make_aware(date_obj.replace(hour=23, minute=59, second=59))
+                    queryset = queryset.filter(date__range=[start_of_day, end_of_day])
+                    applied_filters.append(f"date={date_input} (full day)")
             except ValueError:
-                date_obj = datetime.strptime(date_input, '%Y-%m-%d')
-                start_of_day = timezone.make_aware(date_obj.replace(hour=0, minute=0, second=0))
-                end_of_day = timezone.make_aware(date_obj.replace(hour=23, minute=59, second=59))
-                queryset = queryset.filter(date__range=[start_of_day, end_of_day])
-                applied_filters.append(f"date={date_input} (full day)")
-        except ValueError:
-            raise ValueError('صيغة التاريخ غير صحيحة (YYYY-MM-DD أو YYYY-MM-DD HH:MM:SS).')
+                raise ValueError('صيغة التاريخ غير صحيحة (YYYY-MM-DD أو YYYY-MM-DD HH:MM:SS).')
 
-    if query_params.get('start_date') and query_params.get('end_date'):
-        try:
-            start_input = query_params.get('start_date')
-            end_input = query_params.get('end_date')
+        if query_params.get('start_date') and query_params.get('end_date'):
             try:
-                start_date = datetime.strptime(start_input, '%Y-%m-%d %H:%M:%S')
-                end_date = datetime.strptime(end_input, '%Y-%m-%d %H:%M:%S')
+                start_input = query_params.get('start_date')
+                end_input = query_params.get('end_date')
+                try:
+                    start_date = datetime.strptime(start_input, '%Y-%m-%d %H:%M:%S')
+                    end_date = datetime.strptime(end_input, '%Y-%m-%d %H:MM:SS')
+                except ValueError:
+                    start_date = datetime.strptime(start_input, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+                    end_date = datetime.strptime(end_input, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+                start_date = timezone.make_aware(start_date)
+                end_date = timezone.make_aware(end_date)
+                if start_date > end_date:
+                    raise ValueError('تاريخ البداية يجب أن يكون قبل تاريخ النهاية.')
+                queryset = queryset.filter(date__range=[start_date, end_date])
+                applied_filters.append(f"start_date={start_date}, end_date={end_date}")
             except ValueError:
-                start_date = datetime.strptime(start_input, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
-                end_date = datetime.strptime(end_input, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-            start_date = timezone.make_aware(start_date)
-            end_date = timezone.make_aware(end_date)
-            if start_date > end_date:
-                raise ValueError('تاريخ البداية يجب أن يكون قبل تاريخ النهاية.')
-            queryset = queryset.filter(date__range=[start_date, end_date])
-            applied_filters.append(f"start_date={start_date}, end_date={end_date}")
-        except ValueError:
-            raise ValueError('صيغة التاريخ غير صحيحة (YYYY-MM-DD أو YYYY-MM-DD HH:MM:SS).')
-    elif query_params.get('start_date') or query_params.get('end_date'):
-        raise ValueError('تاريخي البداية والنهاية مطلوبان معًا.')
+                raise ValueError('صيغة التاريخ غير صحيحة (YYYY-MM-DD أو YYYY-MM-DD HH:MM:SS).')
+        elif query_params.get('start_date') or query_params.get('end_date'):
+            raise ValueError('تاريخي البداية والنهاية مطلوبان معًا.')
 
+    # فلتر المستخدم (التأكد من أن الموظف يرى بياناته فقط ما لم يكن لديه أذونات)
     if query_params.get('user'):
         user_obj = get_object_from_id_or_name(User, query_params.get('user'), ['id'])
         if user_obj and user_obj.club == request.user.club:
-            queryset = queryset.filter(**{user_field: user_obj})
-            applied_filters.append(f"user={user_obj.id}")
+            # السماح للأدوار العليا (مثل owner/admin) برؤية بيانات مستخدمين آخرين
+            if request.user.role in ['owner', 'admin'] or user_obj == request.user:
+                queryset = queryset.filter(**{user_field: user_obj})
+                applied_filters.append(f"user={user_obj.id}")
+            else:
+                queryset = queryset.none()
+                applied_filters.append(f"user=None (access denied)")
         else:
             queryset = queryset.none()
             applied_filters.append(f"user=None")
@@ -133,7 +143,7 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
 
     logger.debug(f"Applied filters: {', '.join(applied_filters) if applied_filters else 'none'}")
     logger.debug(f"Number of records after filtering: {queryset.count()}")
-    
+
     if queryset.exists():
         sample_fields = ['id', 'amount', 'date']
         if source_category_field == 'source':
@@ -146,7 +156,7 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
             sample_fields.append('related_employee__username')
         sample_records = queryset[:5].values(*sample_fields)
         logger.debug(f"Sample records: {list(sample_records)}")
-    
+
     return queryset
 
 def calculate_totals(queryset, field='amount'):
@@ -209,22 +219,52 @@ def expense_api(request):
                 'id', 'amount', 'date', 'category__name', 'paid_by__username',
                 'related_employee__username', 'description', 'invoice_number'
             )
-            
-            if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'category', 'user', 'related_employee', 'amount', 'description']):
-                last_24_hours = timezone.now() - timedelta(hours=24)
-                expenses = expenses.filter(date__gte=last_24_hours)
+
+            if request.user.role not in ['admin', 'owner']:
+                attendances = StaffAttendance.objects.filter(
+                    staff=request.user, club=request.user.club
+                ).select_related('staff', 'club')
+
+                if not attendances.exists():
+                    return Response({'error': 'لا توجد سجلات حضور للموظف.'}, status=status.HTTP_404_NOT_FOUND)
+
+                # جمع فترات الحضور
+                expense_filters = []
+                for attendance in attendances:
+                    end_time = attendance.check_out if attendance.check_out else timezone.now()
+                    expense_filters.append(
+                        Q(date__gte=attendance.check_in, date__lt=end_time)
+                    )
+
+                # دمج الفلاتر باستخدام OR
+                combined_filter = reduce(or_, expense_filters) if expense_filters else Q()
+                expenses = expenses.filter(combined_filter)
+
+            # التحقق من وجود فلاتر إضافية
+            if not any(request.query_params.get(param) for param in ['category', 'user', 'related_employee', 'amount', 'description']):
+                if request.user.role not in ['admin', 'owner']:
+                    if not expense_filters:
+                        return Response({'error': 'يجب تحديد معايير البحث أو تسجيل حضور.'}, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    # فلتر افتراضي لآخر 24 ساعة لـ admin/owner إذا لم يتم تحديد فلاتر
+                    last_24_hours = timezone.now() - timedelta(hours=24)
+                    expenses = expenses.filter(date__gte=last_24_hours)
             else:
-                expenses = apply_common_filters(expenses, request, user_field='paid_by', source_category_field='category')
-            
+                # تطبيق الفلاتر الإضافية (تخطي فلاتر التاريخ إذا كان هناك فلتر حضور)
+                expenses = apply_common_filters(
+                    expenses, request, user_field='paid_by', source_category_field='category',
+                    restrict_to_attendance=request.user.role not in ['admin', 'owner']
+                )
+
             expenses = expenses.order_by('-date')
             paginator = StandardPagination()
             page = paginator.paginate_queryset(expenses, request)
             serializer = ExpenseSerializer(page, many=True, context={'request': request})
             return paginator.get_paginated_response(serializer.data)
-        
+
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
+            
     elif request.method == 'POST':
         data = request.data.copy()
         data['paid_by'] = request.user.id
@@ -285,34 +325,63 @@ def income_api(request):
 
     if request.method == 'GET':
         try:
-            incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club).only(
+            # استعلام الإيرادات الأساسي
+            incomes = Income.objects.select_related('source', 'received_by').filter(
+                club=request.user.club
+            ).only(
                 'id', 'amount', 'date', 'source__name', 'received_by__username', 'description', 'quantity'
             )
-            
-            # Require at least one filter to proceed
-            if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'source', 'user', 'amount', 'description']):
-                return Response({'error': 'يجب تحديد معايير البحث (تاريخ، مدة زمنية، مصدر، مستخدم، مبلغ، أو وصف).'}, status=status.HTTP_400_BAD_REQUEST)
-            
-            # Apply common filters
-            incomes = apply_common_filters(incomes, request, user_field='received_by', source_category_field='source')
-            
-            incomes = incomes.order_by('-date')  
+
+            # تطبيق فلتر الحضور فقط إذا لم يكن المستخدم admin أو owner
+            if request.user.role not in ['admin', 'owner']:
+                attendances = StaffAttendance.objects.filter(
+                    staff=request.user, club=request.user.club
+                ).select_related('staff', 'club')
+
+                if not attendances.exists():
+                    return Response({'error': 'لا توجد سجلات حضور للموظف.'}, status=status.HTTP_404_NOT_FOUND)
+
+                # جمع فترات الحضور
+                income_filters = []
+                for attendance in attendances:
+                    end_time = attendance.check_out if attendance.check_out else timezone.now()
+                    income_filters.append(
+                        Q(date__gte=attendance.check_in, date__lt=end_time)
+                    )
+
+                # دمج الفلاتر باستخدام OR
+                combined_filter = reduce(or_, income_filters) if income_filters else Q()
+                incomes = incomes.filter(combined_filter)
+
+            # التحقق من وجود فلاتر إضافية
+            if not any(request.query_params.get(param) for param in ['source', 'user', 'amount', 'description']):
+                if request.user.role not in ['admin', 'owner'] and not income_filters:
+                    return Response({'error': 'يجب تحديد معايير البحث أو تسجيل حضور.'}, status=status.HTTP_400_BAD_REQUEST)
+
+            # تطبيق الفلاتر الإضافية (تخطي فلاتر التاريخ إذا كان هناك فلتر حضور)
+            incomes = apply_common_filters(
+                incomes, request, user_field='received_by', source_category_field='source', 
+                restrict_to_attendance=request.user.role not in ['admin', 'owner']
+            )
+            incomes = incomes.order_by('-date')
+
+            # التصفح
             paginator = StandardPagination()
             page = paginator.paginate_queryset(incomes, request)
             serializer = IncomeSerializer(page, many=True)
-            
-            # Translate source names to Arabic
+
+            # ترجمة أسماء المصادر
             translated_data = serializer.data
             for income in translated_data:
                 if income['source']:
                     source_name = IncomeSource.objects.get(id=income['source']).name
                     income['source'] = SOURCE_TRANSLATIONS.get(source_name, source_name)
-            
+
             return paginator.get_paginated_response(translated_data)
-        
+
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            
+    
     elif request.method == 'POST':
         data = request.data.copy()
         data['received_by'] = request.user.id
@@ -683,6 +752,7 @@ def daily_summary_api(request):
 
 
 
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def employee_daily_report_api(request):
@@ -703,19 +773,58 @@ def employee_daily_report_api(request):
 
         employee = get_object_or_404(User, id=employee_id, club=request.user.club) if employee_id else request.user
 
+        # إعداد البيانات عبر دالة get_employee_report_data
         data, status_code = get_employee_report_data(
             user=request.user, employee_id=employee.id, start_date=start_date, end_date=end_date
         )
-        
+
+        # تطبيق فلتر الحضور إذا لم يكن المستخدم admin أو owner
+        if request.user.role not in ['admin', 'owner'] and employee == request.user:
+            attendances = StaffAttendance.objects.filter(
+                staff=employee, club=request.user.club
+            ).select_related('staff', 'club')
+
+            if not attendances.exists():
+                return Response({'error': 'لا توجد سجلات حضور للموظف.'}, status=status.HTTP_404_NOT_FOUND)
+
+            # جمع فترات الحضور
+            report_filters = []
+            for attendance in attendances:
+                end_time = attendance.check_out if attendance.check_out else timezone.now()
+                report_filters.append(
+                    Q(date__gte=attendance.check_in, date__lt=end_time)
+                )
+
+            combined_filter = reduce(or_, report_filters) if report_filters else Q()
+
+            if 'incomes' in data:
+                incomes = Income.objects.select_related('source', 'received_by').filter(
+                    club=request.user.club, **combined_filter
+                ).only(
+                    'id', 'amount', 'date', 'source__name', 'received_by__username', 'description', 'quantity'
+                )
+                data['incomes'] = IncomeSerializer(incomes, many=True).data
+
+            if 'expenses' in data:
+                expenses = Expense.objects.select_related('category', 'paid_by', 'related_employee').filter(
+                    club=request.user.club, **combined_filter
+                ).only(
+                    'id', 'amount', 'date', 'category__name', 'paid_by__username',
+                    'related_employee__username', 'description', 'invoice_number'
+                )
+                data['expenses'] = ExpenseSerializer(expenses, many=True, context={'request': request}).data
+
+        # ترجمة أسماء المصادر للإيرادات
         if 'incomes' in data:
             for income in data['incomes']:
-                income['source'] = SOURCE_TRANSLATIONS.get(income['source'], income['source'])
+                if income.get('source'):
+                    income['source'] = SOURCE_TRANSLATIONS.get(income['source'], income['source'])
         
         return Response(data, status=status_code)
     
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
+    
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def generate_daily_report_pdf(request):
