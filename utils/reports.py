@@ -20,7 +20,7 @@ SOURCE_TRANSLATIONS = {
 }
 
 def get_employee_report_data(user, employee_id=None, start_date=None, end_date=None):
-    """Generate employee report data with required filters."""
+    """Generate employee report data with required filters including specific time."""
     try:
         # Require at least one filter to proceed
         if not (start_date and end_date) and not employee_id:
@@ -29,24 +29,25 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
 
         employee = get_object_or_404(User, id=employee_id, club=user.club) if employee_id else user
 
+        # تحويل التاريخ والوقت
         if start_date and end_date:
             start = parse_datetime(start_date)
             end = parse_datetime(end_date)
             if not start or not end:
                 logger.error("Invalid date format: start=%s, end=%s", start_date, end_date)
-                return {'error': 'صيغة التاريخ غير صحيحة'}, status.HTTP_400_BAD_REQUEST
+                return {'error': 'صيغة التاريخ والوقت غير صحيحة. استخدم صيغة ISO 8601 (مثل 2025-08-06T08:00:00)'}, status.HTTP_400_BAD_REQUEST
             start = timezone.make_aware(start) if timezone.is_naive(start) else start
             end = timezone.make_aware(end) if timezone.is_naive(end) else end
             if start > end:
                 logger.error("Start date after end date: start=%s, end=%s", start_date, end_date)
-                return {'error': 'تاريخ البداية يجب أن يكون قبل تاريخ النهاية.'}, status.HTTP_400_BAD_REQUEST
+                return {'error': 'تاريخ ووقت البداية يجب أن يكون قبل تاريخ ووقت النهاية.'}, status.HTTP_400_BAD_REQUEST
         else:
             logger.error("Missing date range: start_date=%s, end_date=%s", start_date, end_date)
-            return {'error': 'يجب تحديد تاريخ البداية وتاريخ النهاية.'}, status.HTTP_400_BAD_REQUEST
+            return {'error': 'يجب تحديد تاريخ ووقت البداية وتاريخ ووقت النهاية.'}, status.HTTP_400_BAD_REQUEST
 
         # إعداد الفلاتر الأساسية
-        income_filters = {'club': employee.club}
-        expense_filters = {'club': employee.club}
+        income_filters = {'club': employee.club, 'date__gte': start, 'date__lte': end}
+        expense_filters = {'club': employee.club, 'date__gte': start, 'date__lte': end}
         if employee_id:
             income_filters['received_by'] = employee
             expense_filters['paid_by'] = employee
@@ -59,24 +60,20 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
 
             if not attendances.exists():
                 logger.error("No attendance records found for employee: %s", employee.username)
-                return {'error': 'لا توجد سجلات حضور للموظف.'}, status.HTTP_404_NOT_FOUND
+                return {'error': 'لا توجد سجلات حضور للموظف في الفترة المحددة.'}, status.HTTP_404_NOT_FOUND
 
             # جمع فترات الحضور
             report_filters = []
             for attendance in attendances:
                 end_time = attendance.check_out if attendance.check_out else timezone.now()
                 report_filters.append(
-                    Q(date__gte=attendance.check_in, date__lt=end_time)
+                    Q(date__gte=attendance.check_in, date__lte=end_time)
                 )
 
             # دمج الفلاتر باستخدام OR
             combined_filter = reduce(or_, report_filters) if report_filters else Q()
             income_filters.update(combined_filter=combined_filter)
             expense_filters.update(combined_filter=combined_filter)
-        else:
-            # لـ admin/owner، تطبيق فلتر التاريخ فقط
-            income_filters.update({'date__gte': start, 'date__lte': end})
-            expense_filters.update({'date__gte': start, 'date__lte': end})
 
         # استعلام الإيرادات
         incomes = Income.objects.filter(**income_filters).values('source__name').annotate(

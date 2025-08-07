@@ -44,6 +44,16 @@ class StandardPagination(PageNumberPagination):
     page_size_query_param = 'page_size'
     max_page_size = 20
 
+
+def parse_date_with_optional_time(date_str):
+    try:
+        dt = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
+    except ValueError:
+        dt = datetime.strptime(date_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+    return timezone.make_aware(dt)
+
+
+
 def apply_common_filters(queryset, request, user_field=None, source_category_field=None, restrict_to_attendance=False):
     query_params = request.query_params
     applied_filters = []
@@ -75,8 +85,11 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
                 start_input = query_params.get('start_date')
                 end_input = query_params.get('end_date')
                 try:
-                    start_date = datetime.strptime(start_input, '%Y-%m-%d %H:%M:%S')
-                    end_date = datetime.strptime(end_input, '%Y-%m-%d %H:MM:SS')
+                    # start_date = datetime.strptime(start_input, '%Y-%m-%d %H:%M:%S')
+                    # end_date = datetime.strptime(end_input, '%Y-%m-%d %H:MM:SS')
+                    start_date = parse_date_with_optional_time(start_input)
+                    end_date = parse_date_with_optional_time(end_input)
+
                 except ValueError:
                     start_date = datetime.strptime(start_input, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
                     end_date = datetime.strptime(end_input, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
@@ -756,7 +769,7 @@ def daily_summary_api(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def employee_daily_report_api(request):
-    """Generate daily report for an employee with required filters."""
+    """Generate daily report for an employee with required filters including specific time."""
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
@@ -769,7 +782,7 @@ def employee_daily_report_api(request):
 
         # Require at least one filter to proceed
         if not any([employee_id, start_date, end_date]):
-            return Response({'error': 'يجب تحديد معايير البحث (معرف الموظف، تاريخ البداية، أو تاريخ النهاية).'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'يجب تحديد معايير البحث (معرف الموظف، تاريخ ووقت البداية، أو تاريخ ووقت النهاية).'}, status=status.HTTP_400_BAD_REQUEST)
 
         employee = get_object_or_404(User, id=employee_id, club=request.user.club) if employee_id else request.user
 
@@ -778,28 +791,36 @@ def employee_daily_report_api(request):
             user=request.user, employee_id=employee.id, start_date=start_date, end_date=end_date
         )
 
+        if status_code != status.HTTP_200_OK:
+            return Response(data, status=status_code)
+
         # تطبيق فلتر الحضور إذا لم يكن المستخدم admin أو owner
         if request.user.role not in ['admin', 'owner'] and employee == request.user:
+            start = parse_datetime(start_date)
+            end = parse_datetime(end_date)
+            start = timezone.make_aware(start) if timezone.is_naive(start) else start
+            end = timezone.make_aware(end) if timezone.is_naive(end) else end
+
             attendances = StaffAttendance.objects.filter(
-                staff=employee, club=request.user.club
+                staff=employee, club=request.user.club, check_in__gte=start, check_in__lte=end
             ).select_related('staff', 'club')
 
             if not attendances.exists():
-                return Response({'error': 'لا توجد سجلات حضور للموظف.'}, status=status.HTTP_404_NOT_FOUND)
+                return Response({'error': 'لا توجد سجلات حضور للموظف في الفترة المحددة.'}, status=status.HTTP_404_NOT_FOUND)
 
             # جمع فترات الحضور
             report_filters = []
             for attendance in attendances:
                 end_time = attendance.check_out if attendance.check_out else timezone.now()
                 report_filters.append(
-                    Q(date__gte=attendance.check_in, date__lt=end_time)
+                    Q(date__gte=attendance.check_in, date__lte=end_time)
                 )
 
             combined_filter = reduce(or_, report_filters) if report_filters else Q()
 
             if 'incomes' in data:
                 incomes = Income.objects.select_related('source', 'received_by').filter(
-                    club=request.user.club, **combined_filter
+                    club=request.user.club, date__gte=start, date__lte=end, **combined_filter
                 ).only(
                     'id', 'amount', 'date', 'source__name', 'received_by__username', 'description', 'quantity'
                 )
@@ -807,7 +828,7 @@ def employee_daily_report_api(request):
 
             if 'expenses' in data:
                 expenses = Expense.objects.select_related('category', 'paid_by', 'related_employee').filter(
-                    club=request.user.club, **combined_filter
+                    club=request.user.club, date__gte=start, date__lte=end, **combined_filter
                 ).only(
                     'id', 'amount', 'date', 'category__name', 'paid_by__username',
                     'related_employee__username', 'description', 'invoice_number'
@@ -824,7 +845,9 @@ def employee_daily_report_api(request):
     
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
+
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def generate_daily_report_pdf(request):

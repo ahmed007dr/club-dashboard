@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-hot-toast';
+import { format } from 'date-fns';
 import BASE_URL from '@/config/api';
 import ErrorBoundary from '../reports/ErrorBoundary';
 import ReportFilters from '../reports/ReportFilters';
@@ -61,7 +62,8 @@ const DailyReportButton = () => {
   }, [userRole]);
 
   const formatDateForApi = (date) => {
-    return new Date(date).toISOString().split('T')[0];
+    if (!date) return '';
+    return format(date, "yyyy-MM-dd'T'HH:mm:ssXXX"); // صيغة ISO 8601 مع المنطقة الزمنية
   };
 
   const handlePreviewReport = async () => {
@@ -75,6 +77,7 @@ const DailyReportButton = () => {
         if (employeeId) params.employee_id = employeeId;
         if (startDate) params.start_date = formatDateForApi(startDate);
         if (endDate) params.end_date = formatDateForApi(endDate);
+        console.log('Params:', params); // تسجيل المعلمات للتحقق
         if (!startDate || !endDate) {
           throw new Error('يجب تحديد تاريخ البداية والنهاية');
         }
@@ -102,6 +105,7 @@ const DailyReportButton = () => {
         start_date: formatDateForApi(startDate),
         end_date: formatDateForApi(endDate)
       };
+      console.log('Shift Report Params:', params); // تسجيل المعلمات للتحقق
       const response = await api.get('accounts/api/shift-reports/', { params });
       setShiftReportData(Array.isArray(response.data) ? response.data : []);
       setIsShiftReportOpen(true);
@@ -127,6 +131,7 @@ const DailyReportButton = () => {
         if (employeeId) params.employee_id = employeeId;
         if (startDate) params.start_date = formatDateForApi(startDate);
         if (endDate) params.end_date = formatDateForApi(endDate);
+        console.log('Generate Report Params:', params); // تسجيل المعلمات للتحقق
         if (!startDate || !endDate) {
           throw new Error('يجب تحديد تاريخ البداية والنهاية');
         }
