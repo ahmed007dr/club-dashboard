@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Q
 from functools import reduce
 from operator import or_
+from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,13 @@ SOURCE_TRANSLATIONS = {
     "Subscription": "اشتراك"
 }
 
+PAYMENT_METHOD_TRANSLATIONS = {
+    "Cash": "كاش",
+    "Visa": "فيزا"
+}
+
 def get_employee_report_data(user, employee_id=None, start_date=None, end_date=None):
-    """Generate employee report data with required filters including specific time."""
+    """Generate employee report data with required filters including specific time and payment methods."""
     try:
         # Require at least one filter to proceed
         if not (start_date and end_date) and not employee_id:
@@ -53,9 +59,9 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
             expense_filters['paid_by'] = employee
 
         # تطبيق فلتر الحضور إذا لم يكن المستخدم admin أو owner وكان الموظف هو المستخدم الحالي
-        if user.role not in ['admin', 'owner'] and employee == user:
+        if user.role not in FULL_ACCESS_ROLES and employee == user:
             attendances = StaffAttendance.objects.filter(
-                staff=employee, club=user.club, check_in__gte=start, check_in__lte=end
+                staff=employee, club=user.club, check_in__lte=end, check_out__gte=start
             ).select_related('staff', 'club')
 
             if not attendances.exists():
@@ -72,13 +78,28 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
 
             # دمج الفلاتر باستخدام OR
             combined_filter = reduce(or_, report_filters) if report_filters else Q()
-            income_filters.update(combined_filter=combined_filter)
-            expense_filters.update(combined_filter=combined_filter)
+            income_filters['combined_filter'] = combined_filter
+            expense_filters['combined_filter'] = combined_filter
 
         # استعلام الإيرادات
-        incomes = Income.objects.filter(**income_filters).values('source__name').annotate(
+        incomes = Income.objects.select_related('source', 'payment_method').filter(**income_filters).only(
+            'id', 'amount', 'date', 'source__name', 'payment_method__name', 'quantity'
+        )
+
+        # التحقق من وجود سجلات إيرادات بدون طريقة دفع
+        null_payment_methods = incomes.filter(payment_method__isnull=True).count()
+        if null_payment_methods > 0:
+            logger.warning(f"Found {null_payment_methods} income records with no payment method for employee {employee.username}")
+
+        # تجميع الإيرادات حسب المصدر وطريقة الدفع
+        incomes_by_source = incomes.values('source__name', 'payment_method__name').annotate(
             count=Sum('quantity'), total=Sum('amount')
         )
+
+        # تجميع الإيرادات حسب طريقة الدفع فقط
+        income_by_payment_method = incomes.values('payment_method__name').annotate(
+            total_income=Sum('amount')
+        ).order_by('payment_method__name')
 
         # استعلام المصروفات
         expenses = Expense.objects.filter(**expense_filters).values('category__name').annotate(
@@ -86,9 +107,25 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
         )
 
         # حساب الإجماليات
-        total_income = sum(item['total'] or 0 for item in incomes)
-        total_expenses = sum(item['total'] or 0 for item in expenses)
+        total_income = incomes.aggregate(total=Sum('amount'))['total'] or Decimal('0.0')
+        total_expenses = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.0')
         net_profit = total_income - total_expenses
+
+        # إعداد بيانات طرق الدفع
+        payment_methods_data = []
+        for item in income_by_payment_method:
+            method_name = item['payment_method__name'] or 'غير محدد'
+            method_income = item['total_income'] or Decimal('0.0')
+            # توزيع المصروفات نسبيًا بناءً على الإيرادات
+            method_expense = (method_income / total_income * total_expenses) if total_income > 0 else Decimal('0.0')
+            method_net_profit = method_income - method_expense
+            logger.debug(f"Payment method {method_name}: income={method_income}, expense={method_expense}, net_profit={method_net_profit}")
+            payment_methods_data.append({
+                'payment_method': PAYMENT_METHOD_TRANSLATIONS.get(method_name, method_name),
+                'total_income': float(method_income),
+                'total_expense': float(method_expense),
+                'net_profit': float(method_net_profit)
+            })
 
         # إعداد البيانات
         report_data = {
@@ -96,13 +133,18 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
             'club_name': employee.club.name if employee.club else 'غير محدد',
             'check_in': timezone.localtime(start).isoformat(),
             'check_out': timezone.localtime(end).isoformat(),
+            'total_income': float(total_income),
+            'total_expenses': float(total_expenses),
+            'total_net_profit': float(net_profit),
+            'payment_methods': payment_methods_data,
             'incomes': [
                 {
                     'source': SOURCE_TRANSLATIONS.get(item['source__name'], item['source__name']) or 'غير محدد',
+                    'payment_method': PAYMENT_METHOD_TRANSLATIONS.get(item['payment_method__name'], item['payment_method__name'] or 'غير محدد'),
                     'count': item['count'],
                     'total': float(item['total'])
                 }
-                for item in incomes
+                for item in incomes_by_source
             ],
             'expenses': [
                 {
@@ -110,13 +152,14 @@ def get_employee_report_data(user, employee_id=None, start_date=None, end_date=N
                     'total': float(item['total'])
                 }
                 for item in expenses
-            ],
-            'total_income': float(total_income),
-            'total_expenses': float(total_expenses),
-            'net_profit': float(net_profit)
+            ]
         }
 
         return report_data, status.HTTP_200_OK
     
     except ValueError as e:
+        logger.error(f"Error in get_employee_report_data: {str(e)}")
         return {'error': str(e)}, status.HTTP_400_BAD_REQUEST
+    except Exception as e:
+        logger.error(f"Unexpected error in get_employee_report_data: {str(e)}")
+        return {'error': 'حدث خطأ غير متوقع'}, status.HTTP_500_INTERNAL_SERVER_ERROR

@@ -30,6 +30,12 @@ const IncomeCards = ({ incomes, handleEditClick, handleDeleteClick }) => (
                 {income.amount ? `${income.amount} جنيه` : "غير متاح"}
               </p>
             </div>
+            <div>
+              <p className="text-xs text-gray-500">طريقة الدفع</p>
+              <p className="text-sm text-gray-800">
+                {income.payment_method || "غير محدد"}
+              </p>
+            </div>
           </div>
           <div className="space-y-3">
             <div>

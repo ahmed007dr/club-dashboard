@@ -11,6 +11,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.pagination import PageNumberPagination
+from decimal import Decimal
 
 from accounts.models import User
 from accounts.serializers import (
@@ -255,30 +256,51 @@ def api_system_users(request):
     serializer = UserProfileSerializer(system_users, many=True)
     return Response(serializer.data, status=status.HTTP_200_OK)
 
+
+PAYMENT_METHOD_TRANSLATIONS = {
+    "Cash": "كاش",
+    "Visa": "فيزا"
+}
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def api_shift_reports(request):
     """List simplified shift reports for users who perform operations in the system."""
     if not request.user.club:
-        logger.error(f"User {request.user.username} has no associated club")
+        logger.error(f"User {request.user.username} has no associated club", extra={'force': True})
         return Response({'error': 'لا يوجد نادي مرتبط بك'}, status=status.HTTP_400_BAD_REQUEST)
-
+    
     # Get date range from query parameters
     start_date = request.query_params.get('start_date')
     end_date = request.query_params.get('end_date')
-
     try:
         if start_date and end_date:
-            start_date = datetime.strptime(start_date, '%Y-%m-%d')
-            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            # إزالة الإزاحة الزمنية إذا وجدت
+            start_date = start_date.split('+')[0].split('%2B')[0]
+            end_date = end_date.split('+')[0].split('%2B')[0]
+            logger.debug(f"Removed timezone offset: start_date={start_date}, end_date={end_date}")
+            
+            try:
+                start_date = datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%S')
+                end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%S')
+                logger.debug(f"Parsed ISO datetime: start_date={start_date}, end_date={end_date}")
+            except ValueError:
+                try:
+                    start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
+                    end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
+                    logger.debug(f"Fallback to date-only: start_date={start_date}, end_date={end_date}")
+                except ValueError:
+                    return Response({'error': 'صيغة التاريخ غير صحيحة (متوقع: YYYY-MM-DD أو YYYY-MM-DDTHH:MM:SS)'}, status=status.HTTP_400_BAD_REQUEST)
             start_date = timezone.make_aware(start_date)
-            end_date = timezone.make_aware(end_date.replace(hour=23, minute=59, second=59))
+            end_date = timezone.make_aware(end_date)
         else:
             # Default to last 7 days if no dates provided
             end_date = timezone.now()
             start_date = end_date - timezone.timedelta(days=7)
-    except ValueError:
-        return Response({'error': 'صيغة التاريخ غير صحيحة (YYYY-MM-DD)'}, status=status.HTTP_400_BAD_REQUEST)
+    except ValueError as e:
+        logger.error(f"Error parsing date in api_shift_reports: {str(e)}", extra={'force': True})
+        return Response({'error': 'صيغة التاريخ غير صحيحة (متوقع: YYYY-MM-DD أو YYYY-MM-DDTHH:MM:SS)'}, status=status.HTTP_400_BAD_REQUEST)
 
     # Filter users who perform operations (owner, admin, reception)
     system_users = User.objects.filter(
@@ -294,34 +316,61 @@ def api_shift_reports(request):
             staff=user,
             check_in__range=[start_date, end_date]
         ).select_related('staff').order_by('check_in')
-
+        
         user_shifts = []
         for shift in shifts:
             # Get total expenses and incomes during the shift
             expenses = Expense.objects.filter(
                 paid_by=user,
                 date__range=[shift.check_in, shift.check_out or timezone.now()]
-            ).aggregate(total_expense=Sum('amount'))['total_expense'] or 0
+            ).aggregate(total_expense=Sum('amount'))['total_expense'] or Decimal('0.0')
+            
             incomes = Income.objects.filter(
                 received_by=user,
                 date__range=[shift.check_in, shift.check_out or timezone.now()]
-            ).aggregate(total_income=Sum('amount'))['total_income'] or 0
+            )
             
+            # التحقق من وجود إيرادات بدون طريقة دفع
+            null_payment_methods = incomes.filter(payment_method__isnull=True).count()
+            if null_payment_methods > 0:
+                logger.warning(f"Found {null_payment_methods} income records with no payment method for user {user.username} in shift {shift.id}", extra={'force': True})
+
+            # تجميع الإيرادات حسب طريقة الدفع
+            income_by_payment_method = incomes.values('payment_method__name').annotate(
+                total_income=Sum('amount')
+            ).order_by('payment_method__name')
+
+            total_income = incomes.aggregate(total_income=Sum('amount'))['total_income'] or Decimal('0.0')
+            
+            # إعداد بيانات طرق الدفع
+            payment_methods_data = []
+            for item in income_by_payment_method:
+                method_name = item['payment_method__name'] or 'غير محدد'
+                method_income = item['total_income'] or Decimal('0.0')
+                method_expense = (method_income / total_income * expenses) if total_income > 0 else Decimal('0.0')
+                method_net_profit = method_income - method_expense
+                payment_methods_data.append({
+                    'payment_method': PAYMENT_METHOD_TRANSLATIONS.get(method_name, method_name),
+                    'total_income': float(method_income),
+                    'total_expense': float(method_expense),
+                    'net_profit': float(method_net_profit)
+                })
+
             # Calculate shift duration in hours
             end_time = shift.check_out or timezone.now()
             duration = (end_time - shift.check_in).total_seconds() / 3600  # Convert to hours
-
+            
             user_shifts.append({
                 'shift_id': shift.id,
                 'check_in': shift.check_in.isoformat(),
                 'check_out': shift.check_out.isoformat() if shift.check_out else None,
+                'total_income': float(total_income),
                 'total_expense': float(expenses),
-                'total_income': float(incomes),
-                'net_profit': float(incomes - expenses),
-                'shift_duration': round(duration, 2) 
-
+                'net_profit': float(total_income - expenses),
+                'shift_duration': round(duration, 2),
+                'payment_methods': payment_methods_data
             })
-
+        
         report_data.append({
             'user_id': user.id,
             'username': user.username,
@@ -330,7 +379,6 @@ def api_shift_reports(request):
         })
 
     return Response(report_data, status=status.HTTP_200_OK)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])

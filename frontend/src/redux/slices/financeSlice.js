@@ -1,7 +1,6 @@
-
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import BASE_URL from '../../config/api';
 import toast from 'react-hot-toast';
+import BASE_URL from '../../config/api';
 
 export const fetchExpenseSummary = createAsyncThunk(
   'finance/fetchExpenseSummary',
@@ -273,7 +272,9 @@ export const fetchIncomeSummary = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch income summary.');
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('fetchIncomeSummary payload:', data); // تصحيح
+      return data;
     } catch (error) {
       toast.error(error.message);
       return rejectWithValue(error.message);
@@ -297,8 +298,11 @@ export const fetchIncomeSources = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || 'Failed to fetch income sources.');
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('fetchIncomeSources payload:', data); // تصحيح
+      return data;
     } catch (error) {
+      toast.error(error.message);
       return rejectWithValue(error.message);
     }
   }
@@ -323,6 +327,7 @@ export const addIncomeSource = createAsyncThunk(
       }
       return await response.json();
     } catch (error) {
+      toast.error(error.message);
       return rejectWithValue(error.message);
     }
   }
@@ -351,7 +356,9 @@ export const fetchIncomes = createAsyncThunk(
         const errorData = await response.json();
         return rejectWithValue(errorData.message || `HTTP error! status: ${response.status}`);
       }
-      return await response.json();
+      const data = await response.json();
+      console.log('fetchIncomes payload:', data); // تصحيح
+      return data;
     } catch (error) {
       toast.error(error.message);
       return rejectWithValue(error.message);
@@ -378,6 +385,7 @@ export const addIncome = createAsyncThunk(
       }
       return await response.json();
     } catch (error) {
+      toast.error(error.message);
       return rejectWithValue(error.message);
     }
   }
@@ -402,6 +410,7 @@ export const updateIncome = createAsyncThunk(
       }
       return await response.json();
     } catch (error) {
+      toast.error(error.message);
       return rejectWithValue(error.message);
     }
   }
@@ -425,6 +434,7 @@ export const deleteIncome = createAsyncThunk(
       }
       return id;
     } catch (error) {
+      toast.error(error.message);
       return rejectWithValue(error.message);
     }
   }
@@ -442,7 +452,8 @@ const financeSlice = createSlice({
     incomes: [],
     incomesPagination: { count: 0, next: null, previous: null },
     totalIncome: 0,
-    totalCount: 0,
+    totalIncomeCount: 0,
+    totalQuantity: 0,
     totalExpenses: 0,
     totalExpensesCount: 0,
     allExpenses: [],
@@ -450,120 +461,228 @@ const financeSlice = createSlice({
     loading: false,
     error: null,
   },
-  reducers: {},
+  reducers: {
+    clearError: (state) => {
+      state.error = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchExpenseCategories.pending, (state) => { state.loading = true; state.error = null; })
+      // Expense Categories
+      .addCase(fetchExpenseCategories.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchExpenseCategories.fulfilled, (state, action) => {
         state.loading = false;
-        state.expenseCategories = action.payload.results || action.payload;
+        state.expenseCategories = Array.isArray(action.payload.results) ? action.payload.results : action.payload || [];
         state.expenseCategoriesPagination = {
           count: action.payload.count || 0,
           next: action.payload.next || null,
           previous: action.payload.previous || null,
         };
       })
-      .addCase(fetchExpenseCategories.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(addExpenseCategory.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(fetchExpenseCategories.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(addExpenseCategory.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(addExpenseCategory.fulfilled, (state, action) => {
         state.loading = false;
         state.expenseCategories.push(action.payload);
       })
-      .addCase(addExpenseCategory.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(fetchExpenses.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(addExpenseCategory.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Expenses
+      .addCase(fetchExpenses.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchExpenses.fulfilled, (state, action) => {
         state.loading = false;
-        state.expenses = action.payload.results || action.payload;
+        state.expenses = Array.isArray(action.payload.results) ? action.payload.results : action.payload || [];
         state.expensesPagination = {
           count: action.payload.count || 0,
           next: action.payload.next || null,
           previous: action.payload.previous || null,
         };
       })
-      .addCase(fetchExpenses.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(addExpense.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(fetchExpenses.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(addExpense.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(addExpense.fulfilled, (state, action) => {
         state.loading = false;
         state.expenses.push(action.payload);
       })
-      .addCase(addExpense.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(updateExpense.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(addExpense.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(updateExpense.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(updateExpense.fulfilled, (state, action) => {
         state.loading = false;
         state.expenses = state.expenses.map((expense) =>
           expense.id === action.payload.id ? action.payload : expense
         );
       })
-      .addCase(updateExpense.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(deleteExpense.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(updateExpense.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(deleteExpense.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(deleteExpense.fulfilled, (state, action) => {
         state.loading = false;
         state.expenses = state.expenses.filter((expense) => expense.id !== action.payload);
       })
-      .addCase(deleteExpense.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(fetchAllExpenses.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(deleteExpense.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // All Expenses
+      .addCase(fetchAllExpenses.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchAllExpenses.fulfilled, (state, action) => {
         state.loading = false;
-        state.allExpenses = action.payload;
+        state.allExpenses = Array.isArray(action.payload) ? action.payload : [];
       })
-      .addCase(fetchAllExpenses.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(fetchAllIncomes.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(fetchAllExpenses.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // All Incomes
+      .addCase(fetchAllIncomes.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchAllIncomes.fulfilled, (state, action) => {
         state.loading = false;
-        state.allIncomes = action.payload;
+        state.allIncomes = Array.isArray(action.payload) ? action.payload : [];
       })
-      .addCase(fetchAllIncomes.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(fetchIncomeSources.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(fetchAllIncomes.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Income Sources
+      .addCase(fetchIncomeSources.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchIncomeSources.fulfilled, (state, action) => {
         state.loading = false;
-        state.incomeSources = action.payload.results || action.payload;
-      })
-      .addCase(fetchIncomeSources.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(addIncomeSource.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(addIncomeSource.fulfilled, (state, action) => {
-        state.loading = false;
-        state.incomeSources.push(action.payload);
-      })
-      .addCase(addIncomeSource.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(fetchIncomes.pending, (state) => { state.loading = true; state.error = null; })
-      .addCase(fetchIncomes.fulfilled, (state, action) => {
-        state.loading = false;
-        state.incomes = action.payload.results || action.payload;
-        state.incomesPagination = {
+        state.incomeSources = Array.isArray(action.payload.results) ? action.payload.results : action.payload || [];
+        state.incomeSourcesPagination = {
           count: action.payload.count || 0,
           next: action.payload.next || null,
           previous: action.payload.previous || null,
         };
       })
-      .addCase(fetchIncomes.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(addIncome.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(fetchIncomeSources.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(addIncomeSource.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(addIncomeSource.fulfilled, (state, action) => {
+        state.loading = false;
+        state.incomeSources.push(action.payload);
+      })
+      .addCase(addIncomeSource.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Incomes
+      .addCase(fetchIncomes.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchIncomes.fulfilled, (state, action) => {
+        state.loading = false;
+        state.incomes = Array.isArray(action.payload?.results) ? action.payload.results : [];
+        state.incomesPagination = {
+          count: action.payload?.count || 0,
+          next: action.payload?.next || null,
+          previous: action.payload?.previous || null,
+        };
+      })
+      .addCase(fetchIncomes.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(addIncome.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(addIncome.fulfilled, (state, action) => {
         state.loading = false;
         state.incomes.push(action.payload);
       })
-      .addCase(addIncome.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(updateIncome.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(addIncome.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(updateIncome.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(updateIncome.fulfilled, (state, action) => {
         state.loading = false;
         state.incomes = state.incomes.map((income) =>
           income.id === action.payload.id ? action.payload : income
         );
       })
-      .addCase(updateIncome.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(deleteIncome.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(updateIncome.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(deleteIncome.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(deleteIncome.fulfilled, (state, action) => {
         state.loading = false;
         state.incomes = state.incomes.filter((income) => income.id !== action.payload);
       })
-      .addCase(deleteIncome.rejected, (state, action) => { state.loading = false; state.error = action.payload; })
-      .addCase(fetchIncomeSummary.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(deleteIncome.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Income Summary
+      .addCase(fetchIncomeSummary.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(fetchIncomeSummary.fulfilled, (state, action) => {
         state.loading = false;
         state.totalIncome = action.payload.total_income || 0;
-        state.totalCount = action.payload.details?.length || 0;
+        state.totalIncomeCount = action.payload.total_income_count || 0;
+        state.totalQuantity = action.payload.total_quantity || 0;
       })
-      .addCase(fetchIncomeSummary.rejected, (state, action) => { state.loading = false; state.error = action.payload; });
+      .addCase(fetchIncomeSummary.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      });
   },
 });
 
-export default financeSlice;
+export const { clearError } = financeSlice.actions;
+export default financeSlice.reducer;

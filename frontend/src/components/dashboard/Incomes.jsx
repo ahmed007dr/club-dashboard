@@ -1,5 +1,4 @@
-import { FiDollarSign, FiFilter,FiAlertTriangle, FiDownload, FiList, FiCalendar ,FiPlus} from "react-icons/fi";
-
+import { FiDollarSign, FiFilter, FiAlertTriangle, FiDownload, FiList, FiCalendar, FiPlus } from "react-icons/fi";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
@@ -10,25 +9,27 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import * as XLSX from "xlsx";
 import { debounce } from "lodash";
-import { fetchIncomes, fetchIncomeSources, fetchIncomeSummary, fetchAllIncomes } from "../../redux/slices/financeSlice";
+import { fetchIncomes, fetchIncomeSources, fetchIncomeSummary, fetchAllIncomes, deleteIncome } from "../../redux/slices/financeSlice";
 import { fetchStockItems } from "../../redux/slices/stockSlice";
 import StockTransactionForm from "./StockTransactionForm";
 import IncomeTable from "./IncomeTable";
 import IncomeSourcesList from "./IncomeSourcesList";
 import usePermission from "@/hooks/usePermission";
 import BASE_URL from "../../config/api";
+import toast from 'react-hot-toast';
+import { selectFinance, selectStockItems, selectUser } from '../../selectors/financeSelectors';
 
 const Incomes = () => {
   const dispatch = useDispatch();
   const canAddIncome = usePermission("add_income");
-  const { incomes, incomeSources, loading, error, incomesPagination, totalIncome, totalIncomeCount, allIncomes } = useSelector((state) => state.finance || {});
-  const { stockItems = [] } = useSelector((state) => state.stock || {});
-  const { user } = useSelector((state) => state.auth || {});
+  const { incomes, incomeSources, loading, error, incomesPagination, totalIncome, totalIncomeCount, totalQuantity, allIncomes } = useSelector(selectFinance);
+  const stockItems = useSelector(selectStockItems);
+  const user = useSelector(selectUser);
   const [filters, setFilters] = useState({
     source: "",
     stockItem: "",
-    start_date: new Date().toISOString().slice(0, 10), // افتراضي اليوم
-    end_date: new Date().toISOString().slice(0, 10), // افتراضي اليوم
+    start_date: new Date().toISOString().slice(0, 10),
+    end_date: new Date().toISOString().slice(0, 10),
   });
   const [page, setPage] = useState(1);
   const [showModal, setShowModal] = useState(false);
@@ -55,10 +56,10 @@ const Incomes = () => {
         fetchIncomes({
           page,
           filters: {
-            source: filters.source,
-            stock_item: filters.stockItem,
-            start_date: filters.start_date,
-            end_date: filters.end_date,
+            source: filters.source || "",
+            stock_item: filters.stockItem || "",
+            start_date: filters.start_date || "",
+            end_date: filters.end_date || "",
           },
         })
       );
@@ -96,26 +97,24 @@ const Incomes = () => {
   };
 
   const handleCalculateTotal = () => {
-    dispatch(
-      fetchIncomeSummary({
-        start_date: filters.start_date || null,
-        end_date: filters.end_date || null,
-        source: filters.source || null,
-        stock_item: filters.stockItem || null,
-      })
-    )
+    dispatch(fetchIncomeSummary({
+      start_date: filters.start_date || null,
+      end_date: filters.end_date || null,
+      source: filters.source || null,
+      stock_item: filters.stockItem || null,
+    }))
       .unwrap()
       .then(() => setIsSummaryClicked(true))
       .catch((err) => console.error("Failed to calculate total:", err));
   };
-
+  
   const exportToExcel = () => {
     dispatch(
       fetchAllIncomes({
-        startDate: filters.start_date,
-        endDate: filters.end_date,
-        source: filters.source,
-        stock_item: filters.stockItem,
+        startDate: filters.start_date || "",
+        endDate: filters.end_date || "",
+        source: filters.source || "",
+        stock_item: filters.stockItem || "",
       })
     )
       .unwrap()
@@ -151,33 +150,38 @@ const Incomes = () => {
       .catch((err) => console.error("Failed to export incomes:", err));
   };
 
-  const pageCount = Math.ceil((incomesPagination?.count || 0) / 20);
+  const handleDeleteClick = (incomeId) => {
+    dispatch(deleteIncome(incomeId))
+      .unwrap()
+      .then(() => {
+        toast.success('تم حذف الدخل بنجاح');
+      })
+      .catch((err) => {
+        toast.error('فشل في حذف الدخل: ' + err);
+      });
+  };
 
+  const pageCount = Math.ceil((incomesPagination?.count || 0) / 20);
   const getPageButtons = useCallback((currentPage, totalPages) => {
     const maxButtons = 5;
     const buttons = [];
     const half = Math.floor(maxButtons / 2);
     let startPage = Math.max(1, currentPage - half);
     let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-
     if (endPage - startPage + 1 < maxButtons) {
       startPage = Math.max(1, endPage - maxButtons + 1);
     }
-
     if (startPage > 1) {
       buttons.push(1);
       if (startPage > 2) buttons.push("...");
     }
-
     for (let i = startPage; i <= endPage; i++) {
       buttons.push(i);
     }
-
     if (endPage < totalPages) {
       if (endPage < totalPages - 1) buttons.push("...");
       buttons.push(totalPages);
     }
-
     return buttons;
   }, []);
 
@@ -187,14 +191,12 @@ const Incomes = () => {
         <FiDollarSign className="text-green-600 w-8 h-8" />
         إدارة المبيعات
       </h1>
-
       {error && (
         <div className="bg-red-50 p-4 rounded-lg flex items-center gap-3 text-right">
           <FiAlertTriangle className="text-red-600 w-6 h-6" />
           <p className="text-red-600">{error}</p>
         </div>
       )}
-
       <Tabs defaultValue="incomes" className="bg-white rounded-lg shadow-sm">
         <TabsList className="bg-gray-100 rounded-t-lg p-2 flex justify-end">
           <TabsTrigger value="incomes" className="data-[state=active]:bg-white rounded-md px-4 py-2 text-sm font-medium">
@@ -204,7 +206,6 @@ const Incomes = () => {
             مصادر المبيعات
           </TabsTrigger>
         </TabsList>
-
         <TabsContent value="sources" className="p-4">
           <Card>
             <CardHeader>
@@ -221,7 +222,6 @@ const Incomes = () => {
             </CardContent>
           </Card>
         </TabsContent>
-
         <TabsContent value="incomes" className="p-4">
           <Card>
             <CardHeader>
@@ -237,7 +237,6 @@ const Incomes = () => {
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div className="w-full">
                   <div className="space-y-4 w-full">
-                    {/* السطر الأول: مصدر المبيعات، عنصر المخزون */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="relative">
                         <label className="block text-sm font-medium mb-1 text-right">مصدر المبيعات</label>
@@ -284,26 +283,11 @@ const Incomes = () => {
                         </div>
                       </div>
                     </div>
-
-                    {/* السطر الثاني: التاريخ من وإلى */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="relative">
-                        <label className="block text-sm font-medium mb-1 text-right">إلى</label>
-                        <div className="relative">
-                          <Input
-                            type="date"
-                            name="end_date"
-                            value={filters.end_date}
-                            onChange={handleFilterChange}
-                            className="w-full text-right"
-                          />
-                        </div>
-                      </div>
-                      
-
                       <div className="relative">
                         <label className="block text-sm font-medium mb-1 text-right">من</label>
                         <div className="relative">
+                          <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                           <Input
                             type="date"
                             name="start_date"
@@ -313,21 +297,30 @@ const Incomes = () => {
                           />
                         </div>
                       </div>
-                      
-
+                      <div className="relative">
+                        <label className="block text-sm font-medium mb-1 text-right">إلى</label>
+                        <div className="relative">
+                          <FiCalendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                          <Input
+                            type="date"
+                            name="end_date"
+                            value={filters.end_date}
+                            onChange={handleFilterChange}
+                            className="w-full text-right"
+                          />
+                        </div>
+                      </div>
                     </div>
-
-                    {/* السطر الثالث: الأزرار */}
                     <div className="flex flex-col sm:flex-row justify-between items-end gap-4">
                       <div className="flex gap-2 flex-wrap">
                         <Button onClick={handleResetFilters} variant="outline" className="w-full sm:w-auto text-sm">
-                          إعادة تعيين
+                          <FiFilter className="mr-2" /> إعادة تعيين
                         </Button>
                         <Button
                           onClick={handleCalculateTotal}
                           className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-sm"
                         >
-                          حساب الإجمالي
+                          <FiDollarSign className="mr-2" /> حساب الإجمالي
                         </Button>
                         <Button
                           onClick={exportToExcel}
@@ -359,7 +352,7 @@ const Incomes = () => {
                           className={`text-${totalIncome > 0 ? "green" : "red"}-600 w-6 h-6`}
                         />
                         <p className="text-lg font-semibold text-gray-800">
-                          عدد المبيعات: {totalIncomeCount}
+                          عدد المبيعات: {totalIncomeCount || 0}
                         </p>
                       </div>
                       {totalIncome > 0 ? (
@@ -378,20 +371,18 @@ const Incomes = () => {
                   )}
                 </div>
               </div>
-
               {loading && (
                 <div className="flex justify-center py-6">
                   <Loader2 className="animate-spin w-8 h-8 text-green-600" />
                 </div>
               )}
-
               <IncomeTable
                 incomes={incomes}
                 handleEditClick={(item) => {
                   setCurrentItem(item);
                   setShowModal(true);
                 }}
-                handleDeleteClick={() => {}}
+                handleDeleteClick={handleDeleteClick}
               />
               <div className="flex justify-center items-center gap-4 mt-6">
                 <Button
@@ -431,12 +422,10 @@ const Incomes = () => {
           </Card>
         </TabsContent>
       </Tabs>
-
       {showModal && (
         <StockTransactionForm type="income" currentItem={currentItem} setShowModal={setShowModal} />
       )}
     </div>
   );
 };
-
 export default Incomes;
