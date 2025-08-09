@@ -1,48 +1,51 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Eye, Download, Printer, Loader2, Clock } from 'lucide-react';
+import { Eye, Download, Printer, Loader2, Clock, Lock, Unlock } from 'lucide-react';
+import axios from 'axios';  // Assuming for API calls
 
-const ReportActions = ({ loading, previewLoading, handlePreviewReport, reportData, handleGenerateReport, handlePrintReport, handleGenerateShiftReport }) => {
+const ReportActions = ({ loading, previewLoading, handlePreviewReport, reportData, handleGenerateReport, handlePrintReport, handleGenerateShiftReport, userRole }) => {
+  const handleOpenJournal = async () => {
+    try {
+      await axios.post('finance/api/open-cash-journal/');
+      // Refresh data
+    } catch (error) {
+      console.error('Error opening journal');
+    }
+  };
+
+  const handleCloseJournal = async () => {
+    try {
+      await axios.post('finance/api/close-cash-journal/');
+      // Refresh data
+    } catch (error) {
+      console.error('Error closing journal');
+    }
+  };
+
   return (
     <div className="flex flex-wrap gap-3 justify-end">
-      <Button
-        onClick={handlePreviewReport}
-        disabled={loading || previewLoading}
-        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-2 px-4 text-sm"
-      >
-        {previewLoading ? <Loader2 className="animate-spin w-5 h-5" /> : <Eye className="w-5 h-5" />}
-        معاينة التقرير
-      </Button>
-      {reportData && (
+      {/* ... الأزرار الحالية ... */}
+      {userRole !== 'admin' && userRole !== 'owner' && (  // Only for employees
         <>
           <Button
-            onClick={handleGenerateReport}
-            disabled={loading}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white py-2 px-4 text-sm"
+            onClick={handleOpenJournal}
+            disabled={loading || previewLoading || (reportData?.status === 'open')}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
           >
-            {loading ? <Loader2 className="animate-spin w-5 h-5" /> : <Download className="w-5 h-5" />}
-            تنزيل التقرير كـ PDF
+            <Unlock className="w-5 h-5" />
+            فتح يومية
           </Button>
           <Button
-            onClick={handlePrintReport}
-            disabled={loading || previewLoading}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white py-2 px-4 text-sm"
+            onClick={handleCloseJournal}
+            disabled={loading || previewLoading || (reportData?.status === 'closed')}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-700"
           >
-            <Printer className="w-5 h-5" />
-            طباعة التقرير
+            <Lock className="w-5 h-5" />
+            إغلاق يومية
           </Button>
         </>
       )}
-      <Button
-        onClick={handleGenerateShiftReport}
-        disabled={loading || previewLoading}
-        className="hidden-button flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white py-1 px-3 text-sm"
-      >
-        {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <Clock className="w-4 h-4" />}
-        تقرير الشيفتات
-      </Button>
     </div>
   );
 };
-
 export default ReportActions;

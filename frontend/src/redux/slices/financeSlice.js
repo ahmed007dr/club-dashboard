@@ -14,7 +14,7 @@ export const fetchExpenseSummary = createAsyncThunk(
         }
       });
       const response = await fetch(
-        `${BASE_URL}finance/api/expense-summary/?${urlParams.toString()}`,
+        `${BASE_URL}api/expense-summary/?${urlParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -42,7 +42,7 @@ export const fetchExpenseCategories = createAsyncThunk(
       const token = localStorage.getItem('token');
       const params = new URLSearchParams();
       if (page) params.append('page', page);
-      const response = await fetch(`${BASE_URL}finance/api/expense-categories/?${params.toString()}`, {
+      const response = await fetch(`${BASE_URL}api/expense-categories/?${params.toString()}`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -65,7 +65,7 @@ export const addExpenseCategory = createAsyncThunk(
   async (newCategory, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}finance/api/expense-categories/`, {
+      const response = await fetch(`${BASE_URL}api/expense-categories/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -95,8 +95,9 @@ export const fetchExpenses = createAsyncThunk(
         stock_item: filters.stock_item || '',
         start_date: filters.start_date || '',
         end_date: filters.end_date || '',
+        cash_journal: filters.cash_journal || '',  // Added for cash journal filter
       });
-      const response = await fetch(`${BASE_URL}finance/api/expenses/?${params}`, {
+      const response = await fetch(`${BASE_URL}api/expenses/?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -104,7 +105,7 @@ export const fetchExpenses = createAsyncThunk(
       });
       if (!response.ok) {
         const errorData = await response.json();
-        return rejectWithValue(errorData.message || 'Failed to fetch expenses.');
+        return rejectWithValue(errorData.message || `HTTP error! status: ${response.status}`);
       }
       return await response.json();
     } catch (error) {
@@ -118,7 +119,7 @@ export const addExpense = createAsyncThunk(
   async (newExpense, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}finance/api/expenses/`, {
+      const response = await fetch(`${BASE_URL}api/expenses/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -142,7 +143,7 @@ export const updateExpense = createAsyncThunk(
   async ({ id, updatedData }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}finance/api/expenses/${id}/`, {
+      const response = await fetch(`${BASE_URL}api/expenses/${id}/`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -166,7 +167,7 @@ export const deleteExpense = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}finance/api/expenses/${id}/`, {
+      const response = await fetch(`${BASE_URL}api/expenses/${id}/`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -194,7 +195,7 @@ export const fetchAllExpenses = createAsyncThunk(
       if (endDate) params.append('end', endDate);
       if (categoryId) params.append('category', categoryId);
       const response = await fetch(
-        `${BASE_URL}finance/api/expense/all/?${params.toString()}`,
+        `${BASE_URL}api/expense/all/?${params.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -226,7 +227,7 @@ export const fetchAllIncomes = createAsyncThunk(
       if (sourceId) params.append('source', sourceId);
       if (stock_item) params.append('stock_item', stock_item);
       const response = await fetch(
-        `${BASE_URL}finance/api/income/all/?${params.toString()}`,
+        `${BASE_URL}api/income/all/?${params.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -259,7 +260,7 @@ export const fetchIncomeSummary = createAsyncThunk(
         }
       });
       const response = await fetch(
-        `${BASE_URL}finance/api/income-summary/?${urlParams.toString()}`,
+        `${BASE_URL}api/income-summary/?${urlParams.toString()}`,
         {
           method: 'GET',
           headers: {
@@ -287,7 +288,7 @@ export const fetchIncomeSources = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}finance/api/income-sources/`, {
+      const response = await fetch(`${BASE_URL}api/income-sources/`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -313,7 +314,7 @@ export const addIncomeSource = createAsyncThunk(
   async (newSource, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}finance/api/income-sources/`, {
+      const response = await fetch(`${BASE_URL}api/income-sources/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -345,8 +346,9 @@ export const fetchIncomes = createAsyncThunk(
         stock_item: filters.stock_item || '',
         start_date: filters.start_date || '',
         end_date: filters.end_date || '',
+        cash_journal: filters.cash_journal || '',  // Added for cash journal filter
       });
-      const response = await fetch(`${BASE_URL}finance/api/incomes/?${params}`, {
+      const response = await fetch(`${BASE_URL}api/incomes/?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -371,7 +373,7 @@ export const addIncome = createAsyncThunk(
   async (newIncome, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}finance/api/incomes/`, {
+      const response = await fetch(`${BASE_URL}api/incomes/`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -396,7 +398,7 @@ export const updateIncome = createAsyncThunk(
   async ({ id, updatedData }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}finance/api/incomes/${id}/`, {
+      const response = await fetch(`${BASE_URL}api/incomes/${id}/`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -421,7 +423,7 @@ export const deleteIncome = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${BASE_URL}finance/api/incomes/${id}/`, {
+      const response = await fetch(`${BASE_URL}api/incomes/${id}/`, {
         method: 'DELETE',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -433,6 +435,105 @@ export const deleteIncome = createAsyncThunk(
         return rejectWithValue(errorData.message || 'Failed to delete income.');
       }
       return id;
+    } catch (error) {
+      toast.error(error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const fetchActiveCashJournal = createAsyncThunk(
+  'finance/fetchActiveCashJournal',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}api/cash-journals/?status=open`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.message || 'Failed to fetch active cash journal.');
+      }
+      const data = await response.json();
+      return data.length > 0 ? data[0] : null;
+    } catch (error) {
+      toast.error(error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const openCashJournal = createAsyncThunk(
+  'finance/openCashJournal',
+  async (initialBalance, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}api/open-cash-journal/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ initial_balance: initialBalance }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.message || 'Failed to open cash journal.');
+      }
+      return await response.json();
+    } catch (error) {
+      toast.error(error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const closeCashJournal = createAsyncThunk(
+  'finance/closeCashJournal',
+  async (notes, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}api/close-cash-journal/`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ notes }),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.message || 'Failed to close cash journal.');
+      }
+      return await response.json();
+    } catch (error) {
+      toast.error(error.message);
+      return rejectWithValue(error.message);
+    }
+  }
+);
+
+export const fetchCashJournals = createAsyncThunk(
+  'finance/fetchCashJournals',
+  async (_, { rejectWithValue }) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${BASE_URL}api/cash-journals/`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        return rejectWithValue(errorData.message || 'Failed to fetch cash journals.');
+      }
+      return await response.json();
     } catch (error) {
       toast.error(error.message);
       return rejectWithValue(error.message);
@@ -458,6 +559,8 @@ const financeSlice = createSlice({
     totalExpensesCount: 0,
     allExpenses: [],
     allIncomes: [],
+    activeCashJournal: null,
+    cashJournals: [],
     loading: false,
     error: null,
   },
@@ -678,6 +781,56 @@ const financeSlice = createSlice({
         state.totalQuantity = action.payload.total_quantity || 0;
       })
       .addCase(fetchIncomeSummary.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      // Cash Journals
+      .addCase(fetchActiveCashJournal.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchActiveCashJournal.fulfilled, (state, action) => {
+        state.loading = false;
+        state.activeCashJournal = action.payload;
+      })
+      .addCase(fetchActiveCashJournal.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(openCashJournal.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(openCashJournal.fulfilled, (state, action) => {
+        state.loading = false;
+        state.activeCashJournal = action.payload;
+      })
+      .addCase(openCashJournal.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(closeCashJournal.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(closeCashJournal.fulfilled, (state, action) => {
+        state.loading = false;
+        state.activeCashJournal = null;  // Clear active after close
+        state.cashJournals.push(action.payload);
+      })
+      .addCase(closeCashJournal.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload;
+      })
+      .addCase(fetchCashJournals.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchCashJournals.fulfilled, (state, action) => {
+        state.loading = false;
+        state.cashJournals = action.payload;
+      })
+      .addCase(fetchCashJournals.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
       });

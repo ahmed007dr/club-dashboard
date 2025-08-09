@@ -36,5 +36,7 @@ urlpatterns = [
     path('api/stock-sales-analysis/', api.stock_sales_analysis_api, name='api-stock-sales-analysis'),
     path('api/schedule/', api.schedule_api, name='schedule_api'),
     path('api/stock-inventory-pdf/', api.generate_inventory_pdf, name='generate_inventory_pdf'),
-
+    path('api/open-cash-journal/', api.open_cash_journal, name='open_cash_journal'),
+    path('api/close-cash-journal/', api.close_cash_journal, name='close_cash_journal'),
+    path('api/cash-journals/', api.cash_journal_api, name='cash_journal_api'),
     ]

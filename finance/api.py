@@ -19,10 +19,11 @@ from jinja2 import Template
 from decimal import Decimal
 from accounts.models import User
 from staff.models import StaffAttendance
-from .models import Expense, Income, ExpenseCategory, IncomeSource, StockTransaction, StockItem, Schedule
+from .models import Expense, Income, ExpenseCategory, IncomeSource, StockTransaction, StockItem, Schedule, CashJournal
 from .serializers import (
     ExpenseSerializer, IncomeSerializer, ExpenseCategorySerializer, IncomeSourceSerializer,
-    ExpenseDetailSerializer, IncomeDetailSerializer, IncomeSummarySerializer, StockItemSerializer, ScheduleSerializer
+    ExpenseDetailSerializer, IncomeDetailSerializer, IncomeSummarySerializer, StockItemSerializer, ScheduleSerializer,
+    CashJournalSerializer
 )
 from utils.convert_to_name import get_object_from_id_or_name
 from utils.reports import get_employee_report_data
@@ -30,47 +31,35 @@ from operator import or_
 from functools import reduce
 from django.utils.dateparse import parse_datetime
 from subscriptions.models import PaymentMethod
-
 logger = logging.getLogger(__name__)
-
 FULL_ACCESS_ROLES = ['owner', 'admin']
-
 SOURCE_TRANSLATIONS = {
     "Refund": "استرداد",
     "Renewal": "تجديد",
     "Subscription": "اشتراك"
 }
-
 PAYMENT_METHOD_TRANSLATIONS = {
     "Cash": "كاش",
     "Visa": "فيزا"
 }
-
-
 class StandardPagination(PageNumberPagination):
     page_size = 20
     page_size_query_param = 'page_size'
     max_page_size = 20
-
-
 def parse_date_with_optional_time(date_str):
     try:
         dt = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S')
     except ValueError:
         dt = datetime.strptime(date_str, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
     return timezone.make_aware(dt)
-
-
 def apply_common_filters(queryset, request, user_field=None, source_category_field=None, restrict_to_attendance=False):
     """Apply common filters to queryset based on request parameters."""
     query_params = request.query_params
     applied_filters = []
-
     # تخطي فلاتر التاريخ إذا كانت التصفية تعتمد على فترات الحضور
     if not restrict_to_attendance:
         if query_params.get('date') and (query_params.get('start_date') or query_params.get('end_date')):
             raise ValueError('لا يمكن استخدام "date" مع "start_date" أو "end_date" في نفس الطلب.')
-
         if query_params.get('date'):
             try:
                 date_input = query_params.get('date').split('+')[0].split('%2B')[0]
@@ -95,13 +84,12 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
                         applied_filters.append(f"date={date_input} (full day)")
             except ValueError:
                 raise ValueError('صيغة التاريخ غير صحيحة (متوقع: YYYY-MM-DD أو YYYY-MM-DDTHH:MM:SS أو DD-MM-YYYY).')
-
         if query_params.get('start_date') and query_params.get('end_date'):
             try:
                 start_input = query_params.get('start_date').split('+')[0].split('%2B')[0]
                 end_input = query_params.get('end_date').split('+')[0].split('%2B')[0]
                 logger.debug(f"Applying date filters: start_date={start_input}, end_date={end_input}", extra={'force': True})
-                
+               
                 try:
                     start_date = datetime.strptime(start_input, '%Y-%m-%dT%H:%M:%S')
                     end_date = datetime.strptime(end_input, '%Y-%m-%dT%H:%M:%S')
@@ -123,7 +111,7 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
                                 end_date = datetime.strptime(end_input, '%d-%m-%Y').replace(hour=23, minute=59, second=59)
                             except ValueError:
                                 raise ValueError('صيغة التاريخ غير صحيحة (متوقع: YYYY-MM-DD أو YYYY-MM-DDTHH:MM:SS أو DD-MM-YYYY).')
-                
+               
                 start_date = timezone.make_aware(start_date)
                 end_date = timezone.make_aware(end_date)
                 if start_date > end_date:
@@ -134,7 +122,6 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
                 raise ValueError('صيغة التاريخ غير صحيحة (متوقع: YYYY-MM-DD أو YYYY-MM-DDTHH:MM:SS أو DD-MM-YYYY).')
         elif query_params.get('start_date') or query_params.get('end_date'):
             raise ValueError('تاريخي البداية والنهاية مطلوبان معًا.')
-
     if query_params.get('user'):
         user_obj = get_object_from_id_or_name(User, query_params.get('user'), ['id'])
         if user_obj and user_obj.club == request.user.club:
@@ -147,7 +134,6 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
         else:
             queryset = queryset.none()
             applied_filters.append(f"user=None")
-
     if query_params.get('related_employee'):
         employee_obj = get_object_from_id_or_name(User, query_params.get('related_employee'), ['id'])
         if employee_obj and employee_obj.club == request.user.club:
@@ -156,7 +142,6 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
         else:
             queryset = queryset.none()
             applied_filters.append(f"related_employee=None")
-
     if query_params.get('source') and source_category_field == 'source':
         source_obj = get_object_from_id_or_name(IncomeSource, query_params.get('source'), ['id', 'name'])
         if source_obj and source_obj.club == request.user.club:
@@ -171,25 +156,24 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
             applied_filters.append(f"category={category_obj.name}")
         else:
             raise ValueError('فئة المصروف غير موجودة.')
-
     if query_params.get('amount'):
         try:
             queryset = queryset.filter(amount=float(query_params.get('amount')))
             applied_filters.append(f"amount={query_params.get('amount')}")
         except ValueError:
             raise ValueError('صيغة المبلغ غير صحيحة.')
-
     if query_params.get('description'):
         queryset = queryset.filter(description__icontains=query_params.get('description'))
         applied_filters.append(f"description={query_params.get('description')}")
-
     if query_params.get('stock_item'):
         queryset = queryset.filter(stock_item__name__icontains=query_params.get('stock_item'))
         applied_filters.append(f"stock_item={query_params.get('stock_item')}")
-
+    # New filter for cash journal
+    if query_params.get('cash_journal'):
+        queryset = queryset.filter(cash_journal=query_params.get('cash_journal'))
+        applied_filters.append(f"cash_journal={query_params.get('cash_journal')}")
     logger.debug(f"Applied filters: {', '.join(applied_filters) if applied_filters else 'none'}", extra={'force': True})
     logger.debug(f"Number of records after filtering: {queryset.count()}", extra={'force': True})
-
     if queryset.exists():
         sample_fields = ['id', 'amount', 'date']
         if source_category_field == 'source':
@@ -202,20 +186,16 @@ def apply_common_filters(queryset, request, user_field=None, source_category_fie
             sample_fields.append('related_employee__username')
         sample_records = queryset[:5].values(*sample_fields)
         logger.debug(f"Sample records: {list(sample_records)}", extra={'force': True})
-
     return queryset
-
 def calculate_totals(queryset, field='amount'):
     total = queryset.aggregate(total=Sum(field))['total'] or 0
     logger.debug(f"Calculated total for {field}: {total} for {queryset.count()} records", extra={'force': True})
     return float(total)
-
 def handle_response(data, details_queryset=None, details_serializer=None, details_key=None, translated_details=None, status_code=status.HTTP_200_OK):
     response_data = data.copy()
     if details_queryset and details_serializer and details_key:
         response_data[details_key] = translated_details or details_serializer(details_queryset, many=True).data
     return Response(response_data, status=status_code)
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def expense_category_api(request):
@@ -223,30 +203,24 @@ def expense_category_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     if request.method == 'GET':
         categories = ExpenseCategory.objects.filter(club=request.user.club)
-        
+       
         if request.query_params.get('name'):
             categories = categories.filter(name__icontains=request.query_params.get('name'))
         if request.query_params.get('description'):
             categories = categories.filter(description__icontains=request.query_params.get('description'))
-        
+       
         categories = categories.order_by('-id')
-        # paginator = StandardPagination()
-        # page = paginator.paginate_queryset(categories, request)
-        # serializer = ExpenseCategorySerializer(page, many=True)
-        # return paginator.get_paginated_response(serializer.data)
         serializer = ExpenseCategorySerializer(categories, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
     elif request.method == 'POST':
         serializer = ExpenseCategorySerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(club=request.user.club)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def expense_api(request):
@@ -254,7 +228,6 @@ def expense_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-
     if request.method == 'GET':
         try:
             expenses = Expense.objects.select_related('category', 'paid_by', 'related_employee').filter(
@@ -263,15 +236,12 @@ def expense_api(request):
                 'id', 'amount', 'date', 'category__name', 'paid_by__username',
                 'related_employee__username', 'description', 'invoice_number'
             )
-
             if request.user.role not in ['admin', 'owner']:
                 attendances = StaffAttendance.objects.filter(
                     staff=request.user, club=request.user.club
                 ).select_related('staff', 'club')
-
                 if not attendances.exists():
                     return Response({'error': 'لا توجد سجلات حضور للموظف.'}, status=status.HTTP_404_NOT_FOUND)
-
                 # جمع فترات الحضور
                 expense_filters = []
                 for attendance in attendances:
@@ -279,11 +249,9 @@ def expense_api(request):
                     expense_filters.append(
                         Q(date__gte=attendance.check_in, date__lt=end_time)
                     )
-
                 # دمج الفلاتر باستخدام OR
                 combined_filter = reduce(or_, expense_filters) if expense_filters else Q()
                 expenses = expenses.filter(combined_filter)
-
             # التحقق من وجود فلاتر إضافية
             if not any(request.query_params.get(param) for param in ['category', 'user', 'related_employee', 'amount', 'description']):
                 if request.user.role not in ['admin', 'owner']:
@@ -299,16 +267,14 @@ def expense_api(request):
                     expenses, request, user_field='paid_by', source_category_field='category',
                     restrict_to_attendance=request.user.role not in ['admin', 'owner']
                 )
-
             expenses = expenses.order_by('-date')
             paginator = StandardPagination()
             page = paginator.paginate_queryset(expenses, request)
             serializer = ExpenseSerializer(page, many=True, context={'request': request})
             return paginator.get_paginated_response(serializer.data)
-
         except ValueError as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-            
+           
     elif request.method == 'POST':
         data = request.data.copy()
         data['paid_by'] = request.user.id
@@ -324,7 +290,7 @@ def expense_api(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        
+       
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def income_source_api(request):
@@ -332,7 +298,7 @@ def income_source_api(request):
     if not request.user.club:
         logger.error(f"المستخدم {request.user.username} غير مرتبط بنادي")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     if request.method == 'GET':
         sources = IncomeSource.objects.filter(club=request.user.club)
         if request.query_params.get('name'):
@@ -340,13 +306,8 @@ def income_source_api(request):
         if request.query_params.get('description'):
             sources = sources.filter(description__icontains=request.query_params.get('description'))
         sources = sources.order_by('-id')
-        # paginator = StandardPagination()
-        # page = paginator.paginate_queryset(sources, request)
-        # serializer = IncomeSourceSerializer(page, many=True)
-        # return paginator.get_paginated_response(serializer.data)
         serializer = IncomeSourceSerializer(sources, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
-
     elif request.method == 'POST':
         data = request.data.copy()
         data['club'] = request.user.club.id
@@ -356,10 +317,6 @@ def income_source_api(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def income_api(request):
@@ -367,7 +324,7 @@ def income_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club", extra={'force': True})
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     if request.method == 'GET':
         try:
             incomes = Income.objects.select_related('source', 'received_by').filter(
@@ -375,45 +332,36 @@ def income_api(request):
             ).only(
                 'id', 'amount', 'date', 'source__name', 'received_by__username', 'description', 'quantity', 'payment_method__name'
             )
-
             if request.user.role not in ['admin', 'owner']:
                 attendances = StaffAttendance.objects.filter(
                     staff=request.user, club=request.user.club
                 ).select_related('staff', 'club')
-
                 if not attendances.exists():
                     return Response({'error': 'لا توجد سجلات حضور للموظف.'}, status=status.HTTP_404_NOT_FOUND)
-
                 income_filters = []
                 for attendance in attendances:
                     end_time = attendance.check_out if attendance.check_out else timezone.now()
                     income_filters.append(
                         Q(date__gte=attendance.check_in, date__lt=end_time)
                     )
-
                 combined_filter = reduce(or_, income_filters) if income_filters else Q()
                 incomes = incomes.filter(combined_filter)
-
                 if not any(request.query_params.get(param) for param in ['source', 'user', 'amount', 'description', 'start_date', 'end_date']):
                     if not income_filters:
                         return Response({'error': 'يجب تحديد معايير البحث أو تسجيل حضور.'}, status=status.HTTP_400_BAD_REQUEST)
-
             # تطبيق الفلاتر الإضافية
             incomes = apply_common_filters(
                 incomes, request, user_field='received_by', source_category_field='source',
                 restrict_to_attendance=request.user.role not in ['admin', 'owner']
             )
             incomes = incomes.order_by('-date')
-
             # التحقق من وجود إيرادات بدون طريقة دفع
             null_payment_methods = incomes.filter(payment_method__isnull=True).count()
             if null_payment_methods > 0:
                 logger.warning(f"Found {null_payment_methods} income records with no payment method for club {request.user.club.name}", extra={'force': True})
-
             paginator = PageNumberPagination()
             page = paginator.paginate_queryset(incomes, request)
             serializer = IncomeSerializer(page, many=True)
-
             translated_data = serializer.data
             for income in translated_data:
                 if income['source']:
@@ -423,13 +371,11 @@ def income_api(request):
                     Income.objects.get(id=income['id']).payment_method.name if Income.objects.get(id=income['id']).payment_method else None,
                     'غير محدد'
                 )
-
             return paginator.get_paginated_response(translated_data)
-
         except ValueError as e:
             logger.error(f"Error in income_api GET: {str(e)}", extra={'force': True})
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
+   
     elif request.method == 'POST':
         data = request.data.copy()
         data['received_by'] = request.user.id
@@ -437,12 +383,12 @@ def income_api(request):
         source_id = data.get('source')
         payment_method_id = data.get('payment_method')
         quantity = data.get('quantity', 1)
-        
+       
         if not source_id:
             return Response({'error': 'مصدر الإيراد مطلوب'}, status=status.HTTP_400_BAD_REQUEST)
         if not payment_method_id:
             return Response({'error': 'طريقة الدفع مطلوبة'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         try:
             source = IncomeSource.objects.get(id=source_id, club=request.user.club)
             payment_method = PaymentMethod.objects.get(id=payment_method_id, club=request.user.club, is_active=True)
@@ -464,10 +410,10 @@ def income_api(request):
             return Response({'error': 'معرف طريقة الدفع غير صالح'}, status=status.HTTP_400_BAD_REQUEST)
         except ValueError:
             return Response({'error': 'سعر أو كمية غير صالحة'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         if 'description' not in data or not data['description']:
             data['description'] = ''
-        
+       
         data['payment_method'] = payment_method_id
         serializer = IncomeSerializer(data=data)
         if serializer.is_valid():
@@ -481,8 +427,6 @@ def income_api(request):
                     )
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def expense_detail_api(request, pk):
@@ -490,10 +434,13 @@ def expense_detail_api(request, pk):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     expense = get_object_or_404(Expense, pk=pk, club=request.user.club)
     if request.method != 'GET' and request.user.role not in FULL_ACCESS_ROLES:
         return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+    # Prevent update if cash journal is closed
+    if request.method in ['PUT', 'DELETE'] and expense.cash_journal and expense.cash_journal.status == 'closed':
+        return Response({'error': 'لا يمكن تعديل أو حذف مصروف في يومية خزينة مغلقة.'}, status=status.HTTP_403_FORBIDDEN)
     if request.method == 'GET':
         serializer = ExpenseSerializer(expense, context={'request': request})
         return Response(serializer.data)
@@ -506,8 +453,6 @@ def expense_detail_api(request, pk):
     elif request.method == 'DELETE':
         expense.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
 @api_view(['GET', 'PUT', 'DELETE'])
 @permission_classes([IsAuthenticated])
 def income_detail_api(request, pk):
@@ -515,10 +460,13 @@ def income_detail_api(request, pk):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     income = get_object_or_404(Income, pk=pk, club=request.user.club)
     if request.method != 'GET' and request.user.role not in FULL_ACCESS_ROLES:
         return Response({'error': 'غير مسموح بالتعديل أو الحذف. يجب أن تكون Owner أو Admin.'}, status=status.HTTP_403_FORBIDDEN)
+    # Prevent update if cash journal is closed
+    if request.method in ['PUT', 'DELETE'] and income.cash_journal and income.cash_journal.status == 'closed':
+        return Response({'error': 'لا يمكن تعديل أو حذف إيراد في يومية خزينة مغلقة.'}, status=status.HTTP_403_FORBIDDEN)
     if request.method == 'GET':
         serializer = IncomeSerializer(income)
         translated_data = serializer.data
@@ -535,9 +483,6 @@ def income_detail_api(request, pk):
     elif request.method == 'DELETE':
         income.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def income_summary(request):
@@ -545,31 +490,29 @@ def income_summary(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club", extra={'force': True})
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-   
+  
     try:
         incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club).only(
             'id', 'amount', 'date', 'source__name', 'received_by__username', 'description', 'quantity', 'payment_method__name'
         )
-       
+      
         # Require at least one filter to proceed
         if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'source', 'user', 'amount', 'description']):
             return Response({'error': 'يجب تحديد معايير البحث (تاريخ، مدة زمنية، مصدر، مستخدم، مبلغ، أو وصف).'}, status=status.HTTP_400_BAD_REQUEST)
-       
+      
         # Apply common filters
         incomes = apply_common_filters(incomes, request, user_field='received_by', source_category_field='source')
-       
+      
         # Order by date ascending
         incomes = incomes.order_by('date')
-
         # التحقق من وجود إيرادات بدون طريقة دفع
         null_payment_methods = incomes.filter(payment_method__isnull=True).count()
         if null_payment_methods > 0:
             logger.warning(f"Found {null_payment_methods} income records with no payment method for club {request.user.club.name}", extra={'force': True})
-
         # Calculate totals
         total_income = calculate_totals(incomes, field='amount')
         total_quantity = incomes.aggregate(total_quantity=Sum('quantity'))['total_quantity'] or 0
-       
+      
         # Prepare response
         response_data = {
             'total_income': total_income,
@@ -587,7 +530,7 @@ def income_summary(request):
                     Income.objects.get(id=income['id']).payment_method.name if Income.objects.get(id=income['id']).payment_method else None,
                     'غير محدد'
                 )
-       
+      
         return handle_response(
             response_data,
             details_queryset=incomes if request.query_params.get('details', 'false').lower() == 'true' else None,
@@ -595,12 +538,12 @@ def income_summary(request):
             details_key='details',
             translated_details=translated_details
         )
-   
+  
     except ValueError as e:
         logger.error(f"Error in income_summary: {str(e)}", extra={'force': True})
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
-        
+   
+       
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def expense_summary(request):
@@ -608,25 +551,25 @@ def expense_summary(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     try:
         expenses = Expense.objects.select_related('category', 'paid_by', 'related_employee').filter(club=request.user.club).only(
             'id', 'amount', 'date', 'category__name', 'paid_by__username', 'related_employee__username', 'description'
         )
-        
+       
         # Require at least one filter to proceed
         if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'category', 'user', 'related_employee', 'amount', 'description']):
             return Response({'error': 'يجب تحديد معايير البحث (تاريخ، مدة زمنية، فئة، مستخدم، موظف مرتبط، مبلغ، أو وصف).'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         # Apply common filters
         expenses = apply_common_filters(expenses, request, user_field='paid_by', source_category_field='category')
-        
+       
         # Order by date descending
         expenses = expenses.order_by('-date')
-        
+       
         # Calculate total
         total = calculate_totals(expenses)
-        
+       
         # Prepare response
         response_data = {'total_expense': total}
         return handle_response(
@@ -635,10 +578,10 @@ def expense_summary(request):
             details_serializer=ExpenseDetailSerializer,
             details_key='details'
         )
-    
+   
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-    
+   
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def finance_overview(request):
@@ -646,7 +589,7 @@ def finance_overview(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     try:
         income_qs = Income.objects.select_related('source', 'received_by').filter(club=request.user.club).only(
             'id', 'amount', 'date', 'source__name', 'received_by__username'
@@ -654,34 +597,33 @@ def finance_overview(request):
         expense_qs = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club).only(
             'id', 'amount', 'date', 'category__name', 'paid_by__username'
         )
-        
+       
         # Require at least one filter to proceed
         if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'source', 'category', 'user', 'amount', 'description']):
             return Response({'error': 'يجب تحديد معايير البحث (تاريخ، مدة زمنية، مصدر، فئة، مستخدم، مبلغ، أو وصف).'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         # Apply common filters
         income_qs = apply_common_filters(income_qs, request, user_field='received_by', source_category_field='source')
         expense_qs = apply_common_filters(expense_qs, request, user_field='paid_by', source_category_field='category')
-        
+       
         # Order by date ascending
         income_qs = income_qs.order_by('date')
         expense_qs = expense_qs.order_by('date')
-        
+       
         # Calculate totals
         total_income = calculate_totals(income_qs)
         total_expense = calculate_totals(expense_qs)
         net = total_income - total_expense
-        
+       
         response_data = {
             'total_income': total_income,
             'total_expense': total_expense,
             'net_profit': net
         }
         return Response(response_data, status=status.HTTP_200_OK)
-    
+   
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def expense_all_api(request):
@@ -689,27 +631,25 @@ def expense_all_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     try:
         expenses = Expense.objects.select_related('category', 'paid_by').filter(club=request.user.club).only(
             'id', 'amount', 'date', 'category__name', 'paid_by__username', 'description'
         )
-        
+       
         # Require at least one filter to proceed
         if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'category', 'user', 'amount', 'description']):
             return Response({'error': 'يجب تحديد معايير البحث (تاريخ، مدة زمنية، فئة، مستخدم، مبلغ، أو وصف).'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         # Apply filters
         expenses = apply_common_filters(expenses, request, user_field='paid_by', source_category_field='category')
-        
-        expenses = expenses.order_by('date')  # Order by date ascending
+       
+        expenses = expenses.order_by('date') # Order by date ascending
         serializer = ExpenseSerializer(expenses, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
-    
+   
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def income_all_api(request):
@@ -717,50 +657,49 @@ def income_all_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     try:
         incomes = Income.objects.select_related('source', 'received_by').filter(club=request.user.club).only(
             'id', 'amount', 'date', 'source__name', 'received_by__username', 'description'
         )
-        
+       
         # Require at least one filter to proceed
         if not any(request.query_params.get(param) for param in ['date', 'start_date', 'end_date', 'source', 'user', 'amount', 'description']):
             return Response({'error': 'يجب تحديد معايير البحث (تاريخ، مدة زمنية، مصدر، مستخدم، مبلغ، أو وصف).'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         # Apply filters
         incomes = apply_common_filters(incomes, request, user_field='received_by', source_category_field='source')
-        
-        incomes = incomes.order_by('date')  # Order by date ascending
+       
+        incomes = incomes.order_by('date') # Order by date ascending
         serializer = IncomeSerializer(incomes, many=True)
-        
+       
         # Translate source names to Arabic
         translated_data = serializer.data
         for income in translated_data:
             if income['source']:
                 source_name = IncomeSource.objects.get(id=income['source']).name
                 income['source'] = SOURCE_TRANSLATIONS.get(source_name, source_name)
-        
+       
         return Response(translated_data, status=status.HTTP_200_OK)
-    
+   
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def daily_summary_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     try:
         date_str = request.query_params.get('date')
         month_str = request.query_params.get('month')
         username = request.query_params.get('username')
-        
+       
         # Require at least one filter to proceed
         if not any([date_str, month_str, username]):
             return Response({'error': 'يجب تحديد معايير البحث (تاريخ، شهر، أو اسم مستخدم).'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         date_filter = {}
         if date_str:
             try:
@@ -780,7 +719,7 @@ def daily_summary_api(request):
                 date_filter = {'date__year': year, 'date__month': month}
             except ValueError:
                 return Response({'error': 'صيغة الشهر غير صحيحة (YYYY-MM)'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         club_filter = {'club': request.user.club}
         if username:
             employees = User.objects.filter(**club_filter, username=username)
@@ -788,23 +727,23 @@ def daily_summary_api(request):
                 return Response({'error': 'الموظف غير موجود في ناديك.'}, status=status.HTTP_404_NOT_FOUND)
         else:
             employees = User.objects.filter(**club_filter)
-        
+       
         summary = []
         for employee in employees:
             expenses = Expense.objects.filter(**club_filter, paid_by=employee, **date_filter)
             incomes = Income.objects.filter(**club_filter, received_by=employee, **date_filter)
-            
+           
             total_expenses = calculate_totals(expenses)
             total_incomes = calculate_totals(incomes)
             expense_details = ExpenseDetailSerializer(expenses.order_by('date'), many=True).data
             income_details = IncomeDetailSerializer(incomes.order_by('date'), many=True).data
-            
+           
             # Translate source names in income details
             for income in income_details:
                 if income['source']:
                     source_name = IncomeSource.objects.get(id=income['source']).name
                     income['source'] = SOURCE_TRANSLATIONS.get(source_name, source_name)
-            
+           
             employee_summary = {
                 'employee_id': employee.id,
                 'employee_name': employee.username,
@@ -815,17 +754,13 @@ def daily_summary_api(request):
                 'incomes': income_details
             }
             summary.append(employee_summary)
-        
+       
         paginator = StandardPagination()
         page = paginator.paginate_queryset(summary, request)
         return paginator.get_paginated_response(page)
-    
+   
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
-
-
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def employee_daily_report_api(request):
@@ -833,104 +768,48 @@ def employee_daily_report_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-
     try:
         employee_id = request.query_params.get('employee_id', request.user.id)
         employee = get_object_or_404(User, id=employee_id, club=request.user.club)
-        
-        # تحديد الفترة
-        start_date = request.query_params.get('start_date')
-        end_date = request.query_params.get('end_date')
-        today = timezone.now()
-
-        # للأدوار owner/admin: دعم تواريخ مخصصة بدون قيود
-        if request.user.role in FULL_ACCESS_ROLES:
-            if start_date and end_date:
-                # إزالة الإزاحة الزمنية إذا وجدت
-                start_date = start_date.split('+')[0].split('%2B')[0]
-                end_date = end_date.split('+')[0].split('%2B')[0]
-                logger.debug(f"Removed timezone offset: start_date={start_date}, end_date={end_date}")
-                
-                try:
-                    start_date = datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%S')
-                    end_date = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%S')
-                    logger.debug(f"Parsed ISO datetime: start_date={start_date}, end_date={end_date}")
-                except ValueError:
-                    try:
-                        start_date = datetime.strptime(start_date, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
-                        end_date = datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-                        logger.debug(f"Fallback to date-only: start_date={start_date}, end_date={end_date}")
-                    except ValueError:
-                        return Response({'error': 'صيغة التاريخ غير صحيحة (متوقع: YYYY-MM-DD أو YYYY-MM-DDTHH:MM:SS)'}, status=status.HTTP_400_BAD_REQUEST)
-                start_date = timezone.make_aware(start_date)
-                end_date = timezone.make_aware(end_date)
-            else:
-                start_date = today.replace(hour=0, minute=0, second=0)
-                end_date = today.replace(hour=23, minute=59, second=59)
-        # للأدوار الأخرى: استخدام فترة الحضور
+       
+        # Use cash journal for period
+        cash_journal_id = request.query_params.get('cash_journal')
+        if cash_journal_id:
+            cash_journal = get_object_or_404(CashJournal, id=cash_journal_id, user=employee, club=request.user.club)
+            start_date = cash_journal.start_time
+            end_date = cash_journal.end_time if cash_journal.end_time else timezone.now()
         else:
+            # Fallback to attendance if no journal specified
             attendance = StaffAttendance.objects.filter(
                 staff=employee, club=request.user.club
             ).order_by('-check_in').first()
-            
+           
             if not attendance:
                 return Response({'error': 'لا توجد سجلات حضور للموظف.'}, status=status.HTTP_404_NOT_FOUND)
-            
+           
             start_date = attendance.check_in
-            end_date = attendance.check_out if attendance.check_out else today
-            
-            # إذا تم تمرير تواريخ مخصصة، التأكد من أنها ضمن فترة الحضور
-            if start_date and end_date:
-                # إزالة الإزاحة الزمنية إذا وجدت
-                start_date = start_date.split('+')[0].split('%2B')[0]
-                end_date = end_date.split('+')[0].split('%2B')[0]
-                logger.debug(f"Removed timezone offset: custom_start={start_date}, custom_end={end_date}")
-                
-                try:
-                    custom_start = datetime.strptime(start_date, '%Y-%m-%dT%H:%M:%S')
-                    custom_end = datetime.strptime(end_date, '%Y-%m-%dT%H:%M:%S')
-                    logger.debug(f"Parsed custom ISO datetime: custom_start={custom_start}, custom_end={custom_end}")
-                except ValueError:
-                    try:
-                        custom_start = datetime.strptime(start_date, '%Y-%m-%d').replace(hour=0, minute=0, second=0)
-                        custom_end = datetime.strptime(end_date, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-                        logger.debug(f"Fallback to custom date-only: custom_start={custom_start}, custom_end={custom_end}")
-                    except ValueError:
-                        return Response({'error': 'صيغة التاريخ غير صحيحة (متوقع: YYYY-MM-DD أو YYYY-MM-DDTHH:MM:SS)'}, status=status.HTTP_400_BAD_REQUEST)
-                
-                custom_start = timezone.make_aware(custom_start)
-                custom_end = timezone.make_aware(custom_end)
-                
-                if custom_start < start_date or custom_end > end_date:
-                    return Response({'error': 'التواريخ المحددة خارج فترة حضور الموظف.'}, status=status.HTTP_400_BAD_REQUEST)
-                start_date = custom_start
-                end_date = custom_end
-
+            end_date = attendance.check_out if attendance.check_out else timezone.now()
+       
         # استعلام الإيرادات
         incomes = Income.objects.select_related('source', 'received_by', 'payment_method').filter(
             club=request.user.club, received_by=employee, date__range=[start_date, end_date]
         ).only('id', 'amount', 'date', 'source__name', 'received_by__username', 'description', 'quantity', 'payment_method__name')
-
         # التحقق من وجود سجلات إيرادات بدون طريقة دفع
         null_payment_methods = incomes.filter(payment_method__isnull=True).count()
         if null_payment_methods > 0:
             logger.warning(f"Found {null_payment_methods} income records with no payment method for employee {employee.username}")
-
         # استعلام المصروفات
         expenses = Expense.objects.select_related('category', 'paid_by').filter(
             club=request.user.club, paid_by=employee, date__range=[start_date, end_date]
         ).only('id', 'amount', 'date', 'category__name', 'paid_by__username', 'description')
-
         # تقسيم الإيرادات حسب طريقة الدفع
         income_by_payment_method = incomes.values('payment_method__name').annotate(
             total_income=Sum('amount')
         ).order_by('payment_method__name')
-
         # حساب إجمالي الإيرادات والمصروفات
         total_income = incomes.aggregate(total=Sum('amount'))['total'] or Decimal('0.0')
         total_expense = expenses.aggregate(total=Sum('amount'))['total'] or Decimal('0.0')
         net_profit = total_income - total_expense
-
         # إعداد البيانات لكل طريقة دفع
         payment_methods_data = []
         for item in income_by_payment_method:
@@ -946,7 +825,6 @@ def employee_daily_report_api(request):
                 'total_expense': float(method_expense),
                 'net_profit': float(method_net_profit)
             })
-
         # إعداد البيانات التفصيلية
         income_details = IncomeSerializer(incomes.order_by('date'), many=True).data
         for income in income_details:
@@ -959,9 +837,7 @@ def employee_daily_report_api(request):
                 income_obj.payment_method.name if income_obj.payment_method else None,
                 'غير محدد'
             )
-
         expense_details = ExpenseSerializer(expenses.order_by('date'), many=True, context={'request': request}).data
-
         # إعداد الاستجابة
         response_data = {
             'employee_id': employee.id,
@@ -977,20 +853,17 @@ def employee_daily_report_api(request):
             'income_details': income_details,
             'expense_details': expense_details
         }
-
         # التصفح
         paginator = PageNumberPagination()
         paginator.page_size = 20
         return Response(response_data, status=status.HTTP_200_OK)
-
     except ValueError as e:
         logger.error(f"Error in employee_daily_report_api: {str(e)}")
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.error(f"Unexpected error in employee_daily_report_api: {str(e)}")
         return Response({'error': 'حدث خطأ غير متوقع'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-
+   
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def generate_daily_report_pdf(request):
@@ -998,36 +871,36 @@ def generate_daily_report_pdf(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     try:
         employee_id = request.query_params.get('employee_id')
         start_date = request.query_params.get('start_date')
         end_date = request.query_params.get('end_date')
-        
+       
         # Require at least start_date and end_date
         if not (start_date and end_date):
             return Response({'error': 'يجب تحديد تاريخ البداية وتاريخ النهاية.'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         try:
             start_date_obj = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
             end_date_obj = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
         except ValueError:
             return Response({'error': 'صيغة التاريخ غير صحيحة (ISO format)'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         expenses = Expense.objects.filter(club=request.user.club, date__gte=start_date_obj, date__lte=end_date_obj)
         incomes = Income.objects.filter(club=request.user.club, date__gte=start_date_obj, date__lte=end_date_obj)
-        
+       
         if employee_id:
             employee = get_object_or_404(User, id=employee_id, club=request.user.club)
             expenses = expenses.filter(paid_by=employee)
             incomes = incomes.filter(received_by=employee)
-        
+       
         total_expenses = calculate_totals(expenses)
         total_incomes = calculate_totals(incomes)
         net_profit = total_incomes - total_expenses
         expenses_count = expenses.count()
         incomes_count = incomes.count()
-        
+       
         report_data = {
             'employee_name': employee.username if employee_id else 'جميع الموظفين',
             'start_date': start_date_obj.strftime('%Y-%m-%d %H:%M:%S'),
@@ -1048,7 +921,7 @@ def generate_daily_report_pdf(request):
             'total_incomes': f"{total_incomes:.2f}",
             'net_profit': f"{net_profit:.2f}"
         }
-        
+       
         latex_template_path = os.path.join(os.path.dirname(__file__), 'templates', 'daily_report.tex')
         with open(latex_template_path, 'r', encoding='utf-8') as file:
             template = Template(file.read())
@@ -1067,10 +940,9 @@ def generate_daily_report_pdf(request):
                 response = FileResponse(pdf_file, content_type='application/pdf')
                 response['Content-Disposition'] = f'attachment; filename="daily_report_{employee_id or "all"}_{start_date_obj.strftime("%Y%m%d")}.pdf"'
                 return response
-    
+   
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def financial_analysis_api(request):
@@ -1078,7 +950,7 @@ def financial_analysis_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     try:
         period_type = request.query_params.get('period_type', 'monthly')
         start = request.query_params.get('start_date')
@@ -1090,10 +962,10 @@ def financial_analysis_api(request):
         valid_periods = ['daily', 'weekly', 'monthly', 'yearly']
         if period_type not in valid_periods:
             return Response({'error': f'نوع الفترة غير صالح. استخدم: {", ".join(valid_periods)}'}, status=status.HTTP_400_BAD_REQUEST)
-        
+       
         income_qs = Income.objects.filter(club=request.user.club).only('id', 'amount', 'date', 'source__name', 'received_by__username')
         expense_qs = Expense.objects.filter(club=request.user.club).only('id', 'amount', 'date', 'category__name', 'paid_by__username')
-        
+       
         # Apply filters
         if start and end:
             try:
@@ -1117,10 +989,10 @@ def financial_analysis_api(request):
                 start_date = end_date - relativedelta(years=5)
             income_qs = income_qs.filter(date__range=[start_date, end_date])
             expense_qs = expense_qs.filter(date__range=[start_date, end_date])
-        
+       
         income_qs = apply_common_filters(income_qs, request, user_field='received_by', source_category_field='source')
         expense_qs = apply_common_filters(expense_qs, request, user_field='paid_by', source_category_field='category')
-        
+       
         trunc_func = {
             'daily': TruncDay, 'weekly': TruncWeek, 'monthly': TruncMonth, 'yearly': TruncYear
         }[period_type]
@@ -1141,11 +1013,11 @@ def financial_analysis_api(request):
                 periods[period_str]['net_profit'] = periods[period_str]['total_income'] - periods[period_str]['total_expense']
             else:
                 periods[period_str] = {'total_income': 0, 'total_expense': float(item['total_expense']), 'net_profit': -float(item['total_expense'])}
-        
+       
         total_income = calculate_totals(income_qs)
         total_expense = calculate_totals(expense_qs)
         net_profit = total_income - total_expense
-        
+       
         financial_position = {
             'total_income': total_income,
             'total_expense': total_expense,
@@ -1153,19 +1025,19 @@ def financial_analysis_api(request):
             'cash_balance': net_profit,
             'liabilities': total_expense
         }
-        
+       
         prev_start_date = start_date - (end_date - start_date)
         prev_end_date = start_date - timedelta(days=1)
         prev_income = calculate_totals(Income.objects.filter(club=request.user.club, date__range=[prev_start_date, prev_end_date]))
         prev_expense = calculate_totals(Expense.objects.filter(club=request.user.club, date__range=[prev_start_date, prev_end_date]))
         prev_net = prev_income - prev_expense
-        
+       
         results = {
             'income_growth': float((total_income - prev_income) / prev_income * 100) if prev_income > 0 else 0,
             'expense_growth': float((total_expense - prev_expense) / prev_expense * 100) if prev_expense > 0 else 0,
             'net_profit_growth': float((net_profit - prev_net) / prev_net * 100) if prev_net > 0 else 0
         }
-        
+       
         period_count = Decimal(len(periods)) or Decimal('1')
         avg_income = total_income / period_count
         avg_expense = total_expense / period_count
@@ -1174,7 +1046,7 @@ def financial_analysis_api(request):
             'next_period_expense': float(avg_expense),
             'next_period_net': float(avg_income - avg_expense)
         }
-        
+       
         expense_by_category = expense_qs.values('category__name').annotate(total_amount=Sum('amount')).order_by('-total_amount')
         expense_category_analysis = [
             {
@@ -1183,7 +1055,7 @@ def financial_analysis_api(request):
                 'percentage': float(Decimal(item['total_amount']) / total_expense * 100) if total_expense > 0 else 0
             } for item in expense_by_category
         ]
-        
+       
         income_by_source = income_qs.values('source__name').annotate(total_amount=Sum('amount')).order_by('-total_amount')
         income_source_analysis = [
             {
@@ -1192,10 +1064,10 @@ def financial_analysis_api(request):
                 'percentage': float(Decimal(item['total_amount']) / total_income * 100) if total_income > 0 else 0
             } for item in income_by_source
         ]
-        
+       
         top_expense_categories = expense_category_analysis[:5]
         top_income_sources = income_source_analysis[:5]
-        
+       
         alerts = []
         expense_ratio = total_expense / total_income if total_income > 0 else None
         if expense_ratio is not None and expense_ratio > Decimal('0.9'):
@@ -1208,7 +1080,7 @@ def financial_analysis_api(request):
         for src in income_source_analysis:
             if src['percentage'] < 10:
                 alerts.append(f'تنبيه: مصدر "{src["source"]}" يساهم بـ {src["percentage"]:.2f}% من الإيرادات')
-        
+       
         recommendations = []
         if expense_ratio is not None and expense_ratio > Decimal('0.7'):
             high_expense_categories = [cat["category"] for cat in top_expense_categories]
@@ -1218,7 +1090,7 @@ def financial_analysis_api(request):
             recommendations.append(f'اقتراح: زِد الإيرادات من مصادر مثل {", ".join(low_income_sources)}')
         if net_profit < 0:
             recommendations.append('اقتراح: راجع التسعير أو قلل المصروفات غير الضرورية')
-        
+       
         response_data = {
             'period_analysis': [
                 {'period': period, 'total_income': data['total_income'], 'total_expense': data['total_expense'], 'net_profit': data['net_profit']}
@@ -1234,17 +1106,16 @@ def financial_analysis_api(request):
             'alerts': alerts,
             'recommendations': recommendations
         }
-        
+       
         return handle_response(
             response_data,
             details_queryset=income_qs if details else None,
             details_serializer=IncomeDetailSerializer,
             details_key='income_details'
         )
-    
+   
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def stock_item_api(request):
@@ -1252,7 +1123,7 @@ def stock_item_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     if request.method == 'GET':
         stock_items = StockItem.objects.filter(club=request.user.club)
         if request.query_params.get('name'):
@@ -1262,7 +1133,7 @@ def stock_item_api(request):
         page = paginator.paginate_queryset(stock_items, request)
         serializer = StockItemSerializer(page, many=True)
         return paginator.get_paginated_response(serializer.data)
-    
+   
     elif request.method == 'POST':
         data = request.data.copy()
         data['club'] = request.user.club.id
@@ -1271,7 +1142,6 @@ def stock_item_api(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def stock_inventory_api(request):
@@ -1279,7 +1149,7 @@ def stock_inventory_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     if request.method == 'GET':
         stock_items = StockItem.objects.filter(club=request.user.club).annotate(
             total_added=Sum('transactions__quantity', filter=Q(transactions__transaction_type='ADD')),
@@ -1292,7 +1162,7 @@ def stock_inventory_api(request):
             } for item in stock_items
         ]
         return Response(report_data, status=status.HTTP_200_OK)
-    
+   
     elif request.method == 'POST':
         inventory_data = request.data.get('inventory', [])
         try:
@@ -1326,7 +1196,6 @@ def stock_inventory_api(request):
         except Exception as e:
             logger.error("Error processing inventory: %s", str(e))
             return Response({'error': 'حدث خطأ أثناء تسجيل الجرد'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def stock_profit_api(request):
@@ -1334,7 +1203,7 @@ def stock_profit_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     try:
         stock_item_id = request.query_params.get('stock_item_id')
         start_date = request.query_params.get('start_date')
@@ -1371,10 +1240,9 @@ def stock_profit_api(request):
                 'total_sale_revenue': float(total_sale_revenue), 'profit': float(profit), 'profit_per_unit': float(profit_per_unit)
             })
         return Response(report_data, status=status.HTTP_200_OK)
-    
+   
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def stock_sales_analysis_api(request):
@@ -1382,7 +1250,7 @@ def stock_sales_analysis_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     try:
         stock_item_id = request.query_params.get('stock_item_id')
         start_date = request.query_params.get('start_date')
@@ -1464,10 +1332,9 @@ def stock_sales_analysis_api(request):
                 'sale_gaps': sale_gaps
             })
         return Response(analysis_data, status=status.HTTP_200_OK)
-    
+   
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def generate_inventory_pdf(request):
@@ -1475,7 +1342,7 @@ def generate_inventory_pdf(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     try:
         stock_items = StockItem.objects.filter(club=request.user.club)
         if request.query_params.get('stock_item_id'):
@@ -1505,10 +1372,9 @@ def generate_inventory_pdf(request):
                 response = FileResponse(pdf_file, content_type='application/pdf')
                 response['Content-Disposition'] = f'attachment; filename="inventory_report_{timezone.now().strftime("%Y%m%d")}.pdf"'
                 return response
-    
+   
     except ValueError as e:
         return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
 @api_view(['GET', 'POST'])
 @permission_classes([IsAuthenticated])
 def schedule_api(request):
@@ -1516,13 +1382,13 @@ def schedule_api(request):
     if not request.user.club:
         logger.error(f"User {request.user.username} has no associated club")
         return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
-    
+   
     if request.method == 'GET':
         schedules = Schedule.objects.filter(club=request.user.club)
         return Response([{
             'id': s.id, 'title': s.title, 'start': s.start.isoformat(), 'end': s.end.isoformat(), 'type': s.type
         } for s in schedules], status=status.HTTP_200_OK)
-    
+   
     elif request.method == 'POST':
         data = request.data.copy()
         data['club'] = request.user.club.id
@@ -1532,3 +1398,65 @@ def schedule_api(request):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def open_cash_journal(request):
+    """Open a new cash journal upon check-in."""
+    if not request.user.club:
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Find active attendance
+    attendance = StaffAttendance.objects.filter(staff=request.user, check_out__isnull=True).first()
+    if not attendance:
+        return Response({'error': 'يجب تسجيل حضور أولاً لفتح يومية خزينة.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Check if open journal exists
+    if CashJournal.objects.filter(user=request.user, status='open').exists():
+        return Response({'error': 'يوجد يومية خزينة مفتوحة بالفعل.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    data = {
+        'user': request.user.id,
+        'club': request.user.club.id,
+        'attendance': attendance.id,
+        'initial_balance': request.data.get('initial_balance', 0.00)
+    }
+    serializer = CashJournalSerializer(data=data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def close_cash_journal(request):
+    """Close the open cash journal upon check-out."""
+    if not request.user.club:
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    journal = CashJournal.objects.filter(user=request.user, status='open').first()
+    if not journal:
+        return Response({'error': 'لا يوجد يومية خزينة مفتوحة.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    data = {'status': 'closed', 'notes': request.data.get('notes', '')}
+    serializer = CashJournalSerializer(journal, data=data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        # Optionally generate PDF report here
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def cash_journal_api(request):
+    """List or retrieve cash journals."""
+    if not request.user.club:
+        return Response({'error': 'غير مسموح: المستخدم ليس مرتبط بنادي.'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if request.user.role not in FULL_ACCESS_ROLES:
+        journals = CashJournal.objects.filter(user=request.user, club=request.user.club)
+    else:
+        journals = CashJournal.objects.filter(club=request.user.club)
+    
+    serializer = CashJournalSerializer(journals, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)

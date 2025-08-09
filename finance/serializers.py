@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import Expense, Income, ExpenseCategory, IncomeSource, StockItem, StockTransaction, Schedule
+from .models import Expense, Income, ExpenseCategory, IncomeSource, StockItem, StockTransaction, Schedule, CashJournal
 from core.serializers import ClubSerializer
 from accounts.serializers import UserSerializer
 
@@ -19,6 +19,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
     stock_item_details = serializers.SerializerMethodField()
     attachment_url = serializers.SerializerMethodField()
     date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', input_formats=['%Y-%m-%d %H:%M:%S', '%Y-%m-%d'])
+    cash_journal = serializers.PrimaryKeyRelatedField(read_only=True)  # New field, read-only
 
     class Meta:
         model = Expense
@@ -27,7 +28,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
             'amount', 'description', 'date', 'paid_by', 'paid_by_details',
             'related_employee', 'related_employee_details',
             'invoice_number', 'attachment', 'attachment_url', 'stock_item',
-            'stock_item_details', 'stock_quantity'
+            'stock_item_details', 'stock_quantity', 'cash_journal'  # Added
         ]
         extra_kwargs = {
             'attachment': {'required': False},
@@ -83,13 +84,14 @@ class IncomeSerializer(serializers.ModelSerializer):
     received_by_details = UserSerializer(source='received_by', read_only=True)
     stock_transaction_details = serializers.SerializerMethodField()
     date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
+    cash_journal = serializers.PrimaryKeyRelatedField(read_only=True)  # New field, read-only
 
     class Meta:
         model = Income
         fields = [
             'id', 'club', 'club_details', 'source', 'source_details',
             'amount', 'description', 'date', 'received_by', 'received_by_details',
-            'stock_transaction', 'stock_transaction_details', 'quantity'
+            'stock_transaction', 'stock_transaction_details', 'quantity', 'cash_journal'  # Added
         ]
 
     def get_stock_transaction_details(self, obj):
@@ -122,12 +124,13 @@ class StockItemSerializer(serializers.ModelSerializer):
 class StockTransactionSerializer(serializers.ModelSerializer):
     stock_item_details = serializers.SerializerMethodField()
     date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
+    cash_journal = serializers.PrimaryKeyRelatedField(read_only=True)  # New field
 
     class Meta:
         model = StockTransaction
         fields = [
             'id', 'stock_item', 'stock_item_details', 'transaction_type',
-            'quantity', 'date', 'description', 'related_expense', 'related_income'
+            'quantity', 'date', 'description', 'related_expense', 'related_income', 'cash_journal'  # Added
         ]
 
     def get_stock_item_details(self, obj):
@@ -190,3 +193,35 @@ class ScheduleSerializer(serializers.ModelSerializer):
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         return representation
+
+from django.db import models
+
+
+class CashJournalSerializer(serializers.ModelSerializer):
+    user_details = UserSerializer(source='user', read_only=True)
+    club_details = ClubSerializer(source='club', read_only=True)
+    total_income = serializers.SerializerMethodField()
+    total_expense = serializers.SerializerMethodField()
+    net_profit = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CashJournal
+        fields = ['id', 'user', 'user_details', 'club', 'club_details', 'attendance', 'start_time', 'end_time', 'status', 
+                  'initial_balance', 'final_balance', 'notes', 'total_income', 'total_expense', 'net_profit']
+        read_only_fields = ['id', 'start_time', 'end_time', 'status', 'final_balance']
+
+    def get_total_income(self, obj):
+        return obj.incomes.aggregate(models.Sum('amount'))['amount__sum'] or 0
+
+    def get_total_expense(self, obj):
+        return obj.expenses.aggregate(models.Sum('amount'))['amount__sum'] or 0
+
+    def get_net_profit(self, obj):
+        return self.get_total_income(obj) - self.get_total_expense(obj)
+
+    def update(self, instance, validated_data):
+        if 'status' in validated_data and validated_data['status'] == 'closed' and instance.status == 'open':
+            instance.close_journal()
+        else:
+            instance = super().update(instance, validated_data)
+        return instance

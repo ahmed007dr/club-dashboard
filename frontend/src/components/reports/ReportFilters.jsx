@@ -4,8 +4,20 @@ import { User } from 'lucide-react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import { ar } from 'date-fns/locale';
+import { useSelector } from 'react-redux';  // Assuming Redux for state
 
 const ReportFilters = ({ userRole, employeeId, setEmployeeId, startDate, setStartDate, endDate, setEndDate, employees, employeeLoading, loading, previewLoading }) => {
+  const cashJournal = useSelector((state) => state.finance.activeCashJournal);  // From Redux
+
+  // Auto-set dates from active journal if employee
+  React.useEffect(() => {
+    if (userRole !== 'admin' && userRole !== 'owner' && cashJournal) {
+      setStartDate(new Date(cashJournal.start_time));
+      setEndDate(new Date(cashJournal.end_time || new Date()));
+      setEmployeeId(cashJournal.user.id.toString());
+    }
+  }, [cashJournal, userRole]);
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
       <div>
@@ -16,7 +28,7 @@ const ReportFilters = ({ userRole, employeeId, setEmployeeId, startDate, setStar
           <Select
             value={employeeId}
             onValueChange={setEmployeeId}
-            disabled={employeeLoading || loading || previewLoading}
+            disabled={employeeLoading || loading || previewLoading || (userRole !== 'admin' && userRole !== 'owner')}  // Disable for employees
           >
             <SelectTrigger className="w-full text-right bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md py-2 text-sm">
               <SelectValue placeholder={employeeLoading ? 'جارٍ تحميل الموظفين...' : 'اختر موظفًا'} />
@@ -54,7 +66,7 @@ const ReportFilters = ({ userRole, employeeId, setEmployeeId, startDate, setStar
             dateFormat="d MMMM yyyy, h:mm aa"
             locale={ar}
             className="w-full text-right bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-600"
-            disabled={loading || previewLoading}
+            disabled={loading || previewLoading || (userRole !== 'admin' && userRole !== 'owner')}  // Disable for employees
           />
         </div>
       </div>
@@ -72,12 +84,11 @@ const ReportFilters = ({ userRole, employeeId, setEmployeeId, startDate, setStar
             dateFormat="d MMMM yyyy, h:mm aa"
             locale={ar}
             className="w-full text-right bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-blue-600"
-            disabled={loading || previewLoading}
+            disabled={loading || previewLoading || (userRole !== 'admin' && userRole !== 'owner')}  // Disable for employees
           />
         </div>
       </div>
     </div>
   );
 };
-
 export default ReportFilters;

@@ -3,10 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DollarSign, ShoppingCart } from 'lucide-react';
 import { format, differenceInHours, parseISO } from 'date-fns';
 import { ar } from 'date-fns/locale';
-
 const DailyReportPreview = ({ reportData = {} }) => {
   console.log('DailyReportPreview reportData:', reportData);
-
   const formatDate = (dateString) => {
     try {
       const date = parseISO(dateString);
@@ -15,7 +13,6 @@ const DailyReportPreview = ({ reportData = {} }) => {
       return dateString || 'غير متوفر';
     }
   };
-
   const getShiftDuration = (checkIn, checkOut) => {
     try {
       const start = parseISO(checkIn);
@@ -26,7 +23,6 @@ const DailyReportPreview = ({ reportData = {} }) => {
       return 'غير متوفر';
     }
   };
-
   const {
     income_details = [],
     expense_details = [],
@@ -37,8 +33,8 @@ const DailyReportPreview = ({ reportData = {} }) => {
     employee_name = 'غير متوفر',
     club_name = 'غير متوفر',
     period = { start_date: '', end_date: '' },
+    status = 'مفتوحة',  // New: from cash journal
   } = reportData;
-
   // تجميع الإيرادات حسب مصدر الإيرادات
   const aggregatedIncomes = income_details.reduce((acc, income) => {
     const sourceName = income.source_details?.name || 'غير محدد';
@@ -49,7 +45,6 @@ const DailyReportPreview = ({ reportData = {} }) => {
     acc[sourceName].total += parseFloat(income.amount || 0);
     return acc;
   }, {});
-
   // تجميع النفقات حسب فئة النفقات
   const aggregatedExpenses = expense_details.reduce((acc, expense) => {
     const categoryName = expense.category_details?.name || 'غير محدد';
@@ -59,16 +54,16 @@ const DailyReportPreview = ({ reportData = {} }) => {
     acc[categoryName].total += parseFloat(expense.amount || 0);
     return acc;
   }, {});
-
   return (
     <Card className="mt-6 shadow-sm border-gray-200 dark:border-gray-700 print-report bg-white dark:bg-gray-800 animate-fade-in">
       <CardHeader className="pb-3">
         <CardTitle className="text-right text-lg sm:text-xl font-bold flex items-center gap-3 text-gray-800 dark:text-white">
           <DollarSign className="text-blue-700 bg-blue-100 p-1.5 rounded-full w-8 h-8" />
-          معاينة التقرير
+          معاينة التقرير - حالة اليومية: {status}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
+        
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           <div className="bg-blue-50 dark:bg-blue-900 p-4 rounded-lg flex items-center gap-3">
             <DollarSign className="text-blue-700 w-6 h-6" />
