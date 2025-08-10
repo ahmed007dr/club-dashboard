@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import BASE_URL from '../../config/api';
 import { Link } from 'react-router-dom';
 import usePermission from '@/hooks/usePermission';
 import { FiSearch, FiRefreshCw, FiX } from 'react-icons/fi';
 import { RiForbidLine } from 'react-icons/ri';
+import { debounce } from 'lodash'; // إضافة مكتبة lodash للـ debounce
 
 function UserList() {
   const canViewUsers = usePermission('view_user');
@@ -15,25 +16,21 @@ function UserList() {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [nextPageUrl, setNextPageUrl] = useState(null);
-  const [prevPageUrl, setPrevPageUrl] = useState(null);
 
-  useEffect(() => {
-    if (!canViewUsers) return;
+  // دالة البحث مع debounce
+  const debouncedFetchUsers = useCallback(
+    debounce(async (searchQuery, page) => {
+      if (!canViewUsers) return;
 
-    const source = axios.CancelToken.source();
-
-    const fetchUsers = async () => {
+      const source = axios.CancelToken.source();
       try {
         setLoading(true);
         setError(null);
         const token = localStorage.getItem('token');
         const headers = { Authorization: `Bearer ${token}` };
+        const params = { page, search: searchQuery };
 
-        let url = currentPage === 1 || filter ? `${BASE_URL}accounts/api/users/` : nextPageUrl || prevPageUrl;
-        const params = filter ? { search: filter } : {};
-
-        const response = await axios.get(url, {
+        const response = await axios.get(`${BASE_URL}accounts/api/users/`, {
           headers,
           params,
           cancelToken: source.token,
@@ -41,8 +38,6 @@ function UserList() {
 
         setUsers(response.data.results);
         setCount(response.data.count);
-        setNextPageUrl(response.data.next);
-        setPrevPageUrl(response.data.previous);
         setTotalPages(Math.ceil(response.data.count / 20));
         setLoading(false);
       } catch (err) {
@@ -50,24 +45,27 @@ function UserList() {
         setError('حدث خطأ أثناء جلب بيانات المستخدمين. يرجى المحاولة لاحقاً.');
         setLoading(false);
       }
-    };
+    }, 800),
+    [canViewUsers]
+  );
 
-    const debounceTimer = setTimeout(fetchUsers, 500);
+  // استدعاء البحث عند تغيير filter أو currentPage
+  useEffect(() => {
+    debouncedFetchUsers(filter, currentPage);
 
     return () => {
-      source.cancel();
-      clearTimeout(debounceTimer);
+      debouncedFetchUsers.cancel(); // إلغاء أي طلبات سابقة
     };
-  }, [canViewUsers, currentPage, filter, nextPageUrl, prevPageUrl]);
+  }, [filter, currentPage, debouncedFetchUsers]);
 
   const nextPage = () => {
-    if (currentPage < totalPages && nextPageUrl) {
+    if (currentPage < totalPages) {
       setCurrentPage((prev) => prev + 1);
     }
   };
 
   const prevPage = () => {
-    if (currentPage > 1 && prevPageUrl) {
+    if (currentPage > 1) {
       setCurrentPage((prev) => prev - 1);
     }
   };
@@ -78,7 +76,6 @@ function UserList() {
   };
 
   const startNumber = (currentPage - 1) * 20 + 1;
-
   const memoizedUsers = useMemo(() => users, [users]);
 
   if (!canViewUsers) {
@@ -141,7 +138,7 @@ function UserList() {
         <div className="p-6 bg-red-50 text-red-700 rounded-xl shadow-sm mb-6 flex items-center justify-between">
           <span className="font-medium">{error}</span>
           <button
-            onClick={() => setCurrentPage(1)}
+            onClick={() => debouncedFetchUsers(filter, currentPage)}
             className="flex items-center px-4 py-2 bg-red-100 hover:bg-red-200 rounded-lg text-sm transition-colors"
           >
             <FiRefreshCw className="mr-2" />

@@ -85,7 +85,7 @@ const AttendanceDashboard = () => {
       setLoadingCheckIn(false);
       setErrorCheckIn(error.message);
     }
-  }, 1000);
+  }, 500);
 
   // Debounced RFID search for Check-Out
   const debouncedFetchStaffCheckOut = debounce(async (value) => {
