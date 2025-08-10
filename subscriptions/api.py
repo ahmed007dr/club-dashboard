@@ -628,6 +628,8 @@ def upcoming_subscriptions(request):
     serializer = SubscriptionSerializer(page, many=True)
     return paginator.get_paginated_response(serializer.data)
 
+from datetime import datetime
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def renew_subscription(request, pk):
@@ -643,7 +645,16 @@ def renew_subscription(request, pk):
     
     payment_data = request.data.get('payments', [])
     new_type_id = request.data.get('type', old_subscription.type.id)  # دعم تغيير نوع الاشتراك
-    start_date = request.data.get('start_date', old_subscription.end_date)  # دعم تحديد تاريخ البدء
+    
+    # Handle start_date: parse string to datetime.date if provided, else use old_subscription.end_date
+    start_date_input = request.data.get('start_date', old_subscription.end_date)
+    if isinstance(start_date_input, str):
+        try:
+            start_date = datetime.strptime(start_date_input, '%Y-%m-%d').date()
+        except ValueError:
+            return Response({"error": "تنسيق تاريخ البدء غير صحيح. استخدم YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        start_date = start_date_input  # Assume it’s already a datetime.date (e.g., old_subscription.end_date)
     
     with transaction.atomic():
         subscription_type = get_object_or_404(SubscriptionType, id=new_type_id, club=request.user.club)
@@ -738,6 +749,7 @@ def renew_subscription(request, pk):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+        
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def make_payment(request, pk):

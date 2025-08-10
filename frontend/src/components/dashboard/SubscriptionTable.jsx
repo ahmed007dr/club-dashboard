@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Link } from "react-router-dom";
@@ -32,15 +33,15 @@ import {
   FaUndo,
   FaRedo,
   FaBan,
-  FaTrash,
 } from "react-icons/fa";
 import { toast } from "react-hot-toast";
 import {
   fetchSubscriptionById,
   makePayment,
   renewSubscription,
-  deleteSubscriptionById,
+  cancelSubscription,
   fetchPaymentMethods,
+  fetchSubscriptions,
 } from "@/redux/slices/subscriptionsSlice";
 import usePermission from "@/hooks/usePermission";
 import BASE_URL from '../../config/api';
@@ -52,18 +53,18 @@ const SubscriptionTable = ({
   setPaymentAmounts,
   setSelectedSubscription,
   setIsUpdateModalOpen,
-  setIsDeleteModalOpen,
   setIsFreezeModalOpen,
   setIsDetailModalOpen,
   setDetailSubscription,
 }) => {
   const dispatch = useDispatch();
-  const { paymentMethods, paymentMethodsLoading, paymentMethodsError } = useSelector((state) => state.subscriptions);
+  const { paymentMethods, paymentMethodsLoading, paymentMethodsError, cancelStatus, cancelError } = useSelector((state) => state.subscriptions);
   const [paymentMethodId, setPaymentMethodId] = useState("");
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState(null);
+  const [cancelReason, setCancelReason] = useState("");
   const canUpdateSubscription = usePermission("change_subscription");
-  const canDeleteSubscription = usePermission("delete_subscription");
   const canCancelSubscription = usePermission("change_subscription");
 
   useEffect(() => {
@@ -133,6 +134,7 @@ const SubscriptionTable = ({
           setIsPaymentModalOpen(false);
           setPaymentMethodId("");
           setSelectedSubscriptionId(null);
+          dispatch(fetchSubscriptions({ page: 1 }));
         })
         .catch((err) => {
           toast.error(
@@ -164,9 +166,10 @@ const SubscriptionTable = ({
         .unwrap()
         .then(() => {
           toast.success("تم تجديد الاشتراك بنجاح!");
+          dispatch(fetchSubscriptions({ page: 1 }));
         })
         .catch((err) => {
-          toast.error(`فشل التجديد: ${err || "حدث خطأ"}`);
+          toast.error(`فشل التجديد: ${err?.message || "حدث خطأ"}`);
         });
     },
     [dispatch]
@@ -202,36 +205,33 @@ const SubscriptionTable = ({
     [dispatch]
   );
 
+  const openCancelModal = useCallback((subscription) => {
+    setSelectedSubscription(subscription);
+    setIsCancelModalOpen(true);
+  }, [setSelectedSubscription]);
+
   const handleCancelSubscription = useCallback(
-    (subscription) => {
-      fetch(`${BASE_URL}subscriptions/api/subscriptions/${subscription.id}/cancel/`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-          "Content-Type": "application/json",
-        },
-      })
+    () => {
+      const subscription = subscriptions.find((sub) => sub.id === selectedSubscriptionId);
+      if (!subscription) {
+        toast.error("الاشتراك غير موجود");
+        return;
+      }
+
+      dispatch(cancelSubscription({ subscriptionId: subscription.id, reason: cancelReason }))
+        .unwrap()
         .then((response) => {
-          if (!response.ok) throw new Error("فشل إلغاء الاشتراك");
-          return response.json();
-        })
-        .then(() => {
-          toast.success("تم إلغاء الاشتراك بنجاح!");
+          toast.success(`تم إلغاء الاشتراك بنجاح! المبلغ المسترد: ${response.refund_amount || "0.00"} ج.م`);
+          setIsCancelModalOpen(false);
+          setCancelReason("");
+          setSelectedSubscriptionId(null);
           dispatch(fetchSubscriptions({ page: 1 }));
         })
         .catch((err) => {
-          toast.error(`فشل إلغاء الاشتراك: ${err.message || "حدث خطأ"}`);
+          toast.error(err?.error || err?.message || "فشل إلغاء الاشتراك: حدث خطأ");
         });
     },
-    [dispatch]
-  );
-
-  const handleDelete = useCallback(
-    (subscription) => {
-      setSelectedSubscription(subscription);
-      setIsDeleteModalOpen(true);
-    },
-    [setSelectedSubscription, setIsDeleteModalOpen]
+    [dispatch, cancelReason, selectedSubscriptionId, subscriptions]
   );
 
   if (isLoading || paymentMethodsLoading) {
@@ -351,7 +351,7 @@ const SubscriptionTable = ({
                       >
                         <FaEye className="mr-2" /> عرض
                       </DropdownMenuItem>
-                      {canUpdateSubscription && (
+                      {canUpdateSubscription && subscription.status !== "ملغي" && (
                         <DropdownMenuItem
                           onClick={() => {
                             setSelectedSubscription(subscription);
@@ -362,7 +362,7 @@ const SubscriptionTable = ({
                           <FaEdit className="mr-2" /> تعديل
                         </DropdownMenuItem>
                       )}
-                      {subscription.status === "منتهي" && canUpdateSubscription && (
+                      {canUpdateSubscription && subscription.status === "منتهي" && (
                         <DropdownMenuItem
                           onClick={() => handleRenew(subscription.id)}
                           className="cursor-pointer text-blue-600 hover:bg-blue-50"
@@ -391,18 +391,13 @@ const SubscriptionTable = ({
                       )}
                       {canCancelSubscription && subscription.status !== "ملغي" && (
                         <DropdownMenuItem
-                          onClick={() => handleCancelSubscription(subscription)}
+                          onClick={() => {
+                            setSelectedSubscriptionId(subscription.id);
+                            openCancelModal(subscription);
+                          }}
                           className="cursor-pointer text-red-600 hover:bg-red-50"
                         >
                           <FaBan className="mr-2" /> إلغاء
-                        </DropdownMenuItem>
-                      )}
-                      {canDeleteSubscription && (
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(subscription)}
-                          className="cursor-pointer text-red-600 hover:bg-red-50"
-                        >
-                          <FaTrash className="mr-2" /> حذف
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
@@ -446,9 +441,59 @@ const SubscriptionTable = ({
             <Button
               onClick={handlePayment}
               className="bg-blue-600 hover:bg-blue-700"
-              disabled={!paymentMethodId}
+              disabled={!paymentMethodId || cancelStatus[selectedSubscriptionId] === "loading"}
             >
-              تأكيد الدفع
+              {cancelStatus[selectedSubscriptionId] === "loading" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "تأكيد الدفع"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCancelModalOpen} onOpenChange={setIsCancelModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="text-right">تأكيد إلغاء الاشتراك</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-gray-600 mb-4">
+              هل أنت متأكد من إلغاء الاشتراك "{subscriptions.find((sub) => sub.id === selectedSubscriptionId)?.type_details?.name}"؟
+            </p>
+            <Input
+              type="text"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="سبب الإلغاء (اختياري)"
+              className="text-right"
+            />
+          </div>
+          {cancelError[selectedSubscriptionId] && (
+            <p className="text-red-500 text-sm">{cancelError[selectedSubscriptionId]?.error || "حدث خطأ"}</p>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsCancelModalOpen(false);
+                setCancelReason("");
+                setSelectedSubscriptionId(null);
+              }}
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleCancelSubscription}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={cancelStatus[selectedSubscriptionId] === "loading"}
+            >
+              {cancelStatus[selectedSubscriptionId] === "loading" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "تأكيد الإلغاء"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

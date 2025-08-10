@@ -1,3 +1,4 @@
+
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import BASE_URL from '@/config/api';
@@ -100,20 +101,22 @@ export const updateSubscription = createAsyncThunk(
   }
 );
 
-// حذف اشتراك حسب ID
-export const deleteSubscriptionById = createAsyncThunk(
-  'subscriptions/deleteSubscriptionById',
-  async (id, { rejectWithValue }) => {
+// إلغاء اشتراك
+export const cancelSubscription = createAsyncThunk(
+  'subscriptions/cancelSubscription',
+  async ({ subscriptionId, reason = '' }, { rejectWithValue }) => {
     try {
       const token = localStorage.getItem('token');
-      await axios.delete(
-        `${BASE_URL}subscriptions/api/subscriptions/${id}/`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      if (!token) throw new Error('Authentication token is missing.');
+      const response = await axios.post(
+        `${BASE_URL}subscriptions/api/subscriptions/${subscriptionId}/cancel/`,
+        { reason },
+        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
       );
-      return id;
+      return response.data;
     } catch (error) {
-      console.error('Error deleting subscription:', error);
-      return rejectWithValue(error.response?.data?.detail || error.message);
+      console.error('Error canceling subscription:', error);
+      return rejectWithValue(error.response?.data || error.message);
     }
   }
 );
@@ -636,20 +639,31 @@ const subscriptionsSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(deleteSubscriptionById.pending, (state) => {
+      .addCase(cancelSubscription.pending, (state, action) => {
         state.loading = true;
         state.error = null;
+        const { subscriptionId } = action.meta.arg;
+        state.cancelStatus[subscriptionId] = 'loading';
+        delete state.cancelError[subscriptionId];
+        delete state.cancelSuccess[subscriptionId];
       })
-      .addCase(deleteSubscriptionById.fulfilled, (state, action) => {
+      .addCase(cancelSubscription.fulfilled, (state, action) => {
         state.loading = false;
-        state.subscriptions = state.subscriptions.filter((sub) => sub.id !== action.payload);
-        state.memberSubscriptions.results = state.memberSubscriptions.results.filter(
-          (sub) => sub.id !== action.payload
+        const updatedSubscription = action.payload;
+        state.subscriptions = state.subscriptions.map((sub) =>
+          sub.id === updatedSubscription.id ? updatedSubscription : sub
         );
+        state.memberSubscriptions.results = state.memberSubscriptions.results.map((sub) =>
+          sub.id === updatedSubscription.id ? updatedSubscription : sub
+        );
+        state.cancelStatus[updatedSubscription.id] = 'succeeded';
+        state.cancelSuccess[updatedSubscription.id] = 'تم إلغاء الاشتراك بنجاح';
       })
-      .addCase(deleteSubscriptionById.rejected, (state, action) => {
+      .addCase(cancelSubscription.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload;
+        const { subscriptionId } = action.meta.arg;
+        state.cancelStatus[subscriptionId] = 'failed';
+        state.cancelError[subscriptionId] = action.payload;
       })
       .addCase(fetchSubscriptions.pending, (state) => {
         state.status = 'loading';

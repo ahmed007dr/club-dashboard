@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
@@ -7,8 +8,9 @@ import {
   clearFreezeFeedback,
   renewSubscription,
   updateSubscription,
-  deleteSubscriptionById,
+  cancelSubscription, // إجراء جديد لإلغاء الاشتراك
   makePayment,
+  fetchPaymentMethods,
 } from "@/redux/slices/subscriptionsSlice";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +23,7 @@ import { motion } from "framer-motion";
 import axios from "axios";
 import BASE_URL from "@/config/api";
 
-// إضافة statusStyles لعرض الحالة
+// تعريف statusStyles لعرض الحالة
 const statusStyles = {
   نشط: "bg-green-100 text-green-600",
   منتهي: "bg-red-100 text-red-600",
@@ -33,7 +35,7 @@ const statusStyles = {
   "غير معروف": "bg-gray-100 text-gray-600",
 };
 
-// Fetch all subscription types (نفس منطق CreateSubscription)
+// جلب جميع أنواع الاشتراكات
 const fetchAllSubscriptionTypes = async () => {
   try {
     const token = localStorage.getItem('token');
@@ -63,7 +65,7 @@ const fetchAllSubscriptionTypes = async () => {
   }
 };
 
-// Fetch payment methods (نفس منطق CreateSubscription)
+// جلب طرق الدفع
 const fetchAllPaymentMethods = async () => {
   try {
     const token = localStorage.getItem('token');
@@ -73,7 +75,7 @@ const fetchAllPaymentMethods = async () => {
         "Cache-Control": "no-cache",
       },
     });
-    return Array.isArray(response.data) ? response.data : [];
+    return Array.isArray(response.data) ? response.data : (response.data.results || []);
   } catch (error) {
     console.error('Failed to fetch payment methods:', error);
     throw error;
@@ -179,7 +181,6 @@ const RenewSubscriptionModal = ({ subscriptionId, closeModal, dispatch, selected
   const [allPaymentMethods, setAllPaymentMethods] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // جلب أنواع الاشتراكات وطرق الدفع
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
@@ -232,6 +233,7 @@ const RenewSubscriptionModal = ({ subscriptionId, closeModal, dispatch, selected
           },
         ],
       };
+      console.log("handleRenewSubmission - Payload:", payload);
       const response = await dispatch(
         renewSubscription({ subscriptionId, renewData: payload })
       ).unwrap();
@@ -419,7 +421,6 @@ const UpdateSubscriptionModal = ({ subscription, closeModal, dispatch, selectedM
   const [regularTypes, setRegularTypes] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // جلب أنواع الاشتراكات
   useEffect(() => {
     const fetchInitialData = async () => {
       try {
@@ -459,6 +460,7 @@ const UpdateSubscriptionModal = ({ subscription, closeModal, dispatch, selectedM
       coach_compensation_value: updatedData.coach ? parseFloat(updatedData.coach_compensation_value).toFixed(2) : "0.00",
     };
     try {
+      console.log("handleUpdateSubmission - Payload:", payload);
       const response = await dispatch(updateSubscription({ id: subscription.id, subscriptionData: payload })).unwrap();
       console.log("handleUpdateSubmission - Success Response:", response);
       await dispatch(fetchMemberSubscriptions({ memberId: selectedMember.id, page: currentPage })).unwrap();
@@ -562,11 +564,15 @@ const UpdateSubscriptionModal = ({ subscription, closeModal, dispatch, selectedM
               disabled={isSubmitting}
             >
               <option value="">بدون كابتن</option>
-              {coaches.map((coach) => (
-                <option key={coach.id} value={coach.id}>
-                  {coach.first_name && coach.last_name ? `${coach.first_name} ${coach.last_name}` : coach.username}
-                </option>
-              ))}
+              {coaches && Array.isArray(coaches) ? (
+                coaches.map((coach) => (
+                  <option key={coach.id} value={coach.id}>
+                    {coach.first_name && coach.last_name ? `${coach.first_name} ${coach.last_name}` : coach.username}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>لا يوجد مدربين متاحين</option>
+              )}
             </select>
           </div>
           {updatedData.coach && (
@@ -626,18 +632,21 @@ const UpdateSubscriptionModal = ({ subscription, closeModal, dispatch, selectedM
 // نافذة إلغاء الاشتراك
 const CancelSubscriptionModal = ({ subscription, closeModal, dispatch, selectedMember, currentPage }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
 
   const handleCancelSubmission = async () => {
     setIsSubmitting(true);
     try {
-      const response = await dispatch(deleteSubscriptionById(subscription.id)).unwrap();
+      const response = await dispatch(
+        cancelSubscription({ subscriptionId: subscription.id, reason: cancelReason })
+      ).unwrap();
       console.log("handleCancelSubmission - Success Response:", response);
       await dispatch(fetchMemberSubscriptions({ memberId: selectedMember.id, page: currentPage })).unwrap();
-      toast.success(`تم إلغاء الاشتراك بنجاح. المبلغ المسترد: ${subscription.refund_amount || "0.00"} ج.م`);
+      toast.success(`تم إلغاء الاشتراك بنجاح. المبلغ المسترد: ${response.refund_amount || "0.00"} ج.م`);
       closeModal();
     } catch (error) {
       console.error("handleCancelSubmission - Error:", error);
-      const errorMessage = error?.non_field_errors?.[0] || error?.message || "حدث خطأ";
+      const errorMessage = error?.error || error?.message || "حدث خطأ";
       toast.error(`فشل في إلغاء الاشتراك: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
@@ -660,7 +669,18 @@ const CancelSubscriptionModal = ({ subscription, closeModal, dispatch, selectedM
           هل أنت متأكد من إلغاء الاشتراك "{subscription.type_details?.name}"؟ <br />
           المبلغ المسترد: {subscription.refund_amount || "0.00"} ج.م
         </p>
-        <div className="flex justify-end gap-3">
+        <div>
+          <label className="block text-sm font-medium mb-1">سبب الإلغاء (اختياري)</label>
+          <Input
+            type="text"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="أدخل سبب الإلغاء"
+            className="text-right"
+            disabled={isSubmitting}
+          />
+        </div>
+        <div className="flex justify-end gap-3 mt-6">
           <Button onClick={closeModal} variant="outline">إلغاء</Button>
           <Button
             onClick={handleCancelSubmission}
@@ -675,22 +695,319 @@ const CancelSubscriptionModal = ({ subscription, closeModal, dispatch, selectedM
   );
 };
 
+// نافذة تغيير الكابتن
+const ChangeCoachModal = ({ subscriptionId, closeModal, dispatch, selectedMember, currentPage, coaches }) => {
+  const [coachData, setCoachData] = useState({
+    coach: "",
+    coach_compensation_type: "",
+    coach_compensation_value: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setCoachData({ ...coachData, [name]: value });
+  };
+
+  const handleChangeCoachSubmission = async (e) => {
+    e.preventDefault();
+    if (!coachData.coach) {
+      toast.error("يجب اختيار كابتن");
+      return;
+    }
+    if (!coachData.coach_compensation_type) {
+      toast.error("يجب اختيار نوع تعويض الكابتن");
+      return;
+    }
+    if (!coachData.coach_compensation_value || parseFloat(coachData.coach_compensation_value) <= 0) {
+      toast.error("يجب إدخال قيمة تعويض صالحة");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const payload = {
+      coach: parseInt(coachData.coach),
+      coach_compensation_type: coachData.coach_compensation_type,
+      coach_compensation_value: parseFloat(coachData.coach_compensation_value).toFixed(2),
+    };
+    try {
+      console.log("handleChangeCoachSubmission - Payload:", payload);
+      const response = await dispatch(updateSubscription({ id: subscriptionId, subscriptionData: payload })).unwrap();
+      console.log("handleChangeCoachSubmission - Success Response:", response);
+      await dispatch(fetchMemberSubscriptions({ memberId: selectedMember.id, page: currentPage })).unwrap();
+      toast.success("تم تغيير الكابتن بنجاح");
+      closeModal();
+    } catch (error) {
+      console.error("handleChangeCoachSubmission - Error:", error);
+      const errorMessage = error?.non_field_errors?.[0] || error?.message || "حدث خطأ";
+      toast.error(`فشل في تغيير الكابتن: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    >
+      <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl" dir="rtl">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <FaUsers className="text-orange-600" />
+          تغيير الكابتن
+        </h3>
+        <form onSubmit={handleChangeCoachSubmission} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">الكابتن</label>
+            <select
+              name="coach"
+              value={coachData.coach}
+              onChange={handleInputChange}
+              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+              disabled={isSubmitting}
+              required
+            >
+              <option value="">اختر كابتن</option>
+              {coaches && Array.isArray(coaches) ? (
+                coaches.map((coach) => (
+                  <option key={coach.id} value={coach.id}>
+                    {coach.first_name && coach.last_name ? `${coach.first_name} ${coach.last_name}` : coach.username}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>لا يوجد مدربين متاحين</option>
+              )}
+            </select>
+            {!coaches || !Array.isArray(coaches) || coaches.length === 0 ? (
+              <p className="text-red-500 text-sm mt-1">لا يوجد مدربين متاحين. يرجى تحميل البيانات.</p>
+            ) : null}
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">نوع تعويض الكابتن</label>
+            <select
+              name="coach_compensation_type"
+              value={coachData.coach_compensation_type}
+              onChange={handleInputChange}
+              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+              disabled={isSubmitting}
+              required
+            >
+              <option value="">اختر نوع التعويض</option>
+              <option value="from_subscription">من الاشتراك (نسبة %)</option>
+              <option value="external">خارجي (ج.م)</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              {coachData.coach_compensation_type === "from_subscription" ? "نسبة الكابتن (%)" : "مبلغ الكابتن (ج.م)"}
+            </label>
+            <Input
+              type="number"
+              step={coachData.coach_compensation_type === "from_subscription" ? "0.1" : "0.01"}
+              min="0"
+              name="coach_compensation_value"
+              value={coachData.coach_compensation_value}
+              onChange={handleInputChange}
+              placeholder="0.00"
+              className="text-right"
+              disabled={isSubmitting}
+              required
+            />
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button onClick={closeModal} variant="outline">إلغاء</Button>
+            <Button type="submit" className="bg-orange-600 hover:bg-orange-700" disabled={isSubmitting}>
+              {isSubmitting ? "جاري التغيير..." : "تأكيد"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </motion.div>
+  );
+};
+
+// نافذة سداد المديونية
+const MakePaymentModal = ({ subscriptionId, amount, closeModal, dispatch, selectedMember, currentPage }) => {
+  const { paymentMethods, paymentMethodsLoading, paymentMethodsError } = useSelector((state) => state.subscriptions);
+  const [paymentData, setPaymentData] = useState({
+    amount: amount.toString(),
+    payment_method_id: "",
+    transaction_id: "",
+    notes: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setPaymentData({ ...paymentData, [name]: value });
+  };
+
+  const handlePaymentSubmission = async (e) => {
+    e.preventDefault();
+    if (!paymentData.amount || parseFloat(paymentData.amount) <= 0) {
+      toast.error("يجب إدخال مبلغ دفع صالح");
+      return;
+    }
+    if (!paymentData.payment_method_id) {
+      toast.error("يجب اختيار طريقة دفع");
+      return;
+    }
+
+    setIsSubmitting(true);
+    const payload = {
+      subscriptionId,
+      amount: parseFloat(paymentData.amount).toFixed(2),
+      paymentMethodId: parseInt(paymentData.payment_method_id),
+      transaction_id: paymentData.transaction_id || "",
+      notes: paymentData.notes || "",
+    };
+    try {
+      console.log("handlePaymentSubmission - Payload:", payload);
+      const response = await dispatch(makePayment(payload)).unwrap();
+      console.log("handlePaymentSubmission - Success Response:", response);
+      await dispatch(fetchMemberSubscriptions({ memberId: selectedMember.id, page: currentPage })).unwrap();
+      toast.success("تم سداد المديونية بنجاح");
+      closeModal();
+    } catch (error) {
+      console.error("handlePaymentSubmission - Error:", error);
+      const errorMessage = error?.non_field_errors?.[0] || error?.message || "حدث خطأ";
+      toast.error(`فشل في سداد المديونية: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+    >
+      <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl" dir="rtl">
+        <h3 className="text-xl font-semibold mb-4 flex items-center gap-2">
+          <FaMoneyBillAlt className="text-purple-600" />
+          سداد المديونية
+        </h3>
+        <form onSubmit={handlePaymentSubmission} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">المبلغ (ج.م)</label>
+            <Input
+              type="number"
+              step="0.01"
+              min="0"
+              name="amount"
+              value={paymentData.amount}
+              onChange={handleInputChange}
+              placeholder="أدخل المبلغ"
+              className="text-right"
+              disabled={isSubmitting}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">طريقة الدفع</label>
+            <select
+              name="payment_method_id"
+              value={paymentData.payment_method_id}
+              onChange={handleInputChange}
+              className="w-full p-2.5 border rounded-md focus:ring-2 focus:ring-blue-500"
+              disabled={isSubmitting || paymentMethodsLoading}
+              required
+            >
+              <option value="">اختر طريقة الدفع</option>
+              {paymentMethods && Array.isArray(paymentMethods) ? (
+                paymentMethods.map((method) => (
+                  <option key={method.id} value={method.id}>
+                    {method.name}
+                  </option>
+                ))
+              ) : (
+                <option value="" disabled>لا توجد طرق دفع متاحة</option>
+              )}
+            </select>
+            {paymentMethodsLoading && (
+              <p className="text-blue-500 text-sm mt-1">جاري تحميل طرق الدفع...</p>
+            )}
+            {paymentMethodsError && (
+              <p className="text-red-500 text-sm mt-1">خطأ: {paymentMethodsError}</p>
+            )}
+            {!paymentMethodsLoading && (!paymentMethods || paymentMethods.length === 0) && (
+              <p className="text-red-500 text-sm mt-1">لا توجد طرق دفع متاحة. يرجى تحميل البيانات.</p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">رقم العملية (اختياري)</label>
+            <Input
+              type="text"
+              name="transaction_id"
+              value={paymentData.transaction_id}
+              onChange={handleInputChange}
+              placeholder="أدخل رقم العملية"
+              className="text-right"
+              disabled={isSubmitting}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">ملاحظات (اختياري)</label>
+            <Input
+              type="text"
+              name="notes"
+              value={paymentData.notes}
+              onChange={handleInputChange}
+              placeholder="أدخل ملاحظات"
+              className="text-right"
+              disabled={isSubmitting}
+            />
+          </div>
+          <div className="flex justify-end gap-3 mt-6">
+            <Button onClick={closeModal} variant="outline">إلغاء</Button>
+            <Button type="submit" className="bg-purple-600 hover:bg-purple-700" disabled={isSubmitting}>
+              {isSubmitting ? "جاري السداد..." : "تأكيد"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </motion.div>
+  );
+};
+
 // المكون الرئيسي
 const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, subscriptionStatus, subscriptionError, coaches }) => {
   const dispatch = useDispatch();
-  const { memberSubscriptions, freezeStatus, freezeError, freezeSuccess, cancelStatus } = useSelector((state) => state.subscriptions);
+  const { memberSubscriptions, freezeStatus, freezeError, freezeSuccess, cancelStatus, paymentMethods, paymentMethodsLoading, paymentMethodsError } = useSelector((state) => state.subscriptions);
   const [modalOpen, setModalOpen] = useState(false);
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [renewModalOpen, setRenewModalOpen] = useState(false);
+  const [changeCoachModalOpen, setChangeCoachModalOpen] = useState(false);
+  const [makePaymentModalOpen, setMakePaymentModalOpen] = useState(false);
   const [selectedSubscriptionId, setSelectedSubscriptionId] = useState(null);
   const [selectedSubscription, setSelectedSubscription] = useState(null);
+  const [selectedAmount, setSelectedAmount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
+
+  useEffect(() => {
+    dispatch(fetchPaymentMethods());
+  }, [dispatch]);
 
   const formatDate = (dateString) => {
     const options = { year: "numeric", month: "long", day: "numeric" };
     return dateString ? new Date(dateString).toLocaleDateString("ar-EG", options) : "غير متوفر";
+  };
+
+  const getSubscriptionStatus = (sub) => {
+    if (sub.is_cancelled) return "ملغي";
+    const today = new Date().toISOString().split("T")[0];
+    if (sub.start_date > today) return "قادم";
+    if (sub.end_date < today || (sub.type_details?.max_entries > 0 && sub.entry_count >= sub.type_details.max_entries)) return "منتهي";
+    if (sub.freeze_requests?.some((fr) => fr.is_active)) return "مجمد";
+    if (sub.remaining_amount > 0) return "متبقي";
+    if (sub.end_date >= today && sub.end_date <= new Date(today).setDate(new Date(today).getDate() + 7)) return "قريب من الانتهاء";
+    return "نشط";
   };
 
   const openFreezeModal = (subscriptionId) => {
@@ -733,6 +1050,28 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
     setSelectedSubscriptionId(null);
   };
 
+  const openChangeCoachModal = (subscriptionId) => {
+    setSelectedSubscriptionId(subscriptionId);
+    setChangeCoachModalOpen(true);
+  };
+
+  const closeChangeCoachModal = () => {
+    setChangeCoachModalOpen(false);
+    setSelectedSubscriptionId(null);
+  };
+
+  const openMakePaymentModal = (subscriptionId, amount) => {
+    setSelectedSubscriptionId(subscriptionId);
+    setSelectedAmount(amount);
+    setMakePaymentModalOpen(true);
+  };
+
+  const closeMakePaymentModal = () => {
+    setMakePaymentModalOpen(false);
+    setSelectedSubscriptionId(null);
+    setSelectedAmount(0);
+  };
+
   const handleCancelFreeze = (freezeRequestId) => {
     console.log("handleCancelFreeze - Freeze Request ID:", freezeRequestId);
     dispatch(cancelSubscriptionFreeze({ freezeRequestId })).then((action) => {
@@ -751,37 +1090,13 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
   };
 
   const handleMakePayment = (subscriptionId, amount) => {
-    const paymentMethodId = prompt("أدخل معرف طريقة الدفع:"); // يمكن استبدالها بنموذج
-    console.log("handleMakePayment - Subscription ID:", subscriptionId, "Amount:", amount, "Payment Method ID:", paymentMethodId);
-    if (paymentMethodId) {
-      dispatch(makePayment({ subscriptionId, amount, paymentMethodId: parseInt(paymentMethodId) })).then((action) => {
-        if (makePayment.fulfilled.match(action)) {
-          dispatch(fetchMemberSubscriptions({ memberId: selectedMember.id, page: currentPage }));
-          toast.success("تم سداد المديونية بنجاح");
-        } else {
-          console.error("handleMakePayment - Error:", action.payload);
-          const errorMessage = action.payload?.non_field_errors?.[0] || action.payload?.message || "حدث خطأ";
-          toast.error(`فشل في سداد المديونية: ${errorMessage}`);
-        }
-      });
-    }
+    console.log("handleMakePayment - Subscription ID:", subscriptionId, "Amount:", amount);
+    openMakePaymentModal(subscriptionId, amount);
   };
 
   const handleChangeCoach = (subscriptionId) => {
-    const newCoachId = prompt("أدخل معرف الكابتن الجديد:"); // يمكن استبدالها بنموذج
-    console.log("handleChangeCoach - Subscription ID:", subscriptionId, "New Coach ID:", newCoachId);
-    if (newCoachId) {
-      dispatch(updateSubscription({ id: subscriptionId, subscriptionData: { coach: parseInt(newCoachId) } })).then((action) => {
-        if (updateSubscription.fulfilled.match(action)) {
-          dispatch(fetchMemberSubscriptions({ memberId: selectedMember.id, page: currentPage }));
-          toast.success("تم تغيير الكابتن بنجاح");
-        } else {
-          console.error("handleChangeCoach - Error:", action.payload);
-          const errorMessage = action.payload?.non_field_errors?.[0] || action.payload?.message || "حدث خطأ";
-          toast.error(`فشل في تغيير الكابتن: ${errorMessage}`);
-        }
-      });
-    }
+    console.log("handleChangeCoach - Subscription ID:", subscriptionId);
+    openChangeCoachModal(subscriptionId);
   };
 
   const paginate = (pageNumber) => {
@@ -814,7 +1129,7 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
           dispatch={dispatch}
           selectedMember={selectedMember}
           currentPage={currentPage}
-          coaches={coaches}
+          coaches={coaches || []}
         />
       )}
       {cancelModalOpen && (
@@ -830,6 +1145,26 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
         <RenewSubscriptionModal
           subscriptionId={selectedSubscriptionId}
           closeModal={closeRenewModal}
+          dispatch={dispatch}
+          selectedMember={selectedMember}
+          currentPage={currentPage}
+        />
+      )}
+      {changeCoachModalOpen && (
+        <ChangeCoachModal
+          subscriptionId={selectedSubscriptionId}
+          closeModal={closeChangeCoachModal}
+          dispatch={dispatch}
+          selectedMember={selectedMember}
+          currentPage={currentPage}
+          coaches={coaches || []}
+        />
+      )}
+      {makePaymentModalOpen && (
+        <MakePaymentModal
+          subscriptionId={selectedSubscriptionId}
+          amount={selectedAmount}
+          closeModal={closeMakePaymentModal}
           dispatch={dispatch}
           selectedMember={selectedMember}
           currentPage={currentPage}
@@ -868,7 +1203,7 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
                     ? sub.freeze_requests.find((fr) => fr.is_active)
                     : null;
                   const today = new Date().toISOString().split("T")[0];
-                  const isActive = sub.start_date <= today && sub.end_date >= today && !sub.is_cancelled && sub.status !== "مجمد" && sub.status !== "ملغي";
+                  const isActive = sub.start_date <= today && sub.end_date >= today && !sub.is_cancelled && !activeFreeze;
                   return (
                     <motion.div
                       key={sub.id}
@@ -886,8 +1221,8 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
                           <p className="text-sm text-gray-500">RFID: {sub.member_details?.rfid_code || "غير متوفر"}</p>
                           <p className="text-sm text-gray-500">المدة: {sub.type_details?.duration_days} يوم</p>
                           <p className="text-sm text-gray-500">
-                            <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusStyles[sub.status] || statusStyles["غير معروف"]}`}>
-                              {sub.status}
+                            <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${statusStyles[getSubscriptionStatus(sub)] || statusStyles["غير معروف"]}`}>
+                              {getSubscriptionStatus(sub)}
                             </span>
                           </p>
                         </div>
@@ -1000,7 +1335,7 @@ const SubscriptionsSection = ({ selectedMember, setIsAddSubscriptionModalOpen, s
                             </Button>
                             {parseFloat(sub.remaining_amount) > 0 && (
                               <Button
-                                onClick={() => handleMakePayment(sub.id, parseFloat(sub.remaining_amount))}
+                                onClick={() => openMakePaymentModal(sub.id, parseFloat(sub.remaining_amount))}
                                 className="bg-purple-600 hover:bg-purple-700"
                               >
                                 سداد المديونية

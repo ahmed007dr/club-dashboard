@@ -1,11 +1,13 @@
-import React, { useCallback } from "react";
-import { useDispatch } from "react-redux";
+
+import React, { useCallback, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { deleteSubscriptionById, fetchSubscriptions } from "@/redux/slices/subscriptionsSlice";
+import { Input } from "@/components/ui/input";
+import { cancelSubscription, fetchSubscriptions } from "@/redux/slices/subscriptionsSlice";
 import { toast } from "react-hot-toast";
 
-const DeleteSubscriptionModal = ({
+const CancelSubscriptionModal = ({
   isOpen,
   onClose,
   subscription,
@@ -15,13 +17,15 @@ const DeleteSubscriptionModal = ({
   subscriptionsLength,
 }) => {
   const dispatch = useDispatch();
+  const { cancelStatus, cancelError } = useSelector((state) => state.subscriptions);
+  const [cancelReason, setCancelReason] = useState("");
 
-  const handleDelete = useCallback(() => {
+  const handleCancel = useCallback(() => {
     if (!subscription) return;
-    dispatch(deleteSubscriptionById(subscription.id))
+    dispatch(cancelSubscription({ subscriptionId: subscription.id, reason: cancelReason }))
       .unwrap()
-      .then(() => {
-        toast.success("تم حذف الاشتراك بنجاح!");
+      .then((response) => {
+        toast.success(`تم إلغاء الاشتراك بنجاح! المبلغ المسترد: ${response.refund_amount || "0.00"} ج.م`);
         onClose();
         dispatch(fetchSubscriptions({ page: 1, pageSize: itemsPerPage, ...filters }));
         if (subscriptionsLength === 1 && setCurrentPage > 1) {
@@ -29,9 +33,9 @@ const DeleteSubscriptionModal = ({
         }
       })
       .catch((err) => {
-        toast.error(`فشل في حذف الاشتراك: ${err.message || "حدث خطأ"}`);
+        toast.error(`فشل في إلغاء الاشتراك: ${err?.error || err?.message || "حدث خطأ"}`);
       });
-  }, [dispatch, subscription, onClose, filters, itemsPerPage, subscriptionsLength, setCurrentPage]);
+  }, [dispatch, subscription, onClose, cancelReason, filters, itemsPerPage, subscriptionsLength, setCurrentPage]);
 
   if (!isOpen) return null;
 
@@ -48,22 +52,44 @@ const DeleteSubscriptionModal = ({
         exit={{ scale: 0.8, opacity: 0 }}
         className="bg-white p-6 rounded-lg relative max-w-md w-full"
       >
-        <h3 className="text-lg font-semibold mb-4 text-right">تأكيد الحذف</h3>
+        <h3 className="text-lg font-semibold mb-4 text-right">تأكيد إلغاء الاشتراك</h3>
         <p className="text-right">
-          هل أنت متأكد من حذف اشتراك <strong>{subscription?.member_details.name}</strong>؟
+          هل أنت متأكد من إلغاء اشتراك <strong>{subscription?.member_details.name}</strong>؟
         </p>
+        <div className="mt-4">
+          <label className="block text-sm font-medium mb-1 text-right">سبب الإلغاء (اختياري)</label>
+          <Input
+            type="text"
+            value={cancelReason}
+            onChange={(e) => setCancelReason(e.target.value)}
+            placeholder="أدخل سبب الإلغاء"
+            className="text-right"
+            disabled={cancelStatus[subscription?.id] === "loading"}
+          />
+        </div>
+        {cancelError[subscription?.id] && (
+          <p className="text-red-500 text-sm mt-2">{cancelError[subscription.id]?.error || "حدث خطأ"}</p>
+        )}
         <div className="mt-6 flex justify-end gap-3">
           <Button
-            onClick={onClose}
+            onClick={() => {
+              onClose();
+              setCancelReason("");
+            }}
             className="bg-gray-200 text-gray-700 hover:bg-gray-300"
           >
             إلغاء
           </Button>
           <Button
-            onClick={handleDelete}
+            onClick={handleCancel}
             className="bg-red-600 text-white hover:bg-red-700"
+            disabled={cancelStatus[subscription?.id] === "loading"}
           >
-            حذف
+            {cancelStatus[subscription?.id] === "loading" ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              "تأكيد الإلغاء"
+            )}
           </Button>
         </div>
       </motion.div>
@@ -71,4 +97,4 @@ const DeleteSubscriptionModal = ({
   );
 };
 
-export default DeleteSubscriptionModal;
+export default CancelSubscriptionModal;
