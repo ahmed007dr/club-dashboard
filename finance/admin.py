@@ -99,10 +99,7 @@ class IncomeSourceAdmin(admin.ModelAdmin):
 @admin.register(Income)
 class IncomeAdmin(ImportExportModelAdmin):
     resource_class = IncomeResource
-    list_display = (
-        'club', 'source', 'amount', 'date', 'received_by',
-        'stock_transaction_link'
-    )
+    list_display = ('club', 'source', 'amount', 'date', 'received_by', 'stock_transaction_link')
     search_fields = ('source__name', 'description', 'stock_transaction__id')
     list_filter = ('club', 'source', 'date', 'source__stock_item__is_sellable')
     date_hierarchy = 'date'
