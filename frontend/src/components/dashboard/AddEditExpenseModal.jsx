@@ -23,7 +23,6 @@ const ErrorFallback = ({ error }) => (
 const AddEditExpenseModal = ({
   showModal,
   setShowModal,
-  currentExpense,
   newExpense,
   userClub,
   expenseCategories,
@@ -31,18 +30,14 @@ const AddEditExpenseModal = ({
   handleChange,
   handleSave,
   errors,
-  canEditExpense,
-  canAddExpense,
 }) => {
   const { user } = useSelector((state) => state.auth);
-  const isEditing = !!currentExpense;
-  const expenseData = isEditing ? currentExpense : newExpense;
 
   return (
     <Dialog open={showModal} onOpenChange={setShowModal}>
       <DialogContent className="sm:max-w-[425px] font-sans" dir="rtl">
         <DialogHeader>
-          <DialogTitle>{isEditing ? "تعديل المصروف" : "إضافة مصروف جديد"}</DialogTitle>
+          <DialogTitle>إضافة مصروف جديد</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
@@ -56,9 +51,8 @@ const AddEditExpenseModal = ({
               <Label htmlFor="category" className="text-right col-span-1">الفئة</Label>
               <Select
                 name="category"
-                value={expenseData.category}
+                value={newExpense.category}
                 onValueChange={(value) => handleChange({ target: { name: "category", value } })}
-                disabled={isEditing && !canEditExpense}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="اختر الفئة" />
@@ -84,10 +78,9 @@ const AddEditExpenseModal = ({
               id="amount"
               name="amount"
               type="number"
-              value={expenseData.amount}
+              value={newExpense.amount}
               onChange={handleChange}
               className="col-span-3"
-              disabled={isEditing && !canEditExpense}
             />
             {errors.amount && (
               <p className="text-red-600 text-sm col-span-4 text-right">{errors.amount}</p>
@@ -98,10 +91,9 @@ const AddEditExpenseModal = ({
             <Input
               id="description"
               name="description"
-              value={expenseData.description}
+              value={newExpense.description}
               onChange={handleChange}
               className="col-span-3"
-              disabled={isEditing && !canEditExpense}
             />
             {errors.description && (
               <p className="text-red-600 text-sm col-span-4 text-right">{errors.description}</p>
@@ -112,9 +104,8 @@ const AddEditExpenseModal = ({
               <Label htmlFor="related_employee" className="text-right col-span-1">الموظف المرتبط</Label>
               <Select
                 name="related_employee"
-                value={expenseData.related_employee}
+                value={newExpense.related_employee}
                 onValueChange={(value) => handleChange({ target: { name: "related_employee", value } })}
-                disabled={isEditing && !canEditExpense}
               >
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="اختر الموظف المرتبط (اختياري)" />
@@ -143,7 +134,6 @@ const AddEditExpenseModal = ({
               type="file"
               onChange={(e) => handleChange({ target: { name: "attachment", value: e.target.files[0] } })}
               className="col-span-3"
-              disabled={isEditing && !canEditExpense}
             />
             {errors.attachment && (
               <p className="text-red-600 text-sm col-span-4 text-right">{errors.attachment}</p>
@@ -164,11 +154,9 @@ const AddEditExpenseModal = ({
           >
             إلغاء
           </Button>
-          {(isEditing ? canEditExpense : canAddExpense) && (
-            <Button onClick={handleSave} className="bg-teal-600 hover:bg-teal-700 text-white">
-              حفظ
-            </Button>
-          )}
+          <Button onClick={handleSave} className="bg-teal-600 hover:bg-teal-700 text-white">
+            حفظ
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

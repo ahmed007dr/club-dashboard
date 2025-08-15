@@ -1,330 +1,282 @@
-import React, { useState, useEffect } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { createSelector } from 'reselect';
-import { FiDollarSign, FiAlertTriangle } from 'react-icons/fi';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { Loader2 } from 'lucide-react';
-import { addIncome, updateIncome, addExpense, updateExpense } from '../../redux/slices/financeSlice';
-import { fetchStockItems } from '../../redux/slices/stockSlice';
+import React, { useState, useEffect } from "react";
+import { FiPlus, FiX, FiAlertTriangle, FiList, FiDollarSign } from "react-icons/fi";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useDispatch, useSelector } from "react-redux";
+import { addIncome } from "../../redux/slices/financeSlice";
+import BASE_URL from "@/config/api";
 import toast from 'react-hot-toast';
-import axios from 'axios';
-import BASE_URL from '../../config/api';
 
-// Memoized Selectors
-const selectFinanceState = (state) => state.finance || {};
-const selectStockState = (state) => state.stock || {};
-const selectAuthState = (state) => state.auth || {};
-
-const selectFinance = createSelector(
-  [selectFinanceState],
-  (finance) => ({
-    incomeSources: finance.incomeSources || [],
-    expenseCategories: finance.expenseCategories || [],
-    isLoading: finance.loading || false,
-  })
-);
-
-const selectStockItems = createSelector(
-  [selectStockState],
-  (stock) => stock.stockItems || []
-);
-
-const selectUser = createSelector(
-  [selectAuthState],
-  (auth) => auth.user || {}
-);
-
-const StockTransactionForm = ({ type, currentItem, setShowModal }) => {
+const StockTransactionForm = ({ type, setShowModal, onSuccess }) => {
   const dispatch = useDispatch();
-  const { incomeSources, expenseCategories, isLoading } = useSelector(selectFinance);
-  const stockItems = useSelector(selectStockItems);
-  const user = useSelector(selectUser);
-
-  const [formData, setFormData] = useState({
-    source: '',
-    description: '',
-    stock_item: '',
-    quantity: '1',
-    payment_method: '',
+  const { user } = useSelector((state) => state.auth);
+  const { incomeSources } = useSelector((state) => state.finance);
+  const [newItem, setNewItem] = useState({
+    source: "",
+    amount: "",
+    description: "",
+    quantity: "1",
+    payment_method: "",
+    received_by: "",
   });
-  const [paymentMethods, setPaymentMethods] = useState([]);
-  const [selectedPrice, setSelectedPrice] = useState(null);
   const [errors, setErrors] = useState({});
+  const [paymentMethods, setPaymentMethods] = useState([]);
 
   useEffect(() => {
-    dispatch(fetchStockItems());
-    axios
-      .get(`${BASE_URL}subscriptions/api/payment-methods/`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
-          'Cache-Control': 'no-cache',
-        },
-      })
-      .then((response) => {
-        setPaymentMethods(Array.isArray(response.data) ? response.data : []);
-      })
-      .catch((error) => {
-        console.error('Error fetching payment methods:', error);
-        toast.error('فشل في جلب طرق الدفع');
-      });
+    const fetchData = async () => {
+      try {
+        const paymentMethodsResponse = await fetch(`${BASE_URL}subscriptions/api/payment-methods/`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+        if (!paymentMethodsResponse.ok) throw new Error("فشل في جلب طرق الدفع");
+        const paymentMethodsData = await paymentMethodsResponse.json();
+        setPaymentMethods(paymentMethodsData || []);
+        console.log("Payment methods response:", paymentMethodsData);
 
-    if (currentItem) {
-      const sourceId = type === 'income' ? currentItem.source?.toString() : currentItem.category?.toString();
-      const selectedSource = (type === 'income' ? incomeSources : expenseCategories).find(
-        (item) => item.id === parseInt(sourceId)
-      );
-      setFormData({
-        source: sourceId || '',
-        description: currentItem.description || '',
-        stock_item: currentItem.stock_transaction_details?.stock_item_details?.id?.toString() || currentItem.stock_item?.toString() || '',
-        quantity: currentItem.quantity?.toString() || currentItem.stock_transaction_details?.quantity?.toString() || currentItem.stock_quantity?.toString() || '1',
-        payment_method: currentItem.payment_method?.toString() || '',
-      });
-      setSelectedPrice(selectedSource?.price || null);
-    }
-  }, [dispatch, currentItem, incomeSources, expenseCategories, type]);
+        if (incomeSources.length === 0) {
+          setErrors({ general: "لا توجد مصادر إيرادات متاحة" });
+        }
+      } catch (err) {
+        console.error("فشل في تحميل البيانات:", err);
+        setErrors({ general: err.message || "فشل في تحميل طرق الدفع" });
+      }
+    };
+    fetchData();
+  }, [incomeSources]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    setErrors((prev) => ({ ...prev, [name]: '' }));
-  };
+    setNewItem((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+    setErrors((prev) => ({ ...prev, [name]: "" }));
 
-  const handleSelectChange = (name, value) => {
-    setFormData((prev) => {
-      const newFormData = { ...prev, [name]: value === 'none' ? '' : value };
-      if (name === 'source' && type === 'income') {
-        const selectedSource = incomeSources.find((item) => item.id === parseInt(value));
-        if (selectedSource?.stock_item) {
-          newFormData.stock_item = selectedSource.stock_item.id.toString();
-        } else {
-          newFormData.stock_item = '';
-          newFormData.quantity = '1';
-        }
-        setSelectedPrice(selectedSource?.price || null);
+    if (name === "source") {
+      const selectedSource = incomeSources.find((source) => source.id.toString() === value);
+      if (selectedSource && selectedSource.price) {
+        setNewItem((prev) => ({
+          ...prev,
+          amount: (parseFloat(selectedSource.price) * (parseInt(prev.quantity) || 1)).toString(),
+        }));
+      } else {
+        setNewItem((prev) => ({ ...prev, amount: "" }));
+        setErrors((prev) => ({ ...prev, source: "سعر مصدر الإيراد غير متوفر" }));
       }
-      return newFormData;
-    });
-    setErrors((prev) => ({ ...prev, [name]: '' }));
-  };
-
-  const validateForm = () => {
-    const newErrors = {};
-    if (!formData.source) newErrors.source = type === 'income' ? 'مصدر المبيعات مطلوب' : 'فئة المصروف مطلوبة';
-    if (type === 'income' && !formData.payment_method) newErrors.payment_method = 'طريقة الدفع مطلوبة';
-    if (type === 'income') {
-      if (!formData.quantity || parseInt(formData.quantity) <= 0) {
-        newErrors.quantity = 'الكمية يجب أن تكون أكبر من صفر';
-      } else if (formData.stock_item) {
-        const stockItem = stockItems.find((item) => item.id === parseInt(formData.stock_item));
-        if (stockItem && parseInt(formData.quantity) > stockItem.current_quantity) {
-          newErrors.quantity = 'الكمية المطلوبة غير متوفرة في المخزون';
-        }
-      }
-    } else if (formData.stock_item && (!formData.quantity || parseInt(formData.quantity) <= 0)) {
-      newErrors.quantity = 'الكمية يجب أن تكون أكبر من صفر';
     }
-    if (!selectedPrice && type === 'income') newErrors.source = 'لا يوجد سعر لمصدر المبيعات المحدد';
-    return newErrors;
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const validationErrors = validateForm();
-    if (Object.keys(validationErrors).length > 0) {
+  const handleSave = async () => {
+    const validationErrors = {
+      source: !newItem.source ? "مصدر الإيراد مطلوب." : "",
+      amount: !newItem.amount || parseFloat(newItem.amount) <= 0 ? "المبلغ مطلوب ويجب أن يكون أكبر من صفر." : "",
+      quantity: !newItem.quantity || parseInt(newItem.quantity) <= 0 ? "الكمية يجب أن تكون أكبر من صفر." : "",
+      payment_method: !newItem.payment_method ? "طريقة الدفع مطلوبة." : "",
+    };
+    if (Object.values(validationErrors).some((err) => err)) {
       setErrors(validationErrors);
       return;
     }
 
-    const quantity = parseInt(formData.quantity) || 1;
-    const payload = {
-      [type === 'income' ? 'source' : 'category']: parseInt(formData.source) || null,
-      amount: selectedPrice ? parseFloat(selectedPrice * quantity).toFixed(2) : 0,
-      description: formData.description || '',
-      stock_item: parseInt(formData.stock_item) || null,
-      quantity: type === 'income' ? quantity : formData.stock_item ? quantity : null,
-      payment_method: type === 'income' ? parseInt(formData.payment_method) || null : null,
+    const selectedSource = incomeSources.find((source) => source.id.toString() === newItem.source);
+    if (!selectedSource || !selectedSource.price) {
+      setErrors({ general: "سعر مصدر الإيراد غير متوفر" });
+      return;
+    }
+
+    const incomeData = {
+      source: parseInt(newItem.source),
+      amount: parseFloat(newItem.amount),
+      description: newItem.description || "",
+      quantity: parseInt(newItem.quantity),
+      payment_method: parseInt(newItem.payment_method),
+      club: user.club.id,
+      received_by: user.id,
     };
 
-    const action = type === 'income'
-      ? currentItem
-        ? updateIncome({ id: currentItem.id, updatedData: payload })
-        : addIncome(payload)
-      : currentItem
-      ? updateExpense({ id: currentItem.id, updatedData: payload })
-      : addExpense(payload);
-
-    const loadingToast = toast.loading('جارٍ حفظ العملية...');
     try {
-      await dispatch(action).unwrap();
-      toast.success('تم حفظ العملية بنجاح', { id: loadingToast });
+      await dispatch(addIncome(incomeData)).unwrap();
+      toast.success("تم إضافة الإيراد بنجاح");
       setShowModal(false);
-      setFormData({
-        source: '',
-        description: '',
-        stock_item: '',
-        quantity: '1',
-        payment_method: '',
+      setNewItem({
+        source: "",
+        amount: "",
+        description: "",
+        quantity: "1",
+        payment_method: "",
+        received_by: "",
       });
-      setSelectedPrice(null);
       setErrors({});
+      onSuccess();
     } catch (err) {
-      const errorMessage = err.message || err || 'فشل في حفظ العملية';
-      toast.error(errorMessage, { id: loadingToast });
-      setErrors({ general: errorMessage });
+      console.error("فشل في حفظ الإيراد:", err);
+      setErrors({ general: err.message || "فشل في حفظ الإيراد" });
     }
   };
 
   return (
-    <Dialog open={true} onOpenChange={setShowModal}>
-      <DialogContent dir="rtl" className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="text-right flex items-center gap-2">
-            <FiDollarSign className="text-green-600 w-6 h-6" />
-            {type === 'income' ? (currentItem ? 'تعديل مبيعات' : 'إضافة مبيعات') : (currentItem ? 'تعديل مصروف' : 'إضافة مصروف')}
-          </DialogTitle>
-          <DialogDescription className="text-right text-sm text-gray-600">
-            {type === 'income' ? 'اختر مصدر المبيعات، طريقة الدفع، وعنصر المخزون (إن وجد) لتسجيل المبيعات.' : 'اختر فئة المصروف وعنصر المخزون لتسجيل المصروف.'}
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {errors.general && (
-            <div className="bg-red-50 p-3 rounded-lg flex items-center gap-2 text-red-600">
-              <FiAlertTriangle className="w-5 h-5" />
-              <p>{errors.general}</p>
-            </div>
-          )}
+    <div
+      className="fixed inset-0 z-50 flex justify-center items-center bg-gray-100"
+      onClick={() => setShowModal(false)}
+      dir="rtl"
+    >
+      <div
+        className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md overflow-y-auto max-h-[80vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <FiPlus className="text-green-600 w-6 h-6" />
+          <h3 className="text-xl font-semibold text-right">
+            إضافة إيراد
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1 text-right">
-              {type === 'income' ? 'مصدر المبيعات' : 'فئة المصروف'}
-            </label>
-            <Select
-              onValueChange={(value) => handleSelectChange('source', value)}
-              value={formData.source}
-            >
-              <SelectTrigger className={errors.source ? 'border-red-500' : ''}>
-                <SelectValue placeholder={type === 'income' ? 'اختر مصدر المبيعات' : 'اختر فئة المصروف'} />
-              </SelectTrigger>
-              <SelectContent>
-                {Array.isArray(type === 'income' ? incomeSources : expenseCategories) &&
-                (type === 'income' ? incomeSources : expenseCategories).length > 0 ? (
-                  (type === 'income' ? incomeSources : expenseCategories).map((item) => (
-                    <SelectItem key={`source-${item.id}`} value={item.id.toString()}>
-                      {item.name} ({item.price} جنيه)
-                    </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem key="no-sources" value="no-sources" disabled>
-                    لا توجد {type === 'income' ? 'مصادر' : 'فئات'} متاحة
-                  </SelectItem>
-                )}
-              </SelectContent>
-            </Select>
-            {errors.source && <p className="text-red-600 text-sm mt-1">{errors.source}</p>}
-          </div>
-          {type === 'income' && (
-            <div>
-              <label className="block text-sm font-medium mb-1 text-right">طريقة الدفع</label>
+            <Label className="block text-sm font-medium mb-1 text-right">مصدر الإيراد</Label>
+            <div className="relative">
+              <FiList className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <Select
-                onValueChange={(value) => handleSelectChange('payment_method', value)}
-                value={formData.payment_method}
+                name="source"
+                value={newItem.source}
+                onValueChange={(value) => handleChange({ target: { name: "source", value } })}
               >
-                <SelectTrigger className={errors.payment_method ? 'border-red-500' : ''}>
+                <SelectTrigger className="w-full text-right">
+                  <SelectValue placeholder="اختر مصدر الإيراد" />
+                </SelectTrigger>
+                <SelectContent>
+                  {incomeSources.length > 0 ? (
+                    incomeSources.map((source) => (
+                      <SelectItem key={source.id} value={source.id.toString()}>
+                        {`${source.name} (${source.price} جنيه)`}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="none" disabled>لا توجد مصادر متاحة</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              {errors.source && (
+                <p className="text-red-600 text-sm text-right">{errors.source}</p>
+              )}
+            </div>
+          </div>
+          <div>
+            <Label className="block text-sm font-medium mb-1 text-right">المبلغ</Label>
+            <div className="relative">
+              <FiDollarSign className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Input
+                type="number"
+                name="amount"
+                value={newItem.amount}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg py-2.5 pr-10 pl-4 bg-white text-gray-700 text-right"
+                min="0"
+                step="0.01"
+                disabled
+              />
+              {errors.amount && (
+                <p className="text-red-600 text-sm text-right">{errors.amount}</p>
+              )}
+            </div>
+          </div>
+          <div>
+            <Label className="block text-sm font-medium mb-1 text-right">الكمية</Label>
+            <div className="relative">
+              <Input
+                type="number"
+                name="quantity"
+                value={newItem.quantity}
+                onChange={handleChange}
+                className="w-full border border-gray-300 rounded-lg py-2.5 pr-10 pl-4 bg-white text-gray-700 text-right"
+                min="1"
+                step="1"
+              />
+              {errors.quantity && (
+                <p className="text-red-600 text-sm text-right">{errors.quantity}</p>
+              )}
+            </div>
+          </div>
+          <div>
+            <Label className="block text-sm font-medium mb-1 text-right">طريقة الدفع</Label>
+            <div className="relative">
+              <FiList className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Select
+                name="payment_method"
+                value={newItem.payment_method}
+                onValueChange={(value) => handleChange({ target: { name: "payment_method", value } })}
+              >
+                <SelectTrigger className="w-full text-right">
                   <SelectValue placeholder="اختر طريقة الدفع" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Array.isArray(paymentMethods) && paymentMethods.length > 0 ? (
+                  {paymentMethods.length > 0 ? (
                     paymentMethods.map((method) => (
-                      <SelectItem key={`payment-${method.id}`} value={method.id.toString()}>
+                      <SelectItem key={method.id} value={method.id.toString()}>
                         {method.name}
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem key="no-payment-methods" value="no-payment-methods" disabled>
-                      لا توجد طرق دفع متاحة
-                    </SelectItem>
+                    <SelectItem value="none" disabled>لا توجد طرق دفع متاحة</SelectItem>
                   )}
                 </SelectContent>
               </Select>
-              {errors.payment_method && <p className="text-red-600 text-sm mt-1">{errors.payment_method}</p>}
+              {errors.payment_method && (
+                <p className="text-red-600 text-sm text-right">{errors.payment_method}</p>
+              )}
             </div>
-          )}
-          {selectedPrice !== null && type === 'income' && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-right">
-              <p className="text-sm font-medium text-gray-700">
-                السعر للوحدة: <span className="text-green-600 font-bold">{selectedPrice} جنيه</span>
-                {formData.quantity && parseInt(formData.quantity) > 0 && (
-                  <span> | الإجمالي: {parseFloat(selectedPrice * parseInt(formData.quantity)).toFixed(2)} جنيه</span>
-                )}
-              </p>
-            </div>
-          )}
+          </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-right">الوصف (اختياري)</label>
-            <Textarea
+            <Label className="block text-sm font-medium mb-1 text-right">الوصف</Label>
+            <textarea
               name="description"
-              value={formData.description}
+              value={newItem.description || ""}
               onChange={handleChange}
+              className="w-full border border-gray-300 rounded-lg py-2.5 px-4 bg-white text-gray-700 text-right"
               rows={3}
-              className="text-right"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-right">عنصر المخزون (اختياري)</label>
-            <Select
-              onValueChange={(value) => handleSelectChange('stock_item', value)}
-              value={formData.stock_item}
-            >
-              <SelectTrigger className={errors.stock_item ? 'border-red-500' : ''}>
-                <SelectValue placeholder="اختر عنصر المخزون" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem key="no-stock" value="no-stock">بدون عنصر مخزون</SelectItem>
-                {Array.isArray(stockItems) && stockItems.length > 0 && (
-                  stockItems.map((item) => (
-                    <SelectItem key={`stock-${item.id}`} value={item.id.toString()}>
-                      {item.name} (متوفر: {item.current_quantity})
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {errors.stock_item && <p className="text-red-600 text-sm mt-1">{errors.stock_item}</p>}
+            <Label className="block text-sm font-medium mb-1 text-right">المستلم</Label>
+            <div className="relative">
+              <Input
+                type="text"
+                name="received_by"
+                value={user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.username}
+                className="w-full border border-gray-300 rounded-lg py-2.5 pr-10 pl-4 bg-white text-gray-700 text-right"
+                disabled
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium mb-1 text-right">الكمية</label>
-            <Input
-              name="quantity"
-              type="number"
-              value={formData.quantity}
-              onChange={handleChange}
-              className={errors.quantity ? 'border-red-500 text-right' : 'text-right'}
-              min="1"
-              placeholder="أدخل الكمية"
-              required={type === 'income'}
-            />
-            {errors.quantity && <p className="text-red-600 text-sm mt-1">{errors.quantity}</p>}
+        </div>
+        {errors.general && (
+          <div className="flex items-center gap-2 text-red-600 text-sm mt-4">
+            <FiAlertTriangle className="w-5 h-5" />
+            <p>{errors.general}</p>
           </div>
-          <div className="flex justify-end gap-3">
-            <Button onClick={() => setShowModal(false)} variant="outline">
-              إلغاء
-            </Button>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="bg-green-600 hover:bg-green-700 flex items-center gap-2"
-            >
-              {isLoading && <Loader2 className="animate-spin h-4 w-4" />}
-              حفظ
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
+        )}
+        <div className="mt-6 flex justify-end gap-3">
+          <Button
+            onClick={() => setShowModal(false)}
+            variant="outline"
+            className="px-6 py-2"
+          >
+            إلغاء
+          </Button>
+          <Button
+            onClick={handleSave}
+            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white"
+          >
+            حفظ
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 };
 

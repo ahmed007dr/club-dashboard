@@ -40,6 +40,14 @@ import StaffAttendanceReport from './components/dashboard/StaffAttendanceReport'
 import StockAnalytics from './components/dashboard/StockAnalytics';
 import StaffSalaryReport from './components/dashboard/StaffSalaryReport';
 import AttendanceDashboard from './components/dashboard/AttendanceDashboard';
+import EmployeeSubscriptionList from './components/dashboard/EmployeeSubscriptionList';
+
+import StaffExpenses from './components/staffPage/StaffExpenses';
+import StaffIncomes from './components/staffPage/StaffIncomes';
+import StaffExpenseTable from './components/staffPage/StaffExpenseTable';
+import StaffIncomeTable from './components/staffPage/StaffIncomeTable';
+
+import ChartsPage from './components/dashboard/ChartsPage';
 import useTokenRefresh from './hooks/useTokenRefresh';
 import { Toaster } from 'react-hot-toast';
 
@@ -137,6 +145,17 @@ function App() {
           <Route path="attendance-report/:staffId?" element={<StaffAttendanceReport />} />
           <Route path="attendance-StaffSalaryReport" element={<StaffSalaryReport />} />
           <Route path="AttendanceDashboard" element={<AttendanceDashboard />} />
+          <Route path="EmployeeSubscriptionList" element={<EmployeeSubscriptionList />} />
+
+          {/* <Route path="StaffExpenses" element={<StaffExpenses />} /> */}
+          <Route path="/dashboard/staff-expenses" element={<StaffExpenses />} />
+          {/* <Route path="StaffIncomes" element={<StaffIncomes />} /> */}
+          <Route path="/dashboard/staff-incomes" element={<StaffIncomes />} />
+          <Route path="StaffExpenseTable" element={<StaffExpenseTable />} />
+          <Route path="StaffIncomeTable" element={<StaffIncomeTable />} />
+          
+          <Route path="ChartsPage" element={<ChartsPage />} />
+
         </Route>
       </Routes>
     </div>

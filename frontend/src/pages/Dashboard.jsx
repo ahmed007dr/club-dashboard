@@ -3,8 +3,6 @@ import { Outlet } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import Sidebar from '../components/dashboard/Sidebar';
 import { closeSidebar } from '../redux/slices/uiSlice';
-
-// استيراد الأيقونات
 import { MdOutlineDashboard } from 'react-icons/md';
 import { FiUsers } from 'react-icons/fi';
 import { FaRegBuilding } from 'react-icons/fa';
@@ -19,7 +17,6 @@ import { GiTicket } from 'react-icons/gi';
 import { BiLogIn } from 'react-icons/bi';
 import { TbReportAnalytics } from "react-icons/tb";
 import { GiReceiveMoney } from "react-icons/gi";
-import { MdCategory } from "react-icons/md";
 import { GiPayMoney } from "react-icons/gi";
 
 const Dashboard = () => {
@@ -40,8 +37,7 @@ const Dashboard = () => {
       name: 'الأعضاء والعضوية',
       icon: <FiUsers />,
       children: [
-        { path: 'members', name: 'الأعضاء', icon: <RiGroupLine /> },
-        { path: 'member-profile', name: '2الأعضاء', icon: <RiGroupLine /> },
+        { path: 'member-profile', name: 'الأعضاء', icon: <RiGroupLine /> },
         { path: 'subscriptions', name: 'الاشتراكات', icon: <MdOutlineSubscriptions /> },
         { path: 'attendance', name: 'حضور الأعضاء', icon: <AiOutlineSchedule /> },
         { path: 'free-invites', name: 'الدعوات المجانية', icon: <RiVipCrown2Line /> },
@@ -53,8 +49,16 @@ const Dashboard = () => {
       icon: <RiUserLine />,
       children: [
         { path: 'staff', name: 'شيفتات الموظفين', icon: <AiOutlineSchedule /> },
-        // { path: 'attendance-form', name: 'بصمة الدخول والخروج', icon: <BiLogIn /> },
         { path: 'AttendanceDashboard', name: 'حضور الموظفين', icon: <AiOutlineSchedule /> },
+      ],
+    },
+    {
+      name: 'شيفتات الموظفين',
+      icon: <TbMoneybag />,
+      children: [
+        { path: 'dashboard/staff-expenses', name: 'المصروفات', icon: <GiReceiveMoney /> },
+        { path: 'dashboard/staff-incomes', name: 'الإيرادات', icon: <GiPayMoney /> },
+        { path: 'reports', name: 'تقرير الإيرادات', icon: <GiReceiveMoney /> },
       ],
     },
     {
@@ -63,17 +67,10 @@ const Dashboard = () => {
       children: [
         { path: 'income-sources', name: 'الإيرادات', icon: <GiReceiveMoney /> },
         { path: 'expense', name: 'المصروفات', icon: <GiPayMoney /> },
-        // { path: 'receipts', name: 'الإيصالات', icon: <HiOutlineDocumentReport /> },
         { path: 'reports', name: 'تقرير الإيرادات', icon: <GiReceiveMoney /> },
       ],
     },
-    // {
-    //   name: 'إدارة النادي',
-    //   icon: <FaRegBuilding />,
-    //   children: [
-    //     { path: 'club', name: 'بيانات النادي', icon: <FaRegBuilding /> },
-    //   ],
-    // },
+
     {
       name: 'التقارير والتحليلات',
       icon: <TbReportAnalytics />,
@@ -86,6 +83,7 @@ const Dashboard = () => {
         { path: 'dashboard/financial-analysis', name: 'التحليل المالي', icon: <TbReportAnalytics /> },
         { path: 'dashboard/StockAnalytics', name: 'تحليل المخزون', icon: <IoMdAnalytics /> },
         { path: 'manage-users', name: 'إدارة الموظفين', icon: <FiUsers /> },
+        { path: 'members', name: 'الأعضاء', icon: <RiGroupLine /> },
       ],
     },
   ];
