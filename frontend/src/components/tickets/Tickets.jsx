@@ -9,7 +9,7 @@ import usePermission from '../../hooks/usePermission';
 import BASE_URL from '../../config/api';
 import { toast } from 'react-hot-toast';
 import TicketForm from './TicketForm';
-import AddTicketTypeModal from './AddTicketTypeModal';
+import AddTicketTypeModal from '../dashboard/AddTicketTypeModal';
 import TicketFilters from './TicketFilters';
 import TicketTable from './TicketTable';
 import TicketPagination from './TicketPagination';

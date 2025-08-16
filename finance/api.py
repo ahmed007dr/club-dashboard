@@ -1114,16 +1114,16 @@ def financial_analysis_api(request):
             'expense_growth': float((total_expense - prev_expense) / prev_expense * 100) if prev_expense > 0 else 0,
             'net_profit_growth': float((net_profit - prev_net) / prev_net * 100) if prev_net > 0 else 0
         }
-        
+                
         period_count = Decimal(len(periods)) or Decimal('1')
-        avg_income = total_income / period_count
-        avg_expense = total_expense / period_count
+        avg_income = Decimal(str(total_income)) / period_count
+        avg_expense = Decimal(str(total_expense)) / period_count
         forecasts = {
             'next_period_income': float(avg_income),
             'next_period_expense': float(avg_expense),
             'next_period_net': float(avg_income - avg_expense)
         }
-        
+
         expense_by_category = expense_qs.values('category__name').annotate(total_amount=Sum('amount')).order_by('-total_amount')
         expense_category_analysis = [
             {

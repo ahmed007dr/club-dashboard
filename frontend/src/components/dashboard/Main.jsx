@@ -52,12 +52,14 @@ const Main = () => {
 
   const linkCards = [
     { label: "حضور الأعضاء", icon: <FaRegCalendarCheck />, link: "/attendance", gradient: "from-orange-500 to-red-600", bgGradient: "from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20" },
-    { label: "الأعضاء", icon: <RiGroupLine />, link: "/members", gradient: "from-blue-500 to-cyan-600", bgGradient: "from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20" },
-    { label: "الدعوات المجانية", icon: <RiVipCrown2Line />, link: "/free-invites", gradient: "from-yellow-500 to-amber-600", bgGradient: "from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20" },
+    { label: "الأعضاء", icon: <RiGroupLine />, link: "/member-profile", gradient: "from-blue-500 to-cyan-600", bgGradient: "from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20" },
+    { label: "الاشتراكات", icon: <MdSubscriptions />, link: "/EmployeeSubscriptionList", gradient: "from-pink-500 to-rose-600", bgGradient: "from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20" },
     { label: "التذاكر", icon: <IoTicketOutline />, link: "/tickets", gradient: "from-emerald-500 to-teal-600", bgGradient: "from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20" },
     { label: "حضور الموظفين", icon: <AiOutlineSchedule />, link: "/AttendanceDashboard", gradient: "from-purple-500 to-indigo-600", bgGradient: "from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20" },
-    { label: "شيفتات الموظفين", icon: <BsPeopleFill />, link: "/staff", gradient: "from-pink-500 to-rose-600", bgGradient: "from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20" },
+    // { label: "شيفتات الموظفين", icon: <BsPeopleFill />, link: "/staff", gradient: "from-pink-500 to-rose-600", bgGradient: "from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20" },
     { label: "تقرير الإيرادات", icon: <GiReceiveMoney />, link: "/reports", gradient: "from-green-500 to-lime-600", bgGradient: "from-green-50 to-lime-50 dark:from-green-900/20 dark:to-lime-900/20" },
+    { label: "الدعوات المجانية", icon: <RiVipCrown2Line />, link: "/free-invites", gradient: "from-yellow-500 to-amber-600", bgGradient: "from-yellow-50 to-amber-50 dark:from-yellow-900/20 dark:to-amber-900/20" },
+
   ];
 
   return (
