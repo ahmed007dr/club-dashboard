@@ -39,6 +39,7 @@ const DailyReportButton = () => {
   const [isShiftReportOpen, setIsShiftReportOpen] = useState(false);
   const [error, setError] = useState('');
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+  const [currentShiftId, setCurrentShiftId] = useState(null);
 
   const { user } = useSelector((state) => state.auth || {});
   const userRole = user?.role;
@@ -58,12 +59,37 @@ const DailyReportButton = () => {
           setEmployees([]);
         })
         .finally(() => setEmployeeLoading(false));
+    } else {
+      // Fetch current shift for non-admin/owner users
+      api.get('accounts/api/shift-reports/')
+        .then((response) => {
+          const shiftData = response.data;
+          console.log("Shift reports response:", shiftData);
+          const userShifts = shiftData.find((report) => report.user_id === user.id);
+          const latestShift = userShifts?.shifts?.find((shift) => !shift.check_out);
+          if (latestShift) {
+            setCurrentShiftId(latestShift.shift_id);
+            setStartDate(new Date(latestShift.check_in));
+            setEndDate(latestShift.check_out ? new Date(latestShift.check_out) : new Date());
+          } else {
+            setError('لا يوجد شيفت مفتوح لهذا الموظف');
+            setIsErrorModalOpen(true);
+            toast.error('لا يوجد شيفت مفتوح لهذا الموظف');
+          }
+        })
+        .catch((error) => {
+          console.error('خطأ في جلب تقارير الشيفت:', error);
+          setError('فشل في جلب تقارير الشيفت');
+          setIsErrorModalOpen(true);
+          toast.error('فشل في جلب تقارير الشيفت');
+        });
     }
-  }, [userRole]);
+  }, [userRole, user.id]);
 
   const formatDateForApi = (date) => {
     if (!date) return '';
-    return format(date, "yyyy-MM-dd'T'HH:mm:ssXXX"); // صيغة ISO 8601 مع المنطقة الزمنية
+    const d = new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
   };
 
   const handlePreviewReport = async () => {
@@ -77,12 +103,15 @@ const DailyReportButton = () => {
         if (employeeId) params.employee_id = employeeId;
         if (startDate) params.start_date = formatDateForApi(startDate);
         if (endDate) params.end_date = formatDateForApi(endDate);
-        console.log('Params:', params); // تسجيل المعلمات للتحقق
+        console.log('Preview Report Params:', params);
         if (!startDate || !endDate) {
           throw new Error('يجب تحديد تاريخ البداية والنهاية');
         }
+      } else {
+        if (currentShiftId) params.shift_id = currentShiftId;
       }
       const response = await api.get('finance/api/employee/daily-report/', { params });
+      console.log('Daily Report Response:', response.data);
       setReportData(response.data || {});
       toast.success('تم تحميل التقرير بنجاح');
     } catch (error) {
@@ -105,8 +134,9 @@ const DailyReportButton = () => {
         start_date: formatDateForApi(startDate),
         end_date: formatDateForApi(endDate)
       };
-      console.log('Shift Report Params:', params); // تسجيل المعلمات للتحقق
+      console.log('Shift Report Params:', params);
       const response = await api.get('accounts/api/shift-reports/', { params });
+      console.log('Shift Report Response:', response.data);
       setShiftReportData(Array.isArray(response.data) ? response.data : []);
       setIsShiftReportOpen(true);
       toast.success('تم تحميل تقرير الشيفتات بنجاح');
@@ -131,10 +161,12 @@ const DailyReportButton = () => {
         if (employeeId) params.employee_id = employeeId;
         if (startDate) params.start_date = formatDateForApi(startDate);
         if (endDate) params.end_date = formatDateForApi(endDate);
-        console.log('Generate Report Params:', params); // تسجيل المعلمات للتحقق
+        console.log('Generate Report Params:', params);
         if (!startDate || !endDate) {
           throw new Error('يجب تحديد تاريخ البداية والنهاية');
         }
+      } else {
+        if (currentShiftId) params.shift_id = currentShiftId;
       }
       const response = await api.get('finance/api/employee/daily-report/pdf/', {
         responseType: 'blob',
