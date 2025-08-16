@@ -6,7 +6,7 @@ import { CiCircleList } from "react-icons/ci";
 import SubscriptionFilters from "./SubscriptionFilters";
 import SubscriptionTable from "./SubscriptionTable";
 import SubscriptionCards from "./SubscriptionCards";
-import PaginationControls from "./PaginationControls";
+import PaginationControls from "../dashboard/PaginationControls";
 import CreateSubscriptionModal from "./CreateSubscriptionModal";
 import UpdateSubscriptionModal from "./UpdateSubscriptionModal";
 import DeleteSubscriptionModal from "./DeleteSubscriptionModal";

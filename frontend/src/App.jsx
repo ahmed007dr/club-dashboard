@@ -7,27 +7,19 @@ import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import Navbar from './components/common/Navbar';
 import Main from './components/dashboard/Main';
-import Subscriptions from './components/dashboard/Subscriptions';
+import Subscriptions from './components/subscriptions/Subscriptions';
 import Members from './components/dashboard/Members';
-import Tickets from './components/dashboard/Tickets';
+import Tickets from './components/tickets/Tickets';
 import Attendance from './components/dashboard/Attendance';
-// import FreeInvites from './components/dashboard/FreeInvites';
 import InviteList from './components/freeinvites/InviteList';
-import Leads from './components/dashboard/Leads';
-import Club from './components/dashboard/Club';
-import Profile from './components/dashboard/Profile';
 import Staff from './components/dashboard/Staff';
-import Finance from './components/dashboard/Finance';
 import MemberSubscriptions from './components/dashboard/MemberSubscriptions';
 import MemberProfile from './components/members/MemberProfile';
-import AddMember from './components/modals/AddMember';
 import StaffProfile from './components/dashboard/StaffProfile';
 import AttendanceForm from './components/dashboard/AttendanceForm';
 import OutForm from './components/dashboard/OutForm';
 import AttendanceAnalysis from './components/dashboard/AttendanceAnalysis';
 import UserList from './components/dashboard/UserList';
-import ShiftAttendanceList from './components/dashboard/ShiftAttendanceList';
-import ExpenseCategory from './components/dashboard/ExpenseCategory';
 import Expense from './components/dashboard/Expense';
 import IncomeSources from './components/dashboard/Incomes';
 import CoachProfile from './components/dashboard/CoachProfile';
@@ -35,18 +27,16 @@ import ManageUsers from './components/dashboard/ManageUsers';
 import ReportsPage from './components/dashboard/Reports';
 import FinancialDashboard from './components/dashboard/FinancialDashboard';
 import MemberSubscriptionReport from './components/dashboard/MemberSubscriptionReport';
-import SubscriptionAnalytics from './components/dashboard/SubscriptionAnalytics';
+import SubscriptionAnalytics from './components/subscriptions/SubscriptionAnalytics';
 import StaffAttendanceReport from './components/dashboard/StaffAttendanceReport';
 import StockAnalytics from './components/dashboard/StockAnalytics';
 import StaffSalaryReport from './components/dashboard/StaffSalaryReport';
 import AttendanceDashboard from './components/dashboard/AttendanceDashboard';
-import EmployeeSubscriptionList from './components/dashboard/EmployeeSubscriptionList';
-
+import EmployeeSubscriptionList from './components/staffPage/EmployeeSubscriptionList';
 import StaffExpenses from './components/staffPage/StaffExpenses';
 import StaffIncomes from './components/staffPage/StaffIncomes';
 import StaffExpenseTable from './components/staffPage/StaffExpenseTable';
 import StaffIncomeTable from './components/staffPage/StaffIncomeTable';
-
 import ChartsPage from './components/dashboard/ChartsPage';
 import useTokenRefresh from './hooks/useTokenRefresh';
 import { Toaster } from 'react-hot-toast';
@@ -59,7 +49,6 @@ const ProtectedRoute = ({ element }) => {
   React.useEffect(() => {
     const validateToken = async () => {
       try {
-        // افترض API endpoint للتحقق من التوكن
         const response = await fetch('/api/validate-token', {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
@@ -90,7 +79,7 @@ const ProtectedRoute = ({ element }) => {
 };
 
 function App() {
-  const navigate = useNavigate();
+  const navigate = usenavigate();
   const { error } = useTokenRefresh();
 
   React.useEffect(() => {
@@ -111,51 +100,45 @@ function App() {
         
         {/* Protected Routes */}
         <Route path="/" element={<ProtectedRoute element={<Dashboard />} />}>
+          {/* لوحة التحكم */}
           <Route index element={<Main />} />
-          <Route path="subscriptions" element={<Subscriptions />} />
+
+          {/* الأعضاء والعضوية */}
           <Route path="members" element={<Members />} />
-          <Route path="member-profile" element={<MemberProfile />} /> 
+          <Route path="member-profile" element={<MemberProfile />} />
           <Route path="member-subscriptions/:memberId" element={<MemberSubscriptions />} />
-          <Route path="tickets" element={<Tickets />} />
+          <Route path="subscriptions" element={<Subscriptions />} />
           <Route path="attendance" element={<Attendance />} />
-          {/* <Route path="free-invites" element={<FreeInvites />} /> */}
           <Route path="free-invites" element={<InviteList />} />
-          <Route path="leads" element={<Leads />} />
-          <Route path="club" element={<Club />} />
-          <Route path="profile" element={<Profile />} />
+          <Route path="tickets" element={<Tickets />} />
+
+          {/* إدارة الموظفين */}
           <Route path="staff" element={<Staff />} />
-          <Route path="finance" element={<Finance />} />
-          <Route path="add-member" element={<AddMember />} />
           <Route path="staff/:id" element={<StaffProfile />} />
-          <Route path="attendance-form" element={<AttendanceForm />} />
+          <Route path="staff-shifts" element={<AttendanceForm />} />
           <Route path="check-out" element={<OutForm />} />
+          <Route path="staff-attendance" element={<AttendanceDashboard />} />
           <Route path="attendance/:staffId" element={<AttendanceAnalysis />} />
-          <Route path="staff-reports" element={<UserList />} />
-          <Route path="shift-attendance" element={<ShiftAttendanceList />} />
-          <Route path="expense-category" element={<ExpenseCategory />} />
-          <Route path="expense" element={<Expense />} />
-          <Route path="income-sources" element={<IncomeSources />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="coach-profile/:coachId" element={<CoachProfile />} />
-          <Route path="manage-users" element={<ManageUsers />} />
-          <Route path="dashboard/subscription-report" element={<MemberSubscriptionReport />} />
-          <Route path="dashboard/StockAnalytics" element={<StockAnalytics />} />
-          <Route path="dashboard/financial-analysis" element={<FinancialDashboard />} />
-          <Route path="dashboard/subscription-analytics" element={<SubscriptionAnalytics />} />
-          <Route path="attendance-report/:staffId?" element={<StaffAttendanceReport />} />
-          <Route path="attendance-StaffSalaryReport" element={<StaffSalaryReport />} />
-          <Route path="AttendanceDashboard" element={<AttendanceDashboard />} />
           <Route path="EmployeeSubscriptionList" element={<EmployeeSubscriptionList />} />
 
-          {/* <Route path="StaffExpenses" element={<StaffExpenses />} /> */}
-          <Route path="/dashboard/staff-expenses" element={<StaffExpenses />} />
-          {/* <Route path="StaffIncomes" element={<StaffIncomes />} /> */}
-          <Route path="/dashboard/staff-incomes" element={<StaffIncomes />} />
+          {/* التقارير والتحليلات */}
+          <Route path="staff-reports" element={<UserList />} />
+          <Route path="attendance-report/:staffId?" element={<StaffAttendanceReport />} />
+          <Route path="attendance-StaffSalaryReport" element={<StaffSalaryReport />} />
+          <Route path="subscriptions/subscription-report" element={<MemberSubscriptionReport />} />
+          <Route path="subscriptions/subscription-analytics" element={<SubscriptionAnalytics />} />
+          <Route path="expense" element={<Expense />} />
+          <Route path="income-sources" element={<IncomeSources />} />
+          <Route path="dashboard/staff-expenses" element={<StaffExpenses />} />
+          <Route path="dashboard/staff-incomes" element={<StaffIncomes />} />
           <Route path="StaffExpenseTable" element={<StaffExpenseTable />} />
           <Route path="StaffIncomeTable" element={<StaffIncomeTable />} />
-          
+          <Route path="reports" element={<ReportsPage />} />
+          <Route path="dashboard/financial-analysis" element={<FinancialDashboard />} />
+          <Route path="dashboard/StockAnalytics" element={<StockAnalytics />} />
           <Route path="ChartsPage" element={<ChartsPage />} />
-
+          <Route path="manage-users" element={<ManageUsers />} />
+          <Route path="coach-profile/:coachId" element={<CoachProfile />} />
         </Route>
       </Routes>
     </div>
