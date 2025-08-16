@@ -270,24 +270,9 @@ def subscription_list(request):
                 request.query_params.get('start_date') or
                 request.query_params.get('end_date')):
             logger.info(f"No search criteria provided by user: {request.user.username}")
-            # return Response({'message': 'يرجى إدخال معايير البحث (اسم، رقم هاتف، RFID، حالة الاشتراك، معرف العضو، نوع الاشتراك، تاريخ البدء، أو تاريخ الانتهاء).'}, status=status.HTTP_400_BAD_REQUEST)
 
         subscriptions = Subscription.objects.select_related('member', 'type', 'club').filter(club=request.user.club.id)
 
-        # تحديد الوصول بناءً على الدور
-        if request.user.role not in ['owner', 'admin']:
-            filters = Q()
-            attendance = StaffAttendance.objects.filter(
-                staff=request.user, club=request.user.club, check_out__isnull=True
-            ).order_by('-check_in').first()
-
-            if attendance:
-                filters |= Q(
-                    created_by=request.user,
-                    start_date__gte=attendance.check_in,
-                    start_date__lte=attendance.check_out or timezone.now()
-                )
-            subscriptions = subscriptions.filter(filters)
 
         # إضافة فلتر افتراضي للمبالغ المتبقية إذا لم يتم تحديد status_param
         if not status_param:
@@ -384,6 +369,7 @@ def subscription_list(request):
         page = paginator.paginate_queryset(subscriptions, request)
         serializer = SubscriptionSerializer(page or subscriptions, many=True, context={'request': request})
         return paginator.get_paginated_response(serializer.data) if page else Response(serializer.data)
+
 
     if request.method == 'POST':
         mutable_data = request.data.copy()

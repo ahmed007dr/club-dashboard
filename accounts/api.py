@@ -380,6 +380,45 @@ def api_shift_reports(request):
 
     return Response(report_data, status=status.HTTP_200_OK)
 
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def staff_check_out_by_code(request):
+    """Handle staff check-out using RFID code."""
+    rfid_code = request.data.get('rfid_code')
+    if not rfid_code:
+        logger.error("RFID code not provided for check-out")
+        return Response({'error': 'معرف RFID مطلوب.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        user = User.objects.get(rfid_code=rfid_code, club=request.user.club)
+    except User.DoesNotExist:
+        logger.error(f"No user found with RFID code: {rfid_code} for club: {request.user.club}")
+        return Response({'error': 'المستخدم غير موجود أو غير مرتبط بهذا النادي.'}, status=status.HTTP_404_NOT_FOUND)
+    
+    attendance = StaffAttendance.objects.filter(
+        staff=user, club=request.user.club, check_out__isnull=True
+    ).order_by('-check_in').first()
+    
+    if not attendance:
+        logger.error(f"No active attendance found for user: {user.username}")
+        return Response({'error': 'لا يوجد سجل حضور نشط لهذا الموظف.'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    try:
+        attendance.check_out = timezone.now()
+        attendance.save(update_fields=['check_out'])
+        logger.info(f"Check-out successful for user: {user.username}, shift_id: {attendance.id}")
+        return Response({
+            'message': 'تم تسجيل الخروج بنجاح',
+            'shift_id': attendance.id,
+            'check_out': attendance.check_out.isoformat()
+        }, status=status.HTTP_200_OK)
+    except Exception as e:
+        logger.error(f"Error during check-out for user: {user.username}, error: {str(e)}", exc_info=True)
+        return Response({'error': 'حدث خطأ أثناء تسجيل الخروج.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def coach_list(request):

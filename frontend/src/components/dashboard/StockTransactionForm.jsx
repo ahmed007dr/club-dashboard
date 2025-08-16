@@ -37,7 +37,7 @@ const StockTransactionForm = ({ type, setShowModal, onSuccess }) => {
         if (!paymentMethodsResponse.ok) throw new Error("فشل في جلب طرق الدفع");
         const paymentMethodsData = await paymentMethodsResponse.json();
         setPaymentMethods(paymentMethodsData || []);
-        console.log("Payment methods response:", paymentMethodsData);
+        console.log("Payment methods response for club", user.club.id, ":", paymentMethodsData);
 
         if (incomeSources.length === 0) {
           setErrors({ general: "لا توجد مصادر إيرادات متاحة" });
@@ -48,7 +48,7 @@ const StockTransactionForm = ({ type, setShowModal, onSuccess }) => {
       }
     };
     fetchData();
-  }, [incomeSources]);
+  }, [incomeSources, user.club.id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -90,6 +90,12 @@ const StockTransactionForm = ({ type, setShowModal, onSuccess }) => {
       return;
     }
 
+    const selectedPaymentMethod = paymentMethods.find((method) => method.id.toString() === newItem.payment_method);
+    if (!selectedPaymentMethod) {
+      setErrors({ payment_method: "طريقة الدفع غير صالحة" });
+      return;
+    }
+
     const incomeData = {
       source: parseInt(newItem.source),
       amount: parseFloat(newItem.amount),
@@ -100,8 +106,11 @@ const StockTransactionForm = ({ type, setShowModal, onSuccess }) => {
       received_by: user.id,
     };
 
+    console.log("Sending income data:", incomeData);
+
     try {
-      await dispatch(addIncome(incomeData)).unwrap();
+      const response = await dispatch(addIncome(incomeData)).unwrap();
+      console.log("Income creation response:", response);
       toast.success("تم إضافة الإيراد بنجاح");
       setShowModal(false);
       setNewItem({

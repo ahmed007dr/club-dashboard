@@ -82,6 +82,7 @@ class IncomeSerializer(serializers.ModelSerializer):
     source_details = IncomeSourceSerializer(source='source', read_only=True)
     received_by_details = UserSerializer(source='received_by', read_only=True)
     stock_transaction_details = serializers.SerializerMethodField()
+    payment_method_name = serializers.CharField(source='payment_method.name', allow_null=True, read_only=True)
     date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S', read_only=True)
 
     class Meta:
@@ -89,7 +90,7 @@ class IncomeSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'club', 'club_details', 'source', 'source_details',
             'amount', 'description', 'date', 'received_by', 'received_by_details',
-            'stock_transaction', 'stock_transaction_details', 'quantity'
+            'stock_transaction', 'stock_transaction_details', 'quantity', 'payment_method_name'
         ]
 
     def get_stock_transaction_details(self, obj):
@@ -141,10 +142,11 @@ class IncomeSummarySerializer(serializers.ModelSerializer):
     date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')
     source_name = serializers.CharField(source='source.name', read_only=True)
     received_by_name = serializers.CharField(source='received_by.username', read_only=True)
+    payment_method_name = serializers.CharField(source='payment_method.name', allow_null=True, read_only=True)
 
     class Meta:
         model = Income
-        fields = ['id', 'amount', 'date', 'source', 'source_name', 'received_by', 'received_by_name']
+        fields = ['id', 'amount', 'date', 'source', 'source_name', 'received_by', 'received_by_name', 'payment_method_name']
 
 class ExpenseDetailSerializer(serializers.ModelSerializer):
     date = serializers.DateTimeField(format='%Y-%m-%d %H:%M:%S')

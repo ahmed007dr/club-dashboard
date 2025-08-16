@@ -93,7 +93,8 @@ class Income(models.Model):
     stock_transaction = models.ForeignKey('StockTransaction', on_delete=models.SET_NULL, null=True, blank=True)
     quantity = models.PositiveIntegerField(default=1)
     payment_method = models.ForeignKey(PaymentMethod, on_delete=models.SET_NULL, null=True, blank=True)
-    
+    # payment_method = models.ForeignKey(PaymentMethod, on_delete=models.PROTECT) 
+
     def __str__(self):
         return f"{self.source.name} - {self.amount}"
     

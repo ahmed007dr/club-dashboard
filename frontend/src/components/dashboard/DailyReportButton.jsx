@@ -40,6 +40,7 @@ const DailyReportButton = () => {
   const [error, setError] = useState('');
   const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
   const [currentShiftId, setCurrentShiftId] = useState(null);
+  const [paymentMethodsWarning, setPaymentMethodsWarning] = useState('');
 
   const { user } = useSelector((state) => state.auth || {});
   const userRole = user?.role;
@@ -96,6 +97,7 @@ const DailyReportButton = () => {
     setPreviewLoading(true);
     setError('');
     setReportData(null);
+    setPaymentMethodsWarning('');
     setIsErrorModalOpen(false);
     try {
       let params = {};
@@ -112,7 +114,13 @@ const DailyReportButton = () => {
       }
       const response = await api.get('finance/api/employee/daily-report/', { params });
       console.log('Daily Report Response:', response.data);
-      setReportData(response.data || {});
+      const data = response.data || {};
+      setReportData(data);
+      // Check if payment_methods are all "غير محدد"
+      if (data.payment_methods && data.payment_methods.every((method) => method.payment_method === 'غير محدد')) {
+        setPaymentMethodsWarning('جميع طرق الدفع غير محددة. الرجاء التحقق من بيانات الإيرادات.');
+        toast.warning('جميع طرق الدفع غير محددة');
+      }
       toast.success('تم تحميل التقرير بنجاح');
     } catch (error) {
       console.error('خطأ في جلب بيانات التقرير:', error);
@@ -242,6 +250,11 @@ const DailyReportButton = () => {
                 <AlertDescription>
                   سيتم إنشاء تقرير لورديتك الحالية فقط (من تسجيل الحضور حتى الآن).
                 </AlertDescription>
+              </Alert>
+            )}
+            {paymentMethodsWarning && (
+              <Alert className="bg-yellow-50 border-yellow-200 p-4 rounded-lg text-right text-sm text-yellow-800">
+                <AlertDescription>{paymentMethodsWarning}</AlertDescription>
               </Alert>
             )}
             <ReportActions
